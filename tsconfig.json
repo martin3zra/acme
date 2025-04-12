@@ -1,0 +1,25 @@
+{
+    "compilerOptions": {
+        "esModuleInterop": true,
+        "forceConsistentCasingInFileNames": true,
+        "strict": true,
+        "noImplicitAny": true,
+        "skipLibCheck": true,
+        "baseUrl": ".",
+        "jsx": "react-jsx",
+        "paths": {
+            "@/*": [
+                "resources/js/*"
+            ]
+        }
+    },
+    "include": [
+        "resources/js/**/*.ts",
+        "resources/js/**/*.d.ts",
+        "resources/js/**/*.tsx",
+    ],
+    "exclude": [
+        "node_modules",
+        "public/build"
+    ]
+}

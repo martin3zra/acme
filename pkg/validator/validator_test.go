@@ -1,0 +1,138 @@
+package validator_test
+
+import (
+	"context"
+	"database/sql"
+	"testing"
+
+	"github.com/martin3zra/acme/pkg/database"
+	"github.com/martin3zra/acme/pkg/validator"
+
+	_ "github.com/lib/pq"
+)
+
+type Person struct {
+	Name     string `json:"name,omitempty"`
+	LastName string `json:"last_name"`
+	Email    string `json:"email"`
+	Age      int    `json:"age"`
+}
+
+func (p Person) Rules() map[string]any {
+	return map[string]any{
+		"name":      "required|max:2",
+		"last_name": "required",
+		"email":     "required|email",
+		"age":       validator.Rule{}.Numeric().GreaterThan(18).Different(35).Max(55),
+	}
+}
+
+func TestNumericRule(t *testing.T) {
+	person := Person{
+		Name: "Jane",
+		Age:  25,
+	}
+	var validator = validator.Validator{}
+	validator.Validate(context.Background(), &person, map[string]any{
+		"name": "required|min:2|max:4",
+		"age":  "between:18,30",
+	})
+	if len(validator.Errors()) > 0 {
+		t.Errorf("validation fails:\n %v", validator.Errors())
+	}
+}
+
+func TestBetweenRule(t *testing.T) {
+	person := Person{
+		Age: 36,
+	}
+
+	var validator = validator.Validator{}
+	validator.Validate(context.Background(), &person, map[string]any{
+		"age": "between:32,40",
+	})
+	if len(validator.Errors()) > 0 {
+		t.Errorf("validation fails:\n %v", validator.Errors())
+	}
+}
+
+func TestRuleWithoutAttributes(t *testing.T) {
+	person := Person{
+		Email: "jane@example.com",
+	}
+
+	var validator = validator.Validator{}
+	validator.Validate(context.Background(), &person, map[string]any{
+		"email": "required|email",
+	})
+	if len(validator.Errors()) > 0 {
+		t.Errorf("validation fails:\n %v", validator.Errors())
+	}
+}
+
+func TestRuleSometimes(t *testing.T) {
+	person := Person{
+		Email: "jane@example.com",
+		Age:   20,
+	}
+
+	var validator = validator.Validator{}
+	validator.Validate(context.Background(), &person, map[string]any{
+		"email": "sometimes|email",
+		"age":   "required|gte:20",
+	})
+	if len(validator.Errors()) > 0 {
+		t.Errorf("validation fails:\n %v", validator.Errors())
+	}
+}
+
+func TestExistsRule(t *testing.T) {
+	person := Person{
+		Email: "martin3zra@gmail.com",
+	}
+
+	db, err := sql.Open("postgres", "host=localhost port=5433 dbname=acme user=postgres password=secret sslmode=disable")
+	if err != nil {
+		t.Fail()
+	}
+
+	err = db.Ping()
+	if err != nil {
+		panic(err)
+	}
+
+	ctx := context.WithValue(context.Background(), database.ConnectionKey{}, db)
+	var valid = validator.Validator{}
+	valid.Validate(ctx, &person, map[string]any{
+		"email": "required|email|exists:users",
+	})
+	if len(valid.Errors()) > 0 {
+		t.Errorf("validation fails:\n %v", valid.Errors())
+	}
+}
+
+func TestUniqueRule(t *testing.T) {
+	person := Person{
+		Email: "martin3zra@gmail.com",
+	}
+
+	db, err := sql.Open("postgres", "host=localhost port=5433 dbname=acme user=postgres password=secret sslmode=disable")
+	if err != nil {
+		t.Fail()
+	}
+
+	err = db.Ping()
+	if err != nil {
+		panic(err)
+	}
+
+	ctx := context.WithValue(context.Background(), database.ConnectionKey{}, db)
+	var valid = validator.Validator{}
+	valid.Ignore(1, "id")
+	valid.Validate(ctx, &person, map[string]any{
+		"email": "required|email|unique.ignore:users,email",
+	})
+	if len(valid.Errors()) > 0 {
+		t.Errorf("validation fails:\n %v", valid.Errors())
+	}
+}

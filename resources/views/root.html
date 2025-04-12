@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="csrf-token" content="{{.CSRFToken}}">
+    <link rel="icon" type="image/png" href="data:image/png;base64,iVBORw0KGgo=">
+
+    {{ .inertiaHead }}
+    {{ if .hmr }}
+    <script type="module" >
+        import RefreshRuntime from '{{ vite "@react-refresh" }}';
+        RefreshRuntime.injectIntoGlobalHook(window);
+        window.$RefreshReg$ = () => {};
+        window.$RefreshSig$ = () => (type) => type;
+        window.__vite_plugin_react_preamble_installed__ = true;
+    </script>
+    {{ end }}
+    <title>Acme</title>
+</head>
+<body class="font-sans antialiased">
+    {{ .inertia }}
+    <script type="module" src="{{ vite "resources/js/app.jsx" }}"></script>
+</body>
+</html>
