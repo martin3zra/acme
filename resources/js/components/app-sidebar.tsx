@@ -37,11 +37,11 @@ const data = {
       icon: IconDashboard,
       component: 'Home/Index',
     },
-    // {
-    //   title: "Lifecycle",
-    //   url: "#",
-    //   icon: IconListDetails,
-    // },
+    {
+      title: 'Invoices',
+      url: '/invoices',
+      icon: IconInnerShadowTop,
+    },
     // {
     //   title: "Analytics",
     //   url: "#",

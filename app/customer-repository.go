@@ -67,6 +67,37 @@ func (s *Server) findCustomers(companyID int) ([]*customer, error) {
 	return data, nil
 }
 
+func (s *Server) findCustomersBySearchCriteria(companyID int, term string) ([]*customer, error) {
+
+	rows, err := s.db.Query("SELECT c.id, c.name, c.contact_name, c.phone, c.email, c.amount_due "+
+		"FROM customers c "+
+		"INNER JOIN companies ON (c.company_id = companies.id) "+
+		"WHERE c.company_id = $1 "+
+		"AND c.name LIKE $2 "+
+		"AND c.deleted_at IS NULL AND c.status = 'enabled' LIMIT 5", companyID, "%"+term+"%")
+	if err != nil {
+		return nil, err
+	}
+	data := make([]*customer, 0)
+	for rows.Next() {
+		row := new(customer)
+		if err = rows.Scan(
+			&row.ID,
+			&row.Name,
+			&row.ContactName,
+			&row.Phone,
+			&row.Email,
+			&row.AmountDue,
+		); err != nil {
+			return data, err
+		}
+
+		data = append(data, row)
+	}
+
+	return data, nil
+}
+
 func (s *Server) storeCustomer(companyId int, form StoreCustomerForm) error {
 
 	_, err := s.db.Exec("INSERT INTO customers (company_id, name, contact_name, email, phone) "+

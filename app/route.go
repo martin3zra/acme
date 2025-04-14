@@ -43,6 +43,9 @@ func (s *Server) registerRoutes(guest, auth alice.Chain, inertia *gonertia.Inert
 	s.put("/items/{id}/change-status", auth.Then(s.changeStatusItemHandler(inertia)))
 	s.delete("/items/{id}", auth.Then(s.deleteItemHandler()))
 
+	s.get("/invoices", auth.Then(s.invoicesHandler(inertia)))
+	s.get("/invoices/create", auth.Then(s.createInvoiceHandler(inertia)))
+
 	uiAssets := foundation.GetBuildAssets(s.assets, "public/build")
 	s.mux.Handle("/", http.FileServer(http.FS(uiAssets)))
 

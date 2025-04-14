@@ -78,6 +78,10 @@ export interface Unit {
     name: string;
 }
 
+export interface Invoice {
+    id: number;
+}
+
 export interface BreadcrumbItem {
     title: string;
     href: string;

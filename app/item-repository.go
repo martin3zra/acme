@@ -88,6 +88,34 @@ func (s *Server) findItems(companyID int) ([]*item, error) {
 	return data, nil
 }
 
+func (s *Server) findItemsByReference(companyID int, term string) (*item, error) {
+	result := s.db.QueryRow("SELECT i.id, i.name, i.price, i.description, i.tax_id, t.name, t.rate, "+
+		"iu.unit_id, iu.name as unit_name "+
+		"FROM items i "+
+		"INNER JOIN taxes t ON(i.company_id = t.company_id AND i.tax_id = t.id) "+
+		"LEFT JOIN LATERAL (SELECT iu.unit_id, u.name FROM items_units iu INNER JOIN units u ON (iu.unit_id = u.id) WHERE iu.item_id = i.id limit 1) iu ON true "+
+		"WHERE i.company_id = $1 AND i.name = $2 AND i.deleted_at IS NULL", companyID, term)
+	if result.Err() != nil {
+		return nil, result.Err()
+	}
+
+	i := new(item)
+	if err := result.Scan(
+		&i.ID,
+		&i.Name,
+		&i.Price,
+		&i.Description,
+		&i.Tax.ID,
+		&i.Tax.Name,
+		&i.Tax.Rate,
+		&i.Unit.ID,
+		&i.Unit.Name,
+	); err != nil {
+		return nil, err
+	}
+	return i, nil
+}
+
 func (s *Server) storeItem(companyID int, form StoreItemForm) error {
 	tx, err := s.db.Begin()
 	if err != nil {
