@@ -5,13 +5,14 @@ import { Label } from '@/components/ui/label';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { useNumber } from '@/composables/use-number';
 import { useDebounced } from '@/hooks/use-debounced';
+import { useLocalStorage } from '@/hooks/use-local-storage';
 import AuthenticatedLayout from '@/layouts/authenticated-layout';
 import { cn } from '@/lib/utils';
 import { BreadcrumbItem, Customer, Item, PageProps } from '@/types';
 import { router } from '@inertiajs/react';
 import { format } from 'date-fns';
 import { CalendarIcon, User, UserPlus, XCircleIcon } from 'lucide-react';
-import React, { useEffect } from 'react';
+import React, { useCallback, useEffect } from 'react';
 
 const breadcrumbs: BreadcrumbItem[] = [
   {
@@ -28,23 +29,78 @@ const breadcrumbs: BreadcrumbItem[] = [
   },
 ];
 
-// SET UP THE POST FORM REQUEST WITH INERTIA.
-type IvoiceItemForm = {
-  id: number;
-  quantity: number;
+type HeaderForm = {
+  customer: Customer | undefined;
+  date: Date | undefined;
+  terms: string | undefined;
+  notes: string | undefined;
 };
+
+interface LineForm extends Item {
+  quantity: number;
+  amount: number;
+}
+
+type InvoiceForm = {
+  header: HeaderForm;
+  lines: LineForm[];
+};
+
+// const InvoiceItems: InvoiceItemForm[] = [];
 
 export default function Create({ auth, customers, item }: PageProps<{ customers: Customer[]; item: Item }>) {
   const currency = useNumber().currency;
   const [open, setOpen] = React.useState(false);
-  const [customer, setCustomer] = React.useState<Customer | undefined>(undefined);
-  const [date, sethate] = React.useState<Date>();
+  const [isEditing, setEditing] = React.useState(false);
+
+  const referenceInputRef = React.useRef<HTMLInputElement>(null);
+  const qtyInputRef = React.useRef<HTMLInputElement>(null);
+  const addButtonRef = React.useRef<HTMLButtonElement>(null);
+  // const [date, setDate] = React.useState<Date>();
   const [search, setSearch] = React.useState('');
   const dedbouncedSearch = useDebounced(search, 500);
   const [amount, setAmount] = React.useState(0);
+  const { setItem: storageInvoiceForm, getItem: getStorageInvoiceForm, removeItem } = useLocalStorage('invoice');
+  const [invoiceForm, setInvoiceForm] = React.useState<InvoiceForm>(() => {
+    return getStorageInvoiceForm() || { header: { customer: undefined, date: undefined, terms: undefined, notes: undefined }, lines: [] };
+  });
+  const [currenItem, setCurrentItem] = React.useState<Item | undefined>(undefined);
 
-  const qtyInputRef = React.useRef<HTMLInputElement>(null);
-  const addButtonRef = React.useRef<HTMLButtonElement>(null);
+  // const { headers } = useHeader();
+
+  // const { data, setData, post, errors, reset, processing } = useForm<Required<IvoiceItemForm>>({
+  //   id: item?.id || 0,
+  //   quantity: 1,
+  // });
+
+  const computedCurrentItemAmount = (qty: number) => {
+    setAmount(qty * (currenItem?.price || 0));
+  };
+
+  useEffect(() => setCurrentItem(item), [item]);
+
+  const findCurrentItem = useCallback(() => {
+    const exists = (element: LineForm) => element.id === currenItem?.id;
+    const index = invoiceForm.lines.findIndex(exists);
+    if (index >= 0) {
+      setEditing(true);
+      const line = invoiceForm.lines[index];
+      setCurrentItem(line);
+      qtyInputRef.current!.value = line.quantity.toString();
+      setAmount(line.amount);
+    }
+  }, [currenItem, invoiceForm.lines]);
+
+  useEffect(() => {
+    if (currenItem) {
+      findCurrentItem();
+      qtyInputRef.current?.focus();
+    }
+  }, [currenItem, findCurrentItem]);
+
+  useEffect(() => {
+    storageInvoiceForm(invoiceForm);
+  }, [invoiceForm, storageInvoiceForm]);
 
   useEffect(() => {
     const searchCustomer = () => {
@@ -62,7 +118,9 @@ export default function Create({ auth, customers, item }: PageProps<{ customers:
       only: ['item'],
       data: { search },
       preserveUrl: true,
-      onSuccess: () => qtyInputRef.current?.focus(),
+      onSuccess: () => {
+        qtyInputRef.current!.value = '1';
+      },
     });
   };
 
@@ -88,18 +146,65 @@ export default function Create({ auth, customers, item }: PageProps<{ customers:
   };
 
   const handleDoneButtonClick = (event: React.MouseEvent<HTMLButtonElement>) => {
-    console.log('Done button clicked', event);
-  };
-  const handleQtyChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const value = event.target.value;
-    if (value === '' || /^[0-9]*$/.test(value)) {
-      // Allow only numbers or empty input
-      event.target.value = value;
+    event.preventDefault();
+    const line = currenItem!;
+
+    if (isEditing) {
+      const index = invoiceForm.lines.findIndex((element: LineForm) => element.id === line.id);
+      if (index >= 0) {
+        invoiceForm.lines[index].quantity = qtyInputRef.current?.valueAsNumber || 0;
+        invoiceForm.lines[index].amount = amount;
+      }
+      setEditing(false);
     } else {
-      // Prevent any other characters
-      event.preventDefault();
+      // When searching for the current item, if exists on the invoice, then display current values, and update the quantity
+      invoiceForm.lines.push({ ...line, quantity: qtyInputRef.current?.valueAsNumber || 0, amount });
     }
-    setAmount((parseFloat(value) || 0) * (item?.price || 0));
+    setInvoiceForm(() => {
+      return { ...invoiceForm, lines: [...invoiceForm.lines] };
+    });
+
+    resetInvoiceFormInput();
+  };
+
+  const resetInvoiceFormInput = () => {
+    setCurrentItem(undefined);
+    setAmount(0);
+    referenceInputRef.current!.value = '';
+    qtyInputRef.current!.value = '';
+    referenceInputRef.current?.focus();
+  };
+
+  const handleQtyChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    computedCurrentItemAmount(event.target.valueAsNumber);
+  };
+
+  const handleCustomerSelection = (event: React.MouseEvent<HTMLButtonElement>, customer: Customer | undefined) => {
+    event.preventDefault();
+
+    setInvoiceForm(() => {
+      return { ...invoiceForm, header: { ...invoiceForm.header, customer } };
+    });
+
+    setOpen(false);
+  };
+
+  const handleDateChange = (date: unknown) => {
+    invoiceForm.header.date = date as Date;
+    setInvoiceForm(() => {
+      return { ...invoiceForm, header: { ...invoiceForm.header, date: date as Date } };
+    });
+  };
+
+  const handleRemoveLine = (event: React.MouseEvent<HTMLButtonElement>) => {
+    event.preventDefault();
+    // add confirmation screen here.
+    const index = parseInt(event.currentTarget.dataset.index || '-1');
+    if (index < 0) return;
+    const newItems = invoiceForm.lines.filter((_, i) => i !== index);
+    setInvoiceForm(() => {
+      return { ...invoiceForm, lines: newItems };
+    });
   };
 
   return (
@@ -107,7 +212,7 @@ export default function Create({ auth, customers, item }: PageProps<{ customers:
       <div className="grid h-full w-full grid-cols-12 grid-rows-[auto_1fr_auto] gap-y-4">
         <div className="z-50 col-span-12 grid h-60 grid-cols-2 gap-x-6">
           <div className="rounded-lg bg-white shadow">
-            {!open && !customer && (
+            {!open && !invoiceForm.header.customer && (
               <button onClick={() => setOpen(!open)} className="flex h-full w-full cursor-pointer items-center justify-center gap-2">
                 <div className="flex size-10 items-center justify-center rounded-full bg-gray-200">
                   <User className="size-6" color="white" />
@@ -115,20 +220,20 @@ export default function Create({ auth, customers, item }: PageProps<{ customers:
                 <div className="text-lg">Customer</div>
               </button>
             )}
-            {customer && (
+            {invoiceForm.header.customer && (
               <div className="flex h-full flex-col overflow-y-hidden p-2">
                 <div className="flex w-full items-center justify-between">
-                  <div>{customer?.name}</div>
-                  <div onClick={() => setCustomer(undefined)} className="cursor-pointer p-1">
+                  <div>{invoiceForm.header.customer?.name}</div>
+                  <button onClick={(event) => handleCustomerSelection(event, undefined)} className="cursor-pointer p-1">
                     <XCircleIcon />
-                  </div>
+                  </button>
                 </div>
-                <div>{customer?.email}</div>
-                <div>{customer?.phone}</div>
+                <div>{invoiceForm.header.customer?.email}</div>
+                <div>{invoiceForm.header.customer?.phone}</div>
                 <div>Address here!!!</div>
               </div>
             )}
-            {open && !customer && (
+            {open && !invoiceForm.header.customer && (
               <div className="flex h-full min-h-48 grow flex-col justify-start shadow">
                 <div className="w-full border-b border-gray-200 p-2">
                   <Input
@@ -145,10 +250,7 @@ export default function Create({ auth, customers, item }: PageProps<{ customers:
                       <button
                         key={customer.id}
                         className="flex w-full cursor-pointer items-center justify-start gap-2 rounded-lg p-2 hover:bg-gray-100"
-                        onClick={() => {
-                          setCustomer(customer);
-                          setOpen(false);
-                        }}
+                        onClick={(event) => handleCustomerSelection(event, customer)}
                       >
                         <div className="flex size-10 items-center justify-center rounded-full bg-gray-200">
                           <User className="size-6" color="white" />
@@ -179,17 +281,26 @@ export default function Create({ auth, customers, item }: PageProps<{ customers:
               <Label htmlFor="date">Date</Label>
               <Popover>
                 <PopoverTrigger asChild>
-                  <Button variant={'outline'} className={cn('w-[280px] justify-start text-left font-normal', !date && 'text-muted-foreground')}>
+                  <Button
+                    variant={'outline'}
+                    className={cn('w-[280px] justify-start text-left font-normal', !invoiceForm.header.date && 'text-muted-foreground')}
+                  >
                     <CalendarIcon />
-                    {date ? format(date, 'PPP') : <span>Pick a date</span>}
+                    {invoiceForm.header.date ? format(invoiceForm.header.date, 'PPP') : <span>Pick a date</span>}
                   </Button>
                 </PopoverTrigger>
                 <PopoverContent className="w-auto p-0">
-                  <Calendar mode="single" defaultMonth={date} selected={date} onSelect={sethate} initialFocus />
+                  <Calendar
+                    mode="single"
+                    defaultMonth={invoiceForm.header.date}
+                    selected={invoiceForm.header.date}
+                    onSelect={handleDateChange}
+                    initialFocus
+                  />
                 </PopoverContent>
               </Popover>
             </div>
-            <div className="col-span-6">Hey2</div>
+            <div className="col-span-6"></div>
           </div>
         </div>
         <div className="col-span-12">
@@ -198,32 +309,48 @@ export default function Create({ auth, customers, item }: PageProps<{ customers:
               <thead>
                 <tr>
                   <th scope="col" className="w-60 border border-gray-300">
-                    <Input name="reference" placeholder="Item reference" onKeyDown={handleKeyDown} className="" tabIndex={0} />
+                    <Input
+                      name="reference"
+                      ref={referenceInputRef}
+                      data-reset={false}
+                      placeholder="Item reference"
+                      onKeyDown={handleKeyDown}
+                      className=""
+                      tabIndex={0}
+                    />
                   </th>
                   <th scope="col" className="w-auto border border-gray-300">
-                    <Label>{item?.description}</Label>
+                    <Label>{currenItem?.description}</Label>
                   </th>
                   <th scope="col" className="w-36 border border-gray-300">
                     <Input
                       type="number"
                       min={1}
-                      defaultValue={1}
+                      // defaultValue={currenItem?.quantity || 0}
                       name="quantity"
                       className=""
                       tabIndex={1}
                       ref={qtyInputRef}
+                      onFocus={(e) => computedCurrentItemAmount(e.currentTarget.valueAsNumber)}
                       onChange={handleQtyChange}
                       onKeyDown={handleKeyDown}
                     />
                   </th>
                   <th scope="col" className="w-36 border border-gray-300 bg-red-100 text-end">
-                    <Label className="block">{currency(item?.price || 0)}</Label>
+                    <Label className="block">{currency(currenItem?.price || 0)}</Label>
                   </th>
                   <th scope="col" className="w-36 border border-gray-300 text-end">
                     {amount > 0 ? currency(amount) : ''}
                   </th>
                   <th scope="col" className="w-6 border border-gray-300 text-end">
-                    <Button tabIndex={2} ref={addButtonRef} onKeyDown={handleDoneButtonKeyPress} onClick={handleDoneButtonClick}>
+                    <Button
+                      tabIndex={2}
+                      ref={addButtonRef}
+                      onKeyDown={handleDoneButtonKeyPress}
+                      onClick={handleDoneButtonClick}
+                      // disabled={processing}
+                      className="h-8 w-8 rounded-full p-0"
+                    >
                       +
                     </Button>
                   </th>
@@ -251,6 +378,23 @@ export default function Create({ auth, customers, item }: PageProps<{ customers:
                   <th scope="col" className="w-6 gap-2 border border-gray-300 px-5 text-end whitespace-nowrap"></th>
                 </tr>
               </thead>
+              <tbody>
+                {invoiceForm.lines &&
+                  invoiceForm.lines.map((line, index) => (
+                    <tr key={index}>
+                      <td className="border border-gray-300 text-start">{line.name}</td>
+                      <td className="border border-gray-300 text-start">{line.description}</td>
+                      <td className="border border-gray-300 text-end">{line.quantity}</td>
+                      <td className="border border-gray-300 text-end">{currency(line.price || 0)}</td>
+                      <td className="border border-gray-300 text-end">{currency(line.amount || 0)}</td>
+                      <td className="border border-gray-300 text-end">
+                        <Button variant={'link'} size={'icon'} className="h-8 w-8 rounded-full p-0" data-index={index} onClick={handleRemoveLine}>
+                          <XCircleIcon />
+                        </Button>
+                      </td>
+                    </tr>
+                  ))}
+              </tbody>
             </table>
           </div>
         </div>

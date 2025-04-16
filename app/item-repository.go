@@ -18,7 +18,7 @@ type item struct {
 		ID   *int    `json:"id"`
 		Name *string `json:"name"`
 	} `json:"unit"`
-	Status foundation.Status `json:"status"`
+	Status foundation.Status `json:"status,omitempty"`
 	// Add timestamps properties
 	foundation.Timestamps
 }
