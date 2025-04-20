@@ -62,7 +62,7 @@ export function eventbus<E extends EventMap>(config?: {
 
 // Sample
 // interface MyBus {
-//   'on-event-1': (payload: { data: unknow }) => void
+//   'on-event-1': (payload: { data: unknown }) => void
 // }
 
 // const myBus = eventbus<MyBus>()

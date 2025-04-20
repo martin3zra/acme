@@ -1,3 +1,4 @@
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
 import { Calendar } from '@/components/ui/calendar';
 import { Input } from '@/components/ui/input';
@@ -48,9 +49,12 @@ type InvoiceForm = {
 
 // const InvoiceItems: InvoiceItemForm[] = [];
 
+const defaultInvoiceForm: InvoiceForm = { header: { customer: undefined, date: undefined, terms: undefined, notes: undefined }, lines: [] }
+
 export default function Create({ auth, customers, item }: PageProps<{ customers: Customer[]; item: Item }>) {
   const currency = useNumber().currency;
   const [open, setOpen] = React.useState(false);
+  const [openCancelConfirmation, setCancelConfirmation] = React.useState(false);
   const [isEditing, setEditing] = React.useState(false);
 
   const referenceInputRef = React.useRef<HTMLInputElement>(null);
@@ -60,9 +64,9 @@ export default function Create({ auth, customers, item }: PageProps<{ customers:
   const [search, setSearch] = React.useState('');
   const dedbouncedSearch = useDebounced(search, 500);
   const [amount, setAmount] = React.useState(0);
-  const { setItem: storageInvoiceForm, getItem: getStorageInvoiceForm, removeItem } = useLocalStorage('invoice');
+  const { setItem: storageInvoiceForm, getItem: getStorageInvoiceForm, removeItem: removeStorageIvoinceForm } = useLocalStorage('invoice');
   const [invoiceForm, setInvoiceForm] = React.useState<InvoiceForm>(() => {
-    return getStorageInvoiceForm() || { header: { customer: undefined, date: undefined, terms: undefined, notes: undefined }, lines: [] };
+    return getStorageInvoiceForm() || defaultInvoiceForm;
   });
   const [currenItem, setCurrentItem] = React.useState<Item | undefined>(undefined);
 
@@ -98,9 +102,11 @@ export default function Create({ auth, customers, item }: PageProps<{ customers:
     }
   }, [currenItem, findCurrentItem]);
 
-  useEffect(() => {
-    storageInvoiceForm(invoiceForm);
-  }, [invoiceForm, storageInvoiceForm]);
+  const synInvoiceForm = useCallback(() => {
+    storageInvoiceForm(invoiceForm)
+  }, [invoiceForm])
+
+  useEffect(() => synInvoiceForm(), [invoiceForm]);
 
   useEffect(() => {
     const searchCustomer = () => {
@@ -207,8 +213,27 @@ export default function Create({ auth, customers, item }: PageProps<{ customers:
     });
   };
 
+  const handleCheckout = (event: React.MouseEvent<HTMLButtonElement>) => {
+    event.preventDefault();
+  }
+
+  const performInvoiceCancelation = (event: React.MouseEvent<HTMLButtonElement>) => {
+    event.preventDefault();
+    removeStorageIvoinceForm();
+    router.get('/invoices')
+  }
+
+  const composeSubTotal = invoiceForm.lines.reduce((acc, line) => {
+      return acc + line.amount;
+    }, 0);
   return (
     <AuthenticatedLayout user={auth.user} breadcrumbs={breadcrumbs}>
+      <AuthenticatedLayout.Actions>
+        <div className='flex justify-end gap-x-6'>
+          <Button variant={"secondary"} onClick={() => setCancelConfirmation(true)}>Cancel</Button>
+          <Button onClick={handleCheckout}>Checkout</Button>
+        </div>
+      </AuthenticatedLayout.Actions>
       <div className="grid h-full w-full grid-cols-12 grid-rows-[auto_1fr_auto] gap-y-4">
         <div className="z-50 col-span-12 grid h-60 grid-cols-2 gap-x-6">
           <div className="rounded-lg bg-white shadow">
@@ -398,7 +423,48 @@ export default function Create({ auth, customers, item }: PageProps<{ customers:
             </table>
           </div>
         </div>
-        <div className="col-span-12 min-h-48 bg-yellow-500">Footer</div>
+        <div className="col-span-12 min-h-48 bg-yellow-500">
+          <div className='flex flex-col gap-y-2'>
+            <div className='grid grid-cols-12'>
+              <div className="col-span-6 flex flex-col gap-y-2">Notes</div>
+              <div className="col-span-6 flex flex-col gap-y-2">
+                <div className='grid place-content-end bg-indigo-300'>
+                  <div className='flex justify-between items-center w-60 bg-green-100'>
+                    <span className="block text-base">Subtotal</span>
+                    <span className="block text-base">{currency(composeSubTotal)}</span>
+                  </div>
+                  <div className='flex justify-between items-center w-60 bg-green-100'>
+                    <span className="block text-base">Discount</span>
+                    <span className="block text-base">$0.00</span>
+                  </div>
+                  <div className='flex justify-between items-center w-60 bg-green-100'>
+                    <span className="block text-base">Tax</span>
+                    <span className="block text-base">$0.00</span>
+                  </div>
+                  <div className='flex justify-between items-center w-60 bg-green-100'>
+                    <span className="block text-xl">Total</span>
+                    <span className="block text-xl">{currency(composeSubTotal)}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <AlertDialog open={openCancelConfirmation} onOpenChange={setCancelConfirmation}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+              <AlertDialogDescription>
+                This action cannot be undone. This will permanently delete your
+                account and remove your data from our servers.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogAction onClick={performInvoiceCancelation}>Continue</AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </div>
 
       {/* Command to search for customers */}
