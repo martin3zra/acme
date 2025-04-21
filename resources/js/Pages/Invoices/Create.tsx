@@ -226,6 +226,14 @@ export default function Create({ auth, customers, item }: PageProps<{ customers:
   const composeSubTotal = invoiceForm.lines.reduce((acc, line) => {
       return acc + line.amount;
     }, 0);
+
+  const composeTax = invoiceForm.lines.reduce((acc, line) => {
+    const discount = 0
+    const itemWithDiscount = line.price - (line.price * (discount / 100)) * line.quantity;
+    const tax = itemWithDiscount * (line.tax.rate / 100);
+    // const amount = line.price * line.quantity;
+    return acc + (tax * line.quantity);
+  }, 0);
   return (
     <AuthenticatedLayout user={auth.user} breadcrumbs={breadcrumbs}>
       <AuthenticatedLayout.Actions>
@@ -439,7 +447,7 @@ export default function Create({ auth, customers, item }: PageProps<{ customers:
                   </div>
                   <div className='flex justify-between items-center w-60 bg-green-100'>
                     <span className="block text-base">Tax</span>
-                    <span className="block text-base">$0.00</span>
+                    <span className="block text-base">{currency(composeTax)}</span>
                   </div>
                   <div className='flex justify-between items-center w-60 bg-green-100'>
                     <span className="block text-xl">Total</span>
@@ -455,8 +463,8 @@ export default function Create({ auth, customers, item }: PageProps<{ customers:
             <AlertDialogHeader>
               <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
               <AlertDialogDescription>
-                This action cannot be undone. This will permanently delete your
-                account and remove your data from our servers.
+                This action cannot be undone. This will permanently delete this
+                invoice and remove the data from our servers.
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
