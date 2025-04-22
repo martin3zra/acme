@@ -1,9 +1,10 @@
 import HeadingSmall from '@/components/heading-small';
 import { Button } from '@/components/ui/button';
 import AuthenticatedLayout from '@/layouts/authenticated-layout';
-import { BreadcrumbItem, Invoice, PageProps } from '@/types';
+import { BreadcrumbItem, Invoice, PageProps, Verb } from '@/types';
 import { Link } from '@inertiajs/react';
 import { Plus } from 'lucide-react';
+import { List } from './List/Index';
 
 const breadcrumbs: BreadcrumbItem[] = [
   {
@@ -17,6 +18,8 @@ const breadcrumbs: BreadcrumbItem[] = [
 ];
 export default function Index({ auth, invoices }: PageProps<{ invoices: Invoice[] }>) {
   const hasInvoices = invoices.length > 0;
+
+   const onSelectInvoice = (invoice: Invoice, action: Verb): void => {}
 
   return (
     <AuthenticatedLayout user={auth.user} breadcrumbs={breadcrumbs}>
@@ -48,6 +51,8 @@ export default function Index({ auth, invoices }: PageProps<{ invoices: Invoice[
             </div>
           </>
         )}
+
+        {hasInvoices && <List data={invoices} onSelectInvoice={onSelectInvoice} />}
       </div>
     </AuthenticatedLayout>
   );

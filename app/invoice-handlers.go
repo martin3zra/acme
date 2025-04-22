@@ -11,9 +11,15 @@ import (
 
 func (s *Server) invoicesHandler(i *inertia.Inertia) http.Handler {
 	fn := func(w http.ResponseWriter, r *http.Request) {
+		user := auth.User(r.Context())
+		invoices, err := s.findInvoices(*user.CurrentCompanyId)
+		if err != nil {
+			s.handleError(w, err)
+			return
+		}
 
-		err := i.Render(w, r, "Invoices/Index", inertia.Props{
-			"invoices": map[string]any{},
+		err = i.Render(w, r, "Invoices/Index", inertia.Props{
+			"invoices": invoices,
 		})
 		if err != nil {
 			s.handleError(w, err)

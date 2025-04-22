@@ -80,6 +80,10 @@ export interface Unit {
 
 export interface Invoice {
     id: number;
+    number: string;
+    customer: Customer
+    status: string
+    paid_status: string
 }
 
 export interface BreadcrumbItem {

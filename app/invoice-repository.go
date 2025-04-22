@@ -4,7 +4,61 @@ import (
 	"database/sql"
 	"log"
 	"strconv"
+	"time"
+
+	"github.com/martin3zra/acme/pkg/foundation"
 )
+
+type invoice struct {
+	ID         int        `json:"id"`
+	Number     string     `json:"number"`
+	Customer   customer   `json:"customer"`
+	Date       time.Time  `json:"date"`
+	Amount     float64    `json:"amount"`
+	Tax        float64    `json:"tax"`
+	Status     string     `json:"status"`
+	PaidStatus PaidStatus `json:"paid_status"`
+}
+
+func (s *Server) findInvoices(companyId int) ([]*invoice, error) {
+	rows, err := s.db.Query("SELECT invoices.id, invoices.date, invoices.amount, invoices.tax, invoices.status, invoices.paid_status, "+
+		"customers.id as customer, customers.name, customers.email, customers.phone "+
+		"FROM invoices "+
+		"INNER JOIN companies ON (invoices.company_id = companies.id) "+
+		"INNER JOIN customers ON (invoices.company_id = customers.company_id AND invoices.customer_id = customers.id) "+
+		"WHERE invoices.company_id = $1", companyId)
+	if err != nil {
+		return nil, err
+	}
+	data := make([]*invoice, 0)
+	for rows.Next() {
+		i := new(invoice)
+
+		if err = rows.Scan(
+			&i.ID,
+			&i.Date,
+			&i.Amount,
+			&i.Tax,
+			&i.Status,
+			&i.PaidStatus,
+			&i.Customer.ID,
+			&i.Customer.Name,
+			&i.Customer.Email,
+			&i.Customer.Phone,
+		); err != nil {
+			return nil, err
+		}
+
+		i.Number = s.generatePrefixedInvoiceNumber(i.ID)
+
+		data = append(data, i)
+	}
+	return data, nil
+}
+
+func (s *Server) generatePrefixedInvoiceNumber(value int) string {
+	return foundation.GeneratePrefixedNumber("INV-", 10, value)
+}
 
 func (s *Server) storeInvoice(companyID int, form StoreInvoiceForm) error {
 
