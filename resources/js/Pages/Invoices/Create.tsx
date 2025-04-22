@@ -281,7 +281,10 @@ export default function Create({ auth, customers, item }: PageProps<{ customers:
         return { id: line.id, quantity: line.quantity, price: line.price, rate: line.tax.rate}
       })
     }))
-    post('/invoices', {...headers})
+    post('/invoices', {...headers, onSuccess: () => {
+      removeStorageIvoinceForm();
+      router.get('/invoices')
+    }})
   }
 
   const composeSubTotal = invoiceForm.lines.reduce((acc, line) => {
@@ -300,7 +303,7 @@ export default function Create({ auth, customers, item }: PageProps<{ customers:
       <AuthenticatedLayout.Actions>
         <div className='flex justify-end gap-x-6'>
           <Button variant={"secondary"} onClick={() => setCancelConfirmation(true)}>Cancel</Button>
-          <Button onClick={handleCheckout}>Checkout</Button>
+          <Button onClick={handleCheckout} disabled={processing}>Checkout</Button>
         </div>
       </AuthenticatedLayout.Actions>
       <div className="grid h-full w-full grid-cols-12 grid-rows-[auto_1fr_auto] gap-y-4">
