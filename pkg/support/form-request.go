@@ -10,6 +10,7 @@ import (
 
 type FormRequestContract interface {
 	PrepareForValidation()
+	PassedValidation()
 	Authorize() bool
 	Validate(object any, rules map[string]any, prepareForValidation func()) validator.Validator
 	Rules() map[string]any
@@ -70,8 +71,11 @@ func (f *FormRequest) Rules() map[string]any {
 	return map[string]any{}
 }
 
-func (f *FormRequest) Authorize() bool       { return true }
+func (f *FormRequest) Authorize() bool { return true }
+
 func (f *FormRequest) PrepareForValidation() {}
+
+func (f *FormRequest) PassedValidation() {}
 
 func (f *FormRequest) PassesAuthorization() bool { return true }
 

@@ -43,6 +43,8 @@ func ParseRequest(r *http.Request, params any) error {
 			return errors.New(toJSON(errorMesssages))
 		}
 
+		formRequest.PassedValidation()
+
 		return nil
 	}
 

@@ -1,6 +1,11 @@
 package app
 
-import "github.com/martin3zra/acme/pkg/foundation"
+import (
+	"database/sql"
+	"log"
+
+	"github.com/martin3zra/acme/pkg/foundation"
+)
 
 type customer struct {
 	ID          int     `json:"id"`
@@ -140,4 +145,19 @@ func (s *Server) toggleCustomerStatus(companyID int, customer *customer) error {
 		companyID, customer.ID, status,
 	)
 	return err
+}
+
+func (s *Server) updateCustomerAmountDue(tx *sql.Tx, companyId, customerId int, amountDue float64) error {
+
+	_, err := tx.Exec("UPDATE customers SET amount_due = amount_due + $3 WHERE company_id = $1 AND id = $2",
+		companyId, customerId, amountDue,
+	)
+	if err != nil {
+		if txErr := tx.Rollback(); txErr != nil {
+			log.Fatalf("Error updating customer amount due: %v", txErr)
+			return txErr
+		}
+	}
+
+	return nil
 }

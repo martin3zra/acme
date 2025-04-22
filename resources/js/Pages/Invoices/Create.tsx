@@ -4,13 +4,16 @@ import { Calendar } from '@/components/ui/calendar';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet';
+import { useHeader } from '@/composables/use-headers';
 import { useNumber } from '@/composables/use-number';
 import { useDebounced } from '@/hooks/use-debounced';
 import { useLocalStorage } from '@/hooks/use-local-storage';
 import AuthenticatedLayout from '@/layouts/authenticated-layout';
 import { cn } from '@/lib/utils';
 import { BreadcrumbItem, Customer, Item, PageProps } from '@/types';
-import { router } from '@inertiajs/react';
+import { router, useForm } from '@inertiajs/react';
 import { format } from 'date-fns';
 import { CalendarIcon, User, UserPlus, XCircleIcon } from 'lucide-react';
 import React, { useCallback, useEffect } from 'react';
@@ -30,10 +33,26 @@ const breadcrumbs: BreadcrumbItem[] = [
   },
 ];
 
+type paymentTerm = {
+  value: number
+  label: string
+}
+
+const paymentTerms: paymentTerm[] = [
+  {value: 1, label: "Cash"},
+  {value: 7, label: "7 Days"},
+  {value: 10, label: "10 Days"},
+  {value: 15, label: "15 Days"},
+  {value: 30, label: "30 Days"},
+  {value: 60, label: "60 Days"},
+  {value: 90, label: "90 Days"},
+]
+
 type HeaderForm = {
   customer: Customer | undefined;
   date: Date | undefined;
-  terms: string | undefined;
+  due: Date | undefined;
+  terms: number;
   notes: string | undefined;
 };
 
@@ -47,20 +66,18 @@ type InvoiceForm = {
   lines: LineForm[];
 };
 
-// const InvoiceItems: InvoiceItemForm[] = [];
-
-const defaultInvoiceForm: InvoiceForm = { header: { customer: undefined, date: undefined, terms: undefined, notes: undefined }, lines: [] }
+const defaultInvoiceForm: InvoiceForm = { header: { customer: undefined, date: undefined, due: undefined, terms: 0, notes: undefined }, lines: [] }
 
 export default function Create({ auth, customers, item }: PageProps<{ customers: Customer[]; item: Item }>) {
   const currency = useNumber().currency;
   const [open, setOpen] = React.useState(false);
   const [openCancelConfirmation, setCancelConfirmation] = React.useState(false);
+  const [openCheckout, setCheckout] = React.useState(false);
   const [isEditing, setEditing] = React.useState(false);
 
   const referenceInputRef = React.useRef<HTMLInputElement>(null);
   const qtyInputRef = React.useRef<HTMLInputElement>(null);
   const addButtonRef = React.useRef<HTMLButtonElement>(null);
-  // const [date, setDate] = React.useState<Date>();
   const [search, setSearch] = React.useState('');
   const dedbouncedSearch = useDebounced(search, 500);
   const [amount, setAmount] = React.useState(0);
@@ -70,12 +87,12 @@ export default function Create({ auth, customers, item }: PageProps<{ customers:
   });
   const [currenItem, setCurrentItem] = React.useState<Item | undefined>(undefined);
 
-  // const { headers } = useHeader();
+  const { headers } = useHeader();
 
-  // const { data, setData, post, errors, reset, processing } = useForm<Required<IvoiceItemForm>>({
-  //   id: item?.id || 0,
-  //   quantity: 1,
-  // });
+  const { post, transform, processing } = useForm({
+    customer_id: 0,
+    date: new Date(),
+  });
 
   const computedCurrentItemAmount = (qty: number) => {
     setAmount(qty * (currenItem?.price || 0));
@@ -195,12 +212,36 @@ export default function Create({ auth, customers, item }: PageProps<{ customers:
     setOpen(false);
   };
 
+  const addDays = (dateValue: Date, days: number): Date => {
+    let date: Date = dateValue instanceof Date ? dateValue : new Date(dateValue);
+    date.setDate(date.getDate() + days)
+    return date
+  }
+
   const handleDateChange = (date: unknown) => {
     invoiceForm.header.date = date as Date;
+    if (invoiceForm.header.terms > 0) {
+      invoiceForm.header.due = addDays(date as Date, invoiceForm.header.terms)
+    }
+
     setInvoiceForm(() => {
       return { ...invoiceForm, header: { ...invoiceForm.header, date: date as Date } };
     });
   };
+
+  const handlePaymentTermsChange = (value: string) => {
+    invoiceForm.header.terms = Number(value)
+
+    if (invoiceForm.header.terms > 0 && invoiceForm.header.date) {
+      invoiceForm.header.due = addDays(invoiceForm.header.date, invoiceForm.header.terms)
+    } else {
+      invoiceForm.header.due = undefined
+    }
+
+    setInvoiceForm(() => {
+      return {...invoiceForm, header: {...invoiceForm.header, terms: Number(value)}}
+    })
+  }
 
   const handleRemoveLine = (event: React.MouseEvent<HTMLButtonElement>) => {
     event.preventDefault();
@@ -213,14 +254,34 @@ export default function Create({ auth, customers, item }: PageProps<{ customers:
     });
   };
 
-  const handleCheckout = (event: React.MouseEvent<HTMLButtonElement>) => {
-    event.preventDefault();
-  }
-
   const performInvoiceCancelation = (event: React.MouseEvent<HTMLButtonElement>) => {
     event.preventDefault();
     removeStorageIvoinceForm();
     router.get('/invoices')
+  }
+
+  const handleCheckout = (event: React.MouseEvent<HTMLButtonElement>) => {
+    event.preventDefault()
+    if (invoiceForm.header.terms === 1) {
+      setCheckout(true)
+      return
+    }
+
+    placedInvoice()
+  }
+
+  const placedInvoice = () => {
+    transform((data) => ({
+      ...data,
+      customer_id: invoiceForm.header.customer?.id,
+      date: invoiceForm.header.date,
+      terms: invoiceForm.header.terms,
+      notes: invoiceForm.header.notes || '',
+      lines: invoiceForm.lines.map((line) => {
+        return { id: line.id, quantity: line.quantity, price: line.price, rate: line.tax.rate}
+      })
+    }))
+    post('/invoices', {...headers})
   }
 
   const composeSubTotal = invoiceForm.lines.reduce((acc, line) => {
@@ -310,30 +371,57 @@ export default function Create({ auth, customers, item }: PageProps<{ customers:
             )}
           </div>
           <div className="grid grid-cols-12">
-            <div className="col-span-6 flex flex-col gap-y-2">
-              <Label htmlFor="date">Date</Label>
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button
-                    variant={'outline'}
-                    className={cn('w-[280px] justify-start text-left font-normal', !invoiceForm.header.date && 'text-muted-foreground')}
-                  >
-                    <CalendarIcon />
-                    {invoiceForm.header.date ? format(invoiceForm.header.date, 'PPP') : <span>Pick a date</span>}
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0">
-                  <Calendar
-                    mode="single"
-                    defaultMonth={invoiceForm.header.date}
-                    selected={invoiceForm.header.date}
-                    onSelect={handleDateChange}
-                    initialFocus
-                  />
-                </PopoverContent>
-              </Popover>
+            <div className="col-span-6 flex flex-col gap-y-6">
+              <div className="flex flex-col gap-y-2">
+                <Label htmlFor="date">Date</Label>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant={'outline'}
+                      className={cn('w-[280px] justify-start text-left font-normal', !invoiceForm.header.date && 'text-muted-foreground')}
+                    >
+                      <CalendarIcon />
+                      {invoiceForm.header.date ? format(invoiceForm.header.date, 'PPP') : <span>Pick a date</span>}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0">
+                    <Calendar
+                      mode="single"
+                      defaultMonth={invoiceForm.header.date}
+                      selected={invoiceForm.header.date}
+                      onSelect={handleDateChange}
+                      initialFocus
+                    />
+                  </PopoverContent>
+                </Popover>
+              </div>
+              <div className="flex flex-col gap-y-2">
+                <Label htmlFor="date">Due Date</Label>
+                <Input type='date' value={invoiceForm.header.due ? format(invoiceForm.header.due, 'yyyy-MM-dd') : ''} disabled className='w-70'/>
+              </div>
             </div>
-            <div className="col-span-6"></div>
+            <div className="col-span-6 flex flex-col gap-y-2">
+              <Label htmlFor='paymentTerms'>Payment terms</Label>
+              <Select
+                name='paymentTerms'
+                onValueChange={handlePaymentTermsChange}
+                // disabled={viewMode}
+                defaultValue={"0"}
+                value={String(invoiceForm.header.terms)}
+                required
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Select terms" />
+                </SelectTrigger>
+                <SelectContent className="">
+                  {paymentTerms.map((term, index) => (
+                    <SelectItem key={index.toString()} value={term.value.toString()}>
+                      {term.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
           </div>
         </div>
         <div className="col-span-12">
@@ -473,6 +561,18 @@ export default function Create({ auth, customers, item }: PageProps<{ customers:
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
+
+        <Sheet open={openCheckout} onOpenChange={setCheckout}>
+          <SheetContent side='right' className="m-4 flex h-[calc(~'(100%-var(--spacing)*4)/3')] w-full flex-col rounded-md sm:max-w-4xl">
+            <SheetHeader>
+              <SheetTitle>Checkout</SheetTitle>
+              <SheetDescription className="text-[12px]">Checkout process</SheetDescription>
+            </SheetHeader>
+            <div className="grid gap-4 px-4">
+              Add your checkout form here!
+            </div>
+          </SheetContent>
+        </Sheet>
       </div>
 
       {/* Command to search for customers */}

@@ -44,6 +44,7 @@ func (s *Server) registerRoutes(guest, auth alice.Chain, inertia *gonertia.Inert
 	s.delete("/items/{id}", auth.Then(s.deleteItemHandler()))
 
 	s.get("/invoices", auth.Then(s.invoicesHandler(inertia)))
+	s.post("/invoices", auth.Then(s.storeInvoiceHandler(inertia)))
 	s.get("/invoices/create", auth.Then(s.createInvoiceHandler(inertia)))
 
 	uiAssets := foundation.GetBuildAssets(s.assets, "public/build")
