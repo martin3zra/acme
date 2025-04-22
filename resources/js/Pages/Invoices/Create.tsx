@@ -278,7 +278,7 @@ export default function Create({ auth, customers, item }: PageProps<{ customers:
       terms: invoiceForm.header.terms,
       notes: invoiceForm.header.notes || '',
       lines: invoiceForm.lines.map((line) => {
-        return { id: line.id, quantity: line.quantity, price: line.price, rate: line.tax.rate}
+        return { id: line.id, quantity: line.quantity, unit: line.unit.id, price: line.price, rate: line.tax.rate}
       })
     }))
     post('/invoices', {...headers, onSuccess: () => {
@@ -443,8 +443,11 @@ export default function Create({ auth, customers, item }: PageProps<{ customers:
                       tabIndex={0}
                     />
                   </th>
-                  <th scope="col" className="w-auto border border-gray-300">
+                  <th scope="col" className="w-auto px-1 border bg-gray-50 border-gray-300">
                     <Label>{currenItem?.description}</Label>
+                  </th>
+                  <th scope="col" className="w-36 px-1 border bg-gray-50 border-gray-300">
+                    <Label>{currenItem?.unit.name}</Label>
                   </th>
                   <th scope="col" className="w-36 border border-gray-300">
                     <Input
@@ -452,7 +455,7 @@ export default function Create({ auth, customers, item }: PageProps<{ customers:
                       min={1}
                       // defaultValue={currenItem?.quantity || 0}
                       name="quantity"
-                      className=""
+                      className="text-end"
                       tabIndex={1}
                       ref={qtyInputRef}
                       onFocus={(e) => computedCurrentItemAmount(e.currentTarget.valueAsNumber)}
@@ -460,10 +463,10 @@ export default function Create({ auth, customers, item }: PageProps<{ customers:
                       onKeyDown={handleKeyDown}
                     />
                   </th>
-                  <th scope="col" className="w-36 border border-gray-300 bg-red-100 text-end">
+                  <th scope="col" className="w-36 px-1 border border-gray-300 bg-gray-50 text-end">
                     <Label className="block">{currency(currenItem?.price || 0)}</Label>
                   </th>
-                  <th scope="col" className="w-36 border border-gray-300 text-end">
+                  <th scope="col" className="w-36 px-1 border border-gray-300 text-end">
                     {amount > 0 ? currency(amount) : ''}
                   </th>
                   <th scope="col" className="w-6 border border-gray-300 text-end">
@@ -479,24 +482,23 @@ export default function Create({ auth, customers, item }: PageProps<{ customers:
                     </Button>
                   </th>
                 </tr>
-              </thead>
-            </table>
-            <table className="w-full table-auto">
-              <thead>
                 <tr>
-                  <th scope="col" className="w-60 border border-gray-300 text-start">
+                  <th scope="col" className="w-60 px-1 border border-gray-300 text-start">
                     Reference
                   </th>
-                  <th scope="col" className="w-auto border border-gray-300 text-start">
+                  <th scope="col" className="w-auto px-1 border border-gray-300 text-start">
                     Description
                   </th>
-                  <th scope="col" className="w-36 border border-gray-300 text-end">
+                  <th scope="col" className="w-36 px-1 border border-gray-300 text-start">
+                    Unit
+                  </th>
+                  <th scope="col" className="w-36 px-1 border border-gray-300 text-end">
                     Quantity
                   </th>
-                  <th scope="col" className="w-36 border border-gray-300 text-end">
+                  <th scope="col" className="w-36 px-1 border border-gray-300 text-end">
                     Price
                   </th>
-                  <th scope="col" className="w-36 border border-gray-300 text-end">
+                  <th scope="col" className="w-36 px-1 border border-gray-300 text-end">
                     Amount
                   </th>
                   <th scope="col" className="w-6 gap-2 border border-gray-300 px-5 text-end whitespace-nowrap"></th>
@@ -506,12 +508,13 @@ export default function Create({ auth, customers, item }: PageProps<{ customers:
                 {invoiceForm.lines &&
                   invoiceForm.lines.map((line, index) => (
                     <tr key={index}>
-                      <td className="border border-gray-300 text-start">{line.name}</td>
-                      <td className="border border-gray-300 text-start">{line.description}</td>
-                      <td className="border border-gray-300 text-end">{line.quantity}</td>
-                      <td className="border border-gray-300 text-end">{currency(line.price || 0)}</td>
-                      <td className="border border-gray-300 text-end">{currency(line.amount || 0)}</td>
-                      <td className="border border-gray-300 text-end">
+                      <td className="border px-1 border-gray-300 text-start">{line.name}</td>
+                      <td className="border px-1 border-gray-300 text-start">{line.description}</td>
+                      <td className="border px-1 border-gray-300 text-start">{line.unit.name}</td>
+                      <td className="border px-1 border-gray-300 text-end">{line.quantity}</td>
+                      <td className="border px-1 border-gray-300 text-end">{currency(line.price || 0)}</td>
+                      <td className="border px-1 border-gray-300 text-end">{currency(line.amount || 0)}</td>
+                      <td className="border px-1 border-gray-300 text-end">
                         <Button variant={'link'} size={'icon'} className="h-8 w-8 rounded-full p-0" data-index={index} onClick={handleRemoveLine}>
                           <XCircleIcon />
                         </Button>
@@ -527,7 +530,7 @@ export default function Create({ auth, customers, item }: PageProps<{ customers:
             <div className='grid grid-cols-12'>
               <div className="col-span-6 flex flex-col gap-y-2">Notes</div>
               <div className="col-span-6 flex flex-col gap-y-2">
-                <div className='grid place-content-end bg-indigo-300'>
+                <div className='grid place-content-end bg-indigo-300 p-2'>
                   <div className='flex justify-between items-center w-60 bg-green-100'>
                     <span className="block text-base">Subtotal</span>
                     <span className="block text-base">{currency(composeSubTotal)}</span>

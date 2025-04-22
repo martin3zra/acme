@@ -82,6 +82,7 @@ type StoreInvoiceForm struct {
 	Notes      string    `json:"notes"`
 	Lines      []struct {
 		ID    int     `json:"id"`
+		Unit  int     `json:"unit"`
 		Qty   int     `json:"quantity"`
 		Price float64 `json:"price"`
 		Rate  float64 `json:"rate"`

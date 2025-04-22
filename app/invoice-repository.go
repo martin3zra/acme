@@ -117,7 +117,7 @@ func (s *Server) attachInvoiceLines(tx *sql.Tx, companyId, invoiceId int, form S
 	vals := []any{}
 	for i, line := range form.Lines {
 		//
-		vals = append(vals, companyId, invoiceId, line.ID, 1, line.Qty, line.Price, line.Rate)
+		vals = append(vals, companyId, invoiceId, line.ID, line.Unit, line.Qty, line.Price, line.Rate)
 
 		numFields := 7
 		n := i * numFields
