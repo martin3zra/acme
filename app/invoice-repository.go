@@ -3,9 +3,9 @@ package app
 import (
 	"database/sql"
 	"log"
-	"strconv"
 	"time"
 
+	"github.com/martin3zra/acme/pkg/database"
 	"github.com/martin3zra/acme/pkg/foundation"
 )
 
@@ -113,22 +113,13 @@ func (s *Server) storeInvoice(companyID int, form StoreInvoiceForm) error {
 }
 
 func (s *Server) attachInvoiceLines(tx *sql.Tx, companyId, invoiceId int, form StoreInvoiceForm) error {
-	stmt := "INSERT INTO invoices_items (company_id, invoice_id, item_id, unit_id, qty, price, tax) VALUES "
 	vals := []any{}
-	for i, line := range form.Lines {
-		//
+	for _, line := range form.Lines {
 		vals = append(vals, companyId, invoiceId, line.ID, line.Unit, line.Qty, line.Price, line.Rate)
-
-		numFields := 7
-		n := i * numFields
-
-		stmt += `(`
-		for j := range numFields {
-			stmt += `$` + strconv.Itoa(n+j+1) + `,`
-		}
-		stmt = stmt[:len(stmt)-1] + `),`
 	}
-	stmt = stmt[:len(stmt)-1]
+
+	stmt := "INSERT INTO invoices_items (company_id, invoice_id, item_id, unit_id, qty, price, tax) VALUES "
+	stmt += database.PrepareBulkInsert(7, len(form.Lines))
 
 	_, err := tx.Exec(stmt, vals...)
 	if err != nil {
