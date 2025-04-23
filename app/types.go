@@ -17,7 +17,7 @@ type LoginFormRequest struct {
 
 func (f LoginFormRequest) Rules() map[string]any {
 	return map[string]any{
-		"email":    "required|email|max:100",
+		"email":    "required|email|max:100|lowercase",
 		"password": "required",
 	}
 }
@@ -34,7 +34,7 @@ func (StoreCustomerForm) Rules() map[string]any {
 	return map[string]any{
 		"name":    "required|min:3|max:120",
 		"contact": "sometimes|min:3|max:120",
-		"email":   "required|email|unique.ignore:customers|min:8|max:120",
+		"email":   "required|email|unique.ignore:customers|min:8|max:120|lowercase",
 		"phone":   "sometimes|min:3|max:120",
 	}
 }

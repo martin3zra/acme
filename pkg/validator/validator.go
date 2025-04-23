@@ -100,6 +100,8 @@ func (v *Validator) messages(attribute, rule, kind string, value ...any) string 
 		"unique":           "The %s has already been taken.",
 		"current_password": "The password is incorrect.",
 		"in":               "The selected %s is invalid.",
+		"lowercase":        "The %s field must be lowercase.",
+		"uppercase":        "The %s field must be uppercase.",
 	}
 
 	message, ok := messages[rule]

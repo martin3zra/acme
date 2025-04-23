@@ -210,3 +210,20 @@ func TestInRule(t *testing.T) {
 		t.Errorf("validation fails:\n %v", validator.Errors())
 	}
 }
+
+func TestLowerAndUpperCaseRule(t *testing.T) {
+
+	person := Person{
+		Name:  "ALFREDO",
+		Email: "martin3zra@gmail.com",
+	}
+
+	var validator = validator.Validator{}
+	validator.Validate(context.Background(), &person, map[string]any{
+		"name":  "required|uppercase",
+		"email": "required|lowercase",
+	})
+	if len(validator.Errors()) > 0 {
+		t.Errorf("validation fails:\n %v", validator.Errors())
+	}
+}

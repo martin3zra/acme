@@ -15,6 +15,8 @@ var defaultRules = []string{
 	"unique",
 	"current_password",
 	"in",
+	"uppercase",
+	"lowercase",
 }
 
 var arrayRules = []string{

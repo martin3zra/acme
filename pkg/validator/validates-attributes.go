@@ -102,6 +102,14 @@ func (va *ValidatesAttributes) validateRuleWithoutAttributes(rule string, value 
 		return va.validateCurrentPassword(value)
 	}
 
+	if rule == "lowercase" {
+		return strings.ToLower(value.String()) == value.String()
+	}
+
+	if rule == "uppercase" {
+		return strings.ToUpper(value.String()) == value.String()
+	}
+
 	return true
 }
 
