@@ -15,29 +15,45 @@ func (v *Validator) Validate(ctx context.Context, object any, rules map[string]a
 	for _, cb := range beforeValidation {
 		cb()
 	}
-	// formRequest, ok := object.(support.FormRequestContract)
-	// if ok {
-	// 	// Trigger authorization
-	// 	formRequest.PrepareForValidation()
-	// }
 
 	v.ctx = ctx
-	rValue := reflect.ValueOf(object).Elem()
-	rType := rValue.Type()
 
-	if rType.Kind() == reflect.Struct {
-		for i := range rType.NumField() {
-			key := v.resolveKeyBasedOnJsonTag(rType, i)
-			fieldRule, ok := rules[key]
+	v.validateAttributes(object, rules)
+
+	return len(v.errors) == 0
+}
+
+// Validate a given struct/object/attribute against a rule set
+func (v *Validator) validateAttributes(object any, rules map[string]any) {
+	val := reflect.ValueOf(object)
+	if val.Kind() == reflect.Ptr {
+		val = val.Elem()
+	}
+	for i := range val.NumField() {
+		v.currentPosition = i
+		key := v.resolveKeyBasedOnJsonTag(val.Type(), i)
+		f := val.Field(i)
+		switch f.Kind() {
+		case reflect.Struct:
+			v.validateAttributes(f.Interface(), rules)
+		case reflect.Slice:
+			v.parentKey = key
+			for j := range f.Len() {
+				v.validateAttributes(f.Index(j).Interface(), rules)
+			}
+			v.resetParentKey()
+		default:
+			ruleIdx := key
+			if v.hasParentKey() {
+				ruleIdx = fmt.Sprintf("%s.*.%s", v.parentKey, key)
+			}
+			fieldRule, ok := rules[ruleIdx]
 			if !ok {
 				continue
 			}
-
-			v.compileRuleSet(key, rValue.Field(i), v.resolveRuleComponents(fieldRule))
+			v.compileRuleSet(key, val.Field(i), v.resolveRuleComponents(fieldRule))
 		}
 	}
-
-	return len(v.errors) == 0
 }
 
 func (v *Validator) Errors() Errors {
@@ -98,6 +114,9 @@ func (v *Validator) messages(attribute, rule, kind string, value ...any) string 
 }
 
 func (v *Validator) composeMessage(message, attribute string, value ...any) string {
+	if v.hasParentKey() {
+		attribute = fmt.Sprintf("%s %d %s", v.parentKey, v.currentPosition+1, attribute)
+	}
 
 	re := regexp.MustCompile("%v")
 	matches := re.FindAllStringIndex(message, -1)
@@ -120,6 +139,16 @@ func (v *Validator) record(key, message string) {
 	if v.errors == nil {
 		v.errors = make(map[string][]string)
 	}
+
+	// If we're validating a nested object (Array|Slice) we'll pre-append the parent key
+	// to the error message, and add the human position to the message, so it's more
+	// clear to the user to understand the error.
+	if v.hasParentKey() {
+		nestedKey := fmt.Sprintf("%s.%d.%s", v.parentKey, v.currentPosition+1, key)
+		v.errors[nestedKey] = append(v.errors[key], message)
+		return
+	}
+
 	v.errors[key] = append(v.errors[key], message)
 }
 

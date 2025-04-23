@@ -11,11 +11,25 @@ import (
 )
 
 type ValidatesAttributes struct {
-	ctx           context.Context
-	sometimes     bool
-	needsToIgnore bool
-	ignore        any
-	column        string
+	ctx             context.Context
+	sometimes       bool
+	needsToIgnore   bool
+	ignore          any
+	column          string
+	currentPosition int
+	parentKey       string
+}
+
+func (va *ValidatesAttributes) setParentKey(key string) {
+	va.parentKey = key
+}
+
+func (va *ValidatesAttributes) resetParentKey() {
+	va.parentKey = ""
+}
+
+func (va *ValidatesAttributes) hasParentKey() bool {
+	return va.parentKey != ""
 }
 
 func (va *ValidatesAttributes) Ignore(ignore any, column ...string) {

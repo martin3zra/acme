@@ -11,11 +11,18 @@ import (
 	_ "github.com/lib/pq"
 )
 
+type Contact struct {
+	Name  string `json:"name"`
+	Phone string `json:"phone"`
+	Age   int    `json:"age"`
+}
+
 type Person struct {
-	Name     string `json:"name,omitempty"`
-	LastName string `json:"last_name"`
-	Email    string `json:"email"`
-	Age      int    `json:"age"`
+	Name     string    `json:"name,omitempty"`
+	LastName string    `json:"last_name"`
+	Email    string    `json:"email"`
+	Age      int       `json:"age"`
+	Contacts []Contact `json:"contacts"`
 }
 
 func (p Person) Rules() map[string]any {
@@ -134,5 +141,34 @@ func TestUniqueRule(t *testing.T) {
 	})
 	if len(valid.Errors()) > 0 {
 		t.Errorf("validation fails:\n %v", valid.Errors())
+	}
+}
+
+func TestNestedFields(t *testing.T) {
+
+	person := Person{
+		Email: "martin3zra@gmail.com",
+		Contacts: []Contact{
+			{
+				Name:  "Natasha Martinez Garcia",
+				Phone: "8099879235",
+				Age:   23,
+			},
+			{
+				Name:  "Massiel Natali Garcia",
+				Phone: "8099879232",
+				Age:   18,
+			},
+		},
+	}
+
+	var validator = validator.Validator{}
+	validator.Validate(context.Background(), &person, map[string]any{
+		"email":            "required|email",
+		"contacts.*.name":  "required|min:10",
+		"contacts.*.phone": "required|min:3|max:11",
+	})
+	if len(validator.Errors()) > 0 {
+		t.Errorf("validation fails:\n %v", validator.Errors())
 	}
 }
