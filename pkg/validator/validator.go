@@ -99,6 +99,7 @@ func (v *Validator) messages(attribute, rule, kind string, value ...any) string 
 		"exists":           "The selected %s is invalid.",
 		"unique":           "The %s has already been taken.",
 		"current_password": "The password is incorrect.",
+		"in":               "The selected %s is invalid.",
 	}
 
 	message, ok := messages[rule]
@@ -218,6 +219,13 @@ func (v *Validator) evaluateRuleWithValues(key string, ruleComponents []string, 
 		//set database handler for the validation.
 		if !v.validateDatabaseRules(key, ruleComponents[0], attributes, value) {
 			v.record(key, v.messages(key, ruleComponents[0], value.Kind().String(), attributes[0]))
+		}
+		return
+	}
+
+	if slices.Contains(arrayRules, ruleComponents[0]) {
+		if !v.validateArrayRules(ruleComponents[0], attributes, value) {
+			v.record(key, v.messages(key, ruleComponents[0], value.String(), attributes))
 		}
 		return
 	}

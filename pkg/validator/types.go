@@ -14,6 +14,11 @@ var defaultRules = []string{
 	"exists",
 	"unique",
 	"current_password",
+	"in",
+}
+
+var arrayRules = []string{
+	"in",
 }
 
 var databaseRules = []string{

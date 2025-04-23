@@ -120,11 +120,13 @@ type StoreInvoiceForm struct {
 
 func (StoreInvoiceForm) Rules() map[string]any {
 	return map[string]any{
-		"customer_id": "required|exists:customers,id",
-		"date":        "required",
-		"terms":       "required",
-		"lines":       "required",
-		"discount":    "required",
+		"customer_id":    "required|exists:customers,id",
+		"date":           "required",
+		"terms":          "required",
+		"lines":          "required",
+		"discount":       "required",
+		"discount.value": "required",
+		"discount.type":  "required|in:percentage,fixed",
 	}
 }
 

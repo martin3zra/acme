@@ -26,6 +26,7 @@ type Person struct {
 	LastName string    `json:"last_name"`
 	Email    string    `json:"email"`
 	Age      int       `json:"age"`
+	Gender   string    `json:"gender"`
 	Contacts []Contact `json:"contacts"`
 	Address  Address   `json:"address"`
 }
@@ -189,6 +190,21 @@ func TestNestedFields(t *testing.T) {
 	validator.Validate(context.Background(), &person, map[string]any{
 		"email":        "required|email",
 		"address.line": "required|min:10",
+	})
+	if len(validator.Errors()) > 0 {
+		t.Errorf("validation fails:\n %v", validator.Errors())
+	}
+}
+
+func TestInRule(t *testing.T) {
+
+	person := Person{
+		Gender: "f",
+	}
+
+	var validator = validator.Validator{}
+	validator.Validate(context.Background(), &person, map[string]any{
+		"gender": "required|in:m,f",
 	})
 	if len(validator.Errors()) > 0 {
 		t.Errorf("validation fails:\n %v", validator.Errors())

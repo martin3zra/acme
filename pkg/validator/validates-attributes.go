@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"reflect"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -165,4 +166,16 @@ func (va *ValidatesAttributes) requireParameterCount(count int, params []string,
 func (va *ValidatesAttributes) hasMultipleAttributes(ruleAttributes string) (bool, []string) {
 	parts := strings.Split(ruleAttributes, ",")
 	return len(parts) > 1, parts
+}
+
+func (va *ValidatesAttributes) validateArrayRules(rule string, attributes []string, value reflect.Value) bool {
+	if rule == "in" {
+		return va.validateIn(attributes, value)
+	}
+
+	return true
+}
+
+func (va *ValidatesAttributes) validateIn(attributes []string, value reflect.Value) bool {
+	return slices.Contains(attributes, value.String())
 }
