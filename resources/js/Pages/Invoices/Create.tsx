@@ -12,7 +12,7 @@ import { useDebounced } from '@/hooks/use-debounced';
 import { useLocalStorage } from '@/hooks/use-local-storage';
 import AuthenticatedLayout from '@/layouts/authenticated-layout';
 import { cn } from '@/lib/utils';
-import { BreadcrumbItem, Customer, Item, PageProps } from '@/types';
+import { BreadcrumbItem, Customer, DiscountType, Item, PageProps } from '@/types';
 import { router, useForm } from '@inertiajs/react';
 import { format } from 'date-fns';
 import { CalendarIcon, User, UserPlus, XCircleIcon } from 'lucide-react';
@@ -54,6 +54,7 @@ type HeaderForm = {
   due: Date | undefined;
   terms: number;
   notes: string | undefined;
+  discount: DiscountType;
 };
 
 interface LineForm extends Item {
@@ -66,7 +67,9 @@ type InvoiceForm = {
   lines: LineForm[];
 };
 
-const defaultInvoiceForm: InvoiceForm = { header: { customer: undefined, date: undefined, due: undefined, terms: 0, notes: undefined }, lines: [] }
+const defaultDiscount: DiscountType = {value: 0, type: "fixed"}
+const defaultHeaderForm: HeaderForm =  { customer: undefined, date: undefined, due: undefined, terms: 0, notes: undefined, discount: defaultDiscount}
+const defaultInvoiceForm: InvoiceForm = { header: defaultHeaderForm, lines: [] }
 
 export default function Create({ auth, customers, item }: PageProps<{ customers: Customer[]; item: Item }>) {
   const currency = useNumber().currency;
@@ -254,6 +257,23 @@ export default function Create({ auth, customers, item }: PageProps<{ customers:
     });
   };
 
+  const handleDiscountTypeChange = (value: "fixed" | "percentage") => {
+    invoiceForm.header.discount.type = value
+    // Recalculate totals if the value is set.
+    setInvoiceForm(() => {
+      return {...invoiceForm, header: {...invoiceForm.header, discount: {...invoiceForm.header.discount, type: value}}}
+    })
+  }
+
+  const handleDiscountValueChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    invoiceForm.header.discount.value = event.target.valueAsNumber
+
+    // Recalculate totals if the value is set.
+    setInvoiceForm(() => {
+      return {...invoiceForm, header: {...invoiceForm.header, discount: {...invoiceForm.header.discount, value: event.target.valueAsNumber}}}
+    })
+  };
+
   const performInvoiceCancelation = (event: React.MouseEvent<HTMLButtonElement>) => {
     event.preventDefault();
     removeStorageIvoinceForm();
@@ -276,6 +296,7 @@ export default function Create({ auth, customers, item }: PageProps<{ customers:
       customer_id: invoiceForm.header.customer?.id,
       date: invoiceForm.header.date,
       terms: invoiceForm.header.terms,
+      discount: invoiceForm.header.discount,
       notes: invoiceForm.header.notes || '',
       lines: invoiceForm.lines.map((line) => {
         return { id: line.id, quantity: line.quantity, unit: line.unit.id, price: line.price, rate: line.tax.rate}
@@ -287,17 +308,30 @@ export default function Create({ auth, customers, item }: PageProps<{ customers:
     }})
   }
 
+  const computeDiscount = (): number => {
+    const discount = invoiceForm.header.discount
+    // Percentage calculation
+    if (discount.type === "percentage") {
+      const total = composeSubTotal + composeTax
+      return (total * (discount.value / 100))
+    }
+
+    // Fixed calculation
+    return discount.value
+  }
+
   const composeSubTotal = invoiceForm.lines.reduce((acc, line) => {
       return acc + line.amount;
     }, 0);
 
   const composeTax = invoiceForm.lines.reduce((acc, line) => {
-    const discount = 0
-    const itemWithDiscount = line.price - (line.price * (discount / 100)) * line.quantity;
-    const tax = itemWithDiscount * (line.tax.rate / 100);
-    // const amount = line.price * line.quantity;
+    const tax = line.price * (line.tax.rate / 100);
     return acc + (tax * line.quantity);
   }, 0);
+
+  const composeTotalAmount = (): number => {
+    return (composeSubTotal + composeTax) - computeDiscount()
+  }
   return (
     <AuthenticatedLayout user={auth.user} breadcrumbs={breadcrumbs}>
       <AuthenticatedLayout.Actions>
@@ -537,7 +571,31 @@ export default function Create({ auth, customers, item }: PageProps<{ customers:
                   </div>
                   <div className='flex justify-between items-center w-60 bg-green-100'>
                     <span className="block text-base">Discount</span>
-                    <span className="block text-base">$0.00</span>
+                    <div className='flex'>
+                      <Input
+                        type="number"
+                        min={0}
+                        defaultValue={invoiceForm.header.discount.value}
+                        name="discount"
+                        className="text-end"
+                        onChange={handleDiscountValueChange}
+                      />
+                      <Select
+                        name='discountType'
+                        onValueChange={handleDiscountTypeChange}
+                        defaultValue={"percentage"}
+                        value={String(invoiceForm.header.discount.type)}
+                        required
+                      >
+                        <SelectTrigger className="w-24">
+                          <SelectValue placeholder="Discount" />
+                        </SelectTrigger>
+                        <SelectContent className="">
+                            <SelectItem value={"fixed"}>$</SelectItem>
+                            <SelectItem value={"percentage"}>%</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
                   </div>
                   <div className='flex justify-between items-center w-60 bg-green-100'>
                     <span className="block text-base">Tax</span>
@@ -545,7 +603,7 @@ export default function Create({ auth, customers, item }: PageProps<{ customers:
                   </div>
                   <div className='flex justify-between items-center w-60 bg-green-100'>
                     <span className="block text-xl">Total</span>
-                    <span className="block text-xl">{currency(composeSubTotal)}</span>
+                    <span className="block text-xl">{currency(composeTotalAmount())}</span>
                   </div>
                 </div>
               </div>

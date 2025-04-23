@@ -1,6 +1,9 @@
 package app
 
 import (
+	"database/sql/driver"
+	"encoding/json"
+	"errors"
 	"time"
 
 	"github.com/martin3zra/acme/pkg/support"
@@ -74,11 +77,30 @@ const (
 	PAID    PaidStatus = "paid"
 )
 
+type Discount struct {
+	Val  float64 `json:"value"`
+	Type string  `json:"type"`
+}
+
+func (d *Discount) Value() (driver.Value, error) {
+	return json.Marshal(d)
+}
+
+func (d *Discount) Scan(value any) error {
+	b, ok := value.([]byte)
+	if !ok {
+		return errors.New("type assertion to []byte failed")
+	}
+
+	return json.Unmarshal(b, &d)
+}
+
 type StoreInvoiceForm struct {
 	support.FormRequest
 	CustomerID int       `json:"customer_id"`
 	Date       time.Time `json:"date"`
 	Terms      int       `json:"terms"`
+	Discount   Discount  `json:"discount"`
 	Notes      string    `json:"notes"`
 	Lines      []struct {
 		ID    int     `json:"id"`
@@ -89,12 +111,10 @@ type StoreInvoiceForm struct {
 	} `json:"lines"`
 
 	// considere these fields as protected
-	Amount    float64
-	AmountDue float64
-	Tax       float64
-	Total     float64
-
-	// Protected fields
+	amount     float64
+	amountDue  float64
+	tax        float64
+	total      float64
 	paidStatus PaidStatus
 }
 
@@ -104,23 +124,38 @@ func (StoreInvoiceForm) Rules() map[string]any {
 		"date":        "required",
 		"terms":       "required",
 		"lines":       "required",
+		"discount":    "required",
 	}
 }
 
 func (form *StoreInvoiceForm) PassedValidation() {
 	// compute tax for each line
+	form.computeTax()
+	form.applyDiscount()
+
+	form.paidStatus = PAID
+	if form.Terms > 1 {
+		form.amountDue = form.total
+		form.paidStatus = UNPAID
+	}
+}
+
+func (form *StoreInvoiceForm) computeTax() {
 	for _, line := range form.Lines {
 		// we need to add the discount here.
 		lineAmount := (line.Price * float64(line.Qty))
 
-		form.Tax += lineAmount * (line.Rate / 100)
-		form.Amount += lineAmount
-		form.Total += lineAmount + form.Tax
+		form.tax += lineAmount * (line.Rate / 100)
+		form.amount += lineAmount
+		form.total += lineAmount + form.tax
+	}
+}
+
+func (form *StoreInvoiceForm) applyDiscount() {
+	if form.Discount.Type == "percentage" {
+		form.total = form.total - (form.total * (form.Discount.Val / 100))
+		return
 	}
 
-	form.paidStatus = PAID
-	if form.Terms > 1 {
-		form.AmountDue = form.Amount
-		form.paidStatus = UNPAID
-	}
+	form.total = form.total - form.Discount.Val
 }

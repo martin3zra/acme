@@ -40,7 +40,7 @@ func ParseRequest(r *http.Request, params any) error {
 		errorMesssages := formRequest.Errors()
 		if len(errorMesssages) > 0 {
 			session.GetSession(r).FormErrors(foundation.ErrorBag(errorMesssages))
-			return errors.New(toJSON(errorMesssages))
+			return errors.New(foundation.ToJSON(errorMesssages))
 		}
 
 		formRequest.PassedValidation()
@@ -49,15 +49,6 @@ func ParseRequest(r *http.Request, params any) error {
 	}
 
 	return new(foundation.UnprocessableEntity)
-}
-
-func toJSON(m any) string {
-	js, err := json.Marshal(m)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	return strings.ReplaceAll(string(js), ",", ", ")
 }
 
 func resolveKeyToIgnore(rules map[string]any) *string {

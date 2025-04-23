@@ -1,11 +1,7 @@
 import HeadingSmall from '@/components/heading-small';
-import { Button } from '@/components/ui/button';
 import AuthenticatedLayout from '@/layouts/authenticated-layout';
 import { BreadcrumbItem, Invoice, PageProps, Verb } from '@/types';
-import { Link } from '@inertiajs/react';
-import { Plus } from 'lucide-react';
 import { List } from './List/Index';
-import { JSX } from 'react';
 import { AddNewInvoice } from './Shared/AddNewInvoice';
 
 const breadcrumbs: BreadcrumbItem[] = [

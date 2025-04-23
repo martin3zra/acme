@@ -15,13 +15,15 @@ type invoice struct {
 	Customer   customer   `json:"customer"`
 	Date       time.Time  `json:"date"`
 	Amount     float64    `json:"amount"`
+	Discount   Discount   `json:"discount"`
 	Tax        float64    `json:"tax"`
+	Total      float64    `json:"total"`
 	Status     string     `json:"status"`
 	PaidStatus PaidStatus `json:"paid_status"`
 }
 
 func (s *Server) findInvoices(companyId int) ([]*invoice, error) {
-	rows, err := s.db.Query("SELECT invoices.id, invoices.date, invoices.amount, invoices.tax, invoices.status, invoices.paid_status, "+
+	rows, err := s.db.Query("SELECT invoices.id, invoices.date, invoices.amount, invoices.discount, invoices.tax, invoices.total, invoices.status, invoices.paid_status, "+
 		"customers.id as customer, customers.name, customers.email, customers.phone "+
 		"FROM invoices "+
 		"INNER JOIN companies ON (invoices.company_id = companies.id) "+
@@ -38,7 +40,9 @@ func (s *Server) findInvoices(companyId int) ([]*invoice, error) {
 			&i.ID,
 			&i.Date,
 			&i.Amount,
+			&i.Discount,
 			&i.Tax,
+			&i.Total,
 			&i.Status,
 			&i.PaidStatus,
 			&i.Customer.ID,
@@ -66,8 +70,8 @@ func (s *Server) storeInvoice(companyID int, form StoreInvoiceForm) error {
 	if err != nil {
 		return err
 	}
-	stmt, err := tx.Prepare("INSERT INTO invoices (company_id, date, customer_id, amount, tax, amount_due, note, paid_status) " +
-		"VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id")
+	stmt, err := tx.Prepare("INSERT INTO invoices (company_id, date, customer_id, amount, discount, tax, amount_due, total, note, paid_status) " +
+		"VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING id")
 	if err != nil {
 		defer stmt.Close()
 		if txErr := tx.Rollback(); txErr != nil {
@@ -83,9 +87,11 @@ func (s *Server) storeInvoice(companyID int, form StoreInvoiceForm) error {
 		companyID,
 		form.Date,
 		form.CustomerID,
-		form.Amount,
-		form.Tax,
-		form.AmountDue,
+		form.amount,
+		foundation.ToJSON(form.Discount),
+		form.tax,
+		form.amountDue,
+		form.total,
 		form.Notes,
 		form.paidStatus,
 	).Scan(&invoiceID)
@@ -104,7 +110,7 @@ func (s *Server) storeInvoice(companyID int, form StoreInvoiceForm) error {
 			return err
 		}
 
-		if err = s.updateCustomerAmountDue(tx, companyID, form.CustomerID, form.AmountDue); err != nil {
+		if err = s.updateCustomerAmountDue(tx, companyID, form.CustomerID, form.amountDue); err != nil {
 			return err
 		}
 	}

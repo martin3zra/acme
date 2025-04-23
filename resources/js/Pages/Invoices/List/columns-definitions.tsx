@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { Invoice, Verb } from "@/types";
+import { DiscountType, Invoice, Verb } from "@/types";
 import { ColumnDef } from "@tanstack/react-table";
 import { ArrowUpDown, MoreHorizontal } from "lucide-react";
 
@@ -77,11 +77,35 @@ export const getColumns = ({ onDidClick }: Props): ColumnDef<Invoice>[] => {
       },
     },
     {
+      accessorKey: 'discount',
+      meta: 'Discount',
+      // size: 880,
+      header: (props) => {
+        return <HeaderCell title="Discount" alignment="right" columnWidth={props.column.getSize()} />;
+      },
+      cell: (props) => {
+        const discount = props.row.getValue("discount") as DiscountType
+        const suffix = discount.type === "percentage" ? "%" : undefined
+        return <CurrencyCell columnWidth={props.column.getSize()} suffix={suffix} value={String(discount.value)} />;
+      },
+    },
+    {
       accessorKey: 'tax',
       meta: 'Tax',
       // size: 880,
       header: (props) => {
         return <HeaderCell title="Tax" alignment="right" columnWidth={props.column.getSize()} />;
+      },
+      cell: (props) => {
+        return <CurrencyCell columnWidth={props.column.getSize()} value={props.getValue() as string} />;
+      },
+    },
+    {
+      accessorKey: 'total',
+      meta: 'Total',
+      // size: 880,
+      header: (props) => {
+        return <HeaderCell title="Total" alignment="right" columnWidth={props.column.getSize()} />;
       },
       cell: (props) => {
         return <CurrencyCell columnWidth={props.column.getSize()} value={props.getValue() as string} />;

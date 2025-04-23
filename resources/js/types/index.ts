@@ -78,6 +78,11 @@ export interface Unit {
     name: string;
 }
 
+export type DiscountType = {
+    type: "fixed" | "percentage";
+    value: number
+  }
+
 export interface Invoice {
     id: number;
     number: string;
