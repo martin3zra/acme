@@ -35,8 +35,11 @@ func (v *Validator) validateAttributes(object any, rules map[string]any) {
 		f := val.Field(i)
 		switch f.Kind() {
 		case reflect.Struct:
+			v.setKeySeparator(".")
+			v.setParentKey(key)
 			v.validateAttributes(f.Interface(), rules)
 		case reflect.Slice:
+			v.setKeySeparator(".*.")
 			v.setParentKey(key)
 			for j := range f.Len() {
 				v.validateAttributes(f.Index(j).Interface(), rules)
@@ -45,7 +48,7 @@ func (v *Validator) validateAttributes(object any, rules map[string]any) {
 		default:
 			ruleIdx := key
 			if v.hasParentKey() {
-				ruleIdx = fmt.Sprintf("%s.*.%s", v.parentKey, key)
+				ruleIdx = fmt.Sprintf("%s%s%s", v.parentKey, v.keySeparator, key)
 			}
 			fieldRule, ok := rules[ruleIdx]
 			if !ok {
@@ -115,7 +118,11 @@ func (v *Validator) messages(attribute, rule, kind string, value ...any) string 
 
 func (v *Validator) composeMessage(message, attribute string, value ...any) string {
 	if v.hasParentKey() {
-		attribute = fmt.Sprintf("%s %d %s", v.parentKey, v.currentPosition+1, attribute)
+		if v.keySeparator == "." {
+			attribute = fmt.Sprintf("%s.%s", v.parentKey, attribute)
+		} else {
+			attribute = fmt.Sprintf("%s %d %s", v.parentKey, v.currentPosition+1, attribute)
+		}
 	}
 
 	re := regexp.MustCompile("%v")
@@ -145,6 +152,9 @@ func (v *Validator) record(key, message string) {
 	// clear to the user to understand the error.
 	if v.hasParentKey() {
 		nestedKey := fmt.Sprintf("%s.%d.%s", v.parentKey, v.currentPosition+1, key)
+		if v.keySeparator == "." {
+			nestedKey = fmt.Sprintf("%s.%s", v.parentKey, key)
+		}
 		v.errors[nestedKey] = append(v.errors[key], message)
 		return
 	}

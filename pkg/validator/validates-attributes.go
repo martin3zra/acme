@@ -18,6 +18,11 @@ type ValidatesAttributes struct {
 	column          string
 	currentPosition int
 	parentKey       string
+	keySeparator    string
+}
+
+func (va *ValidatesAttributes) setKeySeparator(separator string) {
+	va.keySeparator = separator
 }
 
 func (va *ValidatesAttributes) setParentKey(key string) {

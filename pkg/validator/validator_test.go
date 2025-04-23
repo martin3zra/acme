@@ -17,12 +17,17 @@ type Contact struct {
 	Age   int    `json:"age"`
 }
 
+type Address struct {
+	Line string `json:"line"`
+}
+
 type Person struct {
 	Name     string    `json:"name,omitempty"`
 	LastName string    `json:"last_name"`
 	Email    string    `json:"email"`
 	Age      int       `json:"age"`
 	Contacts []Contact `json:"contacts"`
+	Address  Address   `json:"address"`
 }
 
 func (p Person) Rules() map[string]any {
@@ -144,7 +149,7 @@ func TestUniqueRule(t *testing.T) {
 	}
 }
 
-func TestNestedFields(t *testing.T) {
+func TestSliceFields(t *testing.T) {
 
 	person := Person{
 		Email: "martin3zra@gmail.com",
@@ -167,6 +172,23 @@ func TestNestedFields(t *testing.T) {
 		"email":            "required|email",
 		"contacts.*.name":  "required|min:10",
 		"contacts.*.phone": "required|min:3|max:11",
+	})
+	if len(validator.Errors()) > 0 {
+		t.Errorf("validation fails:\n %v", validator.Errors())
+	}
+}
+
+func TestNestedFields(t *testing.T) {
+
+	person := Person{
+		Email:   "martin3zra@gmail.com",
+		Address: Address{Line: "C/Mama Tingo"},
+	}
+
+	var validator = validator.Validator{}
+	validator.Validate(context.Background(), &person, map[string]any{
+		"email":        "required|email",
+		"address.line": "required|min:10",
 	})
 	if len(validator.Errors()) > 0 {
 		t.Errorf("validation fails:\n %v", validator.Errors())
