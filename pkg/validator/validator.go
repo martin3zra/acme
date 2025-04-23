@@ -37,7 +37,7 @@ func (v *Validator) validateAttributes(object any, rules map[string]any) {
 		case reflect.Struct:
 			v.validateAttributes(f.Interface(), rules)
 		case reflect.Slice:
-			v.parentKey = key
+			v.setParentKey(key)
 			for j := range f.Len() {
 				v.validateAttributes(f.Index(j).Interface(), rules)
 			}
