@@ -124,9 +124,14 @@ func (StoreInvoiceForm) Rules() map[string]any {
 		"date":           "required",
 		"terms":          "required",
 		"lines":          "required",
+		"lines.*.id":     "required|exists:items,id",
+		"lines.*.unit":   "required|exists:units,id",
+		"lines.*.qty":    "required|min:1",
+		"lines.*.price":  "required",
+		"lines.*.rate":   "required",
 		"discount":       "required",
-		"discount.value": "required",
-		"discount.type":  "required|in:percentage,fixed",
+		"discount.value": "sometimes",
+		"discount.type":  "sometimes|in:percentage,fixed",
 	}
 }
 
