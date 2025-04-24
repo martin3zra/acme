@@ -13,6 +13,7 @@ import { useLocalStorage } from '@/hooks/use-local-storage';
 import AuthenticatedLayout from '@/layouts/authenticated-layout';
 import { cn } from '@/lib/utils';
 import { BreadcrumbItem, Customer, DiscountType, Item, PageProps } from '@/types';
+import { Textarea } from '@headlessui/react';
 import { router, useForm } from '@inertiajs/react';
 import { format } from 'date-fns';
 import { CalendarIcon, User, UserPlus, XCircleIcon } from 'lucide-react';
@@ -82,7 +83,9 @@ export default function Create({ auth, customers, item }: PageProps<{ customers:
   const qtyInputRef = React.useRef<HTMLInputElement>(null);
   const addButtonRef = React.useRef<HTMLButtonElement>(null);
   const [search, setSearch] = React.useState('');
+  const [notes, setNotes] = React.useState('');
   const dedbouncedSearch = useDebounced(search, 500);
+  const dedbouncedNotes = useDebounced(notes, 500);
   const [amount, setAmount] = React.useState(0);
   const { setItem: storageInvoiceForm, getItem: getStorageInvoiceForm, removeItem: removeStorageIvoinceForm } = useLocalStorage('invoice');
   const [invoiceForm, setInvoiceForm] = React.useState<InvoiceForm>(() => {
@@ -138,6 +141,14 @@ export default function Create({ auth, customers, item }: PageProps<{ customers:
       searchCustomer();
     }
   }, [dedbouncedSearch]);
+
+  useEffect(() => {
+    if (dedbouncedNotes) {
+      setInvoiceForm(() => {
+        return { ...invoiceForm, header: { ...invoiceForm.header, notes: dedbouncedNotes } };
+      });
+    }
+  }, [dedbouncedNotes])
 
   const searchItem = (search: string) => {
     router.reload({
@@ -562,7 +573,16 @@ export default function Create({ auth, customers, item }: PageProps<{ customers:
         <div className="col-span-12 min-h-48 bg-yellow-500">
           <div className='flex flex-col gap-y-2'>
             <div className='grid grid-cols-12'>
-              <div className="col-span-6 flex flex-col gap-y-2">Notes</div>
+              <div className="col-span-6 flex flex-col gap-y-2 p-2">
+                <Label className='text-sm/6 font-medium'>Notes</Label>
+                <Textarea
+                  name='notes'
+                  rows={4}
+                  className="block rounded-lg text-sm/6 resize-none border-none px-3 py-1.5 focus:no-data-focus:outline-none data-focus:outline-2 data-focus:-outline-offset-2 data-focus:outline-white/25"
+                  defaultValue={invoiceForm.header.notes}
+                  onChange={(e) => setNotes(e.currentTarget.value)}
+                  ></Textarea>
+              </div>
               <div className="col-span-6 flex flex-col gap-y-2">
                 <div className='grid place-content-end bg-indigo-300 p-2'>
                   <div className='flex justify-between items-center w-60 bg-green-100'>
