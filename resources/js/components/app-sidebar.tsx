@@ -1,176 +1,91 @@
-import {
-  IconCamera,
-  IconDashboard,
-  IconDatabase,
-  IconFileAi,
-  IconFileDescription,
-  IconFileWord,
-  IconHelp,
-  IconInnerShadowTop,
-  IconPackage,
-  IconReport,
-  IconSearch,
-  IconSettings,
-  IconUsers,
-} from '@tabler/icons-react';
-import * as React from 'react';
-
-import { NavMain } from '@/components/nav-main';
-import { NavSecondary } from '@/components/nav-secondary';
-import { NavUser } from '@/components/nav-user';
+import * as React from "react"
+import { NavMain } from "@/components/nav-main"
+import { NavSecondary } from "@/components/nav-secondary"
+import { NavUser } from "@/components/nav-user"
 import {
   Sidebar,
   SidebarContent,
   SidebarFooter,
   SidebarHeader,
-  SidebarInset,
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
-} from '@/components/ui/sidebar';
+} from "@/components/ui/sidebar"
+import { Command, FilePenIcon, HelpCircleIcon, LayoutDashboardIcon, LayoutListIcon, SearchIcon, SettingsIcon, UsersIcon } from "lucide-react";
 
 const data = {
   navMain: [
     {
       title: 'Dashboard',
       url: '/home',
-      icon: IconDashboard,
+      icon: LayoutDashboardIcon,
       component: 'Home/Index',
     },
     {
       title: 'Invoices',
       url: '/invoices',
-      icon: IconInnerShadowTop,
+      icon: FilePenIcon,
+      component: 'Invoices/Index',
     },
-    // {
-    //   url: "#",
-    //   icon: IconChartBar,
-    // {
-    //   title: "Projects",
-    //   url: "#",
-    //   icon: IconFolder,
-    // },
     {
       title: 'Customers',
       url: '/customers',
-      icon: IconUsers,
+      icon: UsersIcon,
       component: 'Customers/Index',
     },
     {
       title: 'Items',
       url: '/items',
-      icon: IconPackage,
+      icon: LayoutListIcon,
       component: 'Items/Index',
-    },
-  ],
-  navClouds: [
-    {
-      title: 'Capture',
-      icon: IconCamera,
-      isActive: true,
-      url: '#',
-      items: [
-        {
-          title: 'Active Proposals',
-          url: '#',
-        },
-        {
-          title: 'Archived',
-          url: '#',
-        },
-      ],
-    },
-    {
-      title: 'Proposal',
-      icon: IconFileDescription,
-      url: '#',
-      items: [
-        {
-          title: 'Active Proposals',
-          url: '#',
-        },
-        {
-          title: 'Archived',
-          url: '#',
-        },
-      ],
-    },
-    {
-      title: 'Prompts',
-      icon: IconFileAi,
-      url: '#',
-      items: [
-        {
-          title: 'Active Proposals',
-          url: '#',
-        },
-        {
-          title: 'Archived',
-          url: '#',
-        },
-      ],
     },
   ],
   navSecondary: [
     {
       title: 'Settings',
       url: '#',
-      icon: IconSettings,
+      icon: SettingsIcon,
     },
     {
       title: 'Get Help',
       url: '#',
-      icon: IconHelp,
+      icon: HelpCircleIcon,
     },
     {
       title: 'Search',
       url: '#',
-      icon: IconSearch,
-    },
-  ],
-  documents: [
-    {
-      name: 'Data Library',
-      url: '#',
-      icon: IconDatabase,
-    },
-    {
-      name: 'Reports',
-      url: '#',
-      icon: IconReport,
-    },
-    {
-      name: 'Word Assistant',
-      url: '#',
-      icon: IconFileWord,
+      icon: SearchIcon,
     },
   ],
 };
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   return (
-    <Sidebar collapsible="offcanvas" {...props} variant="inset">
-      <SidebarInset>
-        <SidebarHeader>
-          <SidebarMenu>
-            <SidebarMenuItem>
-              <SidebarMenuButton asChild className="data-[slot=sidebar-menu-button]:!p-1.5">
-                <a href="#">
-                  <IconInnerShadowTop className="!size-5" />
-                  <span className="text-base font-semibold">Acme Inc.</span>
-                </a>
-              </SidebarMenuButton>
-            </SidebarMenuItem>
-          </SidebarMenu>
-        </SidebarHeader>
-        <SidebarContent>
-          <NavMain items={data.navMain} />
-          <NavSecondary items={data.navSecondary} className="mt-auto" />
-        </SidebarContent>
-        <SidebarFooter>
-          <NavUser user={props.user} />
-        </SidebarFooter>
-      </SidebarInset>
+    <Sidebar variant="inset" {...props}>
+      <SidebarHeader>
+        <SidebarMenu>
+          <SidebarMenuItem>
+            <SidebarMenuButton size="lg" asChild>
+              <a href="#">
+                <div className="bg-sidebar-primary text-sidebar-primary-foreground flex aspect-square size-8 items-center justify-center rounded-lg">
+                  <Command className="size-4" />
+                </div>
+                <div className="grid flex-1 text-left text-sm leading-tight">
+                  <span className="truncate font-medium">Acme Inc</span>
+                  <span className="truncate text-xs">Enterprise</span>
+                </div>
+              </a>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+        </SidebarMenu>
+      </SidebarHeader>
+      <SidebarContent>
+        <NavMain items={data.navMain} />
+        <NavSecondary items={data.navSecondary} className="mt-auto" />
+      </SidebarContent>
+      <SidebarFooter>
+        <NavUser user={props.user} />
+      </SidebarFooter>
     </Sidebar>
-  );
+  )
 }
