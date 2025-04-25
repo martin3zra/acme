@@ -43,10 +43,8 @@ const data = {
       icon: IconInnerShadowTop,
     },
     // {
-    //   title: "Analytics",
     //   url: "#",
     //   icon: IconChartBar,
-    // },
     // {
     //   title: "Projects",
     //   url: "#",
