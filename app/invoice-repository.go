@@ -20,10 +20,12 @@ type invoice struct {
 	Total      float64    `json:"total"`
 	Status     string     `json:"status"`
 	PaidStatus PaidStatus `json:"paid_status"`
+	Payment    Payment    `json:"payment"`
 }
 
 func (s *Server) findInvoices(companyId int) ([]*invoice, error) {
-	rows, err := s.db.Query("SELECT invoices.id, invoices.date, invoices.amount, invoices.discount, invoices.tax, invoices.total, invoices.status, invoices.paid_status, "+
+	rows, err := s.db.Query("SELECT invoices.id, invoices.date, invoices.amount, invoices.discount, invoices.tax, "+
+		"invoices.total, invoices.status, invoices.paid_status, invoices.payment, "+
 		"customers.id as customer, customers.name, customers.email, customers.phone "+
 		"FROM invoices "+
 		"INNER JOIN companies ON (invoices.company_id = companies.id) "+
@@ -45,6 +47,7 @@ func (s *Server) findInvoices(companyId int) ([]*invoice, error) {
 			&i.Total,
 			&i.Status,
 			&i.PaidStatus,
+			&i.Payment,
 			&i.Customer.ID,
 			&i.Customer.Name,
 			&i.Customer.Email,
@@ -70,8 +73,8 @@ func (s *Server) storeInvoice(companyID int, form StoreInvoiceForm) error {
 	if err != nil {
 		return err
 	}
-	stmt, err := tx.Prepare("INSERT INTO invoices (company_id, date, customer_id, amount, discount, tax, amount_due, total, note, paid_status) " +
-		"VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING id")
+	stmt, err := tx.Prepare("INSERT INTO invoices (company_id, date, customer_id, amount, discount, tax, amount_due, total, note, paid_status, payment) " +
+		"VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING id")
 	if err != nil {
 		defer stmt.Close()
 		if txErr := tx.Rollback(); txErr != nil {
@@ -94,6 +97,7 @@ func (s *Server) storeInvoice(companyID int, form StoreInvoiceForm) error {
 		form.total,
 		form.Notes,
 		form.paidStatus,
+		foundation.ToJSON(form.Payment),
 	).Scan(&invoiceID)
 
 	if err != nil {

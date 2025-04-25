@@ -1,3 +1,4 @@
+import FormSection from '@/components/form-section';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
 import { Calendar } from '@/components/ui/calendar';
@@ -5,7 +6,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet';
+import { Separator } from '@/components/ui/separator';
+import { Sheet, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { useHeader } from '@/composables/use-headers';
 import { useNumber } from '@/composables/use-number';
 import { useDebounced } from '@/hooks/use-debounced';
@@ -17,7 +19,276 @@ import { Textarea } from '@headlessui/react';
 import { router, useForm } from '@inertiajs/react';
 import { format } from 'date-fns';
 import { CalendarIcon, User, UserPlus, XCircleIcon } from 'lucide-react';
-import React, { useCallback, useEffect } from 'react';
+import React, { JSX, useCallback, useEffect } from 'react';
+
+interface PaymentFormType {
+  amount: number;
+  reference: string;
+}
+// On focus display element
+type InputViewProps = {
+  value: number;
+  method: paymentMethod;
+  autoFocus?: boolean;
+  onChange: (method: paymentMethod, value: number) => void;
+  onFocus: (method: paymentMethod) => void;
+}
+
+const InputView = ({ value, method, autoFocus, onChange, onFocus }: InputViewProps): JSX.Element => {
+
+  const handleChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    onChange(method, event.currentTarget.valueAsNumber)
+  }
+
+  const handleOnFocus = (event: React.FocusEvent<HTMLInputElement>) => {
+    if (method !== "cash") onFocus(method)
+  }
+
+  return (
+    <div className='p-0'>
+      <Input
+        key={method}
+        type="number"
+        min={0}
+        className="text-end"
+        value={value}
+        autoFocus={autoFocus}
+        onFocus={handleOnFocus}
+        onChange={handleChange}
+      />
+    </div>
+  )
+}
+const CashFormView = () => <></>
+
+type CheckFormProps = Partial<PaymentFormType> & {
+  onChange: (value: number|string) => void;
+}
+
+type CheckForm = PaymentFormType & {}
+
+const defaultCheckForm: CheckForm = {amount: 0, reference: ""}
+
+const CheckFormView = ({amount, reference, onChange}: CheckFormProps) => {
+  const handleChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    if(event.currentTarget.name === "ck") {
+      onChange(event.currentTarget.valueAsNumber)
+      return
+    }
+
+    onChange(event.currentTarget.value)
+  }
+  return (
+    <div>
+      <FormSection onSubmit={() => {}}>
+        <FormSection.Title>Check payment</FormSection.Title>
+        <FormSection.Description>Specify the amount of the Check and the number for future reference.</FormSection.Description>
+        <FormSection.Form>
+          <div className="col-span-6 sm:col-span-4 space-y-2">
+            <Label  htmlFor='ck' className='text-end'>Amount</Label>
+            <Input
+              type="number"
+              min={0}
+              name="ck"
+              className="text-end h-12 md:text-xl"
+              onChange={handleChange}
+              autoFocus
+              value={amount}
+            />
+          </div>
+          <div className="col-span-6 sm:col-span-4 space-y-2">
+            <Label  htmlFor='ck'>CK Number</Label>
+            <Input
+              type="text"
+              name="reference"
+              className="text-start h-12 md:text-xl"
+              onChange={handleChange}
+              value={reference}
+            />
+          </div>
+        </FormSection.Form>
+      </FormSection>
+    </div>
+  )
+}
+
+type CardBrand = {
+  value: string;
+  name: string;
+}
+
+const defaultCardBrands: CardBrand[] = [
+  {value:"visa", name: "Visa"},
+  {value:"mastercard", name: "MasterCard"},
+  {value:"ae", name: "American Express"},
+  {value:"unknown", name: "Unknown"},
+]
+
+type CardFormInput = "last4" | "brand" | "reference" | "amount"
+
+type CardForm = PaymentFormType & {
+  last4: number;
+  brand: string;
+}
+const defaultCardForm: CardForm = {last4: 0, brand: "unknow", amount: 0, reference: ""}
+
+type CardFormProps = PaymentFormType & {
+  last4: number;
+  brand: string;
+  onChange: (value: number|string, key: CardFormInput) => void
+ }
+
+const CardFormView = ({last4, brand, amount, reference, onChange}: CardFormProps) => {
+  const handleChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    if(event.currentTarget.name === "last4") {
+      event.currentTarget.value = event.currentTarget.value.replace(/\D/g, "")
+      if (event.currentTarget.value.length > event.currentTarget.maxLength) {
+        event.currentTarget.value = event.currentTarget.value.slice(0, event.currentTarget.maxLength);
+      }
+      onChange(event.currentTarget.valueAsNumber, event.currentTarget.name)
+      return
+    }
+
+    if(event.currentTarget.name === "amount") {
+      onChange(event.currentTarget.valueAsNumber, "amount")
+    }
+
+    onChange(event.currentTarget.value, event.currentTarget.name as CardFormInput)
+  }
+
+  return (
+    <div>
+      <FormSection onSubmit={() => {}}>
+        <FormSection.Title>Debit/Credit payment</FormSection.Title>
+        <FormSection.Description>Specify the amount of the Debit/Credit Card and the last 4 digits for future reference.</FormSection.Description>
+        <FormSection.Form>
+          <div className="col-span-6 sm:col-span-3 space-y-2">
+            <Label  htmlFor='last4' className='text-end'>Last 4 Digits</Label>
+            <Input
+              type="number"
+              inputMode="numeric"
+              name="last4"
+              pattern="[0-9]*"
+              maxLength={4}
+              className="text-end h-12 md:text-xl"
+              onChange={handleChange}
+              autoFocus
+              value={last4}
+            />
+          </div>
+          <div className="col-span-6 sm:col-span-3 space-y-2">
+            <Label  htmlFor='brand' className='text-end'>Brand</Label>
+            <Select
+              name='brand'
+              onValueChange={(value) => onChange(value, "brand")}
+              value={brand}
+              required
+            >
+              <SelectTrigger className="w-full" size={"lg"}>
+                <SelectValue placeholder="Select brand" />
+              </SelectTrigger>
+              <SelectContent className="w-full">
+                {defaultCardBrands.map((brand, index) => (
+                  <SelectItem key={index.toString()} value={brand.value.toString()}>
+                    {brand.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="col-span-6 sm:col-span-3 space-y-2">
+            <Label  htmlFor='reference'>Authorization</Label>
+            <Input
+              type="text"
+              name="reference"
+              className="text-start h-12 md:text-xl"
+              onChange={handleChange}
+              value={reference}
+            />
+          </div>
+          <div className="col-span-6 sm:col-span-3 space-y-2">
+            <Label  htmlFor='amount' className='text-end'>Amount</Label>
+            <Input
+              type="number"
+              inputMode="numeric"
+              name="amount"
+              pattern="[0-9]*"
+              className="text-end h-12 md:text-xl"
+              onChange={handleChange}
+              value={amount}
+            />
+          </div>
+        </FormSection.Form>
+      </FormSection>
+    </div>
+  )
+}
+
+type BTFormProps = CheckFormProps & {}
+
+type BTForm = PaymentFormType & {}
+
+const defaultBTForm: BTForm = {amount: 0, reference: ""}
+
+const BankTransferFormView = ({amount, reference, onChange}: BTFormProps) => {
+  const handleChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    if(event.currentTarget.name === "amount") {
+      onChange(event.currentTarget.valueAsNumber)
+      return
+    }
+
+    onChange(event.currentTarget.value)
+  }
+  return (
+    <div>
+      <FormSection onSubmit={() => {}}>
+        <FormSection.Title>Bank Transfer payment</FormSection.Title>
+        <FormSection.Description>Specify the amount of the Bank Transfer and the number for future reference.</FormSection.Description>
+        <FormSection.Form>
+          <div className="col-span-6 sm:col-span-4 space-y-2">
+            <Label  htmlFor='amount' className='text-end'>Amount</Label>
+            <Input
+              type="number"
+              min={0}
+              name="amount"
+              className="text-end h-12 md:text-xl"
+              onChange={handleChange}
+              autoFocus
+              value={amount}
+            />
+          </div>
+          <div className="col-span-6 sm:col-span-4 space-y-2">
+            <Label  htmlFor='reference'>Reference</Label>
+            <Input
+              type="text"
+              name="reference"
+              className="text-start h-12 md:text-xl"
+              onChange={handleChange}
+              value={reference}
+            />
+          </div>
+        </FormSection.Form>
+      </FormSection>
+    </div>
+  )
+}
+
+type paymentMethod = "cash" | "ck" | "card" | "bt";
+
+type paymentMethodType = {
+  value: paymentMethod
+  name: string;
+  amount: number
+  autoFocus?: boolean
+}
+
+const defaultPaymentMethods: paymentMethodType[] = [
+  {value: "cash", name: "Cash", amount: 0, autoFocus: true},
+  {value: "ck", name: "CK", amount: 0},
+  {value: "card", name: "Debit/Credit Card", amount: 0},
+  {value: "bt", name: "Bank Transfer", amount: 0},
+]
 
 const breadcrumbs: BreadcrumbItem[] = [
   {
@@ -78,6 +349,13 @@ export default function Create({ auth, customers, item }: PageProps<{ customers:
   const [openCancelConfirmation, setCancelConfirmation] = React.useState(false);
   const [openCheckout, setCheckout] = React.useState(false);
   const [isEditing, setEditing] = React.useState(false);
+  const [activePaymentForm, setActivePaymentForm] = React.useState<paymentMethod>("cash");
+  // Payment methods
+  const [paymentMethods, setPaymentMethods] = React.useState<paymentMethodType[]>(defaultPaymentMethods)
+  const [cashAmount, setCashAmount] = React.useState(0);
+  const [ckForm, setCkForm] = React.useState<CheckForm>(defaultCheckForm);
+  const [cardForm, setCardForm] = React.useState<CardForm>(defaultCardForm);
+  const [btForm, setBTForm] = React.useState<BTForm>(defaultBTForm);
 
   const referenceInputRef = React.useRef<HTMLInputElement>(null);
   const qtyInputRef = React.useRef<HTMLInputElement>(null);
@@ -301,7 +579,17 @@ export default function Create({ auth, customers, item }: PageProps<{ customers:
     placedInvoice()
   }
 
+  const composePaymentMethods = () => {
+    return {
+      cash: {amount: cashAmount},
+      check: ckForm,
+      card: cardForm,
+      bt: btForm,
+    }
+  }
+
   const placedInvoice = () => {
+    // Check if the total and payment match on cash terms.
     transform((data) => ({
       ...data,
       customer_id: invoiceForm.header.customer?.id,
@@ -311,7 +599,8 @@ export default function Create({ auth, customers, item }: PageProps<{ customers:
       notes: invoiceForm.header.notes || '',
       lines: invoiceForm.lines.map((line) => {
         return { id: line.id, quantity: line.quantity, unit: line.unit.id, price: line.price, rate: line.tax.rate}
-      })
+      }),
+      payment: composePaymentMethods()
     }))
     post('/invoices', {...headers, onSuccess: () => {
       removeStorageIvoinceForm();
@@ -343,6 +632,66 @@ export default function Create({ auth, customers, item }: PageProps<{ customers:
   const composeTotalAmount = (): number => {
     return (composeSubTotal + composeTax) - computeDiscount()
   }
+
+  const handleOnChangeInputView = (method: paymentMethod, value: number) => {
+    setActivePaymentForm(method)
+
+    if (typeof value  === "number" && method === "cash") {
+      const givenValue =  isNaN(value) ? 0 : value
+      setCashAmount(givenValue)
+      paymentMethods.filter((p) => p.value === "cash")[0].amount = givenValue
+      return
+    }
+  }
+
+  const handleOnChangeCheckFormView = (value: number|string) => {
+    if (typeof value  === "number") {
+      const givenValue =  isNaN(value) ? 0 : value
+      setCkForm(() => { return {...ckForm, amount: givenValue} })
+      paymentMethods.filter((p) => p.value === "ck")[0].amount = givenValue
+      return
+    }
+
+    setCkForm(() => { return {...ckForm, reference: value} })
+  }
+
+  const handleOnChangeCardFormView = (value: number | string, key: CardFormInput) => {
+    if (typeof value  === "number" && key === "last4") {
+      const givenValue =  isNaN(value) ? 0 : value
+      setCardForm(() => { return {...cardForm, last4: givenValue} })
+      return
+    }
+    if (key === "amount"){
+      setCardForm(() => { return {...cardForm, [key]: Number(value)} })
+      paymentMethods.filter((p) => p.value === "card")[0].amount = Number(value)
+      return
+    }
+
+    setCardForm(() => { return {...cardForm, [key]: value} })
+  }
+
+  const handleOnChangeBTFormView = (value: number|string) => {
+    if (typeof value  === "number") {
+      const givenValue =  isNaN(value) ? 0 : value
+      setBTForm(() => { return {...btForm, amount: givenValue} })
+      paymentMethods.filter((p) => p.value === "bt")[0].amount = givenValue
+      return
+    }
+
+    setBTForm(() => { return {...btForm, reference: value} })
+  }
+
+  const renderPaymentMethodForm = () => {
+    if (activePaymentForm === "ck") return <CheckFormView amount={ckForm.amount} reference={ckForm.reference} onChange={handleOnChangeCheckFormView}/>
+    if (activePaymentForm === "card") return <CardFormView last4={cardForm.last4} brand={cardForm.brand} amount={cardForm.amount} reference={cardForm.reference} onChange={handleOnChangeCardFormView} />
+    if (activePaymentForm === "bt") return <BankTransferFormView amount={btForm.amount} reference={btForm.reference} onChange={handleOnChangeBTFormView}  />
+    return <CashFormView />
+  }
+
+  const computeReceivedAmount = (): number => {
+    return (Number(cashAmount) + Number(ckForm.amount) + Number(cardForm.amount) + Number(btForm.amount))
+  }
+
   return (
     <AuthenticatedLayout user={auth.user} breadcrumbs={breadcrumbs}>
       <AuthenticatedLayout.Actions>
@@ -351,8 +700,8 @@ export default function Create({ auth, customers, item }: PageProps<{ customers:
           <Button onClick={handleCheckout} disabled={processing}>Checkout</Button>
         </div>
       </AuthenticatedLayout.Actions>
-      <div className="grid h-full w-full grid-cols-12 grid-rows-[auto_1fr_auto] gap-y-4">
-        <div className="z-50 col-span-12 grid h-60 grid-cols-2 gap-x-6">
+      <div className="grid h-full w-full grid-cols-12 grid-rows-[auto_1fr_auto] gap-y-4 bg-gray-50">
+        <div className="z-50 col-span-12 grid h-42 grid-cols-2 gap-x-6">
           <div className="rounded-lg bg-white shadow">
             {!open && !invoiceForm.header.customer && (
               <button onClick={() => setOpen(!open)} className="flex h-full w-full cursor-pointer items-center justify-center gap-2">
@@ -498,7 +847,6 @@ export default function Create({ auth, customers, item }: PageProps<{ customers:
                     <Input
                       type="number"
                       min={1}
-                      // defaultValue={currenItem?.quantity || 0}
                       name="quantity"
                       className="text-end"
                       tabIndex={1}
@@ -570,10 +918,10 @@ export default function Create({ auth, customers, item }: PageProps<{ customers:
             </table>
           </div>
         </div>
-        <div className="col-span-12 min-h-48 bg-yellow-500">
+        <div className="col-span-12 min-h-48">
           <div className='flex flex-col gap-y-2'>
             <div className='grid grid-cols-12'>
-              <div className="col-span-6 flex flex-col gap-y-2 p-2">
+              <div className="col-span-10 flex flex-col gap-y-2 p-2">
                 <Label className='text-sm/6 font-medium'>Notes</Label>
                 <Textarea
                   name='notes'
@@ -583,21 +931,21 @@ export default function Create({ auth, customers, item }: PageProps<{ customers:
                   onChange={(e) => setNotes(e.currentTarget.value)}
                   ></Textarea>
               </div>
-              <div className="col-span-6 flex flex-col gap-y-2">
-                <div className='grid place-content-end bg-indigo-300 p-2'>
-                  <div className='flex justify-between items-center w-60 bg-green-100'>
+              <div className="col-span-2 flex flex-col gap-y-2 rounded-lg shadow">
+                <div className='grid place-content-end p-2 gap-y-4'>
+                  <div className='flex justify-between items-center w-60'>
                     <span className="block text-base">Subtotal</span>
                     <span className="block text-base">{currency(composeSubTotal)}</span>
                   </div>
-                  <div className='flex justify-between items-center w-60 bg-green-100'>
+                  <div className='flex justify-between items-center w-60'>
                     <span className="block text-base">Discount</span>
-                    <div className='flex'>
+                    <div className='flex justify-end w-40'>
                       <Input
                         type="number"
                         min={0}
                         defaultValue={invoiceForm.header.discount.value}
                         name="discount"
-                        className="text-end"
+                        className="text-end w-20"
                         onChange={handleDiscountValueChange}
                       />
                       <Select
@@ -607,7 +955,7 @@ export default function Create({ auth, customers, item }: PageProps<{ customers:
                         value={String(invoiceForm.header.discount.type)}
                         required
                       >
-                        <SelectTrigger className="w-24">
+                        <SelectTrigger className="w-16">
                           <SelectValue placeholder="Discount" />
                         </SelectTrigger>
                         <SelectContent className="">
@@ -617,11 +965,12 @@ export default function Create({ auth, customers, item }: PageProps<{ customers:
                       </Select>
                     </div>
                   </div>
-                  <div className='flex justify-between items-center w-60 bg-green-100'>
+                  <div className='flex justify-between items-center w-60'>
                     <span className="block text-base">Tax</span>
                     <span className="block text-base">{currency(composeTax)}</span>
                   </div>
-                  <div className='flex justify-between items-center w-60 bg-green-100'>
+                  <Separator />
+                  <div className='flex justify-between items-center w-60'>
                     <span className="block text-xl">Total</span>
                     <span className="block text-xl">{currency(composeTotalAmount())}</span>
                   </div>
@@ -653,8 +1002,53 @@ export default function Create({ auth, customers, item }: PageProps<{ customers:
               <SheetDescription className="text-[12px]">Checkout process</SheetDescription>
             </SheetHeader>
             <div className="grid gap-4 px-4">
-              Add your checkout form here!
+              <h4>Payment detail</h4>
+              <div className='flex justify-between items-center w-full'>
+                 <table className="w-full table-auto">
+                  <thead>
+                    <tr>
+                    {paymentMethods.map((method) =>
+                      <th scope="col" key={method.value} className="w-60 border border-gray-300">{method.name}</th>
+                    )}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                    {paymentMethods.map((method) =>
+                      <td key={method.value} className="border px-1 border-gray-300 text-start">
+                        <InputView
+                          key={method.value}
+                          value={method.amount}
+                          method={method.value}
+                          onChange={handleOnChangeInputView}
+                          onFocus={(methodType) => setActivePaymentForm(methodType)}
+                          />
+                      </td>
+                    )}
+                    </tr>
+                  </tbody>
+                </table>
+
+              </div>
+              <div className='pb-6'>
+                {renderPaymentMethodForm()}
+              </div>
+              <Separator className='' />
+              <div className='flex justify-between items-center w-60'>
+                <span className="block text-2xl">To collect</span>
+                <span className="block text-2xl">{currency(composeTotalAmount())}</span>
+              </div>
+              <div className='flex justify-between items-center w-60'>
+                <span className="block text-2xl">Received</span>
+                <span className="block text-2xl">{currency(computeReceivedAmount())}</span>
+              </div>
             </div>
+            <SheetFooter>
+              <div className='flex justify-end gap-x-6'>
+                <Button variant={"secondary"} onClick={() => setCancelConfirmation(true)}>Cancel</Button>
+                <Button onClick={placedInvoice} disabled={processing}>Complete Invoice</Button>
+              </div>
+            </SheetFooter>
           </SheetContent>
         </Sheet>
       </div>

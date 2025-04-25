@@ -95,6 +95,53 @@ func (d *Discount) Scan(value any) error {
 	return json.Unmarshal(b, &d)
 }
 
+type PaymentAmount struct {
+	Amount float64 `json:"amount"`
+}
+
+type PaymentBase struct {
+	PaymentAmount
+	Reference string `json:"reference"`
+}
+
+type Cash struct {
+	PaymentAmount
+}
+
+type Check struct {
+	PaymentBase
+}
+
+type Card struct {
+	PaymentBase
+	Last4 int    `json:"last4"`
+	Brand string `json:"brand"`
+}
+
+type Bt struct {
+	PaymentBase
+}
+
+type Payment struct {
+	Cash  Cash  `json:"cash"`
+	Check Check `json:"check"`
+	Card  Card  `json:"card"`
+	Bt    Bt    `json:"bt"`
+}
+
+func (d *Payment) Value() (driver.Value, error) {
+	return json.Marshal(d)
+}
+
+func (d *Payment) Scan(value any) error {
+	b, ok := value.([]byte)
+	if !ok {
+		return errors.New("type assertion to []byte failed")
+	}
+
+	return json.Unmarshal(b, &d)
+}
+
 type StoreInvoiceForm struct {
 	support.FormRequest
 	CustomerID int       `json:"customer_id"`
@@ -109,7 +156,7 @@ type StoreInvoiceForm struct {
 		Price float64 `json:"price"`
 		Rate  float64 `json:"rate"`
 	} `json:"lines"`
-
+	Payment Payment `json:"payment"`
 	// considere these fields as protected
 	amount     float64
 	amountDue  float64
