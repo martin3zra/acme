@@ -8,6 +8,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"time"
 )
 
 func (v *Validator) Validate(ctx context.Context, object any, rules map[string]any, beforeValidation ...func()) bool {
@@ -35,12 +36,34 @@ func (v *Validator) validateAttributes(object any, rules map[string]any) {
 		f := val.Field(i)
 		switch f.Kind() {
 		case reflect.Struct:
-			v.setKeySeparator(".")
+			if f.Type() == reflect.TypeOf(time.Time{}) {
+				v.resetParentKey()
+				fieldRule, ok := rules[key]
+				if !ok {
+					continue
+				}
+
+				v.compileRuleSet(key, val.Field(i), v.resolveRuleComponents(fieldRule))
+				continue
+			}
+
 			v.setParentKey(key)
+			v.setKeySeparator(".")
 			v.validateAttributes(f.Interface(), rules)
 		case reflect.Slice:
-			v.setKeySeparator(".*.")
+			// If the Slice is empty compile any specified rule.
+			if f.Len() == 0 {
+				v.resetParentKey()
+				fieldRule, ok := rules[key]
+				if !ok {
+					continue
+				}
+				v.compileRuleSet(key, val.Field(i), v.resolveRuleComponents(fieldRule))
+				continue
+			}
+
 			v.setParentKey(key)
+			v.setKeySeparator(".*.")
 			for j := range f.Len() {
 				v.validateAttributes(f.Index(j).Interface(), rules)
 			}
@@ -69,10 +92,12 @@ func (v *Validator) messages(attribute, rule, kind string, value ...any) string 
 		"max": map[string]any{
 			"int":    "The %s field must not be greater than %v.",
 			"string": "The %s field must not be greater than %v characters.",
+			"slice":  "The %s field must not have more than %v items.",
 		},
 		"min": map[string]any{
 			"int":    "The %s field must not be greater than %v.",
 			"string": "The %s field must be at least %v characters.",
+			"slice":  "The %s field must has at least %v items.",
 		},
 		"gte": map[string]any{
 			"int":    "The %s field must be greater than or equal to %v.",
@@ -102,6 +127,8 @@ func (v *Validator) messages(attribute, rule, kind string, value ...any) string 
 		"in":               "The selected %s is invalid.",
 		"lowercase":        "The %s field must be lowercase.",
 		"uppercase":        "The %s field must be uppercase.",
+		"date":             "The %s field must be a valid date.",
+		"after":            "The %s field must be a date after %v.",
 	}
 
 	message, ok := messages[rule]
@@ -150,6 +177,8 @@ func (v *Validator) record(key, message string) {
 		v.errors = make(map[string][]string)
 	}
 
+	v.shouldStopOnFirstFailure(v.canBail)
+
 	// If we're validating a nested object (Array|Slice) we'll pre-append the parent key
 	// to the error message, and add the human position to the message, so it's more
 	// clear to the user to understand the error.
@@ -183,8 +212,9 @@ func (v *Validator) resolveRuleComponents(data any) []string {
 
 func (v *Validator) compileRuleSet(key string, value reflect.Value, rules []string) {
 	v.sometimes = slices.Contains(rules, "sometimes")
+	v.canBail = slices.Contains(rules, "bail")
 	rules = slices.DeleteFunc(rules, func(cmp string) bool {
-		return cmp == "sometimes"
+		return cmp == "sometimes" || cmp == "bail"
 	})
 
 	for _, rule := range rules {
@@ -198,6 +228,11 @@ func (v *Validator) compileRuleSet(key string, value reflect.Value, rules []stri
 			v.needsToIgnore = prepends[1] == "ignore"
 			rule = prepends[0]
 			ruleComponents[0] = rule
+		}
+
+		if v.stopOnFirstFailure {
+			v.shouldStopOnFirstFailure(false)
+			break
 		}
 
 		if v.ensureRuleExists(rule) {
@@ -232,6 +267,13 @@ func (v *Validator) evaluateRuleWithValues(key string, ruleComponents []string, 
 		return
 	}
 
+	if slices.Contains(dateRules, ruleComponents[0]) {
+		if !v.evaluateDateRule(ruleComponents[0], ruleComponents[1], value.Interface().(time.Time)) {
+			v.record(key, v.messages(key, ruleComponents[0], value.String(), attributes))
+		}
+		return
+	}
+
 	if hasMultipleAttributes {
 		if !v.validateBetween(int(value.Int()), attributes) {
 			v.record(key, v.messages(key, ruleComponents[0], value.Kind().String(), attributes[0], attributes[1]))
@@ -241,6 +283,16 @@ func (v *Validator) evaluateRuleWithValues(key string, ruleComponents []string, 
 	}
 
 	v.evaluateSingleValueRule(key, ruleComponents[0], attributes[0], value)
+}
+
+func (v *Validator) evaluateDateRule(rule string, ruleValue string, value time.Time) bool {
+	if rule == "after" {
+		if ruleValue == "yesterday" {
+			return value.After(time.Now().AddDate(0, 0, -1))
+		}
+	}
+
+	return true
 }
 
 func (v *Validator) evaluateSingleValueRule(key, rule string, ruleValue any, value reflect.Value) {
@@ -253,8 +305,10 @@ func (v *Validator) evaluateSingleValueRule(key, rule string, ruleValue any, val
 	case reflect.Float64:
 		castedRuleValue, _ := strconv.ParseFloat(ruleValue.(string), 64)
 		v.evaluateFloat64Rules(key, rule, value.Float(), castedRuleValue)
+	case reflect.Slice:
+		v.evaluateSliceRules(key, rule, value, castedRuleValue)
 	default:
-		fmt.Println("data type not supported yet!")
+		fmt.Println("data type not supported yet!", value.Type())
 	}
 
 }
@@ -268,6 +322,12 @@ func (v *Validator) evaluateSingleRule(key, rule string, value reflect.Value) {
 func (v *Validator) evaluateIntRules(key, rule string, fieldValue, ruleValue int) {
 	if !v.validateIntRules(rule, fieldValue, ruleValue) {
 		v.record(key, v.messages(key, rule, "int", ruleValue))
+	}
+}
+
+func (v *Validator) evaluateSliceRules(key, rule string, fieldValue reflect.Value, ruleValue int) {
+	if !v.validateSliceRules(rule, fieldValue, ruleValue) {
+		v.record(key, v.messages(key, rule, "slice", ruleValue))
 	}
 }
 

@@ -7,19 +7,26 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/martin3zra/acme/pkg/auth"
 )
 
 type ValidatesAttributes struct {
-	ctx             context.Context
-	sometimes       bool
-	needsToIgnore   bool
-	ignore          any
-	column          string
-	currentPosition int
-	parentKey       string
-	keySeparator    string
+	ctx                context.Context
+	sometimes          bool
+	canBail            bool
+	stopOnFirstFailure bool
+	needsToIgnore      bool
+	ignore             any
+	column             string
+	currentPosition    int
+	parentKey          string
+	keySeparator       string
+}
+
+func (va *ValidatesAttributes) shouldStopOnFirstFailure(shouldStop bool) {
+	va.stopOnFirstFailure = shouldStop
 }
 
 func (va *ValidatesAttributes) setKeySeparator(separator string) {
@@ -108,6 +115,10 @@ func (va *ValidatesAttributes) validateRuleWithoutAttributes(rule string, value 
 
 	if rule == "uppercase" {
 		return strings.ToUpper(value.String()) == value.String()
+	}
+
+	if rule == "date" {
+		return !value.Interface().(time.Time).IsZero()
 	}
 
 	return true

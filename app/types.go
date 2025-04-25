@@ -142,6 +142,14 @@ func (d *Payment) Scan(value any) error {
 	return json.Unmarshal(b, &d)
 }
 
+type Line struct {
+	ID    int     `json:"id"`
+	Unit  int     `json:"unit"`
+	Qty   int     `json:"quantity"`
+	Price float64 `json:"price"`
+	Rate  float64 `json:"rate"`
+}
+
 type StoreInvoiceForm struct {
 	support.FormRequest
 	CustomerID int       `json:"customer_id"`
@@ -149,14 +157,8 @@ type StoreInvoiceForm struct {
 	Terms      int       `json:"terms"`
 	Discount   Discount  `json:"discount"`
 	Notes      string    `json:"notes"`
-	Lines      []struct {
-		ID    int     `json:"id"`
-		Unit  int     `json:"unit"`
-		Qty   int     `json:"quantity"`
-		Price float64 `json:"price"`
-		Rate  float64 `json:"rate"`
-	} `json:"lines"`
-	Payment Payment `json:"payment"`
+	Lines      []Line    `json:"lines"`
+	Payment    Payment   `json:"payment"`
 	// considere these fields as protected
 	amount     float64
 	amountDue  float64
@@ -167,10 +169,10 @@ type StoreInvoiceForm struct {
 
 func (StoreInvoiceForm) Rules() map[string]any {
 	return map[string]any{
-		"customer_id":    "required|exists:customers,id",
-		"date":           "required",
-		"terms":          "required",
-		"lines":          "required",
+		"customer_id":    "bail|required|exists:customers,id",
+		"date":           "bail|required|date|after:yesterday",
+		"terms":          "bail|required|min:1",
+		"lines":          "required|min:1",
 		"lines.*.id":     "required|exists:items,id",
 		"lines.*.unit":   "required|exists:units,id",
 		"lines.*.qty":    "required|min:1",

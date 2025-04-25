@@ -17,6 +17,17 @@ var defaultRules = []string{
 	"in",
 	"uppercase",
 	"lowercase",
+	"date",
+	"after",
+	"before",
+	"format",
+}
+
+var dateRules = []string{
+	"date",
+	"after",
+	"before",
+	"format",
 }
 
 var arrayRules = []string{

@@ -15,6 +15,11 @@ func PrepareBulkInsert(columns, values int) string {
 		stmt = stmt[:len(stmt)-1] + `),`
 	}
 
-	// Remove last comma and Return the statement
-	return stmt[:len(stmt)-1]
+	if len(stmt) > 0 {
+
+		// Remove last comma and Return the statement
+		return stmt[:len(stmt)-1]
+	}
+
+	return stmt
 }
