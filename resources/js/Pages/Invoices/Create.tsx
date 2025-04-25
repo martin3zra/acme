@@ -1,4 +1,6 @@
 import FormSection from '@/components/form-section';
+import InputError from '@/components/input-error';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
 import { Calendar } from '@/components/ui/calendar';
@@ -16,9 +18,9 @@ import AuthenticatedLayout from '@/layouts/authenticated-layout';
 import { cn } from '@/lib/utils';
 import { BreadcrumbItem, Customer, DiscountType, Item, PageProps } from '@/types';
 import { Textarea } from '@headlessui/react';
-import { router, useForm } from '@inertiajs/react';
+import { router, useForm, usePage } from '@inertiajs/react';
 import { format } from 'date-fns';
-import { CalendarIcon, User, UserPlus, XCircleIcon } from 'lucide-react';
+import { AlertCircle, CalendarIcon, User, UserPlus, XCircleIcon } from 'lucide-react';
 import React, { JSX, useCallback, useEffect } from 'react';
 
 interface PaymentFormType {
@@ -372,9 +374,11 @@ export default function Create({ auth, customers, item }: PageProps<{ customers:
   const [currenItem, setCurrentItem] = React.useState<Item | undefined>(undefined);
 
   const { headers } = useHeader();
-
-  const { post, transform, processing } = useForm({
+  const { errors: propsErrors } = usePage<PageProps>().props;
+  const { post, transform, processing, errors } = useForm({
     customer_id: 0,
+    terms: 0,
+    lines: [],
     date: new Date(),
   });
 
@@ -505,14 +509,15 @@ export default function Create({ auth, customers, item }: PageProps<{ customers:
   };
 
   const addDays = (dateValue: Date, days: number): Date => {
-    let date: Date = dateValue instanceof Date ? dateValue : new Date(dateValue);
+    const date: Date = dateValue instanceof Date ? dateValue : new Date(dateValue);
     date.setDate(date.getDate() + days)
     return date
   }
 
   const handleDateChange = (date: unknown) => {
     invoiceForm.header.date = date as Date;
-    if (invoiceForm.header.terms > 0) {
+    invoiceForm.header.due = undefined
+    if (invoiceForm.header.terms > 1) {
       invoiceForm.header.due = addDays(date as Date, invoiceForm.header.terms)
     }
 
@@ -524,8 +529,8 @@ export default function Create({ auth, customers, item }: PageProps<{ customers:
   const handlePaymentTermsChange = (value: string) => {
     invoiceForm.header.terms = Number(value)
 
-    if (invoiceForm.header.terms > 0 && invoiceForm.header.date) {
-      invoiceForm.header.due = addDays(invoiceForm.header.date, invoiceForm.header.terms)
+    if (invoiceForm.header.terms > 1 && invoiceForm.header.date) {
+      invoiceForm.header.due = addDays(new Date(invoiceForm.header.date.getDate()), invoiceForm.header.terms)
     } else {
       invoiceForm.header.due = undefined
     }
@@ -700,16 +705,20 @@ export default function Create({ auth, customers, item }: PageProps<{ customers:
           <Button onClick={handleCheckout} disabled={processing}>Checkout</Button>
         </div>
       </AuthenticatedLayout.Actions>
-      <div className="grid h-full w-full grid-cols-12 grid-rows-[auto_1fr_auto] gap-y-4 bg-gray-50">
+      {propsErrors.status && <div className="mb-4 text-center text-sm font-medium text-red-600">{propsErrors.status}</div>}
+      <div className="grid h-full w-full grid-cols-12 grid-rows-[auto_1fr_auto] gap-y-4 bg-gray-50/10">
         <div className="z-50 col-span-12 grid h-42 grid-cols-2 gap-x-6">
           <div className="rounded-lg bg-white shadow">
             {!open && !invoiceForm.header.customer && (
-              <button onClick={() => setOpen(!open)} className="flex h-full w-full cursor-pointer items-center justify-center gap-2">
-                <div className="flex size-10 items-center justify-center rounded-full bg-gray-200">
-                  <User className="size-6" color="white" />
-                </div>
-                <div className="text-lg">Customer</div>
-              </button>
+              <div data-slot={`${errors.customer_id ? 'customer-error' : 'default'}`} className='flex flex-col h-full w-full items-center justify-center [&_svg]:text-white px-2 pb-2 data-[slot=customer-error]:rounded-lg data-[slot=customer-error]:bg-red-100/50 data-[slot=customer-error]:border data-[slot=customer-error]:border-red-500 data-[slot=customer-error]:[&_svg]:text-red-500 data-[slot=customer-error]:[&_[data-label=true]]:text-red-500'>
+                <button onClick={() => setOpen(!open)} className="flex h-full w-full cursor-pointer items-center justify-center gap-2">
+                  <div className="flex size-10 items-center justify-center rounded-full bg-gray-200">
+                    <User className="size-6 *:data-[slot=customer-error]:text-red-500" />
+                  </div>
+                  <div data-label="true" className="text-lg">Customer</div>
+                </button>
+                <InputError className="mt-2" message={errors.customer_id} />
+              </div>
             )}
             {invoiceForm.header.customer && (
               <div className="flex h-full flex-col overflow-y-hidden p-2">
@@ -791,6 +800,7 @@ export default function Create({ auth, customers, item }: PageProps<{ customers:
                     />
                   </PopoverContent>
                 </Popover>
+                <InputError className="mt-2" message={errors.date} />
               </div>
               <div className="flex flex-col gap-y-2">
                 <Label htmlFor="date">Due Date</Label>
@@ -802,7 +812,6 @@ export default function Create({ auth, customers, item }: PageProps<{ customers:
               <Select
                 name='paymentTerms'
                 onValueChange={handlePaymentTermsChange}
-                // disabled={viewMode}
                 defaultValue={"0"}
                 value={String(invoiceForm.header.terms)}
                 required
@@ -818,22 +827,24 @@ export default function Create({ auth, customers, item }: PageProps<{ customers:
                   ))}
                 </SelectContent>
               </Select>
+              <InputError className="mt-2" message={errors.terms} />
             </div>
           </div>
         </div>
         <div className="col-span-12">
           <div className="flex flex-col">
+            <InputError message={errors.lines} />
             <table className="w-full table-auto">
               <thead>
                 <tr>
-                  <th scope="col" className="w-60 border border-gray-300">
+                  <th scope="col" className="w-60 pe-1 border border-gray-300">
                     <Input
                       name="reference"
                       ref={referenceInputRef}
                       data-reset={false}
                       placeholder="Item reference"
                       onKeyDown={handleKeyDown}
-                      className=""
+                      className="border-none focus-visible:border-none focus-visible:ring-[2px] rounded-none"
                       tabIndex={0}
                     />
                   </th>
@@ -848,7 +859,7 @@ export default function Create({ auth, customers, item }: PageProps<{ customers:
                       type="number"
                       min={1}
                       name="quantity"
-                      className="text-end"
+                      className="text-endborder-none focus-visible:border-none focus-visible:ring-[2px] rounded-none"
                       tabIndex={1}
                       ref={qtyInputRef}
                       onFocus={(e) => computedCurrentItemAmount(e.currentTarget.valueAsNumber)}
@@ -868,7 +879,6 @@ export default function Create({ auth, customers, item }: PageProps<{ customers:
                       ref={addButtonRef}
                       onKeyDown={handleDoneButtonKeyPress}
                       onClick={handleDoneButtonClick}
-                      // disabled={processing}
                       className="h-8 w-8 rounded-full p-0"
                     >
                       +
