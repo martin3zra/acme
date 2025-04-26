@@ -73,8 +73,8 @@ func (s *Server) storeInvoice(companyID int, form StoreInvoiceForm) error {
 	if err != nil {
 		return err
 	}
-	stmt, err := tx.Prepare("INSERT INTO invoices (company_id, date, customer_id, amount, discount, tax, amount_due, total, note, paid_status, payment) " +
-		"VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING id")
+	stmt, err := tx.Prepare("INSERT INTO invoices (company_id, date, type, due_on, customer_id, amount, discount, tax, amount_due, total, note, paid_status, payment) " +
+		"VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13) RETURNING id")
 	if err != nil {
 		defer stmt.Close()
 		if txErr := tx.Rollback(); txErr != nil {
@@ -89,6 +89,8 @@ func (s *Server) storeInvoice(companyID int, form StoreInvoiceForm) error {
 	err = stmt.QueryRow(
 		companyID,
 		form.Date,
+		form.termType,
+		&form.dueOn,
 		form.CustomerID,
 		form.amount,
 		foundation.ToJSON(form.Discount),

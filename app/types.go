@@ -69,6 +69,13 @@ func (StoreItemForm) Rules() map[string]any {
 	}
 }
 
+type TermType string
+
+const (
+	CASH   TermType = "cash"
+	CREDIT TermType = "credit"
+)
+
 type PaidStatus string
 
 const (
@@ -165,6 +172,8 @@ type StoreInvoiceForm struct {
 	tax        float64
 	total      float64
 	paidStatus PaidStatus
+	dueOn      *time.Time
+	termType   TermType
 }
 
 func (StoreInvoiceForm) Rules() map[string]any {
@@ -189,10 +198,16 @@ func (form *StoreInvoiceForm) PassedValidation() {
 	form.computeTax()
 	form.applyDiscount()
 
+	form.dueOn = nil
 	form.paidStatus = PAID
+	form.termType = CASH
 	if form.Terms > 1 {
 		form.amountDue = form.total
 		form.paidStatus = UNPAID
+		form.termType = CREDIT
+
+		dueDate := form.Date.AddDate(0, 0, form.Terms)
+		form.dueOn = &dueDate
 	}
 }
 
