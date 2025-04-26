@@ -196,6 +196,10 @@ func (form *StoreInvoiceForm) PassedValidation() {
 	}
 }
 
+func (form *StoreInvoiceForm) paymentTotalAmount() float64 {
+	return form.Payment.Cash.Amount + form.Payment.Card.Amount + form.Payment.Check.Amount + form.Payment.Bt.Amount
+}
+
 func (form *StoreInvoiceForm) computeTax() {
 	for _, line := range form.Lines {
 		// we need to add the discount here.

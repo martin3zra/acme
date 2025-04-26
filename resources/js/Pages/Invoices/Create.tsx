@@ -1,6 +1,6 @@
+import { AlertDestructive } from '@/components/alert-destructive';
 import FormSection from '@/components/form-section';
 import InputError from '@/components/input-error';
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
 import { Calendar } from '@/components/ui/calendar';
@@ -20,7 +20,7 @@ import { BreadcrumbItem, Customer, DiscountType, Item, PageProps } from '@/types
 import { Textarea } from '@headlessui/react';
 import { router, useForm, usePage } from '@inertiajs/react';
 import { format } from 'date-fns';
-import { AlertCircle, CalendarIcon, User, UserPlus, XCircleIcon } from 'lucide-react';
+import { CalendarIcon, User, UserPlus, XCircleIcon } from 'lucide-react';
 import React, { JSX, useCallback, useEffect } from 'react';
 
 interface PaymentFormType {
@@ -697,6 +697,9 @@ export default function Create({ auth, customers, item }: PageProps<{ customers:
     return (Number(cashAmount) + Number(ckForm.amount) + Number(cardForm.amount) + Number(btForm.amount))
   }
 
+  const computeRemainingBalance = (): number => {
+    return composeTotalAmount() - computeReceivedAmount()
+  }
   return (
     <AuthenticatedLayout user={auth.user} breadcrumbs={breadcrumbs}>
       <AuthenticatedLayout.Actions>
@@ -705,8 +708,8 @@ export default function Create({ auth, customers, item }: PageProps<{ customers:
           <Button onClick={handleCheckout} disabled={processing}>Checkout</Button>
         </div>
       </AuthenticatedLayout.Actions>
-      {propsErrors.status && <div className="mb-4 text-center text-sm font-medium text-red-600">{propsErrors.status}</div>}
       <div className="grid h-full w-full grid-cols-12 grid-rows-[auto_1fr_auto] gap-y-4 bg-gray-50/10">
+        {!openCheckout && propsErrors.status && <div className="col-span-12"><AlertDestructive description={propsErrors.status} onDestroy={() => delete propsErrors.status }/></div>}
         <div className="z-50 col-span-12 grid h-42 grid-cols-2 gap-x-6">
           <div className="rounded-lg bg-white shadow">
             {!open && !invoiceForm.header.customer && (
@@ -859,7 +862,7 @@ export default function Create({ auth, customers, item }: PageProps<{ customers:
                       type="number"
                       min={1}
                       name="quantity"
-                      className="text-endborder-none focus-visible:border-none focus-visible:ring-[2px] rounded-none"
+                      className="text-end border-none focus-visible:border-none focus-visible:ring-[2px] rounded-none"
                       tabIndex={1}
                       ref={qtyInputRef}
                       onFocus={(e) => computedCurrentItemAmount(e.currentTarget.valueAsNumber)}
@@ -936,12 +939,12 @@ export default function Create({ auth, customers, item }: PageProps<{ customers:
                 <Textarea
                   name='notes'
                   rows={4}
-                  className="block rounded-lg text-sm/6 resize-none border-none px-3 py-1.5 focus:no-data-focus:outline-none data-focus:outline-2 data-focus:-outline-offset-2 data-focus:outline-white/25"
+                  className="block w-1/2 rounded-lg text-sm/6 resize-none border px-3 py-1.5 focus:no-data-focus:outline-none data-focus:outline-2 data-focus:-outline-offset-2 data-focus:outline-white/25"
                   defaultValue={invoiceForm.header.notes}
                   onChange={(e) => setNotes(e.currentTarget.value)}
                   ></Textarea>
               </div>
-              <div className="col-span-2 flex flex-col gap-y-2 rounded-lg shadow">
+              <div className="col-span-2 flex flex-col gap-y-2 rounded-lg border border-gray-300/25 bg-gray-100/10">
                 <div className='grid place-content-end p-2 gap-y-4'>
                   <div className='flex justify-between items-center w-60'>
                     <span className="block text-base">Subtotal</span>
@@ -1012,6 +1015,7 @@ export default function Create({ auth, customers, item }: PageProps<{ customers:
               <SheetDescription className="text-[12px]">Checkout process</SheetDescription>
             </SheetHeader>
             <div className="grid gap-4 px-4">
+              {propsErrors.status && <AlertDestructive description={propsErrors.status} onDestroy={() => delete propsErrors.status }/>}
               <h4>Payment detail</h4>
               <div className='flex justify-between items-center w-full'>
                  <table className="w-full table-auto">
@@ -1044,19 +1048,26 @@ export default function Create({ auth, customers, item }: PageProps<{ customers:
                 {renderPaymentMethodForm()}
               </div>
               <Separator className='' />
-              <div className='flex justify-between items-center w-60'>
-                <span className="block text-2xl">To collect</span>
-                <span className="block text-2xl">{currency(composeTotalAmount())}</span>
-              </div>
-              <div className='flex justify-between items-center w-60'>
-                <span className="block text-2xl">Received</span>
-                <span className="block text-2xl">{currency(computeReceivedAmount())}</span>
+              <div>
+                <div className='flex justify-between items-center w-60'>
+                  <span className="block text-2xl">To collect</span>
+                  <span className="block text-2xl">{currency(composeTotalAmount())}</span>
+                </div>
+                <div className='flex justify-between items-center w-60'>
+                  <span className="block text-2xl">Received</span>
+                  <span className="block text-2xl">{currency(computeReceivedAmount())}</span>
+                </div>
+                <div className='flex justify-between items-center w-60'>
+                  <span className="block text-2xl">Remaining</span>
+                  <span className="block text-2xl text-red-600 font-medium">{currency(computeRemainingBalance())}</span>
+                </div>
               </div>
             </div>
             <SheetFooter>
+              {computeRemainingBalance() !== 0 && <AlertDestructive description="The amount collected must be equals to the Invoice total amount." destroyable={false} />}
               <div className='flex justify-end gap-x-6'>
                 <Button variant={"secondary"} onClick={() => setCancelConfirmation(true)}>Cancel</Button>
-                <Button onClick={placedInvoice} disabled={processing}>Complete Invoice</Button>
+                <Button onClick={placedInvoice} disabled={processing || computeRemainingBalance() !== 0}>Complete Invoice</Button>
               </div>
             </SheetFooter>
           </SheetContent>

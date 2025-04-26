@@ -227,3 +227,18 @@ func TestLowerAndUpperCaseRule(t *testing.T) {
 		t.Errorf("validation fails:\n %v", validator.Errors())
 	}
 }
+
+func TestDigitsRule(t *testing.T) {
+
+	person := Person{
+		Age: 22,
+	}
+
+	var validator = validator.Validator{}
+	validator.Validate(context.Background(), &person, map[string]any{
+		"age": "required|min_digits:2",
+	})
+	if len(validator.Errors()) > 0 {
+		t.Errorf("validation fails:\n %v", validator.Errors())
+	}
+}

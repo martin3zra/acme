@@ -71,6 +71,12 @@ func (s *Server) storeInvoiceHandler(i *inertia.Inertia) http.Handler {
 			return
 		}
 
+		if form.Terms == 1 && form.total != form.paymentTotalAmount() {
+			s.session.Errors("status", "Invoice total amount and the payment details are different.")
+			i.Back(w, r)
+			return
+		}
+
 		user := auth.User(r.Context())
 		err = s.storeInvoice(*user.CurrentCompanyId, form)
 		if err != nil {

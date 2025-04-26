@@ -21,6 +21,10 @@ var defaultRules = []string{
 	"after",
 	"before",
 	"format",
+	"digits",
+	"digits_between",
+	"max_digits",
+	"min_digits",
 }
 
 var dateRules = []string{

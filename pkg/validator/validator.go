@@ -129,6 +129,10 @@ func (v *Validator) messages(attribute, rule, kind string, value ...any) string 
 		"uppercase":        "The %s field must be uppercase.",
 		"date":             "The %s field must be a valid date.",
 		"after":            "The %s field must be a date after %v.",
+		"digits":           "The %s field must be %v digits.",
+		"digits_between":   "The %s field must be between %v and %v digits.",
+		"max_digits":       "The %s field must not have more than %v digits.",
+		"min_digits":       "The %s field must have at least %v digits.",
 	}
 
 	message, ok := messages[rule]
@@ -275,6 +279,12 @@ func (v *Validator) evaluateRuleWithValues(key string, ruleComponents []string, 
 	}
 
 	if hasMultipleAttributes {
+		if ruleComponents[0] == "digits_between" {
+			if !v.validateBetween(digits(int(value.Int())), attributes) {
+				v.record(key, v.messages(key, ruleComponents[0], value.Kind().String(), attributes[0], attributes[1]))
+			}
+			return
+		}
 		if !v.validateBetween(int(value.Int()), attributes) {
 			v.record(key, v.messages(key, ruleComponents[0], value.Kind().String(), attributes[0], attributes[1]))
 		}
@@ -320,6 +330,13 @@ func (v *Validator) evaluateSingleRule(key, rule string, value reflect.Value) {
 }
 
 func (v *Validator) evaluateIntRules(key, rule string, fieldValue, ruleValue int) {
+	if rule == "max_digits" || rule == "min_digits" {
+		if !v.validateIntRules(rule, digits(fieldValue), ruleValue) {
+			v.record(key, v.messages(key, rule, "int", ruleValue))
+		}
+		return
+	}
+
 	if !v.validateIntRules(rule, fieldValue, ruleValue) {
 		v.record(key, v.messages(key, rule, "int", ruleValue))
 	}
