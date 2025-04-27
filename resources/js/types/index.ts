@@ -97,3 +97,47 @@ export interface BreadcrumbItem {
 }
 
 export type Verb = "create" | "view" | "edit" | "trash"
+
+export interface PaymentFormType {
+  amount: number;
+  reference: string;
+}
+
+export type BankOperationFormProps = Partial<PaymentFormType> & {
+  onChange: (value: number|string) => void;
+}
+
+export type CheckForm = PaymentFormType & {}
+
+export type PaymentMethod = "cash" | "ck" | "card" | "bt";
+
+export type CardBrand = {
+  value: string;
+  name: string;
+}
+
+export type CardFormInput = "last4" | "brand" | "reference" | "amount"
+
+export type CardForm = PaymentFormType & {
+  last4: number;
+  brand: string;
+}
+
+export type BTForm = PaymentFormType & {}
+
+export type PaymentMethodType = {
+  value: PaymentMethod
+  name: string;
+  amount: number
+  autoFocus?: boolean
+}
+
+export type PaymentTerm = {
+  value: number
+  label: string
+}
+
+export interface LineForm extends Item {
+  quantity: number;
+  amount: number;
+}

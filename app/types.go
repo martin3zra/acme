@@ -190,7 +190,7 @@ func (form StoreInvoiceForm) Rules() map[string]any {
 		"lines.*.rate":  "required",
 		"discount":      "required",
 		"discount.value": []any{
-			"required",
+			"sometimes",
 			validator.Rule{}.When(form.Discount.Type == "percentage", "between:0,100", "min:0"),
 		},
 		"discount.type": "required|in:percentage,fixed",
@@ -226,8 +226,9 @@ func (form *StoreInvoiceForm) computeTax() {
 
 		form.tax += lineAmount * (line.Rate / 100)
 		form.amount += lineAmount
-		form.total += lineAmount + form.tax
 	}
+
+	form.total = form.amount + form.tax
 }
 
 func (form *StoreInvoiceForm) applyDiscount() {
