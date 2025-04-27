@@ -380,6 +380,7 @@ export default function Create({ auth, customers, item }: PageProps<{ customers:
     terms: 0,
     lines: [],
     date: new Date(),
+    discount: defaultDiscount,
   });
 
   const computedCurrentItemAmount = (qty: number) => {
@@ -938,10 +939,12 @@ export default function Create({ auth, customers, item }: PageProps<{ customers:
                   className="block w-1/2 rounded-lg text-sm/6 resize-none border px-3 py-1.5 focus:no-data-focus:outline-none data-focus:outline-2 data-focus:-outline-offset-2 data-focus:outline-white/25"
                   defaultValue={invoiceForm.header.notes}
                   onChange={(e) => setNotes(e.currentTarget.value)}
-                  ></Textarea>
+                  />
               </div>
               <div className="col-span-2 flex flex-col gap-y-2 rounded-lg border border-gray-300/25 bg-gray-100/10">
                 <div className='grid place-content-end p-2 gap-y-4'>
+                  {/* Add red border as the customer card, using data attributes */}
+                  <InputError message={errors["discount.value"]} />
                   <div className='flex justify-between items-center w-60'>
                     <span className="block text-base">Subtotal</span>
                     <span className="block text-base">{currency(composeSubTotal)}</span>

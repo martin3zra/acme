@@ -3,6 +3,7 @@ package support
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"log"
 	"net/http"
 	"slices"
@@ -11,6 +12,7 @@ import (
 
 	"github.com/martin3zra/acme/pkg/foundation"
 	"github.com/martin3zra/acme/pkg/session"
+	"github.com/martin3zra/acme/pkg/validator"
 )
 
 func ParseRequest(r *http.Request, params any) error {
@@ -53,7 +55,7 @@ func ParseRequest(r *http.Request, params any) error {
 
 func resolveKeyToIgnore(rules map[string]any) *string {
 	for k, rule := range rules {
-		parts := strings.Split(rule.(string), "|")
+		parts := resolveRuleParts(rule)
 		for _, part := range parts {
 			components := strings.Split(part, ":")
 			hasIgnore := slices.Contains(components, "unique.ignore")
@@ -63,4 +65,32 @@ func resolveKeyToIgnore(rules map[string]any) *string {
 		}
 	}
 	return nil
+}
+
+func resolveRuleParts(data any) []string {
+	mixedData, ok := data.([]any)
+	if ok {
+		rules := make([]string, 0)
+		for index := range mixedData {
+			switch attributes := mixedData[index].(type) {
+			case validator.ConditionalRules:
+				rules = append(rules, strings.Split(attributes.Constraints(), "|")...)
+			case validator.RuleConstraints:
+				rules = append(rules, strings.Split(attributes.Constraints(), "|")...)
+			case string:
+				rules = append(rules, strings.Split(attributes, "|")...)
+			default:
+				fmt.Println("Field rules not supported!")
+			}
+		}
+
+		return rules
+	}
+
+	ruleContractValue, ok := data.(validator.RuleConstraints)
+	if ok {
+		return strings.Split(ruleContractValue.Constraints(), "|")
+	}
+
+	return strings.Split(data.(string), "|")
 }

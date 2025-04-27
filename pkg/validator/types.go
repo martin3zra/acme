@@ -59,3 +59,26 @@ type Validator struct {
 	ValidatesAttributes
 	errors Errors
 }
+
+type ConditionalRules struct {
+	condition    bool
+	rules        string
+	defaultRules string
+}
+
+func (c ConditionalRules) Constraints() string {
+
+	if c.condition {
+		return c.rules
+	}
+
+	return c.defaultRules
+}
+
+func (r Rule) When(condition bool, rules string, defaultRules string) ConditionalRules {
+	return ConditionalRules{
+		condition:    condition,
+		rules:        rules,
+		defaultRules: defaultRules,
+	}
+}

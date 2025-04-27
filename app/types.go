@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/martin3zra/acme/pkg/support"
+	"github.com/martin3zra/acme/pkg/validator"
 )
 
 type LoginFormRequest struct {
@@ -176,20 +177,23 @@ type StoreInvoiceForm struct {
 	termType   TermType
 }
 
-func (StoreInvoiceForm) Rules() map[string]any {
+func (form StoreInvoiceForm) Rules() map[string]any {
 	return map[string]any{
-		"customer_id":    "bail|required|exists:customers,id",
-		"date":           "bail|required|date|after:yesterday",
-		"terms":          "bail|required|min:1",
-		"lines":          "required|min:1",
-		"lines.*.id":     "required|exists:items,id",
-		"lines.*.unit":   "required|exists:units,id",
-		"lines.*.qty":    "required|min:1",
-		"lines.*.price":  "required",
-		"lines.*.rate":   "required",
-		"discount":       "required",
-		"discount.value": "sometimes",
-		"discount.type":  "sometimes|in:percentage,fixed",
+		"customer_id":   "bail|required|exists:customers,id",
+		"date":          "bail|required|date|after:yesterday",
+		"terms":         "bail|required|min:1",
+		"lines":         "required|min:1",
+		"lines.*.id":    "required|exists:items,id",
+		"lines.*.unit":  "required|exists:units,id",
+		"lines.*.qty":   "required|min:1",
+		"lines.*.price": "required",
+		"lines.*.rate":  "required",
+		"discount":      "required",
+		"discount.value": []any{
+			"required",
+			validator.Rule{}.When(form.Discount.Type == "percentage", "between:0,100", "min:0"),
+		},
+		"discount.type": "required|in:percentage,fixed",
 	}
 }
 

@@ -86,13 +86,21 @@ func (va *ValidatesAttributes) validateNumericRules(rule string, fieldValue, rul
 	return true
 }
 
-func (va *ValidatesAttributes) validateBetween(value int, params []string) bool {
+func (va *ValidatesAttributes) validateBetween(value reflect.Value, params []string) bool {
 	va.requireParameterCount(2, params, "bewteen")
 
 	minValue, _ := strconv.Atoi(params[0])
 	maxValue, _ := strconv.Atoi(params[1])
 
-	return value >= minValue && value <= maxValue
+	switch value.Kind() {
+	case reflect.Int, reflect.Int64:
+		return value.Int() >= int64(minValue) && value.Int() <= int64(maxValue)
+	case reflect.Float32, reflect.Float64:
+		return value.Float() >= float64(minValue) && value.Float() <= float64(maxValue)
+	default:
+	}
+
+	return true
 }
 
 func (va *ValidatesAttributes) validateRuleWithoutAttributes(rule string, value reflect.Value) bool {

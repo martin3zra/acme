@@ -242,3 +242,20 @@ func TestDigitsRule(t *testing.T) {
 		t.Errorf("validation fails:\n %v", validator.Errors())
 	}
 }
+
+func TestConditionalRule(t *testing.T) {
+
+	person := Person{
+		Age:  22,
+		Name: "Jane",
+	}
+
+	var vali = validator.Validator{}
+	vali.Validate(context.Background(), &person, map[string]any{
+		"age":  "required|min:18",
+		"name": []any{"required", validator.Rule{}.When(person.Age > 30, "min:10|max:100", "min:3")},
+	})
+	if len(vali.Errors()) > 0 {
+		t.Errorf("validation fails:\n %v", vali.Errors())
+	}
+}

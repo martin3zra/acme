@@ -207,10 +207,29 @@ func (v *Validator) resolveKeyBasedOnJsonTag(field reflect.Type, index int) stri
 }
 
 func (v *Validator) resolveRuleComponents(data any) []string {
+	mixedData, ok := data.([]any)
+	if ok {
+		rules := make([]string, 0)
+		for index := range mixedData {
+			switch attributes := mixedData[index].(type) {
+			case ConditionalRules:
+				rules = append(rules, strings.Split(attributes.Constraints(), "|")...)
+			case RuleConstraints:
+				rules = append(rules, strings.Split(attributes.Constraints(), "|")...)
+			case string:
+				rules = append(rules, strings.Split(attributes, "|")...)
+			default:
+				fmt.Println("Field rules not supported!")
+			}
+		}
+		return rules
+	}
+
 	ruleContractValue, ok := data.(RuleConstraints)
 	if ok {
 		return strings.Split(ruleContractValue.Constraints(), "|")
 	}
+
 	return strings.Split(data.(string), "|")
 }
 
@@ -279,16 +298,7 @@ func (v *Validator) evaluateRuleWithValues(key string, ruleComponents []string, 
 	}
 
 	if hasMultipleAttributes {
-		if ruleComponents[0] == "digits_between" {
-			if !v.validateBetween(digits(int(value.Int())), attributes) {
-				v.record(key, v.messages(key, ruleComponents[0], value.Kind().String(), attributes[0], attributes[1]))
-			}
-			return
-		}
-		if !v.validateBetween(int(value.Int()), attributes) {
-			v.record(key, v.messages(key, ruleComponents[0], value.Kind().String(), attributes[0], attributes[1]))
-		}
-
+		v.evaluateMultipleValueRule(key, ruleComponents[0], value, attributes)
 		return
 	}
 
@@ -303,6 +313,28 @@ func (v *Validator) evaluateDateRule(rule string, ruleValue string, value time.T
 	}
 
 	return true
+}
+
+func (v *Validator) evaluateMultipleValueRule(key, rule string, value reflect.Value, attributes []string) {
+	fieldValue := value
+	if rule == "digits_between" {
+		if value.Kind() != reflect.Int {
+			return
+		}
+		fieldValue = reflect.ValueOf(digits(int(value.Int())))
+	}
+
+	if !v.validateBetween(fieldValue, attributes) {
+		kind := ""
+		switch value.Kind() {
+		case reflect.Float32, reflect.Float64, reflect.Int32, reflect.Int64:
+			kind = "int"
+		default:
+			kind = "string"
+		}
+
+		v.record(key, v.messages(key, rule, kind, attributes[0], attributes[1]))
+	}
 }
 
 func (v *Validator) evaluateSingleValueRule(key, rule string, ruleValue any, value reflect.Value) {
