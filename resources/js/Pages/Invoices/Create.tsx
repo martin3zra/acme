@@ -15,7 +15,7 @@ import { useNumber } from '@/composables/use-number';
 import { useDebounced } from '@/hooks/use-debounced';
 import { useLocalStorage } from '@/hooks/use-local-storage';
 import AuthenticatedLayout from '@/layouts/authenticated-layout';
-import { cn } from '@/lib/utils';
+import { addDays, cn } from '@/lib/utils';
 import { BreadcrumbItem, Customer, DiscountType, Item, PageProps } from '@/types';
 import { Textarea } from '@headlessui/react';
 import { router, useForm, usePage } from '@inertiajs/react';
@@ -508,17 +508,11 @@ export default function Create({ auth, customers, item }: PageProps<{ customers:
     setOpen(false);
   };
 
-  const addDays = (dateValue: Date, days: number): Date => {
-    const date: Date = dateValue instanceof Date ? dateValue : new Date(dateValue);
-    date.setDate(date.getDate() + days)
-    return date
-  }
-
   const handleDateChange = (date: unknown) => {
     invoiceForm.header.date = date as Date;
     invoiceForm.header.due = undefined
     if (invoiceForm.header.terms > 1) {
-      invoiceForm.header.due = addDays(date as Date, invoiceForm.header.terms)
+      invoiceForm.header.due = addDays(invoiceForm.header.date, invoiceForm.header.terms)
     }
 
     setInvoiceForm(() => {
@@ -530,7 +524,7 @@ export default function Create({ auth, customers, item }: PageProps<{ customers:
     invoiceForm.header.terms = Number(value)
 
     if (invoiceForm.header.terms > 1 && invoiceForm.header.date) {
-      invoiceForm.header.due = addDays(new Date(invoiceForm.header.date.getDate()), invoiceForm.header.terms)
+      invoiceForm.header.due = addDays(invoiceForm.header.date, invoiceForm.header.terms)
     } else {
       invoiceForm.header.due = undefined
     }
@@ -807,7 +801,9 @@ export default function Create({ auth, customers, item }: PageProps<{ customers:
               </div>
               <div className="flex flex-col gap-y-2">
                 <Label htmlFor="date">Due Date</Label>
-                <Input type='date' value={invoiceForm.header.due ? format(invoiceForm.header.due, 'yyyy-MM-dd') : ''} disabled className='w-70'/>
+                <Label className='w-70 border p-2.5 rounded-sm text-muted-foreground'>
+                  {invoiceForm.header.due ? format(invoiceForm.header.due, 'PPP') : 'Unknow'}
+                </Label>
               </div>
             </div>
             <div className="col-span-6 flex flex-col gap-y-2">
