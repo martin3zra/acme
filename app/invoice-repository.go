@@ -73,8 +73,13 @@ func (s *Server) storeInvoice(companyID int, form StoreInvoiceForm) error {
 	if err != nil {
 		return err
 	}
-	stmt, err := tx.Prepare("INSERT INTO invoices (company_id, date, type, due_on, customer_id, amount, discount, tax, amount_due, total, note, paid_status, payment) " +
-		"VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13) RETURNING id")
+	taxReceiptSequence, err := s.grabTaxReceiptSequence(tx, companyID, form.TaxReceipt)
+	if err != nil {
+		return err
+	}
+
+	stmt, err := tx.Prepare("INSERT INTO invoices (company_id, tax_receipt_id, tax_receipt_sequence, date, type, due_on, customer_id, amount, discount, tax, amount_due, total, note, paid_status, payment) " +
+		"VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15) RETURNING id")
 	if err != nil {
 		defer stmt.Close()
 		if txErr := tx.Rollback(); txErr != nil {
@@ -88,6 +93,8 @@ func (s *Server) storeInvoice(companyID int, form StoreInvoiceForm) error {
 	var invoiceID int
 	err = stmt.QueryRow(
 		companyID,
+		form.TaxReceipt,
+		taxReceiptSequence,
 		form.Date,
 		form.termType,
 		&form.dueOn,

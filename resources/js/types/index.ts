@@ -152,3 +152,8 @@ export type PaymentForm = {
   card: CardForm
   bt: BTForm
 }
+
+export interface Nameable {
+  id: string | number;
+  name: string
+}

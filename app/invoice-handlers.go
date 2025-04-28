@@ -1,6 +1,7 @@
 package app
 
 import (
+	"fmt"
 	"log"
 	"net/http"
 
@@ -34,8 +35,17 @@ func (s *Server) createInvoiceHandler(i *inertia.Inertia) http.Handler {
 	fn := func(w http.ResponseWriter, r *http.Request) {
 
 		term := r.URL.Query().Get("search")
+		user := auth.User(r.Context())
+		taxReceipts, err := s.findTaxesReceipts(*user.CurrentCompanyId)
+		if err != nil {
+			s.handleError(w, err)
+			return
+		}
 
-		err := i.Render(w, r, "Invoices/Create", inertia.Props{
+		err = i.Render(w, r, "Invoices/Create", inertia.Props{
+			"tax_receipts": mapSlice(taxReceipts, func(receipt *taxReceipt) map[string]any {
+				return map[string]any{"id": receipt.ID, "name": fmt.Sprintf("%s-%s", receipt.Type, receipt.Name)}
+			}),
 			"customers": inertia.Optional(func() (any, error) {
 				customers, err := s.findCustomersBySearchCriteria(1, term)
 				if err != nil {
@@ -91,4 +101,12 @@ func (s *Server) storeInvoiceHandler(i *inertia.Inertia) http.Handler {
 	}
 
 	return http.HandlerFunc(fn)
+}
+
+func mapSlice[T, U any](s []T, f func(T) U) []U {
+	result := make([]U, len(s))
+	for i, v := range s {
+		result[i] = f(v)
+	}
+	return result
 }

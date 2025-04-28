@@ -163,6 +163,7 @@ type StoreInvoiceForm struct {
 	CustomerID int       `json:"customer_id"`
 	Date       time.Time `json:"date"`
 	Terms      int       `json:"terms"`
+	TaxReceipt int       `json:"tax_receipt"`
 	Discount   Discount  `json:"discount"`
 	Notes      string    `json:"notes"`
 	Lines      []Line    `json:"lines"`
@@ -182,6 +183,7 @@ func (form StoreInvoiceForm) Rules() map[string]any {
 		"customer_id":   "bail|required|exists:customers,id",
 		"date":          "bail|required|date|after:yesterday",
 		"terms":         "bail|required|min:1",
+		"tax_receipt":   "bail|required|exists:tax_receipts,id",
 		"lines":         "required|min:1",
 		"lines.*.id":    "required|exists:items,id",
 		"lines.*.unit":  "required|exists:units,id",

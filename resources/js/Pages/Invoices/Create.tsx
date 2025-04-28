@@ -14,13 +14,13 @@ import { useDebounced } from '@/hooks/use-debounced';
 import { useLocalStorage } from '@/hooks/use-local-storage';
 import AuthenticatedLayout from '@/layouts/authenticated-layout';
 import { addDays, cn } from '@/lib/utils';
-import { BTForm, CardForm, CashForm, CheckForm, Customer, DiscountType, Item, LineForm, PageProps, PaymentForm, PaymentMethod, PaymentMethodType } from '@/types';
+import { BTForm, CardForm, CashForm, CheckForm, Customer, DiscountType, Item, LineForm, Nameable, PageProps, PaymentForm, PaymentMethod } from '@/types';
 import { Textarea } from '@headlessui/react';
 import { router, useForm, usePage } from '@inertiajs/react';
 import { format } from 'date-fns';
 import { CalendarIcon } from 'lucide-react';
 import React, { useCallback, useEffect } from 'react';
-import { breadcrumbs, defaultBTForm, defaultCardForm, defaultCashForm, defaultCheckForm, defaultPaymentMethods, paymentTerms } from './constants';
+import { breadcrumbs, defaultBTForm, defaultCardForm, defaultCashForm, defaultCheckForm, paymentTerms } from './constants';
 import { CustomerSection } from './Shared/customer-section';
 import { Lines } from './Shared/lines';
 import CheckoutForm from './Shared/checkout-form';
@@ -30,6 +30,7 @@ type HeaderForm = {
   date: Date | undefined;
   due: Date | undefined;
   terms: number;
+  taxReceipt: number;
   notes: string | undefined;
   discount: DiscountType;
 };
@@ -42,7 +43,7 @@ type InvoiceForm = {
 
 const defaultPaymentForm: PaymentForm = {cash: defaultCashForm, ck: defaultCheckForm, card: defaultCardForm, bt: defaultBTForm}
 const defaultDiscount: DiscountType = {value: 0, type: "fixed"}
-const defaultHeaderForm: HeaderForm =  { customer: undefined, date: undefined, due: undefined, terms: 0, notes: undefined, discount: defaultDiscount}
+const defaultHeaderForm: HeaderForm =  { customer: undefined, date: undefined, due: undefined, terms: 0, taxReceipt: 0, notes: undefined, discount: defaultDiscount}
 const defaultInvoiceForm: InvoiceForm = { header: defaultHeaderForm, lines: [], payment: defaultPaymentForm }
 
 const { setItem: storageInvoiceForm, getItem: getStorageInvoiceForm, removeItem: removeStorageIvoinceForm } = useLocalStorage('invoice');
@@ -50,7 +51,7 @@ const getInvoiceFromStorage = () => {
   return getStorageInvoiceForm() || defaultInvoiceForm;
 }
 
-export default function Create({ auth, customers, item }: PageProps<{ customers: Customer[]; item: Item }>) {
+export default function Create({ auth, customers, item, tax_receipts }: PageProps<{ customers: Customer[]; item: Item, tax_receipts: Nameable[] }>) {
   const currency = useNumber().currency;
   const [open, setOpen] = React.useState(false);
   const [openCancelConfirmation, setCancelConfirmation] = React.useState(false);
@@ -71,6 +72,7 @@ export default function Create({ auth, customers, item }: PageProps<{ customers:
   const { post, transform, processing, errors } = useForm({
     customer_id: 0,
     terms: 0,
+    tax_receipt: 0,
     lines: [],
     date: new Date(),
     discount: defaultDiscount,
@@ -212,6 +214,14 @@ export default function Create({ auth, customers, item }: PageProps<{ customers:
     })
   }
 
+  const handleTaxReceiptChange = (value: string) => {
+    invoiceForm.header.taxReceipt = Number(value)
+
+    setInvoiceForm(() => {
+      return {...invoiceForm, header: {...invoiceForm.header, taxReceipt: Number(value)}}
+    })
+  }
+
   const handleRemoveLine = (event: React.MouseEvent<HTMLButtonElement>) => {
     event.preventDefault();
     // add confirmation screen here.
@@ -263,6 +273,7 @@ export default function Create({ auth, customers, item }: PageProps<{ customers:
       customer_id: invoiceForm.header.customer?.id,
       date: invoiceForm.header.date,
       terms: invoiceForm.header.terms,
+      tax_receipt: invoiceForm.header.taxReceipt,
       discount: invoiceForm.header.discount,
       notes: invoiceForm.header.notes || '',
       lines: invoiceForm.lines.map((line) => {
@@ -362,27 +373,51 @@ export default function Create({ auth, customers, item }: PageProps<{ customers:
                 </Label>
               </div>
             </div>
-            <div className="col-span-6 flex flex-col gap-y-2">
-              <Label htmlFor='paymentTerms'>Payment terms</Label>
-              <Select
-                name='paymentTerms'
-                onValueChange={handlePaymentTermsChange}
-                defaultValue={"0"}
-                value={String(invoiceForm.header.terms)}
-                required
-              >
-                <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Select terms" />
-                </SelectTrigger>
-                <SelectContent className="">
-                  {paymentTerms.map((term, index) => (
-                    <SelectItem key={index.toString()} value={term.value.toString()}>
-                      {term.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <InputError className="mt-2" message={errors.terms} />
+            <div className="col-span-6 flex flex-col gap-y-6">
+              <div className="flex flex-col gap-y-2">
+                <Label htmlFor='paymentTerms'>Payment terms</Label>
+                <Select
+                  name='paymentTerms'
+                  onValueChange={handlePaymentTermsChange}
+                  defaultValue={"0"}
+                  value={String(invoiceForm.header.terms)}
+                  required
+                >
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Select terms" />
+                  </SelectTrigger>
+                  <SelectContent className="">
+                    {paymentTerms.map((term, index) => (
+                      <SelectItem key={index.toString()} value={term.value.toString()}>
+                        {term.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <InputError className="mt-2" message={errors.terms} />
+              </div>
+              <div className="flex flex-col gap-y-2">
+                <Label htmlFor='paymentTerms'>Tax Receipt</Label>
+                <Select
+                  name='paymentTerms'
+                  onValueChange={handleTaxReceiptChange}
+                  defaultValue={"0"}
+                  value={String(invoiceForm.header.taxReceipt)}
+                  required
+                >
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Select terms" />
+                  </SelectTrigger>
+                  <SelectContent className="">
+                    {tax_receipts.map((receipt) => (
+                      <SelectItem key={receipt.id} value={String(receipt.id)}>
+                        {receipt.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <InputError className="mt-2" message={errors.tax_receipt} />
+              </div>
             </div>
           </div>
         </div>
