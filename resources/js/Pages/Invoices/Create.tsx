@@ -329,7 +329,7 @@ export default function Create({ auth, customers, item, tax_receipts }: PageProp
       </AuthenticatedLayout.Actions>
       <div className="grid h-full w-full grid-cols-12 grid-rows-[auto_1fr_auto] gap-y-4 bg-gray-50/10">
         {!openCheckout && propsErrors.status && <div className="col-span-12"><AlertDestructive description={propsErrors.status} onDestroy={() => delete propsErrors.status }/></div>}
-        <div className="z-50 col-span-12 grid h-42 grid-cols-2 gap-x-6">
+        <div className="z-50 col-span-12 grid min-h-42 grid-cols-2 gap-x-6">
           <CustomerSection
             customer={invoiceForm.header.customer}
             customers={customers}
@@ -423,9 +423,9 @@ export default function Create({ auth, customers, item, tax_receipts }: PageProp
         </div>
         <div className="col-span-12">
           <div className="flex flex-col">
-            <InputError message={errors.lines} />
             <Lines
               lines={invoiceForm.lines}
+              lineError={errors.lines}
               currentItem={currentItem}
               handleRemoveLine={handleRemoveLine}
               handleKeyDown={handleKeyDown}

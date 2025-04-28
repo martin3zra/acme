@@ -1,3 +1,4 @@
+import { AlertDestructive } from "@/components/alert-destructive"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -7,6 +8,7 @@ import { XCircleIcon } from "lucide-react"
 
 type LinesProps = {
   lines: LineForm[]
+  lineError?: string
   currentItem: Item | undefined
   handleRemoveLine: (event: React.MouseEvent<HTMLButtonElement>) => void
   handleKeyDown: (event: React.KeyboardEvent<HTMLInputElement>) => void
@@ -16,6 +18,7 @@ type LinesProps = {
   qtyInputRef: React.RefObject<HTMLInputElement | null>
 }
 export const Lines = ({
+  lineError,
   referenceInputRef,
   qtyInputRef,
   lines,
@@ -28,10 +31,6 @@ export const Lines = ({
   const currency = useNumber().currency;
   const computedItemAmount = (qty: number) => {
     setAmount(qty * (currentItem?.price || 0));
-  };
-
-  const handleQtyChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    computedItemAmount(event.target.valueAsNumber);
   };
 
   return (
@@ -64,7 +63,7 @@ export const Lines = ({
               tabIndex={1}
               ref={qtyInputRef}
               onFocus={(e) => computedItemAmount(e.currentTarget.valueAsNumber)}
-              onChange={handleQtyChange}
+              onChange={(e) => computedItemAmount(e.target.valueAsNumber)}
               onKeyDown={handleKeyDown}
             />
           </th>
@@ -115,6 +114,17 @@ export const Lines = ({
           </tr>
         ))}
       </tbody>
+      {lineError &&
+        <tfoot>
+          <tr>
+            <td colSpan={7}>
+            <div className="py-3">
+              <AlertDestructive description={lineError} destroyable={false} />
+            </div>
+            </td>
+          </tr>
+        </tfoot>
+      }
     </table>
   )
 }
