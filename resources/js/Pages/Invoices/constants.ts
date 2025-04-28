@@ -1,8 +1,12 @@
-import { BreadcrumbItem, BTForm, CardBrand, CardForm, CheckForm, PaymentMethodType, PaymentTerm } from "@/types";
+import { BreadcrumbItem, BTForm, CardBrand, CardForm, CashForm, CheckForm, PaymentMethodType, PaymentTerm } from "@/types";
 
 export const defaultCheckForm: CheckForm = {
   amount: 0,
   reference: "",
+}
+
+export const defaultCashForm: CashForm = {
+  amount: 0,
 }
 
 export const defaultCardBrands: CardBrand[] = [

@@ -14,17 +14,16 @@ import { useDebounced } from '@/hooks/use-debounced';
 import { useLocalStorage } from '@/hooks/use-local-storage';
 import AuthenticatedLayout from '@/layouts/authenticated-layout';
 import { addDays, cn } from '@/lib/utils';
-import { BTForm, CardForm, CardFormInput, CheckForm, Customer, DiscountType, Item, LineForm, PageProps, PaymentMethod, PaymentMethodType } from '@/types';
+import { BTForm, CardForm, CashForm, CheckForm, Customer, DiscountType, Item, LineForm, PageProps, PaymentForm, PaymentMethod, PaymentMethodType } from '@/types';
 import { Textarea } from '@headlessui/react';
 import { router, useForm, usePage } from '@inertiajs/react';
 import { format } from 'date-fns';
 import { CalendarIcon } from 'lucide-react';
 import React, { useCallback, useEffect } from 'react';
-import { breadcrumbs, defaultBTForm, defaultCardForm, defaultCheckForm, defaultPaymentMethods, paymentTerms } from './constants';
+import { breadcrumbs, defaultBTForm, defaultCardForm, defaultCashForm, defaultCheckForm, defaultPaymentMethods, paymentTerms } from './constants';
 import { CustomerSection } from './Shared/customer-section';
 import { Lines } from './Shared/lines';
-import { CheckoutForm } from './Shared/checkout-form';
-
+import CheckoutForm from './Shared/checkout-form';
 
 type HeaderForm = {
   customer: Customer | undefined;
@@ -38,11 +37,18 @@ type HeaderForm = {
 type InvoiceForm = {
   header: HeaderForm;
   lines: LineForm[];
+  payment: PaymentForm
 };
 
+const defaultPaymentForm: PaymentForm = {cash: defaultCashForm, ck: defaultCheckForm, card: defaultCardForm, bt: defaultBTForm}
 const defaultDiscount: DiscountType = {value: 0, type: "fixed"}
 const defaultHeaderForm: HeaderForm =  { customer: undefined, date: undefined, due: undefined, terms: 0, notes: undefined, discount: defaultDiscount}
-const defaultInvoiceForm: InvoiceForm = { header: defaultHeaderForm, lines: [] }
+const defaultInvoiceForm: InvoiceForm = { header: defaultHeaderForm, lines: [], payment: defaultPaymentForm }
+
+const { setItem: storageInvoiceForm, getItem: getStorageInvoiceForm, removeItem: removeStorageIvoinceForm } = useLocalStorage('invoice');
+const getInvoiceFromStorage = () => {
+  return getStorageInvoiceForm() || defaultInvoiceForm;
+}
 
 export default function Create({ auth, customers, item }: PageProps<{ customers: Customer[]; item: Item }>) {
   const currency = useNumber().currency;
@@ -50,13 +56,9 @@ export default function Create({ auth, customers, item }: PageProps<{ customers:
   const [openCancelConfirmation, setCancelConfirmation] = React.useState(false);
   const [openCheckout, setCheckout] = React.useState(false);
   const [isEditing, setEditing] = React.useState(false);
-  const [activePaymentForm, setActivePaymentForm] = React.useState<PaymentMethod>("cash");
+
   // Payment methods
   const [paymentMethods] = React.useState<PaymentMethodType[]>(defaultPaymentMethods)
-  const [cashAmount, setCashAmount] = React.useState(0);
-  const [ckForm, setCkForm] = React.useState<CheckForm>(defaultCheckForm);
-  const [cardForm, setCardForm] = React.useState<CardForm>(defaultCardForm);
-  const [btForm, setBTForm] = React.useState<BTForm>(defaultBTForm);
 
   const referenceInputRef = React.useRef<HTMLInputElement>(null);
   const qtyInputRef = React.useRef<HTMLInputElement>(null);
@@ -65,10 +67,7 @@ export default function Create({ auth, customers, item }: PageProps<{ customers:
   const dedbouncedSearch = useDebounced(search, 500);
   const dedbouncedNotes = useDebounced(notes, 500);
   const [amount, setAmount] = React.useState(0);
-  const { setItem: storageInvoiceForm, getItem: getStorageInvoiceForm, removeItem: removeStorageIvoinceForm } = useLocalStorage('invoice');
-  const [invoiceForm, setInvoiceForm] = React.useState<InvoiceForm>(() => {
-    return getStorageInvoiceForm() || defaultInvoiceForm;
-  });
+  const [invoiceForm, setInvoiceForm] = React.useState<InvoiceForm>(getInvoiceFromStorage);
   const [currentItem, setCurrentItem] = React.useState<Item | undefined>(undefined);
 
   const { headers } = useHeader();
@@ -261,15 +260,6 @@ export default function Create({ auth, customers, item }: PageProps<{ customers:
     placedInvoice()
   }
 
-  const composePaymentMethods = () => {
-    return {
-      cash: {amount: cashAmount},
-      check: ckForm,
-      card: cardForm,
-      bt: btForm,
-    }
-  }
-
   const placedInvoice = () => {
     // Check if the total and payment match on cash terms.
     transform((data) => ({
@@ -282,7 +272,7 @@ export default function Create({ auth, customers, item }: PageProps<{ customers:
       lines: invoiceForm.lines.map((line) => {
         return { id: line.id, quantity: line.quantity, unit: line.unit.id, price: line.price, rate: line.tax.rate}
       }),
-      payment: composePaymentMethods()
+      payment: invoiceForm.payment,
     }))
     post('/invoices', {...headers, onSuccess: () => {
       removeStorageIvoinceForm();
@@ -315,60 +305,15 @@ export default function Create({ auth, customers, item }: PageProps<{ customers:
     return (composeSubTotal + composeTax) - computeDiscount()
   }
 
-  const handleOnChangeInputView = (method: PaymentMethod, value: number) => {
-    setActivePaymentForm(method)
-
-    if (typeof value  === "number" && method === "cash") {
-      const givenValue =  isNaN(value) ? 0 : value
-      setCashAmount(givenValue)
-      paymentMethods.filter((p) => p.value === "cash")[0].amount = givenValue
-      return
-    }
+  const handleOnPaymentChange = (method: PaymentMethod, value: number) => {
+    paymentMethods.filter((p) => p.value == method)[0].amount = value
   }
 
-  const handleOnChangeCheckFormView = (value: number|string) => {
-    if (typeof value  === "number") {
-      const givenValue =  isNaN(value) ? 0 : value
-      setCkForm(() => { return {...ckForm, amount: givenValue} })
-      paymentMethods.filter((p) => p.value === "ck")[0].amount = givenValue
-      return
-    }
-
-    setCkForm(() => { return {...ckForm, reference: value} })
-  }
-
-  const handleOnChangeCardFormView = (value: number | string, key: CardFormInput) => {
-    if (typeof value  === "number" && key === "last4") {
-      const givenValue =  isNaN(value) ? 0 : value
-      setCardForm(() => { return {...cardForm, last4: givenValue} })
-      return
-    }
-    if (key === "amount"){
-      setCardForm(() => { return {...cardForm, [key]: Number(value)} })
-      paymentMethods.filter((p) => p.value === "card")[0].amount = Number(value)
-      return
-    }
-
-    setCardForm(() => { return {...cardForm, [key]: value} })
-  }
-
-  const handleOnChangeBTFormView = (value: number|string) => {
-    if (typeof value  === "number") {
-      const givenValue =  isNaN(value) ? 0 : value
-      setBTForm(() => { return {...btForm, amount: givenValue} })
-      paymentMethods.filter((p) => p.value === "bt")[0].amount = givenValue
-      return
-    }
-
-    setBTForm(() => { return {...btForm, reference: value} })
-  }
-
-  const computeReceivedAmount = (): number => {
-    return (Number(cashAmount) + Number(ckForm.amount) + Number(cardForm.amount) + Number(btForm.amount))
-  }
-
-  const computeRemainingBalance = (): number => {
-    return computeTotalAmount() - computeReceivedAmount()
+  const handleCheckoutChange = (method: PaymentMethod, form: CashForm | CheckForm | CardForm | BTForm) => {
+    // Recalculate totals if the value is set.
+    setInvoiceForm(() => {
+      return {...invoiceForm, payment: {...invoiceForm.payment, [method]:form}}
+    })
   }
 
   return (
@@ -545,23 +490,15 @@ export default function Create({ auth, customers, item }: PageProps<{ customers:
         <CheckoutForm
           openCheckout={openCheckout}
           setCheckout={setCheckout}
-          activePaymentForm={activePaymentForm}
-          setActivePaymentForm={setActivePaymentForm}
           paymentMethods={paymentMethods}
-          handleOnChangeInputView={handleOnChangeInputView}
-          ckForm={ckForm}
-          cardForm={cardForm}
-          btForm={btForm}
-          handleOnChangeCheckFormView={handleOnChangeCheckFormView}
-          handleOnChangeCardFormView={handleOnChangeCardFormView}
-          handleOnChangeBTFormView={handleOnChangeBTFormView}
-          remainingBalance={computeRemainingBalance()}
+          paymentForm={invoiceForm.payment}
           totalAmount={computeTotalAmount()}
-          receivedAmount={computeReceivedAmount()}
           onPlacedInvoice={placedInvoice}
           processing={processing}
           setCancelConfirmation={setCancelConfirmation}
           errors={propsErrors}
+          onPaymentChange={handleOnPaymentChange}
+          onCheckoutChange={handleCheckoutChange}
         />
       </div>
 

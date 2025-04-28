@@ -107,6 +107,10 @@ export type BankOperationFormProps = Partial<PaymentFormType> & {
   onChange: (value: number|string) => void;
 }
 
+export type CashForm = {
+  amount: number;
+}
+
 export type CheckForm = PaymentFormType & {}
 
 export type PaymentMethod = "cash" | "ck" | "card" | "bt";
@@ -140,4 +144,11 @@ export type PaymentTerm = {
 export interface LineForm extends Item {
   quantity: number;
   amount: number;
+}
+
+export type PaymentForm = {
+  cash: CashForm
+  ck: CheckForm
+  card: CardForm
+  bt: BTForm
 }
