@@ -17,7 +17,7 @@ export const InputView = ({ value, method, autoFocus, onChange, onFocus }: Input
   }
 
   const handleOnFocus = (event: React.FocusEvent<HTMLInputElement>) => {
-    if (method !== "cash") onFocus(method)
+    onFocus(method)
   }
 
   return (
@@ -26,11 +26,12 @@ export const InputView = ({ value, method, autoFocus, onChange, onFocus }: Input
         key={method}
         type="number"
         min={0}
-        className="text-end"
+        className={`${method !== "cash" && 'cursor-pointer'} text-end border-none`}
         value={value}
         autoFocus={autoFocus}
         onFocus={handleOnFocus}
         onChange={handleChange}
+        readOnly={method !== "cash"}
       />
     </div>
   )

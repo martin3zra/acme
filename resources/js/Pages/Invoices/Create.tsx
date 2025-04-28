@@ -56,10 +56,6 @@ export default function Create({ auth, customers, item }: PageProps<{ customers:
   const [openCancelConfirmation, setCancelConfirmation] = React.useState(false);
   const [openCheckout, setCheckout] = React.useState(false);
   const [isEditing, setEditing] = React.useState(false);
-
-  // Payment methods
-  const [paymentMethods] = React.useState<PaymentMethodType[]>(defaultPaymentMethods)
-
   const referenceInputRef = React.useRef<HTMLInputElement>(null);
   const qtyInputRef = React.useRef<HTMLInputElement>(null);
   const [search, setSearch] = React.useState('');
@@ -305,10 +301,6 @@ export default function Create({ auth, customers, item }: PageProps<{ customers:
     return (composeSubTotal + composeTax) - computeDiscount()
   }
 
-  const handleOnPaymentChange = (method: PaymentMethod, value: number) => {
-    paymentMethods.filter((p) => p.value == method)[0].amount = value
-  }
-
   const handleCheckoutChange = (method: PaymentMethod, form: CashForm | CheckForm | CardForm | BTForm) => {
     // Recalculate totals if the value is set.
     setInvoiceForm(() => {
@@ -490,14 +482,12 @@ export default function Create({ auth, customers, item }: PageProps<{ customers:
         <CheckoutForm
           openCheckout={openCheckout}
           setCheckout={setCheckout}
-          paymentMethods={paymentMethods}
           paymentForm={invoiceForm.payment}
           totalAmount={computeTotalAmount()}
           onPlacedInvoice={placedInvoice}
           processing={processing}
           setCancelConfirmation={setCancelConfirmation}
           errors={propsErrors}
-          onPaymentChange={handleOnPaymentChange}
           onCheckoutChange={handleCheckoutChange}
         />
       </div>

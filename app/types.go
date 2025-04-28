@@ -132,7 +132,7 @@ type Bt struct {
 
 type Payment struct {
 	Cash  Cash  `json:"cash"`
-	Check Check `json:"check"`
+	Check Check `json:"ck"`
 	Card  Card  `json:"card"`
 	Bt    Bt    `json:"bt"`
 }
