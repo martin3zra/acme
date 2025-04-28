@@ -22,7 +22,7 @@ const breadcrumbs: BreadcrumbItem[] = [
 ];
 
 export default function Index({ auth, customers }: PageProps<{ customers: Customer[] }>) {
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(true);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [selectedCustomer, setSelectedCustomer] = useState<CreateFormParams>({ customer: undefined, action: 'create' });
 
@@ -46,7 +46,7 @@ export default function Index({ auth, customers }: PageProps<{ customers: Custom
   useEffect(() => {
     if (selectedCustomer && selectedCustomer.customer !== undefined) {
       if (selectedCustomer.action !== 'trash') {
-        setOpen(true);
+        // setOpen(true);
       } else {
         setDeleteDialogOpen(true);
       }

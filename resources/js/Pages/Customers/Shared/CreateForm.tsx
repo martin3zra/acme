@@ -21,6 +21,7 @@ type CreateFormProps = {
 };
 
 type CustomerForm = {
+  id: number | undefined;
   name: string;
   contact: string;
   email: string;
@@ -32,6 +33,7 @@ export default function CreateForm({ onFinish, params }: CreateFormProps) {
   const { headers } = useHeader();
   const { errors: propsErrors } = usePage<PageProps>().props;
   const { data, setData, post, put, errors, reset, processing } = useForm<Required<CustomerForm>>({
+    id: params.customer?.id,
     name: params.customer?.name || '',
     contact: params.customer?.contact_name || '',
     email: params.customer?.email || '',

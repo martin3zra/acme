@@ -167,7 +167,7 @@ func (s *Server) attachItemUnit(tx *sql.Tx, companyID, itemID, unitID int) error
 	return err
 }
 
-func (s *Server) updateItem(companyID, itemID int, form StoreItemForm) error {
+func (s *Server) updateItem(companyID, itemID int, form UpdateItemForm) error {
 	tx, err := s.db.Begin()
 	if err != nil {
 		return err

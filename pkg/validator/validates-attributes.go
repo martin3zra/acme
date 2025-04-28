@@ -13,11 +13,11 @@ import (
 )
 
 type ValidatesAttributes struct {
-	ctx                 context.Context
-	sometimes           bool
-	canBail             bool
-	stopOnFirstFailure  bool
-	needsToIgnore       bool
+	ctx                context.Context
+	sometimes          bool
+	canBail            bool
+	stopOnFirstFailure bool
+	// needsToIgnore       bool
 	ignore              any
 	column              string
 	currentPosition     int
@@ -177,8 +177,15 @@ func (va *ValidatesAttributes) validateUnique(key string, attributes []string, r
 	va.requireParameterCount(1, attributes, rule)
 
 	dbRule := newDatabaseRule(va.ctx, key, attributes, value)
-	if va.needsToIgnore {
-		dbRule.ignore(va.ignore, va.column)
+
+	contrainsts := attributes[2:]
+	if len(contrainsts) >= 2 {
+		dbRule.ignore(contrainsts[0], contrainsts[1])
+
+		if len(contrainsts[2:]) > 0 {
+			wheres := splitWheres(contrainsts[2:])
+			return dbRule.addWheres(wheres).getCount() == 0
+		}
 	}
 
 	return dbRule.getCount() == 0
@@ -206,4 +213,13 @@ func (va *ValidatesAttributes) validateArrayRules(rule string, attributes []stri
 
 func (va *ValidatesAttributes) validateIn(attributes []string, value reflect.Value) bool {
 	return slices.Contains(attributes, value.String())
+}
+
+func splitWheres(attr []string) [][]string {
+	var result [][]string
+	for i := 0; i < len(attr); i += 2 {
+		end := min(i+2, len(attr))
+		result = append(result, attr[i:end])
+	}
+	return result
 }

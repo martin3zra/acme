@@ -147,9 +147,18 @@ func TestUniqueRule(t *testing.T) {
 
 	ctx := context.WithValue(context.Background(), database.ConnectionKey{}, db)
 	var valid = validator.Validator{}
-	valid.Ignore(1, "id")
+	// valid.Ignore(1, "id")
 	valid.Validate(ctx, &person, map[string]any{
-		"email": "required|email|unique.ignore:users,email",
+		// "email": "required|email|unique.ignore:users,email",
+		"email": []any{
+			"required",
+			"email",
+			validator.Rule{}.
+				Unique("users", "email").
+				Where("id", 1).
+				Where("current_company_id", 1).
+				Ignore(person.Email, "email"), //"unique.ignore:users,email",
+		},
 	})
 	if len(valid.Errors()) > 0 {
 		t.Errorf("validation fails:\n %v", valid.Errors())

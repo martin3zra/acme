@@ -14,7 +14,6 @@ type FormRequestContract interface {
 	Authorize() bool
 	Validate(object any, rules map[string]any, prepareForValidation func()) validator.Validator
 	Rules() map[string]any
-	Ignore(ignore any, column ...string)
 	Errors() validator.Errors
 	User() *foundation.User
 	SetContext(ctx context.Context)
@@ -58,10 +57,6 @@ func (f *FormRequest) Validate(object any, rules map[string]any, prepareForValid
 	f.validator.Validate(f.ctx, object, rules, prepareForValidation)
 
 	return *f.validator
-}
-
-func (f *FormRequest) Ignore(ignore any, column ...string) {
-	f.validator.Ignore(ignore, column...)
 }
 
 func (f *FormRequest) Errors() validator.Errors {

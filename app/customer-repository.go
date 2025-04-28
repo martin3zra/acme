@@ -113,7 +113,7 @@ func (s *Server) storeCustomer(companyId int, form StoreCustomerForm) error {
 	return err
 }
 
-func (s *Server) updateCustomer(companyID, customerID int, form StoreCustomerForm) error {
+func (s *Server) updateCustomer(companyID, customerID int, form UpdateCustomerForm) error {
 
 	_, err := s.db.Exec(
 		"UPDATE customers SET name = $1, contact_name = $2,  email = $3, phone = $4 WHERE company_id = $5 AND id = $6",

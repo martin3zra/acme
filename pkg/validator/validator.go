@@ -263,22 +263,21 @@ func (v *Validator) compileRuleSet(key string, value reflect.Value, rules []stri
 	})
 
 	for _, rule := range rules {
-		v.needsToIgnore = false
-		ruleComponents := strings.Split(rule, ":")
-
-		rule := ruleComponents[0]
-		prepends := strings.Split(rule, ".")
-
-		if len(prepends) > 1 {
-			v.needsToIgnore = prepends[1] == "ignore"
-			rule = prepends[0]
-			ruleComponents[0] = rule
-		}
-
 		if v.stopOnFirstFailure {
 			v.shouldStopOnFirstFailure(false)
 			break
 		}
+		// v.needsToIgnore = false
+		ruleComponents := strings.Split(rule, ":")
+
+		rule := ruleComponents[0]
+		// prepends := strings.Split(rule, ".")
+
+		// if len(prepends) > 1 {
+		// 	v.needsToIgnore = prepends[1] == "ignore"
+		// 	rule = prepends[0]
+		// 	ruleComponents[0] = rule
+		// }
 
 		if v.ensureRuleExists(rule) {
 			if v.sometimes && value.IsZero() {

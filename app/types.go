@@ -35,8 +35,40 @@ func (StoreCustomerForm) Rules() map[string]any {
 	return map[string]any{
 		"name":    "required|min:3|max:120",
 		"contact": "sometimes|min:3|max:120",
-		"email":   "required|email|unique.ignore:customers|min:8|max:120|lowercase",
-		"phone":   "sometimes|min:3|max:120",
+		"email": []any{
+			"required",
+			"email",
+			"min:8",
+			"max:120",
+			"lowercase",
+			validator.Rule{}.Unique("customers", "email"),
+		},
+		"phone": "sometimes|min:3|max:120",
+	}
+}
+
+type UpdateCustomerForm struct {
+	support.FormRequest
+	ID      int    `json:"id"`
+	Name    string `json:"name"`
+	Contact string `json:"contact"`
+	Email   string `json:"email"`
+	Phone   string `json:"phone"`
+}
+
+func (form UpdateCustomerForm) Rules() map[string]any {
+	return map[string]any{
+		"name":    "required|min:3|max:120",
+		"contact": "sometimes|min:3|max:120",
+		"email": []any{
+			"required",
+			"email",
+			"min:8",
+			"max:120",
+			"lowercase",
+			validator.Rule{}.Unique("customers", "email").Ignore(form.ID, "id"),
+		},
+		"phone": "sometimes|min:3|max:120",
 	}
 }
 
@@ -62,7 +94,32 @@ type StoreItemForm struct {
 
 func (StoreItemForm) Rules() map[string]any {
 	return map[string]any{
-		"name":        "required|min:3|max:120|unique.ignore:items,name",
+		"name": []any{
+			"required",
+			"min:3",
+			"max:120",
+			validator.Rule{}.Unique("items", "name"),
+		},
+		"description": "sometimes|min:3|max:120",
+		"price":       "required|min:0",
+		"tax_id":      "required|exists:taxes,id",
+		"unit_id":     "required|exists:units,id",
+	}
+}
+
+type UpdateItemForm struct {
+	support.FormRequest
+	ID          int     `json:"id"`
+	Name        string  `json:"name"`
+	Price       float64 `json:"price"`
+	Description string  `json:"description"`
+	TaxID       int     `json:"tax_id"`
+	UnitID      int     `json:"unit_id"`
+}
+
+func (form UpdateItemForm) Rules() map[string]any {
+	return map[string]any{
+		"name":        []any{"required", "min:3", "max:120", validator.Rule{}.Unique("items", "name").Ignore(form.ID, "id")},
 		"description": "sometimes|min:3|max:120",
 		"price":       "required|min:0",
 		"tax_id":      "required|exists:taxes,id",
