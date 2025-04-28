@@ -18,6 +18,7 @@ type FormRequestContract interface {
 	Errors() validator.Errors
 	User() *foundation.User
 	SetContext(ctx context.Context)
+	Messages() map[string]string
 }
 
 type FormRequest struct {
@@ -81,4 +82,8 @@ func (f *FormRequest) PassesAuthorization() bool { return true }
 
 func (f *FormRequest) FailedAuthorization() {
 	// return here everything for a 403 status code
+}
+
+func (f *FormRequest) Messages() map[string]string {
+	return make(map[string]string)
 }

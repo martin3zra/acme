@@ -40,6 +40,12 @@ func (p Person) Rules() map[string]any {
 	}
 }
 
+func (p Person) Messages() map[string]string {
+	return map[string]string{
+		"name.required": "Hey debes de especificar el Nombre.",
+	}
+}
+
 func TestNumericRule(t *testing.T) {
 	person := Person{
 		Name: "Jane",
@@ -256,6 +262,22 @@ func TestConditionalRule(t *testing.T) {
 		"name": []any{"required", validator.Rule{}.When(person.Age > 30, "min:10|max:100", "min:3")},
 	})
 	if len(vali.Errors()) > 0 {
+		t.Errorf("validation fails:\n %v", vali.Errors())
+	}
+}
+
+func TestCustomErrorMessage(t *testing.T) {
+
+	person := Person{
+		Age: 22,
+	}
+
+	var vali = validator.Validator{}
+	vali.Validate(context.Background(), &person, map[string]any{
+		"age":  "required|min:18",
+		"name": "required",
+	})
+	if len(vali.Errors()) == 0 {
 		t.Errorf("validation fails:\n %v", vali.Errors())
 	}
 }

@@ -30,6 +30,16 @@ func (v *Validator) validateAttributes(object any, rules map[string]any) {
 	if val.Kind() == reflect.Ptr {
 		val = val.Elem()
 	}
+
+	v.customErrorMessages = map[string]string{}
+	hasMessages := val.MethodByName("Messages")
+	if hasMessages.IsValid() && hasMessages.Kind() == reflect.Func {
+		result := hasMessages.Call([]reflect.Value{})[0].Interface()
+		if messages, ok := result.(map[string]string); ok {
+			v.customErrorMessages = messages
+		}
+	}
+
 	for i := range val.NumField() {
 		v.currentPosition = i
 		key := v.resolveKeyBasedOnJsonTag(val.Type(), i)
@@ -135,7 +145,19 @@ func (v *Validator) messages(attribute, rule, kind string, value ...any) string 
 		"min_digits":       "The %s field must have at least %v digits.",
 	}
 
-	message, ok := messages[rule]
+	var message any
+	var ok bool
+
+	if len(v.customErrorMessages) > 0 {
+		customKey := attribute + "." + rule
+		message, ok = v.customErrorMessages[customKey]
+		if !ok {
+			message, ok = messages[rule]
+		}
+	} else {
+		message, ok = messages[rule]
+	}
+
 	if ok {
 		switch message := message.(type) {
 		case map[string]any:

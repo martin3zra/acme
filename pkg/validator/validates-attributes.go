@@ -13,16 +13,17 @@ import (
 )
 
 type ValidatesAttributes struct {
-	ctx                context.Context
-	sometimes          bool
-	canBail            bool
-	stopOnFirstFailure bool
-	needsToIgnore      bool
-	ignore             any
-	column             string
-	currentPosition    int
-	parentKey          string
-	keySeparator       string
+	ctx                 context.Context
+	sometimes           bool
+	canBail             bool
+	stopOnFirstFailure  bool
+	needsToIgnore       bool
+	ignore              any
+	column              string
+	currentPosition     int
+	parentKey           string
+	keySeparator        string
+	customErrorMessages map[string]string
 }
 
 func (va *ValidatesAttributes) shouldStopOnFirstFailure(shouldStop bool) {

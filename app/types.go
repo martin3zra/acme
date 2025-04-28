@@ -199,6 +199,13 @@ func (form StoreInvoiceForm) Rules() map[string]any {
 	}
 }
 
+func (StoreInvoiceForm) Messages() map[string]string {
+	return map[string]string{
+		"customer_id.required": "You must specify the customer you want to invoice.",
+		"lines.min":            "You must specify at least one item to invoice.",
+	}
+}
+
 func (form *StoreInvoiceForm) PassedValidation() {
 	// compute tax for each line
 	form.computeTax()
