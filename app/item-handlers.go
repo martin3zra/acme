@@ -18,38 +18,25 @@ func (s *Server) itemsHandler(i *inertia.Inertia) http.Handler {
 			s.handleError(w, err)
 			return
 		}
-		taxes, err := s.findTaxes(*user.CurrentCompanyId)
-		if err != nil {
-			s.handleError(w, err)
-			return
-		}
-
-		units, err := s.findUnits(*user.CurrentCompanyId)
-		if err != nil {
-			s.handleError(w, err)
-			return
-		}
 
 		err = i.Render(w, r, "Items/Index", inertia.Props{
 			"items": items,
-			"taxes": taxes,
-			"units": units,
-			// "units": inertia.Defer(func() (any, error) {
-			// 	units, err := s.findUnits(*user.CurrentCompanyId)
-			// 	if err != nil {
-			// 		s.handleError(w, err)
-			// 		return nil, nil
-			// 	}
-			// 	return units, err
-			// }, "attributes"),
-			// "taxes": inertia.Defer(func() (any, error) {
-			// 	taxes, err := s.findTaxes(*user.CurrentCompanyId)
-			// 	if err != nil {
-			// 		s.handleError(w, err)
-			// 		return nil, err
-			// 	}
-			// 	return taxes, nil
-			// }, "attributes"),
+			"units": inertia.Defer(func() (any, error) {
+				units, err := s.findUnits(*user.CurrentCompanyId)
+				if err != nil {
+					s.handleError(w, err)
+					return nil, nil
+				}
+				return units, err
+			}, "attributes"),
+			"taxes": inertia.Defer(func() (any, error) {
+				taxes, err := s.findTaxes(*user.CurrentCompanyId)
+				if err != nil {
+					s.handleError(w, err)
+					return nil, err
+				}
+				return taxes, nil
+			}, "attributes"),
 		})
 		if err != nil {
 			s.handleError(w, err)

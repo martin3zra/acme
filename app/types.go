@@ -102,8 +102,8 @@ func (StoreItemForm) Rules() map[string]any {
 		},
 		"description": "sometimes|min:3|max:120",
 		"price":       "required|min:0",
-		"tax_id":      "required|exists:taxes,id",
-		"unit_id":     "required|exists:units,id",
+		"tax_id":      "bail|required|exists:taxes,id",
+		"unit_id":     "bail|required|exists:units,id",
 	}
 }
 
