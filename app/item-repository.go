@@ -11,6 +11,7 @@ import (
 
 type item struct {
 	ID          int     `json:"id"`
+	UUID        string  `json:"uuid"`
 	Name        string  `json:"name"`
 	Price       float64 `json:"price"`
 	Description string  `json:"description"`
@@ -27,13 +28,14 @@ type item struct {
 
 func (s *Server) findItemByID(companyID, itemID int) (*item, error) {
 	var i item
-	err := s.db.QueryRow("SELECT i.id, i.name, i.price, i.description, i.tax_id, t.name, t.rate, i.status, "+
+	err := s.db.QueryRow("SELECT i.id, i.uuid, i.name, i.price, i.description, i.tax_id, t.name, t.rate, i.status, "+
 		"i.created_at, i.updated_at, i.deleted_at, iu.unit_id, iu.name as unit_name  "+
 		"FROM items i "+
 		"INNER JOIN taxes t ON(i.company_id = t.company_id AND i.tax_id = t.id)"+
 		"LEFT JOIN LATERAL (SELECT iu.unit_id, u.name FROM items_units iu INNER JOIN units u ON (iu.unit_id = u.id) WHERE iu.item_id = i.id limit 1) iu ON true "+
 		"WHERE i.company_id = $1 AND i.id = $2 AND i.deleted_at IS NULL", companyID, itemID).Scan(
 		&i.ID,
+		&i.UUID,
 		&i.Name,
 		&i.Price,
 		&i.Description,
@@ -56,7 +58,7 @@ func (s *Server) findItemByID(companyID, itemID int) (*item, error) {
 
 func (s *Server) findItems(companyID int) ([]*item, error) {
 
-	is, err := s.db.Query("SELECT i.id, i.name, i.price, i.description, i.tax_id, t.name, t.rate, i.status, "+
+	is, err := s.db.Query("SELECT i.id, i.uuid, i.name, i.price, i.description, i.tax_id, t.name, t.rate, i.status, "+
 		"i.created_at, i.updated_at, i.deleted_at, iu.unit_id, iu.name as unit_name "+
 		"FROM items i "+
 		"INNER JOIN taxes t ON(i.company_id = t.company_id AND i.tax_id = t.id) "+
@@ -70,6 +72,7 @@ func (s *Server) findItems(companyID int) ([]*item, error) {
 		i := new(item)
 		if err = is.Scan(
 			&i.ID,
+			&i.UUID,
 			&i.Name,
 			&i.Price,
 			&i.Description,
@@ -94,7 +97,7 @@ func (s *Server) findItemsByCriteria(companyID int, term string) ([]*item, error
 	if len(strings.TrimSpace(term)) == 0 {
 		return nil, errors.New("need to specifiy the item you're looking for")
 	}
-	is, err := s.db.Query("SELECT i.id, i.name, i.price, i.description, i.tax_id, t.name, t.rate, i.status, "+
+	is, err := s.db.Query("SELECT i.id, i.uuid, i.name, i.price, i.description, i.tax_id, t.name, t.rate, i.status, "+
 		"i.created_at, i.updated_at, i.deleted_at, iu.unit_id, iu.name as unit_name "+
 		"FROM items i "+
 		"INNER JOIN taxes t ON(i.company_id = t.company_id AND i.tax_id = t.id) "+
@@ -108,6 +111,7 @@ func (s *Server) findItemsByCriteria(companyID int, term string) ([]*item, error
 		i := new(item)
 		if err = is.Scan(
 			&i.ID,
+			&i.UUID,
 			&i.Name,
 			&i.Price,
 			&i.Description,
@@ -133,7 +137,7 @@ func (s *Server) findItemsByReference(companyID int, term string) (*item, error)
 		return nil, errors.New("need to specifiy the item you're looking for")
 	}
 
-	result := s.db.QueryRow("SELECT i.id, i.name, i.price, i.description, i.tax_id, t.name, t.rate, "+
+	result := s.db.QueryRow("SELECT i.id, i.uuid, i.name, i.price, i.description, i.tax_id, t.name, t.rate, "+
 		"iu.unit_id, iu.name as unit_name "+
 		"FROM items i "+
 		"INNER JOIN taxes t ON(i.company_id = t.company_id AND i.tax_id = t.id) "+
@@ -146,6 +150,7 @@ func (s *Server) findItemsByReference(companyID int, term string) (*item, error)
 	i := new(item)
 	if err := result.Scan(
 		&i.ID,
+		&i.UUID,
 		&i.Name,
 		&i.Price,
 		&i.Description,
@@ -218,7 +223,7 @@ func (s *Server) updateItem(companyID, itemID int, form UpdateItemForm) error {
 	}
 
 	_, err = tx.Exec(
-		"UPDATE items SET name = $1, description = $2,  price = $3, tax_id = $4 WHERE company_id = $5 AND id = $6",
+		"UPDATE items SET name = $1, description = $2, price = $3, tax_id = $4 WHERE company_id = $5 AND id = $6",
 		form.Name, form.Description, form.Price, form.TaxID, companyID, itemID,
 	)
 

@@ -11,6 +11,7 @@ import (
 
 type customer struct {
 	ID          int     `json:"id"`
+	UUID        string  `json:"uuid"`
 	Name        string  `json:"name"`
 	ContactName string  `json:"contact_name,omitempty"`
 	Phone       string  `json:"phone"`
@@ -24,14 +25,14 @@ type customer struct {
 func (s *Server) findCustomeByID(companyID, customerID int) (*customer, error) {
 
 	var c customer
-	err := s.db.QueryRow("SELECT c.id, c.name, c.contact_name, c.phone, c.email, c.status, c.amount_due, "+
+	err := s.db.QueryRow("SELECT c.id, c.uuid, c.name, c.contact_name, c.phone, c.email, c.status, c.amount_due, "+
 		"c.created_at, c.updated_at, c.deleted_at "+
 		"FROM customers c "+
 		"INNER JOIN companies ON (c.company_id = companies.id) "+
 		"WHERE c.company_id = $1 "+
 		"AND c.id = $2 "+
 		"AND c.deleted_at IS NULL", companyID, customerID).
-		Scan(&c.ID, &c.Name, &c.ContactName, &c.Phone, &c.Email, &c.Status, &c.AmountDue, &c.CreatedAt, &c.UpdatedAt, &c.DeletedAt)
+		Scan(&c.ID, &c.UUID, &c.Name, &c.ContactName, &c.Phone, &c.Email, &c.Status, &c.AmountDue, &c.CreatedAt, &c.UpdatedAt, &c.DeletedAt)
 	if err != nil {
 		return nil, err
 	}
@@ -41,7 +42,7 @@ func (s *Server) findCustomeByID(companyID, customerID int) (*customer, error) {
 
 func (s *Server) findCustomers(companyID int) ([]*customer, error) {
 
-	rows, err := s.db.Query("SELECT c.id, c.name, c.contact_name, c.phone, c.email, c.status, c.amount_due, "+
+	rows, err := s.db.Query("SELECT c.id, c.uuid, c.name, c.contact_name, c.phone, c.email, c.status, c.amount_due, "+
 		"c.created_at, c.updated_at, c.deleted_at "+
 		"FROM customers c "+
 		"INNER JOIN companies ON (c.company_id = companies.id) "+
@@ -55,6 +56,7 @@ func (s *Server) findCustomers(companyID int) ([]*customer, error) {
 		row := new(customer)
 		if err = rows.Scan(
 			&row.ID,
+			&row.UUID,
 			&row.Name,
 			&row.ContactName,
 			&row.Phone,
@@ -78,7 +80,7 @@ func (s *Server) findCustomersBySearchCriteria(companyID int, term string) ([]*c
 	if len(strings.TrimSpace(term)) == 0 {
 		return nil, errors.New("need to specifiy the customer you're looking for")
 	}
-	rows, err := s.db.Query("SELECT c.id, c.name, c.contact_name, c.phone, c.email, c.amount_due "+
+	rows, err := s.db.Query("SELECT c.id, c.uuid, c.name, c.contact_name, c.phone, c.email, c.amount_due "+
 		"FROM customers c "+
 		"INNER JOIN companies ON (c.company_id = companies.id) "+
 		"WHERE c.company_id = $1 "+
@@ -92,6 +94,7 @@ func (s *Server) findCustomersBySearchCriteria(companyID int, term string) ([]*c
 		row := new(customer)
 		if err = rows.Scan(
 			&row.ID,
+			&row.UUID,
 			&row.Name,
 			&row.ContactName,
 			&row.Phone,

@@ -42,6 +42,7 @@ export interface SharedData {
 
 export interface Customer {
   id: number;
+  uuid: string;
   name: string;
   contact_name: string;
   phone: string;
@@ -54,6 +55,7 @@ export interface Customer {
 
 export interface Item {
     id: number;
+    uuid: string;
     name: string;
     price: number;
     tax: Tax;
@@ -85,6 +87,7 @@ export type DiscountType = {
 
 export interface Invoice {
     id: number;
+    uuid: string;
     number: string;
     customer: Customer
     status: string

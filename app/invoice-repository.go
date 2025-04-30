@@ -11,6 +11,7 @@ import (
 
 type invoice struct {
 	ID         int        `json:"id"`
+	UUID       string     `json:"uuid"`
 	Number     string     `json:"number"`
 	Customer   customer   `json:"customer"`
 	Date       time.Time  `json:"date"`
@@ -24,7 +25,7 @@ type invoice struct {
 }
 
 func (s *Server) findInvoices(companyId int) ([]*invoice, error) {
-	rows, err := s.db.Query("SELECT invoices.id, invoices.date, invoices.amount, invoices.discount, invoices.tax, "+
+	rows, err := s.db.Query("SELECT invoices.id, invoices.uuid, invoices.date, invoices.amount, invoices.discount, invoices.tax, "+
 		"invoices.total, invoices.status, invoices.paid_status, invoices.payment, "+
 		"customers.id as customer, customers.name, customers.email, customers.phone "+
 		"FROM invoices "+
@@ -40,6 +41,7 @@ func (s *Server) findInvoices(companyId int) ([]*invoice, error) {
 
 		if err = rows.Scan(
 			&i.ID,
+			&i.UUID,
 			&i.Date,
 			&i.Amount,
 			&i.Discount,
