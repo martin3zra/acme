@@ -2,7 +2,9 @@ package app
 
 import (
 	"database/sql"
+	"errors"
 	"log"
+	"strings"
 
 	"github.com/martin3zra/acme/pkg/foundation"
 )
@@ -89,7 +91,9 @@ func (s *Server) findItems(companyID int) ([]*item, error) {
 }
 
 func (s *Server) findItemsByCriteria(companyID int, term string) ([]*item, error) {
-
+	if len(strings.TrimSpace(term)) == 0 {
+		return nil, errors.New("need to specifiy the item you're looking for")
+	}
 	is, err := s.db.Query("SELECT i.id, i.name, i.price, i.description, i.tax_id, t.name, t.rate, i.status, "+
 		"i.created_at, i.updated_at, i.deleted_at, iu.unit_id, iu.name as unit_name "+
 		"FROM items i "+
@@ -125,6 +129,10 @@ func (s *Server) findItemsByCriteria(companyID int, term string) ([]*item, error
 }
 
 func (s *Server) findItemsByReference(companyID int, term string) (*item, error) {
+	if len(strings.TrimSpace(term)) == 0 {
+		return nil, errors.New("need to specifiy the item you're looking for")
+	}
+
 	result := s.db.QueryRow("SELECT i.id, i.name, i.price, i.description, i.tax_id, t.name, t.rate, "+
 		"iu.unit_id, iu.name as unit_name "+
 		"FROM items i "+

@@ -21,7 +21,7 @@ type taxReceipt struct {
 
 func (s *Server) findTaxesReceipts(companyId int) ([]*taxReceipt, error) {
 	rows, err := s.db.Query("SELECT id, name, series, type, sequence_start, sequence_end, current, created_at, updated_at, deleted_at "+
-		"FROM tax_receipts WHERE company_id = $1", companyId)
+		"FROM tax_receipts WHERE company_id = $1 ORDER BY id", companyId)
 	if err != nil {
 		return nil, err
 	}

@@ -2,7 +2,9 @@ package app
 
 import (
 	"database/sql"
+	"errors"
 	"log"
+	"strings"
 
 	"github.com/martin3zra/acme/pkg/foundation"
 )
@@ -73,7 +75,9 @@ func (s *Server) findCustomers(companyID int) ([]*customer, error) {
 }
 
 func (s *Server) findCustomersBySearchCriteria(companyID int, term string) ([]*customer, error) {
-
+	if len(strings.TrimSpace(term)) == 0 {
+		return nil, errors.New("need to specifiy the customer you're looking for")
+	}
 	rows, err := s.db.Query("SELECT c.id, c.name, c.contact_name, c.phone, c.email, c.amount_due "+
 		"FROM customers c "+
 		"INNER JOIN companies ON (c.company_id = companies.id) "+

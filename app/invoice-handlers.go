@@ -47,7 +47,7 @@ func (s *Server) createInvoiceHandler(i *inertia.Inertia) http.Handler {
 				return map[string]any{"id": receipt.ID, "name": fmt.Sprintf("%s-%s", receipt.Type, receipt.Name)}
 			}),
 			"customers": inertia.Optional(func() (any, error) {
-				customers, err := s.findCustomersBySearchCriteria(1, term)
+				customers, err := s.findCustomersBySearchCriteria(*user.CurrentCompanyId, term)
 				if err != nil {
 					return nil, err
 				}
@@ -55,7 +55,7 @@ func (s *Server) createInvoiceHandler(i *inertia.Inertia) http.Handler {
 				return customers, err
 			}),
 			"item": inertia.Optional(func() (any, error) {
-				item, err := s.findItemsByReference(1, term)
+				item, err := s.findItemsByReference(*user.CurrentCompanyId, term)
 				if err != nil {
 					return nil, err
 				}
@@ -63,7 +63,7 @@ func (s *Server) createInvoiceHandler(i *inertia.Inertia) http.Handler {
 				return item, err
 			}),
 			"items": inertia.Optional(func() (any, error) {
-				item, err := s.findItemsByCriteria(1, term)
+				item, err := s.findItemsByCriteria(*user.CurrentCompanyId, term)
 				if err != nil {
 					return nil, err
 				}
