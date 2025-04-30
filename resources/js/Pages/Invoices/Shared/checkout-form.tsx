@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button"
 import { Separator } from "@/components/ui/separator"
 import React from "react"
 import { defaultPaymentMethods } from "../constants"
-import { cn } from "@/lib/utils"
+import { cn, subtractFloats } from "@/lib/utils"
 
 type errorBag = {
   [key:string]: string
@@ -31,6 +31,8 @@ type CheckoutFormProps = {
 type CheckoutFormState = {
   paymentMethods: PaymentMethodType[]
   activePaymentForm: PaymentMethod
+  receivedAmount: number
+  remainingBalance: number
   cashForm: CashForm
   ckForm: CheckForm
   cardForm: CardForm
@@ -41,9 +43,16 @@ class CheckoutForm extends React.Component<CheckoutFormProps, CheckoutFormState>
   currency = useNumber().currency;
   constructor(props: CheckoutFormProps){
     super(props)
+
+    const paymentMethods = this.hydratePaymentMethods()
+    const receivedAmount =  paymentMethods.reduce((accumulator, method) => accumulator + method.amount, 0)
+    const remainingBalance = props.totalAmount - receivedAmount
+
     this.state = {
       activePaymentForm: "cash",
-      paymentMethods: this.hydratePaymentMethods(),
+      paymentMethods: paymentMethods,
+      receivedAmount: receivedAmount,
+      remainingBalance: remainingBalance,
       cashForm: props.paymentForm.cash,
       ckForm: props.paymentForm.ck,
       cardForm: props.paymentForm.card,
@@ -73,7 +82,7 @@ class CheckoutForm extends React.Component<CheckoutFormProps, CheckoutFormState>
       const givenValue =  isNaN(value) ? 0 : value
       this.setState((state: CheckoutFormState) =>
         ({ cashForm: {...state.cashForm, amount: givenValue}}),
-        () => this.props.onCheckoutChange("cash",this.state.cashForm)
+        () => this.computeTotals("cash",this.state.cashForm)
       )
       this.onPaymentChange("cash", givenValue)
       return
@@ -85,7 +94,7 @@ class CheckoutForm extends React.Component<CheckoutFormProps, CheckoutFormState>
       const givenValue =  isNaN(value) ? 0 : value
       this.setState((state: CheckoutFormState) =>
         ({ ckForm: {...state.ckForm, amount: givenValue}}),
-        () => this.props.onCheckoutChange("ck", this.state.ckForm)
+        () => this.computeTotals("ck", this.state.ckForm)
       )
       this.onPaymentChange("ck", givenValue)
       return
@@ -109,7 +118,7 @@ class CheckoutForm extends React.Component<CheckoutFormProps, CheckoutFormState>
     if (key === "amount"){
       this.setState((state: CheckoutFormState) =>
         ({ cardForm: {...state.cardForm, [key]: Number(value)}}),
-        () => this.props.onCheckoutChange("card", this.state.cardForm)
+        () => this.computeTotals("card", this.state.cardForm)
       )
       this.onPaymentChange("card", Number(value))
       return
@@ -126,7 +135,7 @@ class CheckoutForm extends React.Component<CheckoutFormProps, CheckoutFormState>
       const givenValue =  isNaN(value) ? 0 : value
       this.setState((state: CheckoutFormState) =>
         ({ btForm: {...state.btForm, amount: givenValue}}),
-        () => this.props.onCheckoutChange("bt", this.state.btForm)
+      () => this.computeTotals("bt", this.state.btForm)
       )
       this.onPaymentChange("bt", givenValue)
       return
@@ -138,10 +147,16 @@ class CheckoutForm extends React.Component<CheckoutFormProps, CheckoutFormState>
     )
   }
 
-  receivedAmount = () => this.state.paymentMethods.reduce((accumulator, method) => accumulator + method.amount, 0)
-
-  computeRemainingBalance = (): number => {
-    return this.props.totalAmount - this.receivedAmount()
+  computeTotals = (method: PaymentMethod, form: CashForm | CheckForm | CardForm | BTForm) => {
+    this.setState((state: CheckoutFormState) => {
+        const receivedAmount = state.paymentMethods.reduce((accumulator, method) => accumulator + method.amount, 0)
+        return ({
+          receivedAmount: receivedAmount,
+          remainingBalance: subtractFloats(this.props.totalAmount, receivedAmount),
+        })
+      },
+      () => this.props.onCheckoutChange(method, form)
+    )
   }
 
   renderPaymentMethodForm = () => {
@@ -153,7 +168,9 @@ class CheckoutForm extends React.Component<CheckoutFormProps, CheckoutFormState>
       "bt": <BankTransferFormView {...btForm} onChange={this.handleOnChangeBTFormView}  />,
     }[activePaymentForm]
   }
+
   render() {
+    const { receivedAmount, remainingBalance } = this.state
     const { openCheckout, setCheckout, errors, totalAmount, onPlacedInvoice, processing, setCancelConfirmation } = this.props
     return (
       <Sheet open={openCheckout} onOpenChange={setCheckout}>
@@ -215,19 +232,18 @@ class CheckoutForm extends React.Component<CheckoutFormProps, CheckoutFormState>
               </div>
               <div className='flex justify-between items-center w-60'>
                 <span className="block text-2xl">Received</span>
-                <span className="block text-2xl">{this.currency(this.receivedAmount())}</span>
+                <span className="block text-2xl">{this.currency(receivedAmount)}</span>
               </div>
               <div className='flex justify-between items-center w-60'>
                 <span className="block text-2xl">Remaining</span>
-                <span className="block text-2xl text-red-600 font-medium">{this.currency(this.computeRemainingBalance())}</span>
+                <span className="block text-2xl text-red-600 font-medium">{this.currency(remainingBalance)}</span>
               </div>
             </div>
           </div>
           <SheetFooter>
-            {this.computeRemainingBalance() !== 0 && <AlertDestructive description="The amount collected must be equals to the Invoice total amount." destroyable={false} />}
             <div className='flex justify-end gap-x-6'>
               <Button variant={"secondary"} onClick={() => setCancelConfirmation(true)}>Cancel</Button>
-              <Button onClick={onPlacedInvoice} disabled={processing || this.computeRemainingBalance() !== 0}>Complete Invoice</Button>
+              <Button onClick={onPlacedInvoice} disabled={processing || remainingBalance !== 0}>Complete Invoice</Button>
             </div>
           </SheetFooter>
         </SheetContent>

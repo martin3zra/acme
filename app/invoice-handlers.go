@@ -62,6 +62,14 @@ func (s *Server) createInvoiceHandler(i *inertia.Inertia) http.Handler {
 
 				return item, err
 			}),
+			"items": inertia.Optional(func() (any, error) {
+				item, err := s.findItemsByCriteria(1, term)
+				if err != nil {
+					return nil, err
+				}
+
+				return item, err
+			}),
 		})
 		if err != nil {
 			s.handleError(w, err)

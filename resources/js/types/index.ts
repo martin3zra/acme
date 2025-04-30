@@ -157,3 +157,5 @@ export interface Nameable {
   id: string | number;
   name: string
 }
+
+export type currencySignature = (value: number | string, precision?: number, inCent?: boolean) => string

@@ -3,7 +3,6 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { BankOperationFormProps } from "@/types"
 
-// REVIEW WHY THE INPUT IS NOT POPULATE,.
 export const CheckFormView = ({amount, reference, onChange}: BankOperationFormProps) => {
   const handleChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     if(event.currentTarget.name === "ck") {

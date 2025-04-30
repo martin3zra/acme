@@ -88,6 +88,42 @@ func (s *Server) findItems(companyID int) ([]*item, error) {
 	return data, nil
 }
 
+func (s *Server) findItemsByCriteria(companyID int, term string) ([]*item, error) {
+
+	is, err := s.db.Query("SELECT i.id, i.name, i.price, i.description, i.tax_id, t.name, t.rate, i.status, "+
+		"i.created_at, i.updated_at, i.deleted_at, iu.unit_id, iu.name as unit_name "+
+		"FROM items i "+
+		"INNER JOIN taxes t ON(i.company_id = t.company_id AND i.tax_id = t.id) "+
+		"LEFT JOIN LATERAL (SELECT iu.unit_id, u.name FROM items_units iu INNER JOIN units u ON (iu.unit_id = u.id) WHERE iu.item_id = i.id limit 1) iu ON true "+
+		"WHERE i.company_id = $1 AND i.name LIKE $2 AND i.deleted_at IS NULL", companyID, "%"+term+"%")
+	if err != nil {
+		return nil, err
+	}
+	data := make([]*item, 0)
+	for is.Next() {
+		i := new(item)
+		if err = is.Scan(
+			&i.ID,
+			&i.Name,
+			&i.Price,
+			&i.Description,
+			&i.Tax.ID,
+			&i.Tax.Name,
+			&i.Tax.Rate,
+			&i.Status,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.DeletedAt,
+			&i.Unit.ID,
+			&i.Unit.Name,
+		); err != nil {
+			return nil, err
+		}
+		data = append(data, i)
+	}
+	return data, nil
+}
+
 func (s *Server) findItemsByReference(companyID int, term string) (*item, error) {
 	result := s.db.QueryRow("SELECT i.id, i.name, i.price, i.description, i.tax_id, t.name, t.rate, "+
 		"iu.unit_id, iu.name as unit_name "+

@@ -13,7 +13,7 @@ import { useNumber } from '@/composables/use-number';
 import { useDebounced } from '@/hooks/use-debounced';
 import { useLocalStorage } from '@/hooks/use-local-storage';
 import AuthenticatedLayout from '@/layouts/authenticated-layout';
-import { addDays, cn } from '@/lib/utils';
+import { addDays, cn, isNotEmpty } from '@/lib/utils';
 import { BTForm, CardForm, CashForm, CheckForm, Customer, DiscountType, Item, LineForm, Nameable, PageProps, PaymentForm, PaymentMethod } from '@/types';
 import { Textarea } from '@headlessui/react';
 import { router, useForm, usePage } from '@inertiajs/react';
@@ -51,7 +51,7 @@ const getInvoiceFromStorage = () => {
   return getStorageInvoiceForm() || defaultInvoiceForm;
 }
 
-export default function Create({ auth, customers, item, tax_receipts }: PageProps<{ customers: Customer[]; item: Item, tax_receipts: Nameable[] }>) {
+export default function Create({ auth, customers, items, item, tax_receipts }: PageProps<{ customers: Customer[]; items: Item[]; item: Item, tax_receipts: Nameable[] }>) {
   const currency = useNumber().currency;
   const [open, setOpen] = React.useState(false);
   const [openCancelConfirmation, setCancelConfirmation] = React.useState(false);
@@ -135,10 +135,16 @@ export default function Create({ auth, customers, item, tax_receipts }: PageProp
     });
   };
 
+  const handleOnSelectedItem = (item: Item) => {
+    setCurrentItem(item)
+    referenceInputRef.current!.value = item.name
+    qtyInputRef.current!.value = '1';
+  }
+
   const handleKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
     if (event.key === 'Enter' || event.key === 'Tab') {
       event.preventDefault(); // Prevent default behavior of Enter key
-      if (event.currentTarget.name === 'reference') {
+      if (event.currentTarget.name === 'reference' && isNotEmpty(event.currentTarget.value)) {
         searchItem(event.currentTarget.value);
         return
       }
@@ -256,7 +262,9 @@ export default function Create({ auth, customers, item, tax_receipts }: PageProp
 
   const handleCheckout = (event: React.MouseEvent<HTMLButtonElement>) => {
     event.preventDefault()
-    if (invoiceForm.header.terms === 1) {
+    if (computeTotalAmount()=== 0) return
+    if (invoiceForm.header.terms === 1 ) {
+      Object.keys(propsErrors).forEach(key => delete propsErrors[key]);
       setCheckout(true)
       return
     }
@@ -279,7 +287,7 @@ export default function Create({ auth, customers, item, tax_receipts }: PageProp
       }),
       payment: invoiceForm.payment,
     }))
-    post('/invoices', {...headers, onSuccess: () => {
+    post('/invoices', {...headers, preserveState: "errors", onSuccess: () => {
       removeStorageIvoinceForm();
       router.get('/invoices')
     }})
@@ -322,7 +330,7 @@ export default function Create({ auth, customers, item, tax_receipts }: PageProp
       <AuthenticatedLayout.Actions>
         <div className='flex justify-end gap-x-6'>
           <Button variant={"secondary"} onClick={() => setCancelConfirmation(true)}>Cancel</Button>
-          <Button onClick={handleCheckout} disabled={processing}>Checkout</Button>
+          <Button onClick={handleCheckout} disabled={processing || (computeTotalAmount()=== 0)}>Checkout</Button>
         </div>
       </AuthenticatedLayout.Actions>
       <div className="grid h-full w-full grid-cols-12 grid-rows-[auto_1fr_auto] gap-y-4 bg-gray-50/10">
@@ -422,11 +430,13 @@ export default function Create({ auth, customers, item, tax_receipts }: PageProp
         <div className="col-span-12">
           <div className="flex flex-col">
             <Lines
+              items={items}
               lines={invoiceForm.lines}
               lineError={errors.lines}
               currentItem={currentItem}
               handleRemoveLine={handleRemoveLine}
               handleKeyDown={handleKeyDown}
+              handleOnSelected={handleOnSelectedItem}
               amount={amount}
               setAmount={setAmount}
               referenceInputRef={referenceInputRef}

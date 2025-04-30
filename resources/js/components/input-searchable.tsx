@@ -70,7 +70,7 @@ class InputSearchable<T extends object> extends React.Component<Props<T>, InputS
             !open && "h-full",
           )}>{trigger}</div>
         </PopoverTrigger>
-        <PopoverContent align="start" side="top" className="w-[var(--radix-popover-trigger-width)] p-0" onOpenAutoFocus={(e) => e.preventDefault()}>
+        <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0" onOpenAutoFocus={(e) => e.preventDefault()}>
           <Command shouldFilter={false} className="w-full">
             <CommandInput
               placeholder={`Search ${title}`}
