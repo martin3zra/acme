@@ -178,9 +178,7 @@ export default function Create({ auth, customers, item, tax_receipts }: PageProp
     referenceInputRef.current?.focus();
   };
 
-  const handleCustomerSelection = (event: React.MouseEvent<HTMLButtonElement>, customer: Customer | undefined) => {
-    event.preventDefault();
-
+  const handleCustomerSelection = (customer: Customer | undefined) => {
     setInvoiceForm(() => {
       return { ...invoiceForm, header: { ...invoiceForm.header, customer } };
     });
