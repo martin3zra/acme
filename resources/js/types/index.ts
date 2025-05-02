@@ -12,6 +12,7 @@ export interface User {
 
 export interface Auth {
   user: User;
+  company: Company;
 }
 
 export interface Company {

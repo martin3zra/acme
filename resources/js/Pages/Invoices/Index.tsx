@@ -1,9 +1,11 @@
 import HeadingSmall from '@/components/heading-small';
+import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import useCallbackState from '@/hooks/use-callback-state';
 import AuthenticatedLayout from '@/layouts/authenticated-layout';
 import { BreadcrumbItem, Invoice, InvoiceWithLines, PageProps, Verb } from '@/types';
 import { router, usePage } from '@inertiajs/react';
+import { NotebookPen, Printer } from 'lucide-react';
 import { List } from './List/Index';
 import { AddNewInvoice } from './Shared/AddNewInvoice';
 import Show from './Show';
@@ -65,11 +67,23 @@ export default function Index({ auth, invoices, invoice }: PageProps<{ invoices:
           <Sheet open={open} onOpenChange={onOpenChange}>
             <SheetContent side="right" className="m-4 flex h-[calc(~'(100%-var(--spacing)*4)/3')] w-full flex-col rounded-md sm:max-w-7xl">
               <SheetHeader>
-                <SheetTitle>Invoice: {invoice.header.number}</SheetTitle>
-                <SheetDescription className="text-[12px]">Invoice details</SheetDescription>
+                <div className="mr-6 flex items-start justify-between">
+                  <div className="flex flex-col">
+                    <SheetTitle>Acme</SheetTitle>
+                    <SheetDescription className="text-[12px]">Invoice details</SheetDescription>
+                  </div>
+                  <div className="mx-4 flex gap-x-3">
+                    <Button>
+                      <NotebookPen /> Edit
+                    </Button>
+                    <Button>
+                      <Printer /> Print
+                    </Button>
+                  </div>
+                </div>
               </SheetHeader>
               <div className="grid gap-4 px-4">
-                <Show invoice={invoice} />
+                <Show invoice={invoice} auth={auth} />
               </div>
             </SheetContent>
           </Sheet>

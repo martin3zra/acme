@@ -3,32 +3,51 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Separator } from '@/components/ui/separator';
 import { useNumber } from '@/composables/use-number';
 import { cn } from '@/lib/utils';
-import { InvoiceWithLines, PaidStatuses } from '@/types';
+import { Auth, InvoiceWithLines, PaidStatuses } from '@/types';
 import { format } from 'date-fns';
 import { Calendar1, CircleCheckIcon, CircleDollarSignIcon, CreditCardIcon, InfoIcon, UserPen } from 'lucide-react';
 import PaymentSummary from './Shared/payment-summary';
 
 type Props = {
   invoice: InvoiceWithLines;
+  auth: Auth;
 };
 
-export default function Show({ invoice }: Props) {
+export default function Show({ invoice, auth }: Props) {
   const { currency } = useNumber();
 
   return (
     <div className="grid grid-cols-12 gap-x-4">
+      <div className="col-span-12 pb-6">
+        <Separator />
+        <div className="flex justify-between py-6 [&_[data-slot=label]]:text-base/2 [&_[data-slot=label]]:font-medium">
+          <div className="col-span-6 flex items-center gap-x-2">
+            <Label>Invoice</Label>
+            <Label>#{invoice.header.number}</Label>
+          </div>
+          <div className="col-span-6 flex items-center gap-x-2 [&_[data-slot=label]]:font-normal">
+            <Label>Date</Label>
+            <Label className="">{format(invoice.header.date, 'PPP')}</Label>
+          </div>
+        </div>
+        <Separator />
+      </div>
       <div className="col-span-9 grid h-full w-full grid-cols-12 grid-rows-[auto_1fr_auto] gap-y-4">
         {/* header */}
         <div className="col-span-12 grid grid-cols-12">
           <div className="col-span-6">
-            <div className="flex items-center gap-x-1">
-              <Label>Date:</Label>
-              <Label data-slot="label-value">{format(invoice.header.date, 'PPP')}</Label>
+            <div className="w-56">
+              <Label className="font-bold">Pay to:</Label>
+              <div className="pt-2">
+                <span className="text-sm font-semibold">{auth.company.name}</span>
+                <address className="text-muted-foreground text-sm font-normal">{auth.company.address}</address>
+              </div>
+              <div className="text-sm font-medium">{invoice.header.customer.email}</div>
             </div>
           </div>
           <div className="col-span-6 place-items-end">
             <div className="w-56">
-              <Label className="font-semibold">Invoice to:</Label>
+              <Label className="font-bold">Invoice to:</Label>
               <div className="pt-2">
                 <span className="text-sm font-semibold">{invoice.header.customer.name}</span>
                 <address className="text-muted-foreground text-sm font-normal">{invoice.header.customer.address}</address>
@@ -79,7 +98,7 @@ export default function Show({ invoice }: Props) {
                     {line.qty}
                   </td>
                   <td data-format="number">{currency(line.price)}</td>
-                  <td data-format="number">{currency(line.price)}</td>
+                  <td data-format="number">{currency(line.qty * line.price)}</td>
                 </tr>
               ))}
             </tbody>
