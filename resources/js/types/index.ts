@@ -98,6 +98,8 @@ export interface Invoice {
   customer: Customer;
   date: string;
   due_on?: string;
+  terms: number;
+  tax_receipt_id: number;
   amount: number;
   discount: DiscountType;
   tax: number;
@@ -181,3 +183,19 @@ export interface Nameable {
 }
 
 export type currencySignature = (value: number | string, precision?: number, inCent?: boolean) => string;
+
+export type HeaderForm = {
+  customer: Customer | undefined;
+  date: Date | undefined;
+  due: Date | undefined;
+  terms: number;
+  taxReceipt: number;
+  notes: string | undefined;
+  discount: DiscountType;
+};
+
+export type InvoiceForm = {
+  header: HeaderForm;
+  lines: LineForm[];
+  payment: PaymentForm;
+};

@@ -10,21 +10,23 @@ import (
 )
 
 type invoice struct {
-	ID         int        `json:"id"`
-	UUID       string     `json:"uuid"`
-	Number     string     `json:"number"`
-	NCF        string     `json:"ncf"`
-	Customer   customer   `json:"customer"`
-	Date       time.Time  `json:"date"`
-	DueOn      *time.Time `json:"due_on"`
-	Amount     float64    `json:"amount"`
-	Discount   Discount   `json:"discount"`
-	Tax        float64    `json:"tax"`
-	Total      float64    `json:"total"`
-	Status     string     `json:"status"`
-	PaidStatus PaidStatus `json:"paid_status"`
-	Payment    Payment    `json:"payment"`
-	Notes      string     `json:"notes"`
+	ID           int        `json:"id"`
+	UUID         string     `json:"uuid"`
+	Number       string     `json:"number"`
+	NCF          string     `json:"ncf"`
+	Customer     customer   `json:"customer"`
+	Date         time.Time  `json:"date"`
+	DueOn        *time.Time `json:"due_on"`
+	Terms        int        `json:"terms"`
+	TaxReceiptID int        `json:"tax_receipt_id"`
+	Amount       float64    `json:"amount"`
+	Discount     Discount   `json:"discount"`
+	Tax          float64    `json:"tax"`
+	Total        float64    `json:"total"`
+	Status       string     `json:"status"`
+	PaidStatus   PaidStatus `json:"paid_status"`
+	Payment      Payment    `json:"payment"`
+	Notes        string     `json:"notes"`
 }
 
 type line struct {
@@ -43,7 +45,7 @@ type line struct {
 
 func (s *Server) findInvoices(companyId int) ([]*invoice, error) {
 	rows, err := s.db.Query("SELECT invoices.id, invoices.uuid, invoices.date, invoices.due_on, invoices.amount, invoices.discount, invoices.tax, "+
-		"invoices.total, invoices.status, invoices.paid_status, invoices.payment, invoices.note, "+
+		"invoices.total, invoices.status, invoices.paid_status, invoices.payment, invoices.note, invoices.tax_receipt_id,"+
 		"tax_receipts.series || tax_receipts.type || LPAD(invoices.tax_receipt_sequence::varchar,8,'0') as NCF, "+
 		"customers.id as customer, customers.name, customers.email, customers.phone "+
 		"FROM invoices "+
@@ -71,6 +73,7 @@ func (s *Server) findInvoices(companyId int) ([]*invoice, error) {
 			&i.PaidStatus,
 			&i.Payment,
 			&i.Notes,
+			&i.TaxReceiptID,
 			&i.NCF,
 			&i.Customer.ID,
 			&i.Customer.Name,
@@ -79,7 +82,6 @@ func (s *Server) findInvoices(companyId int) ([]*invoice, error) {
 		); err != nil {
 			return nil, err
 		}
-
 		i.Number = s.generatePrefixedInvoiceNumber(i.ID)
 		i.Customer.Address = "LOUISVILLE, Selby 3864 Johnson Street, United States of America"
 
@@ -91,7 +93,7 @@ func (s *Server) findInvoices(companyId int) ([]*invoice, error) {
 func (s *Server) findInvoicesByUUID(companyId int, uuid string) (*invoice, error) {
 	i := new(invoice)
 	err := s.db.QueryRow("SELECT invoices.id, invoices.uuid, invoices.date, invoices.due_on, invoices.amount, invoices.discount, invoices.tax, "+
-		"invoices.total, invoices.status, invoices.paid_status, invoices.payment, invoices.note, "+
+		"invoices.total, invoices.status, invoices.paid_status, invoices.payment, invoices.note, invoices.tax_receipt_id, "+
 		"tax_receipts.series || tax_receipts.type || LPAD(invoices.tax_receipt_sequence::varchar,8,'0') as NCF, "+
 		"customers.id as customer, customers.name, customers.email, customers.phone "+
 		"FROM invoices "+
@@ -112,6 +114,7 @@ func (s *Server) findInvoicesByUUID(companyId int, uuid string) (*invoice, error
 			&i.PaidStatus,
 			&i.Payment,
 			&i.Notes,
+			&i.TaxReceiptID,
 			&i.NCF,
 			&i.Customer.ID,
 			&i.Customer.Name,
@@ -119,6 +122,12 @@ func (s *Server) findInvoicesByUUID(companyId int, uuid string) (*invoice, error
 			&i.Customer.Phone)
 	if err != nil {
 		return nil, err
+	}
+	i.Terms = 1
+	if i.DueOn != nil {
+		difference := i.DueOn.Sub(i.Date)
+		// Difference in days
+		i.Terms = int(difference.Hours()) / 24
 	}
 
 	i.Number = s.generatePrefixedInvoiceNumber(i.ID)

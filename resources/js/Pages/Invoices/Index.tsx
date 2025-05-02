@@ -4,7 +4,7 @@ import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '
 import useCallbackState from '@/hooks/use-callback-state';
 import AuthenticatedLayout from '@/layouts/authenticated-layout';
 import { BreadcrumbItem, Invoice, InvoiceWithLines, PageProps, Verb } from '@/types';
-import { router, usePage } from '@inertiajs/react';
+import { Link, router, usePage } from '@inertiajs/react';
 import { NotebookPen, Printer } from 'lucide-react';
 import { List } from './List/Index';
 import { AddNewInvoice } from './Shared/AddNewInvoice';
@@ -26,20 +26,26 @@ export default function Index({ auth, invoices, invoice }: PageProps<{ invoices:
   const hasInvoices = invoices.length > 0;
 
   const onSelectInvoice = (invoice: Invoice, action: Verb): void => {
+    if (action === 'edit') {
+      router.visit(`/invoices/${invoice.uuid}/edit`);
+      return;
+    }
     if (action !== 'view') return;
     setOpen(
       (open) => !open,
       (newVal) => {
-        if (newVal) {
-          router.visit(page.url, {
-            except: ['invoices'],
-            data: { id: invoice.uuid },
-            preserveScroll: true,
-            preserveState: true,
-          });
-        }
+        if (newVal) findSelectedInvoice(invoice.uuid);
       },
     );
+  };
+
+  const findSelectedInvoice = (uuid: string) => {
+    router.visit(page.url, {
+      except: ['invoices'],
+      data: { id: uuid },
+      preserveScroll: true,
+      preserveState: true,
+    });
   };
 
   const onOpenChange = (open: boolean) => {
@@ -73,8 +79,10 @@ export default function Index({ auth, invoices, invoice }: PageProps<{ invoices:
                     <SheetDescription className="text-[12px]">Invoice details</SheetDescription>
                   </div>
                   <div className="mx-4 flex gap-x-3">
-                    <Button>
-                      <NotebookPen /> Edit
+                    <Button asChild>
+                      <Link href={`/invoices/${invoice.header.uuid}/edit`} as="button">
+                        <NotebookPen /> Edit
+                      </Link>
                     </Button>
                     <Button>
                       <Printer /> Print
