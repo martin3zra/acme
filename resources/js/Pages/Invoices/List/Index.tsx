@@ -1,17 +1,26 @@
-import { Invoice, Verb } from "@/types"
-import { ColumnFiltersState, flexRender, getCoreRowModel, getFilteredRowModel, getPaginationRowModel, getSortedRowModel, SortingState, useReactTable, VisibilityState } from "@tanstack/react-table"
-import { FC, useState } from "react"
-import { getColumns } from "./columns-definitions"
-import { Input } from "@/components/ui/input"
-import { DropdownMenu, DropdownMenuCheckboxItem, DropdownMenuContent, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
-import { Button } from "@/components/ui/button"
-import { ChevronDown } from "lucide-react"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import { Button } from '@/components/ui/button';
+import { DropdownMenu, DropdownMenuCheckboxItem, DropdownMenuContent, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Invoice, Verb } from '@/types';
+import {
+  ColumnFiltersState,
+  flexRender,
+  getCoreRowModel,
+  getFilteredRowModel,
+  getPaginationRowModel,
+  getSortedRowModel,
+  SortingState,
+  useReactTable,
+  VisibilityState,
+} from '@tanstack/react-table';
+import { ChevronDown } from 'lucide-react';
+import { FC, useState } from 'react';
+import { getColumns } from './columns-definitions';
 
 type Props = {
-  data: Invoice[]
+  data: Invoice[];
   onSelectInvoice: (invoice: Invoice, action: Verb) => void;
-}
+};
 
 export const List: FC<Props> = ({ data, onSelectInvoice }) => {
   const [sorting, setSorting] = useState<SortingState>([]);
@@ -123,4 +132,4 @@ export const List: FC<Props> = ({ data, onSelectInvoice }) => {
       </div>
     </div>
   );
-}
+};

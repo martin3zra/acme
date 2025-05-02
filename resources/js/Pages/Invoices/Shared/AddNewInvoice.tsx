@@ -1,5 +1,5 @@
-import { Link } from "@inertiajs/react"
-import { Plus } from "lucide-react"
+import { Link } from '@inertiajs/react';
+import { Plus } from 'lucide-react';
 
 export const AddNewInvoice = () => {
   return (
@@ -10,5 +10,5 @@ export const AddNewInvoice = () => {
     >
       <Plus /> Add Invoice
     </Link>
-  )
-}
+  );
+};

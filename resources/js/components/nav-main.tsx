@@ -1,24 +1,18 @@
-"use client"
+'use client';
 
-import { type LucideIcon } from "lucide-react"
-import {
-  SidebarGroup,
-  SidebarGroupLabel,
-  SidebarMenu,
-  SidebarMenuButton,
-  SidebarMenuItem,
-} from "@/components/ui/sidebar"
-import { Link, usePage } from "@inertiajs/react"
+import { SidebarGroup, SidebarGroupLabel, SidebarMenu, SidebarMenuButton, SidebarMenuItem } from '@/components/ui/sidebar';
+import { Link, usePage } from '@inertiajs/react';
+import { type LucideIcon } from 'lucide-react';
 
 export function NavMain({
   items,
 }: {
   items: {
-    title: string
-    url: string
-    icon: LucideIcon
-    component: string
-  }[]
+    title: string;
+    url: string;
+    icon: LucideIcon;
+    component: string;
+  }[];
 }) {
   const { component } = usePage();
   return (
@@ -43,5 +37,5 @@ export function NavMain({
         ))}
       </SidebarMenu>
     </SidebarGroup>
-  )
+  );
 }

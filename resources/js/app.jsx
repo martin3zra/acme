@@ -1,8 +1,8 @@
 import { createInertiaApp } from '@inertiajs/react';
 import { resolvePageComponent } from 'laravel-vite-plugin/inertia-helpers';
 import { createRoot } from 'react-dom/client';
-import '../css/app.css';
 import { toast } from 'sonner';
+import '../css/app.css';
 
 createInertiaApp({
   resolve: (name) => resolvePageComponent(`./Pages/${name}.tsx`, import.meta.glob('./Pages/**/*.tsx')),
@@ -12,18 +12,18 @@ createInertiaApp({
 });
 
 let onSuccessEvent = (e) => {
-    const props = e.detail.page.props || { flash: {} };
-    if (props.flash) {
-        const message = props.flash.success
-        if (message) {
-            setTimeout(() => {
-                toast.success(message);
-            }, 200);
-        }
-
-      delete props.flash;
+  const props = e.detail.page.props || { flash: {} };
+  if (props.flash) {
+    const message = props.flash.success;
+    if (message) {
+      setTimeout(() => {
+        toast.success(message);
+      }, 200);
     }
-}
 
-document.addEventListener('inertia:success', onSuccessEvent)
-document.removeEventListener('inertia:finish', onSuccessEvent)
+    delete props.flash;
+  }
+};
+
+document.addEventListener('inertia:success', onSuccessEvent);
+document.removeEventListener('inertia:finish', onSuccessEvent);

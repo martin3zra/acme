@@ -1,14 +1,21 @@
-import { CurrencyCell } from "@/components/data-table/currency-cell";
-import { DateCell } from "@/components/data-table/date-cell";
-import { HeaderCell } from "@/components/data-table/header-cell";
-import { TextCell } from "@/components/data-table/text-cell";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { DiscountType, Invoice, Verb } from "@/types";
-import { ColumnDef } from "@tanstack/react-table";
-import { ArrowUpDown, MoreHorizontal } from "lucide-react";
+import { CurrencyCell } from '@/components/data-table/currency-cell';
+import { DateCell } from '@/components/data-table/date-cell';
+import { HeaderCell } from '@/components/data-table/header-cell';
+import { TextCell } from '@/components/data-table/text-cell';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import { DiscountType, Invoice, Verb } from '@/types';
+import { ColumnDef } from '@tanstack/react-table';
+import { ArrowUpDown, MoreHorizontal } from 'lucide-react';
 
 type Props = {
   onDidClick: (item: Invoice, action: Verb) => void;
@@ -51,7 +58,7 @@ export const getColumns = ({ onDidClick }: Props): ColumnDef<Invoice>[] => {
         );
       },
       cell: (props) => {
-        return <TextCell columnWidth={props.column.getSize()} value={ props.getValue() as string} />;
+        return <TextCell columnWidth={props.column.getSize()} value={props.getValue() as string} />;
       },
     },
     {
@@ -84,8 +91,8 @@ export const getColumns = ({ onDidClick }: Props): ColumnDef<Invoice>[] => {
         return <HeaderCell title="Discount" alignment="right" columnWidth={props.column.getSize()} />;
       },
       cell: (props) => {
-        const discount = props.row.getValue("discount") as DiscountType
-        const suffix = discount.type === "percentage" ? "%" : undefined
+        const discount = props.row.getValue('discount') as DiscountType;
+        const suffix = discount.type === 'percentage' ? '%' : undefined;
         return <CurrencyCell columnWidth={props.column.getSize()} suffix={suffix} value={String(discount.value)} />;
       },
     },
@@ -166,5 +173,5 @@ export const getColumns = ({ onDidClick }: Props): ColumnDef<Invoice>[] => {
         );
       },
     },
-  ]
-}
+  ];
+};

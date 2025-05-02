@@ -1,6 +1,15 @@
 import { AlertDestructive } from '@/components/alert-destructive';
 import InputError from '@/components/input-error';
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
 import { Calendar } from '@/components/ui/calendar';
 import { Input } from '@/components/ui/input';
@@ -14,16 +23,29 @@ import { useDebounced } from '@/hooks/use-debounced';
 import { useLocalStorage } from '@/hooks/use-local-storage';
 import AuthenticatedLayout from '@/layouts/authenticated-layout';
 import { addDays, cn, isNotEmpty } from '@/lib/utils';
-import { BTForm, CardForm, CashForm, CheckForm, Customer, DiscountType, Item, LineForm, Nameable, PageProps, PaymentForm, PaymentMethod } from '@/types';
+import {
+  BTForm,
+  CardForm,
+  CashForm,
+  CheckForm,
+  Customer,
+  DiscountType,
+  Item,
+  LineForm,
+  Nameable,
+  PageProps,
+  PaymentForm,
+  PaymentMethod,
+} from '@/types';
 import { Textarea } from '@headlessui/react';
 import { router, useForm, usePage } from '@inertiajs/react';
 import { format } from 'date-fns';
 import { CalendarIcon } from 'lucide-react';
 import React, { useCallback, useEffect } from 'react';
 import { breadcrumbs, defaultBTForm, defaultCardForm, defaultCashForm, defaultCheckForm, paymentTerms } from './constants';
+import CheckoutForm from './Shared/checkout-form';
 import { CustomerSection } from './Shared/customer-section';
 import { Lines } from './Shared/lines';
-import CheckoutForm from './Shared/checkout-form';
 
 type HeaderForm = {
   customer: Customer | undefined;
@@ -38,20 +60,31 @@ type HeaderForm = {
 type InvoiceForm = {
   header: HeaderForm;
   lines: LineForm[];
-  payment: PaymentForm
+  payment: PaymentForm;
 };
 
-const defaultPaymentForm: PaymentForm = {cash: defaultCashForm, ck: defaultCheckForm, card: defaultCardForm, bt: defaultBTForm}
-const defaultDiscount: DiscountType = {value: 0, type: "fixed"}
-const defaultHeaderForm: HeaderForm =  { customer: undefined, date: undefined, due: undefined, terms: 0, taxReceipt: 0, notes: undefined, discount: defaultDiscount}
-const defaultInvoiceForm: InvoiceForm = { header: defaultHeaderForm, lines: [], payment: defaultPaymentForm }
+const defaultPaymentForm: PaymentForm = { cash: defaultCashForm, ck: defaultCheckForm, card: defaultCardForm, bt: defaultBTForm };
+const defaultDiscount: DiscountType = { value: 0, type: 'fixed' };
+const defaultHeaderForm: HeaderForm = {
+  customer: undefined,
+  date: undefined,
+  due: undefined,
+  terms: 0,
+  taxReceipt: 0,
+  notes: undefined,
+  discount: defaultDiscount,
+};
+const defaultInvoiceForm: InvoiceForm = { header: defaultHeaderForm, lines: [], payment: defaultPaymentForm };
 
-const { setItem: storageInvoiceForm, getItem: getStorageInvoiceForm, removeItem: removeStorageIvoinceForm } = useLocalStorage('invoice');
-const getInvoiceFromStorage = () => {
-  return getStorageInvoiceForm() || defaultInvoiceForm;
-}
-
-export default function Create({ auth, customers, items, item, tax_receipts }: PageProps<{ customers: Customer[]; items: Item[]; item: Item, tax_receipts: Nameable[] }>) {
+export default function Create({
+  auth,
+  customers,
+  items,
+  item,
+  tax_receipts,
+}: PageProps<{ customers: Customer[]; items: Item[]; item: Item; tax_receipts: Nameable[] }>) {
+  const { setItem: storageInvoiceForm, getItem: getStorageInvoiceForm, removeItem: removeStorageIvoinceForm } = useLocalStorage('invoice');
+  const getInvoiceFromStorage = () => getStorageInvoiceForm() || defaultInvoiceForm;
   const currency = useNumber().currency;
   const [open, setOpen] = React.useState(false);
   const [openCancelConfirmation, setCancelConfirmation] = React.useState(false);
@@ -100,10 +133,10 @@ export default function Create({ auth, customers, items, item, tax_receipts }: P
   }, [currentItem, findCurrentItem]);
 
   const synInvoiceForm = useCallback(() => {
-    storageInvoiceForm(invoiceForm)
-  }, [invoiceForm])
+    storageInvoiceForm(invoiceForm);
+  }, [invoiceForm, storageInvoiceForm]);
 
-  useEffect(() => synInvoiceForm(), [invoiceForm]);
+  useEffect(() => synInvoiceForm(), [invoiceForm, synInvoiceForm]);
 
   useEffect(() => {
     const searchCustomer = () => {
@@ -122,7 +155,7 @@ export default function Create({ auth, customers, items, item, tax_receipts }: P
         return { ...invoiceForm, header: { ...invoiceForm.header, notes: dedbouncedNotes } };
       });
     }
-  }, [dedbouncedNotes])
+  }, [dedbouncedNotes, invoiceForm]);
 
   const searchItem = (search: string) => {
     router.reload({
@@ -136,26 +169,25 @@ export default function Create({ auth, customers, items, item, tax_receipts }: P
   };
 
   const handleOnSelectedItem = (item: Item) => {
-    setCurrentItem(item)
-    referenceInputRef.current!.value = item.name
+    setCurrentItem(item);
+    referenceInputRef.current!.value = item.name;
     qtyInputRef.current!.value = '1';
-  }
+  };
 
   const handleKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
     if (event.key === 'Enter' || event.key === 'Tab') {
       event.preventDefault(); // Prevent default behavior of Enter key
       if (event.currentTarget.name === 'reference' && isNotEmpty(event.currentTarget.value)) {
         searchItem(event.currentTarget.value);
-        return
+        return;
       }
       if (event.currentTarget.name === 'quantity' && currentItem != undefined) {
-        processCurrentItem()
+        processCurrentItem();
       }
     }
   };
 
   const processCurrentItem = () => {
-
     const line = currentItem!;
 
     if (isEditing) {
@@ -194,9 +226,9 @@ export default function Create({ auth, customers, items, item, tax_receipts }: P
 
   const handleDateChange = (date: unknown) => {
     invoiceForm.header.date = date as Date;
-    invoiceForm.header.due = undefined
+    invoiceForm.header.due = undefined;
     if (invoiceForm.header.terms > 1) {
-      invoiceForm.header.due = addDays(invoiceForm.header.date, invoiceForm.header.terms)
+      invoiceForm.header.due = addDays(invoiceForm.header.date, invoiceForm.header.terms);
     }
 
     setInvoiceForm(() => {
@@ -205,26 +237,26 @@ export default function Create({ auth, customers, items, item, tax_receipts }: P
   };
 
   const handlePaymentTermsChange = (value: string) => {
-    invoiceForm.header.terms = Number(value)
+    invoiceForm.header.terms = Number(value);
 
     if (invoiceForm.header.terms > 1 && invoiceForm.header.date) {
-      invoiceForm.header.due = addDays(invoiceForm.header.date, invoiceForm.header.terms)
+      invoiceForm.header.due = addDays(invoiceForm.header.date, invoiceForm.header.terms);
     } else {
-      invoiceForm.header.due = undefined
+      invoiceForm.header.due = undefined;
     }
 
     setInvoiceForm(() => {
-      return {...invoiceForm, header: {...invoiceForm.header, terms: Number(value)}}
-    })
-  }
+      return { ...invoiceForm, header: { ...invoiceForm.header, terms: Number(value) } };
+    });
+  };
 
   const handleTaxReceiptChange = (value: string) => {
-    invoiceForm.header.taxReceipt = Number(value)
+    invoiceForm.header.taxReceipt = Number(value);
 
     setInvoiceForm(() => {
-      return {...invoiceForm, header: {...invoiceForm.header, taxReceipt: Number(value)}}
-    })
-  }
+      return { ...invoiceForm, header: { ...invoiceForm.header, taxReceipt: Number(value) } };
+    });
+  };
 
   const handleRemoveLine = (event: React.MouseEvent<HTMLButtonElement>) => {
     event.preventDefault();
@@ -237,40 +269,40 @@ export default function Create({ auth, customers, items, item, tax_receipts }: P
     });
   };
 
-  const handleDiscountTypeChange = (value: "fixed" | "percentage") => {
-    invoiceForm.header.discount.type = value
+  const handleDiscountTypeChange = (value: 'fixed' | 'percentage') => {
+    invoiceForm.header.discount.type = value;
     // Recalculate totals if the value is set.
     setInvoiceForm(() => {
-      return {...invoiceForm, header: {...invoiceForm.header, discount: {...invoiceForm.header.discount, type: value}}}
-    })
-  }
+      return { ...invoiceForm, header: { ...invoiceForm.header, discount: { ...invoiceForm.header.discount, type: value } } };
+    });
+  };
 
   const handleDiscountValueChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    invoiceForm.header.discount.value = event.target.valueAsNumber
+    invoiceForm.header.discount.value = event.target.valueAsNumber;
 
     // Recalculate totals if the value is set.
     setInvoiceForm(() => {
-      return {...invoiceForm, header: {...invoiceForm.header, discount: {...invoiceForm.header.discount, value: event.target.valueAsNumber}}}
-    })
+      return { ...invoiceForm, header: { ...invoiceForm.header, discount: { ...invoiceForm.header.discount, value: event.target.valueAsNumber } } };
+    });
   };
 
   const performInvoiceCancelation = (event: React.MouseEvent<HTMLButtonElement>) => {
     event.preventDefault();
     removeStorageIvoinceForm();
-    router.get('/invoices')
-  }
+    router.get('/invoices');
+  };
 
   const handleCheckout = (event: React.MouseEvent<HTMLButtonElement>) => {
-    event.preventDefault()
-    if (computeTotalAmount()=== 0) return
-    if (invoiceForm.header.terms === 1 ) {
-      Object.keys(propsErrors).forEach(key => delete propsErrors[key]);
-      setCheckout(true)
-      return
+    event.preventDefault();
+    if (computeTotalAmount() === 0) return;
+    if (invoiceForm.header.terms === 1) {
+      Object.keys(propsErrors).forEach((key) => delete propsErrors[key]);
+      setCheckout(true);
+      return;
     }
 
-    placedInvoice()
-  }
+    placedInvoice();
+  };
 
   const placedInvoice = () => {
     // Check if the total and payment match on cash terms.
@@ -283,58 +315,70 @@ export default function Create({ auth, customers, items, item, tax_receipts }: P
       discount: invoiceForm.header.discount,
       notes: invoiceForm.header.notes || '',
       lines: invoiceForm.lines.map((line) => {
-        return { id: line.id, quantity: line.quantity, unit: line.unit.id, price: line.price, rate: line.tax.rate}
+        return { id: line.id, quantity: line.quantity, unit: line.unit.id, price: line.price, rate: line.tax.rate };
       }),
       payment: invoiceForm.payment,
-    }))
-    post('/invoices', {...headers, preserveState: "errors", onSuccess: () => {
-      removeStorageIvoinceForm();
-      router.get('/invoices')
-    }})
-  }
+    }));
+    post('/invoices', {
+      ...headers,
+      preserveState: 'errors',
+      onSuccess: () => {
+        removeStorageIvoinceForm();
+        router.get('/invoices');
+      },
+    });
+  };
 
   const computeDiscount = (): number => {
-    const discount = invoiceForm.header.discount
+    const discount = invoiceForm.header.discount;
     // Percentage calculation
-    if (discount.type === "percentage") {
-      const total = composeSubTotal + composeTax
-      return (total * (discount.value / 100))
+    if (discount.type === 'percentage') {
+      const total = composeSubTotal + composeTax;
+      return total * (discount.value / 100);
     }
 
     // Fixed calculation
-    return discount.value
-  }
+    return discount.value;
+  };
 
   const composeSubTotal = invoiceForm.lines.reduce((acc, line) => {
-      return acc + line.amount;
-    }, 0);
+    return acc + line.amount;
+  }, 0);
 
   const composeTax = invoiceForm.lines.reduce((acc, line) => {
     const tax = line.price * (line.tax.rate / 100);
-    return acc + (tax * line.quantity);
+    return acc + tax * line.quantity;
   }, 0);
 
   const computeTotalAmount = (): number => {
-    return (composeSubTotal + composeTax) - computeDiscount()
-  }
+    return composeSubTotal + composeTax - computeDiscount();
+  };
 
   const handleCheckoutChange = (method: PaymentMethod, form: CashForm | CheckForm | CardForm | BTForm) => {
     // Recalculate totals if the value is set.
     setInvoiceForm(() => {
-      return {...invoiceForm, payment: {...invoiceForm.payment, [method]:form}}
-    })
-  }
+      return { ...invoiceForm, payment: { ...invoiceForm.payment, [method]: form } };
+    });
+  };
 
   return (
     <AuthenticatedLayout user={auth.user} breadcrumbs={breadcrumbs}>
       <AuthenticatedLayout.Actions>
-        <div className='flex justify-end gap-x-6'>
-          <Button variant={"secondary"} onClick={() => setCancelConfirmation(true)}>Cancel</Button>
-          <Button onClick={handleCheckout} disabled={processing || (computeTotalAmount()=== 0)}>Checkout</Button>
+        <div className="flex justify-end gap-x-6">
+          <Button variant={'secondary'} onClick={() => setCancelConfirmation(true)}>
+            Cancel
+          </Button>
+          <Button onClick={handleCheckout} disabled={processing || computeTotalAmount() === 0}>
+            Checkout
+          </Button>
         </div>
       </AuthenticatedLayout.Actions>
       <div className="grid h-full w-full grid-cols-12 grid-rows-[auto_1fr_auto] gap-y-4 bg-gray-50/10">
-        {!openCheckout && propsErrors.status && <div className="col-span-12"><AlertDestructive description={propsErrors.status} onDestroy={() => delete propsErrors.status }/></div>}
+        {!openCheckout && propsErrors.status && (
+          <div className="col-span-12">
+            <AlertDestructive description={propsErrors.status} onDestroy={() => delete propsErrors.status} />
+          </div>
+        )}
         <div className="z-50 col-span-12 grid min-h-42 grid-cols-2 gap-x-6">
           <CustomerSection
             customer={invoiceForm.header.customer}
@@ -374,18 +418,18 @@ export default function Create({ auth, customers, items, item, tax_receipts }: P
               </div>
               <div className="flex flex-col gap-y-2">
                 <Label htmlFor="date">Due Date</Label>
-                <Label className='w-70 border p-2.5 rounded-sm text-muted-foreground'>
+                <Label className="text-muted-foreground w-70 rounded-sm border p-2.5">
                   {invoiceForm.header.due ? format(invoiceForm.header.due, 'PPP') : 'Unknow'}
                 </Label>
               </div>
             </div>
             <div className="col-span-6 flex flex-col gap-y-6">
               <div className="flex flex-col gap-y-2">
-                <Label htmlFor='paymentTerms'>Payment terms</Label>
+                <Label htmlFor="paymentTerms">Payment terms</Label>
                 <Select
-                  name='paymentTerms'
+                  name="paymentTerms"
                   onValueChange={handlePaymentTermsChange}
-                  defaultValue={"0"}
+                  defaultValue={'0'}
                   value={String(invoiceForm.header.terms)}
                   required
                 >
@@ -403,11 +447,11 @@ export default function Create({ auth, customers, items, item, tax_receipts }: P
                 <InputError className="mt-2" message={errors.terms} />
               </div>
               <div className="flex flex-col gap-y-2">
-                <Label htmlFor='paymentTerms'>Tax Receipt</Label>
+                <Label htmlFor="paymentTerms">Tax Receipt</Label>
                 <Select
-                  name='paymentTerms'
+                  name="paymentTerms"
                   onValueChange={handleTaxReceiptChange}
-                  defaultValue={"0"}
+                  defaultValue={'0'}
                   value={String(invoiceForm.header.taxReceipt)}
                   required
                 >
@@ -445,41 +489,41 @@ export default function Create({ auth, customers, items, item, tax_receipts }: P
           </div>
         </div>
         <div className="col-span-12 min-h-48">
-          <div className='flex flex-col gap-y-2'>
-            <div className='grid grid-cols-12'>
+          <div className="flex flex-col gap-y-2">
+            <div className="grid grid-cols-12">
               <div className="col-span-10 flex flex-col gap-y-2 p-2">
-                <Label className='text-sm/6 font-medium'>Notes</Label>
+                <Label className="text-sm/6 font-medium">Notes</Label>
                 <Textarea
-                  name='notes'
+                  name="notes"
                   rows={4}
-                  className="block w-1/2 rounded-lg text-sm/6 resize-none border px-3 py-1.5 focus:no-data-focus:outline-none data-focus:outline-2 data-focus:-outline-offset-2 data-focus:outline-white/25"
+                  className="focus:no-data-focus:outline-none block w-1/2 resize-none rounded-lg border px-3 py-1.5 text-sm/6 data-focus:outline-2 data-focus:-outline-offset-2 data-focus:outline-white/25"
                   defaultValue={invoiceForm.header.notes}
                   onChange={(e) => setNotes(e.currentTarget.value)}
-                  />
+                />
               </div>
               <div className="col-span-2 flex flex-col gap-y-2 rounded-lg border border-gray-300/25 bg-gray-100/10">
-                <div className='grid place-content-end p-2 gap-y-4'>
+                <div className="grid place-content-end gap-y-4 p-2">
                   {/* Add red border as the customer card, using data attributes */}
-                  <InputError message={errors["discount.value"]} />
-                  <div className='flex justify-between items-center w-60'>
+                  <InputError message={errors['discount.value']} />
+                  <div className="flex w-60 items-center justify-between">
                     <span className="block text-base">Subtotal</span>
                     <span className="block text-base">{currency(composeSubTotal)}</span>
                   </div>
-                  <div className='flex justify-between items-center w-60'>
+                  <div className="flex w-60 items-center justify-between">
                     <span className="block text-base">Discount</span>
-                    <div className='flex justify-end w-40'>
+                    <div className="flex w-40 justify-end">
                       <Input
                         type="number"
                         min={0}
                         defaultValue={invoiceForm.header.discount.value}
                         name="discount"
-                        className="text-end w-20"
+                        className="w-20 text-end"
                         onChange={handleDiscountValueChange}
                       />
                       <Select
-                        name='discountType'
+                        name="discountType"
                         onValueChange={handleDiscountTypeChange}
-                        defaultValue={"percentage"}
+                        defaultValue={'percentage'}
                         value={String(invoiceForm.header.discount.type)}
                         required
                       >
@@ -487,18 +531,18 @@ export default function Create({ auth, customers, items, item, tax_receipts }: P
                           <SelectValue placeholder="Discount" />
                         </SelectTrigger>
                         <SelectContent className="">
-                            <SelectItem value={"fixed"}>$</SelectItem>
-                            <SelectItem value={"percentage"}>%</SelectItem>
+                          <SelectItem value={'fixed'}>$</SelectItem>
+                          <SelectItem value={'percentage'}>%</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
                   </div>
-                  <div className='flex justify-between items-center w-60'>
+                  <div className="flex w-60 items-center justify-between">
                     <span className="block text-base">Tax</span>
                     <span className="block text-base">{currency(composeTax)}</span>
                   </div>
                   <Separator />
-                  <div className='flex justify-between items-center w-60'>
+                  <div className="flex w-60 items-center justify-between">
                     <span className="block text-xl">Total</span>
                     <span className="block text-xl">{currency(computeTotalAmount())}</span>
                   </div>
@@ -512,8 +556,7 @@ export default function Create({ auth, customers, items, item, tax_receipts }: P
             <AlertDialogHeader>
               <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
               <AlertDialogDescription>
-                This action cannot be undone. This will permanently delete this
-                invoice and remove the data from our servers.
+                This action cannot be undone. This will permanently delete this invoice and remove the data from our servers.
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
@@ -532,6 +575,7 @@ export default function Create({ auth, customers, items, item, tax_receipts }: P
           setCancelConfirmation={setCancelConfirmation}
           errors={propsErrors}
           onCheckoutChange={handleCheckoutChange}
+          currency={currency}
         />
       </div>
 

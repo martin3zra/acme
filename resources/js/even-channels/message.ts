@@ -1,8 +1,8 @@
-import { eventbus } from "@/lib/event-bus";
+import { eventbus } from '@/lib/event-bus';
 
 export const messageChannel = eventbus<{
-    onSend: (payload: unknown) => void
-}>()
+  onSend: (payload: unknown) => void;
+}>();
 
 /*
 useEffect(() => {

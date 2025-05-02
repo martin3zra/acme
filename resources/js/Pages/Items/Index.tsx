@@ -90,17 +90,17 @@ export default function Index({ auth, items, taxes, units }: PageProps<{ items: 
 
         {hasItems && <List data={items} onSelectItem={onSelectItem} />}
 
-          <Sheet open={open} onOpenChange={onOpenChange}>
-            <SheetContent side="right" className="m-4 flex h-[calc(~'(100%-var(--spacing)*4)/3')] w-full flex-col rounded-md sm:max-w-4xl">
-              <SheetHeader>
-                <SheetTitle>{verbName} Item</SheetTitle>
-                <SheetDescription className="text-[12px]">Create a new item</SheetDescription>
-              </SheetHeader>
-              <div className="grid gap-4 px-4">
-                <CreateForm params={setSelectedItem} onFinish={() => modalHandler(false)} />
-              </div>
-            </SheetContent>
-          </Sheet>
+        <Sheet open={open} onOpenChange={onOpenChange}>
+          <SheetContent side="right" className="m-4 flex h-[calc(~'(100%-var(--spacing)*4)/3')] w-full flex-col rounded-md sm:max-w-4xl">
+            <SheetHeader>
+              <SheetTitle>{verbName} Item</SheetTitle>
+              <SheetDescription className="text-[12px]">Create a new item</SheetDescription>
+            </SheetHeader>
+            <div className="grid gap-4 px-4">
+              <CreateForm params={setSelectedItem} onFinish={() => modalHandler(false)} />
+            </div>
+          </SheetContent>
+        </Sheet>
 
         {setSelectedItem.item && (
           <ConfirmsPassword
