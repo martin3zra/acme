@@ -12,6 +12,7 @@ import (
 
 func (s *Server) invoicesHandler(i *inertia.Inertia) http.Handler {
 	fn := func(w http.ResponseWriter, r *http.Request) {
+
 		user := auth.User(r.Context())
 		invoices, err := s.findInvoices(*user.CurrentCompanyId)
 		if err != nil {
@@ -21,6 +22,23 @@ func (s *Server) invoicesHandler(i *inertia.Inertia) http.Handler {
 
 		err = i.Render(w, r, "Invoices/Index", inertia.Props{
 			"invoices": invoices,
+			"invoice": inertia.Optional(func() (any, error) {
+				uuid := r.URL.Query().Get("id")
+				invoice, err := s.findInvoicesByUUID(*user.CurrentCompanyId, uuid)
+				if err != nil {
+					return nil, err
+				}
+
+				lines, err := s.findInvoiceLines(*user.CurrentCompanyId, invoice.ID)
+				if err != nil {
+					return nil, err
+				}
+
+				return map[string]any{
+					"header": invoice,
+					"lines":  lines,
+				}, err
+			}),
 		})
 		if err != nil {
 			s.handleError(w, err)

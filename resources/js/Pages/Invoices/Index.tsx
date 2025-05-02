@@ -1,8 +1,13 @@
 import HeadingSmall from '@/components/heading-small';
 import AuthenticatedLayout from '@/layouts/authenticated-layout';
-import { BreadcrumbItem, Invoice, PageProps, Verb } from '@/types';
+import { BreadcrumbItem, Invoice, InvoiceWithLines, PageProps, Verb } from '@/types';
 import { List } from './List/Index';
 import { AddNewInvoice } from './Shared/AddNewInvoice';
+import { useEffect, useState } from 'react';
+import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet';
+import Show from './Show';
+import { router, usePage } from '@inertiajs/react';
+import useCallbackState from '@/hooks/use-callback-state';
 
 const breadcrumbs: BreadcrumbItem[] = [
   {
@@ -14,10 +19,28 @@ const breadcrumbs: BreadcrumbItem[] = [
     href: '/invoices',
   },
 ];
-export default function Index({ auth, invoices }: PageProps<{ invoices: Invoice[] }>) {
+export default function Index({ auth, invoices, invoice }: PageProps<{ invoices: Invoice[], invoice: InvoiceWithLines }>) {
+  const [open, setOpen] = useCallbackState<boolean>(false)
+  const page = usePage()
   const hasInvoices = invoices.length > 0;
 
-  const onSelectInvoice = (invoice: Invoice, action: Verb): void => {}
+  const onSelectInvoice = (invoice: Invoice, action: Verb): void => {
+    if (action !== "view") return
+    setOpen((open) => !open, (newVal) => {
+      if (newVal) {
+        router.visit(page.url, {
+          except: ['invoices'],
+          data: {id: invoice.uuid},
+          preserveScroll: true,
+          preserveState: true
+        });
+      }
+    })
+  }
+
+  const onOpenChange = (open: boolean) => {
+    setOpen(open);
+  };
 
   return (
     <AuthenticatedLayout user={auth.user} breadcrumbs={breadcrumbs}>
@@ -41,6 +64,20 @@ export default function Index({ auth, invoices }: PageProps<{ invoices: Invoice[
         )}
 
         {hasInvoices && <List data={invoices} onSelectInvoice={onSelectInvoice} />}
+
+        {invoice && (
+          <Sheet open={open} onOpenChange={onOpenChange}>
+          <SheetContent side="right" className="m-4 flex h-[calc(~'(100%-var(--spacing)*4)/3')] w-full flex-col rounded-md sm:max-w-7xl">
+            <SheetHeader>
+              <SheetTitle>Invoice: {invoice.header.number}</SheetTitle>
+              <SheetDescription className="text-[12px]">Invoice details</SheetDescription>
+            </SheetHeader>
+            <div className="grid gap-4 px-4">
+              <Show invoice={invoice} />
+            </div>
+          </SheetContent>
+        </Sheet>
+        )}
       </div>
     </AuthenticatedLayout>
   );

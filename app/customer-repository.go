@@ -13,13 +13,14 @@ type customer struct {
 	ID          int     `json:"id"`
 	UUID        string  `json:"uuid"`
 	Name        string  `json:"name"`
-	ContactName string  `json:"contact_name,omitempty"`
+	ContactName string  `json:"contact_name,omitempty,"`
 	Phone       string  `json:"phone"`
 	Email       string  `json:"email"`
-	AmountDue   float64 `json:"amount_due,omitempty"`
+	AmountDue   float64 `json:"amount_due,omitempty,"`
+	Address     string  `json:"address"`
 	// Add timestamps properties
 	foundation.Timestamps
-	Status foundation.Status `json:"status,omitempty"`
+	Status foundation.Status `json:"status,omitempty,"`
 }
 
 func (s *Server) findCustomeByID(companyID, customerID int) (*customer, error) {

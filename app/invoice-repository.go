@@ -15,6 +15,7 @@ type invoice struct {
 	Number     string     `json:"number"`
 	Customer   customer   `json:"customer"`
 	Date       time.Time  `json:"date"`
+	DueOn      *time.Time `json:"due_on"`
 	Amount     float64    `json:"amount"`
 	Discount   Discount   `json:"discount"`
 	Tax        float64    `json:"tax"`
@@ -22,11 +23,26 @@ type invoice struct {
 	Status     string     `json:"status"`
 	PaidStatus PaidStatus `json:"paid_status"`
 	Payment    Payment    `json:"payment"`
+	Notes      string     `json:"notes"`
+}
+
+type line struct {
+	ID          int64   `json:"id"`
+	Qty         int64   `json:"qty"`
+	Price       float64 `json:"price"`
+	Name        string  `json:"name"`
+	Description string  `json:"description"`
+	Unit        struct {
+		ID   int64  `json:"id"`
+		Name string `json:"name"`
+	} `json:"unit"`
+	// Add timestamps properties
+	foundation.Timestamps
 }
 
 func (s *Server) findInvoices(companyId int) ([]*invoice, error) {
-	rows, err := s.db.Query("SELECT invoices.id, invoices.uuid, invoices.date, invoices.amount, invoices.discount, invoices.tax, "+
-		"invoices.total, invoices.status, invoices.paid_status, invoices.payment, "+
+	rows, err := s.db.Query("SELECT invoices.id, invoices.uuid, invoices.date, invoices.due_on, invoices.amount, invoices.discount, invoices.tax, "+
+		"invoices.total, invoices.status, invoices.paid_status, invoices.payment, invoices.note, "+
 		"customers.id as customer, customers.name, customers.email, customers.phone "+
 		"FROM invoices "+
 		"INNER JOIN companies ON (invoices.company_id = companies.id) "+
@@ -43,6 +59,7 @@ func (s *Server) findInvoices(companyId int) ([]*invoice, error) {
 			&i.ID,
 			&i.UUID,
 			&i.Date,
+			&i.DueOn,
 			&i.Amount,
 			&i.Discount,
 			&i.Tax,
@@ -50,6 +67,7 @@ func (s *Server) findInvoices(companyId int) ([]*invoice, error) {
 			&i.Status,
 			&i.PaidStatus,
 			&i.Payment,
+			&i.Notes,
 			&i.Customer.ID,
 			&i.Customer.Name,
 			&i.Customer.Email,
@@ -59,10 +77,47 @@ func (s *Server) findInvoices(companyId int) ([]*invoice, error) {
 		}
 
 		i.Number = s.generatePrefixedInvoiceNumber(i.ID)
+		i.Customer.Address = "LOUISVILLE, Selby 3864 Johnson Street, United States of America"
 
 		data = append(data, i)
 	}
 	return data, nil
+}
+
+func (s *Server) findInvoicesByUUID(companyId int, uuid string) (*invoice, error) {
+	i := new(invoice)
+	err := s.db.QueryRow("SELECT invoices.id, invoices.uuid, invoices.date, invoices.due_on, invoices.amount, invoices.discount, invoices.tax, "+
+		"invoices.total, invoices.status, invoices.paid_status, invoices.payment, invoices.note, "+
+		"customers.id as customer, customers.name, customers.email, customers.phone "+
+		"FROM invoices "+
+		"INNER JOIN companies ON (invoices.company_id = companies.id) "+
+		"INNER JOIN customers ON (invoices.company_id = customers.company_id AND invoices.customer_id = customers.id) "+
+		"WHERE invoices.company_id = $1 AND invoices.uuid = $2", companyId, uuid).
+		Scan(
+			&i.ID,
+			&i.UUID,
+			&i.Date,
+			&i.DueOn,
+			&i.Amount,
+			&i.Discount,
+			&i.Tax,
+			&i.Total,
+			&i.Status,
+			&i.PaidStatus,
+			&i.Payment,
+			&i.Notes,
+			&i.Customer.ID,
+			&i.Customer.Name,
+			&i.Customer.Email,
+			&i.Customer.Phone)
+	if err != nil {
+		return nil, err
+	}
+
+	i.Number = s.generatePrefixedInvoiceNumber(i.ID)
+	i.Customer.Address = "LOUISVILLE, Selby 3864 Johnson Street, United States of America"
+
+	return i, nil
 }
 
 func (s *Server) generatePrefixedInvoiceNumber(value int) string {
@@ -153,6 +208,45 @@ func (s *Server) attachInvoiceLines(tx *sql.Tx, companyId, invoiceId int, form S
 	}
 
 	return nil
+}
+
+func (s *Server) findInvoiceLines(companyId int, invoiceId int) ([]*line, error) {
+	rows, err := s.db.Query(`
+    SELECT ii.item_id, ii.qty, ii.price, iu.unit_id, it.name, it.description, u.name,
+    ii.created_at, ii.updated_at, ii.deleted_at
+    FROM invoices_items AS ii
+    INNER JOIN companies AS com ON (ii.company_id = com.id)
+    INNER JOIN invoices AS i ON (ii.invoice_id = i.id AND ii.company_id = i.company_id)
+    INNER JOIN items AS it ON(ii.item_id = it.id AND ii.company_id = it.company_id)
+    INNER JOIN items_units AS iu ON(ii.unit_id = iu.unit_id AND ii.item_id = iu.item_id AND ii.company_id = iu.company_id)
+    INNER JOIN units AS u ON (iu.unit_id = u.id AND iu.company_id = u.company_id)
+    WHERE ii.company_id = $1
+    AND ii.invoice_id = $2`, companyId, invoiceId)
+	if err != nil {
+		return nil, err
+	}
+	data := make([]*line, 0)
+	for rows.Next() {
+		i := new(line)
+
+		if err = rows.Scan(
+			&i.ID,
+			&i.Qty,
+			&i.Price,
+			&i.Unit.ID,
+			&i.Name,
+			&i.Description,
+			&i.Unit.Name,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.DeletedAt,
+		); err != nil {
+			return nil, err
+		}
+
+		data = append(data, i)
+	}
+	return data, nil
 }
 
 func (s *Server) registerReceivable(tx *sql.Tx, companyId, invoiceId, customerId int) error {

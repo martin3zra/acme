@@ -47,6 +47,7 @@ export interface Customer {
   contact_name: string;
   phone: string;
   email: string;
+  address: string;
   status: string;
   amount_due: number;
   created_at: string;
@@ -54,44 +55,60 @@ export interface Customer {
 }
 
 export interface Item {
-    id: number;
-    uuid: string;
-    name: string;
-    price: number;
-    tax: Tax;
-    unit: Unit;
-    description: string;
-    status: string;
+  id: number;
+  uuid: string;
+  name: string;
+  price: number;
+  tax: Tax;
+  unit: Unit;
+  description: string;
+  status: string;
+}
+
+export interface InvoiceLine extends Item {
+  qty: number;
 }
 
 export interface Tax {
-    id: number;
-    name: string;
-    rate: number;
+  id: number;
+  name: string;
+  rate: number;
 }
 
 export interface Unit {
-    id: number;
-    name: string;
-}
-
-export interface Unit {
-    id: number;
-    name: string;
+  id: number;
+  name: string;
 }
 
 export type DiscountType = {
-    type: "fixed" | "percentage";
-    value: number
-  }
+  type: "fixed" | "percentage";
+  value: number
+}
+
+export const PaidStatuses = ["paid" , "unpaid" , "partial"] as const
+
+export type PaidStatus = typeof PaidStatuses[number]
 
 export interface Invoice {
     id: number;
     uuid: string;
     number: string;
-    customer: Customer
-    status: string
-    paid_status: string
+    customer: Customer;
+    date: string;
+    due_on?: string;
+    amount: number;
+    discount: DiscountType;
+    tax: number;
+    total: number;
+    payment: PaymentForm
+    status: string;
+    paid_status: PaidStatus;
+    notes: string;
+}
+
+export interface InvoiceWithLines {
+  header: Invoice
+  lines: InvoiceLine[]
 }
 
 export interface BreadcrumbItem {
