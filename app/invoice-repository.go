@@ -13,6 +13,7 @@ type invoice struct {
 	ID         int        `json:"id"`
 	UUID       string     `json:"uuid"`
 	Number     string     `json:"number"`
+	NCF        string     `json:"ncf"`
 	Customer   customer   `json:"customer"`
 	Date       time.Time  `json:"date"`
 	DueOn      *time.Time `json:"due_on"`
@@ -43,10 +44,12 @@ type line struct {
 func (s *Server) findInvoices(companyId int) ([]*invoice, error) {
 	rows, err := s.db.Query("SELECT invoices.id, invoices.uuid, invoices.date, invoices.due_on, invoices.amount, invoices.discount, invoices.tax, "+
 		"invoices.total, invoices.status, invoices.paid_status, invoices.payment, invoices.note, "+
+		"tax_receipts.series || tax_receipts.type || LPAD(invoices.tax_receipt_sequence::varchar,8,'0') as NCF, "+
 		"customers.id as customer, customers.name, customers.email, customers.phone "+
 		"FROM invoices "+
 		"INNER JOIN companies ON (invoices.company_id = companies.id) "+
 		"INNER JOIN customers ON (invoices.company_id = customers.company_id AND invoices.customer_id = customers.id) "+
+		"INNER JOIN tax_receipts ON (invoices.company_id = tax_receipts.company_id AND invoices.tax_receipt_id = tax_receipts.id) "+
 		"WHERE invoices.company_id = $1", companyId)
 	if err != nil {
 		return nil, err
@@ -68,6 +71,7 @@ func (s *Server) findInvoices(companyId int) ([]*invoice, error) {
 			&i.PaidStatus,
 			&i.Payment,
 			&i.Notes,
+			&i.NCF,
 			&i.Customer.ID,
 			&i.Customer.Name,
 			&i.Customer.Email,
@@ -88,10 +92,12 @@ func (s *Server) findInvoicesByUUID(companyId int, uuid string) (*invoice, error
 	i := new(invoice)
 	err := s.db.QueryRow("SELECT invoices.id, invoices.uuid, invoices.date, invoices.due_on, invoices.amount, invoices.discount, invoices.tax, "+
 		"invoices.total, invoices.status, invoices.paid_status, invoices.payment, invoices.note, "+
+		"tax_receipts.series || tax_receipts.type || LPAD(invoices.tax_receipt_sequence::varchar,8,'0') as NCF, "+
 		"customers.id as customer, customers.name, customers.email, customers.phone "+
 		"FROM invoices "+
 		"INNER JOIN companies ON (invoices.company_id = companies.id) "+
 		"INNER JOIN customers ON (invoices.company_id = customers.company_id AND invoices.customer_id = customers.id) "+
+		"INNER JOIN tax_receipts ON (invoices.company_id = tax_receipts.company_id AND invoices.tax_receipt_id = tax_receipts.id) "+
 		"WHERE invoices.company_id = $1 AND invoices.uuid = $2", companyId, uuid).
 		Scan(
 			&i.ID,
@@ -106,6 +112,7 @@ func (s *Server) findInvoicesByUUID(companyId int, uuid string) (*invoice, error
 			&i.PaidStatus,
 			&i.Payment,
 			&i.Notes,
+			&i.NCF,
 			&i.Customer.ID,
 			&i.Customer.Name,
 			&i.Customer.Email,

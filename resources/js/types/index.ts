@@ -94,6 +94,7 @@ export interface Invoice {
   id: number;
   uuid: string;
   number: string;
+  ncf: string;
   customer: Customer;
   date: string;
   due_on?: string;

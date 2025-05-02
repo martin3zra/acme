@@ -48,6 +48,17 @@ export const getColumns = ({ onDidClick }: Props): ColumnDef<Invoice>[] => {
       },
     },
     {
+      accessorKey: 'ncf',
+      meta: 'NCF',
+      // size: 880,
+      header: (props) => {
+        return <HeaderCell title="NCF" alignment="left" columnWidth={props.column.getSize()} />;
+      },
+      cell: (props) => {
+        return <TextCell columnWidth={props.column.getSize()} value={props.getValue() as string} />;
+      },
+    },
+    {
       accessorKey: 'customer.name',
       id: 'customer.name',
       header: ({ column }) => {
@@ -141,7 +152,7 @@ export const getColumns = ({ onDidClick }: Props): ColumnDef<Invoice>[] => {
         return <HeaderCell title="Paid Status" alignment="center" columnWidth={props.column.getSize()} />;
       },
       cell: (props) => {
-        const isEnabled = props.row.original.paid_status === 'enabled';
+        const isEnabled = props.row.original.paid_status === 'paid';
         const capitalized = props.row.original.paid_status.charAt(0).toUpperCase() + props.row.original.paid_status.slice(1);
         return (
           <div className={`pl-1.5 w-[${props.column.getSize()}px]`}>

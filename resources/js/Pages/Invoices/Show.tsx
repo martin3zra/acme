@@ -21,9 +21,15 @@ export default function Show({ invoice, auth }: Props) {
       <div className="col-span-12 pb-6">
         <Separator />
         <div className="flex justify-between py-6 [&_[data-slot=label]]:text-base/2 [&_[data-slot=label]]:font-medium">
-          <div className="col-span-6 flex items-center gap-x-2">
-            <Label>Invoice</Label>
-            <Label>#{invoice.header.number}</Label>
+          <div className="col-span-6 flex items-center gap-x-6 [&>div]:flex [&>div]:gap-x-2">
+            <div>
+              <Label>Invoice</Label>
+              <Label>#{invoice.header.number}</Label>
+            </div>
+            <div>
+              <Label>NCF</Label>
+              <Label>{invoice.header.ncf}</Label>
+            </div>
           </div>
           <div className="col-span-6 flex items-center gap-x-2 [&_[data-slot=label]]:font-normal">
             <Label>Date</Label>
