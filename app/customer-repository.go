@@ -1,30 +1,39 @@
 package app
 
-import "github.com/martin3zra/acme/pkg/foundation"
+import (
+	"database/sql"
+	"errors"
+	"log"
+	"strings"
+
+	"github.com/martin3zra/acme/pkg/foundation"
+)
 
 type customer struct {
 	ID          int     `json:"id"`
+	UUID        string  `json:"uuid"`
 	Name        string  `json:"name"`
-	ContactName string  `json:"contact_name,omitempty"`
+	ContactName string  `json:"contact_name,omitempty,"`
 	Phone       string  `json:"phone"`
 	Email       string  `json:"email"`
-	AmountDue   float64 `json:"amount_due,omitempty"`
+	AmountDue   float64 `json:"amount_due,omitempty,"`
+	Address     string  `json:"address"`
 	// Add timestamps properties
 	foundation.Timestamps
-	Status foundation.Status `json:"status,omitempty"`
+	Status foundation.Status `json:"status,omitempty,"`
 }
 
 func (s *Server) findCustomeByID(companyID, customerID int) (*customer, error) {
 
 	var c customer
-	err := s.db.QueryRow("SELECT c.id, c.name, c.contact_name, c.phone, c.email, c.status, c.amount_due, "+
+	err := s.db.QueryRow("SELECT c.id, c.uuid, c.name, c.contact_name, c.phone, c.email, c.status, c.amount_due, "+
 		"c.created_at, c.updated_at, c.deleted_at "+
 		"FROM customers c "+
 		"INNER JOIN companies ON (c.company_id = companies.id) "+
 		"WHERE c.company_id = $1 "+
 		"AND c.id = $2 "+
 		"AND c.deleted_at IS NULL", companyID, customerID).
-		Scan(&c.ID, &c.Name, &c.ContactName, &c.Phone, &c.Email, &c.Status, &c.AmountDue, &c.CreatedAt, &c.UpdatedAt, &c.DeletedAt)
+		Scan(&c.ID, &c.UUID, &c.Name, &c.ContactName, &c.Phone, &c.Email, &c.Status, &c.AmountDue, &c.CreatedAt, &c.UpdatedAt, &c.DeletedAt)
 	if err != nil {
 		return nil, err
 	}
@@ -34,7 +43,7 @@ func (s *Server) findCustomeByID(companyID, customerID int) (*customer, error) {
 
 func (s *Server) findCustomers(companyID int) ([]*customer, error) {
 
-	rows, err := s.db.Query("SELECT c.id, c.name, c.contact_name, c.phone, c.email, c.status, c.amount_due, "+
+	rows, err := s.db.Query("SELECT c.id, c.uuid, c.name, c.contact_name, c.phone, c.email, c.status, c.amount_due, "+
 		"c.created_at, c.updated_at, c.deleted_at "+
 		"FROM customers c "+
 		"INNER JOIN companies ON (c.company_id = companies.id) "+
@@ -48,6 +57,7 @@ func (s *Server) findCustomers(companyID int) ([]*customer, error) {
 		row := new(customer)
 		if err = rows.Scan(
 			&row.ID,
+			&row.UUID,
 			&row.Name,
 			&row.ContactName,
 			&row.Phone,
@@ -57,6 +67,40 @@ func (s *Server) findCustomers(companyID int) ([]*customer, error) {
 			&row.CreatedAt,
 			&row.UpdatedAt,
 			&row.DeletedAt,
+		); err != nil {
+			return data, err
+		}
+
+		data = append(data, row)
+	}
+
+	return data, nil
+}
+
+func (s *Server) findCustomersBySearchCriteria(companyID int, term string) ([]*customer, error) {
+	if len(strings.TrimSpace(term)) == 0 {
+		return nil, errors.New("need to specifiy the customer you're looking for")
+	}
+	rows, err := s.db.Query("SELECT c.id, c.uuid, c.name, c.contact_name, c.phone, c.email, c.amount_due "+
+		"FROM customers c "+
+		"INNER JOIN companies ON (c.company_id = companies.id) "+
+		"WHERE c.company_id = $1 "+
+		"AND c.name LIKE $2 "+
+		"AND c.deleted_at IS NULL AND c.status = 'enabled' LIMIT 5", companyID, "%"+term+"%")
+	if err != nil {
+		return nil, err
+	}
+	data := make([]*customer, 0)
+	for rows.Next() {
+		row := new(customer)
+		if err = rows.Scan(
+			&row.ID,
+			&row.UUID,
+			&row.Name,
+			&row.ContactName,
+			&row.Phone,
+			&row.Email,
+			&row.AmountDue,
 		); err != nil {
 			return data, err
 		}
@@ -77,7 +121,7 @@ func (s *Server) storeCustomer(companyId int, form StoreCustomerForm) error {
 	return err
 }
 
-func (s *Server) updateCustomer(companyID, customerID int, form StoreCustomerForm) error {
+func (s *Server) updateCustomer(companyID, customerID int, form UpdateCustomerForm) error {
 
 	_, err := s.db.Exec(
 		"UPDATE customers SET name = $1, contact_name = $2,  email = $3, phone = $4 WHERE company_id = $5 AND id = $6",
@@ -109,4 +153,19 @@ func (s *Server) toggleCustomerStatus(companyID int, customer *customer) error {
 		companyID, customer.ID, status,
 	)
 	return err
+}
+
+func (s *Server) updateCustomerAmountDue(tx *sql.Tx, companyId, customerId int, amountDue float64) error {
+
+	_, err := tx.Exec("UPDATE customers SET amount_due = amount_due + $3 WHERE company_id = $1 AND id = $2",
+		companyId, customerId, amountDue,
+	)
+	if err != nil {
+		if txErr := tx.Rollback(); txErr != nil {
+			log.Fatalf("Error updating customer amount due: %v", txErr)
+			return txErr
+		}
+	}
+
+	return nil
 }

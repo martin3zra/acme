@@ -10,13 +10,14 @@ import (
 
 type FormRequestContract interface {
 	PrepareForValidation()
+	PassedValidation()
 	Authorize() bool
 	Validate(object any, rules map[string]any, prepareForValidation func()) validator.Validator
 	Rules() map[string]any
-	Ignore(ignore any, column ...string)
 	Errors() validator.Errors
 	User() *foundation.User
 	SetContext(ctx context.Context)
+	Messages() map[string]string
 }
 
 type FormRequest struct {
@@ -58,10 +59,6 @@ func (f *FormRequest) Validate(object any, rules map[string]any, prepareForValid
 	return *f.validator
 }
 
-func (f *FormRequest) Ignore(ignore any, column ...string) {
-	f.validator.Ignore(ignore, column...)
-}
-
 func (f *FormRequest) Errors() validator.Errors {
 	return f.validator.Errors()
 }
@@ -70,11 +67,18 @@ func (f *FormRequest) Rules() map[string]any {
 	return map[string]any{}
 }
 
-func (f *FormRequest) Authorize() bool       { return true }
+func (f *FormRequest) Authorize() bool { return true }
+
 func (f *FormRequest) PrepareForValidation() {}
+
+func (f *FormRequest) PassedValidation() {}
 
 func (f *FormRequest) PassesAuthorization() bool { return true }
 
 func (f *FormRequest) FailedAuthorization() {
 	// return here everything for a 403 status code
+}
+
+func (f *FormRequest) Messages() map[string]string {
+	return make(map[string]string)
 }

@@ -5,7 +5,6 @@ import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '
 import { useVerb } from '@/composables/use-verbs';
 import AuthenticatedLayout from '@/layouts/authenticated-layout';
 import { BreadcrumbItem, Item, PageProps, Tax, Unit, Verb } from '@/types';
-import { Deferred } from '@inertiajs/react';
 import { Plus } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { List } from './List/Index';
@@ -91,19 +90,17 @@ export default function Index({ auth, items, taxes, units }: PageProps<{ items: 
 
         {hasItems && <List data={items} onSelectItem={onSelectItem} />}
 
-        <Deferred data={['units', 'taxes']} fallback={<div>Loading...</div>}>
-          <Sheet open={open} onOpenChange={onOpenChange}>
-            <SheetContent side="right" className="m-4 flex h-[calc(~'(100%-var(--spacing)*4)/3')] w-full flex-col rounded-md sm:max-w-4xl">
-              <SheetHeader>
-                <SheetTitle>{verbName} Item</SheetTitle>
-                <SheetDescription className="text-[12px]">Create a new item</SheetDescription>
-              </SheetHeader>
-              <div className="grid gap-4 px-4">
-                <CreateForm params={setSelectedItem} onFinish={() => modalHandler(false)} />
-              </div>
-            </SheetContent>
-          </Sheet>
-        </Deferred>
+        <Sheet open={open} onOpenChange={onOpenChange}>
+          <SheetContent side="right" className="m-4 flex h-[calc(~'(100%-var(--spacing)*4)/3')] w-full flex-col rounded-md sm:max-w-4xl">
+            <SheetHeader>
+              <SheetTitle>{verbName} Item</SheetTitle>
+              <SheetDescription className="text-[12px]">Create a new item</SheetDescription>
+            </SheetHeader>
+            <div className="grid gap-4 px-4">
+              <CreateForm params={setSelectedItem} onFinish={() => modalHandler(false)} />
+            </div>
+          </SheetContent>
+        </Sheet>
 
         {setSelectedItem.item && (
           <ConfirmsPassword

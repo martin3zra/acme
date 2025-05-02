@@ -24,6 +24,7 @@ type CreateFormProps = {
 };
 
 type ItemForm = {
+  id: number | undefined;
   name: string;
   description: string;
   price: number;
@@ -36,6 +37,7 @@ export default function CreateForm({ onFinish, params }: CreateFormProps) {
   const { headers } = useHeader();
   const { errors: propsErrors } = usePage<PageProps>().props;
   const { data, setData, post, put, errors, reset, processing } = useForm<Required<ItemForm>>({
+    id: params.item?.id,
     name: params.item?.name || '',
     description: params.item?.description || '',
     price: params.item?.price || 0,

@@ -4,14 +4,17 @@ import { FC } from 'react';
 type Props = {
   value?: string;
   columnWidth: number;
+  suffix?: string;
 };
 
-export const CurrencyCell: FC<Props> = ({ value, columnWidth }) => {
+export const CurrencyCell: FC<Props> = ({ value, columnWidth, suffix }) => {
   const { currency } = useNumber();
-  const formattedValue = value !== undefined ? currency(value) : '';
+  let formattedValue = value !== undefined ? currency(value) : '';
+  formattedValue = suffix !== undefined ? formattedValue.substring(1) : formattedValue;
   return (
     <div className="p-1.5 text-right" title={formattedValue} style={{ width: columnWidth }}>
       {formattedValue}
+      {suffix && <span>{suffix}</span>}
     </div>
   );
 };

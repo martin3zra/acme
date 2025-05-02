@@ -14,6 +14,28 @@ var defaultRules = []string{
 	"exists",
 	"unique",
 	"current_password",
+	"in",
+	"uppercase",
+	"lowercase",
+	"date",
+	"after",
+	"before",
+	"format",
+	"digits",
+	"digits_between",
+	"max_digits",
+	"min_digits",
+}
+
+var dateRules = []string{
+	"date",
+	"after",
+	"before",
+	"format",
+}
+
+var arrayRules = []string{
+	"in",
 }
 
 var databaseRules = []string{
@@ -36,4 +58,27 @@ type RuleContract interface {
 type Validator struct {
 	ValidatesAttributes
 	errors Errors
+}
+
+type ConditionalRules struct {
+	condition    bool
+	rules        string
+	defaultRules string
+}
+
+func (c ConditionalRules) Constraints() string {
+
+	if c.condition {
+		return c.rules
+	}
+
+	return c.defaultRules
+}
+
+func (r Rule) When(condition bool, rules string, defaultRules string) ConditionalRules {
+	return ConditionalRules{
+		condition:    condition,
+		rules:        rules,
+		defaultRules: defaultRules,
+	}
 }

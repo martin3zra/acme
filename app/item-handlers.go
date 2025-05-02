@@ -80,7 +80,7 @@ func (s *Server) updateItemHandler(i *inertia.Inertia) http.Handler {
 			return
 		}
 
-		var form StoreItemForm
+		var form UpdateItemForm
 		err = support.ParseRequest(r, &form)
 		if err != nil {
 			s.handleError(w, err, func() {

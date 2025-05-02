@@ -12,6 +12,7 @@ export interface User {
 
 export interface Auth {
   user: User;
+  company: Company;
 }
 
 export interface Company {
@@ -42,10 +43,12 @@ export interface SharedData {
 
 export interface Customer {
   id: number;
+  uuid: string;
   name: string;
   contact_name: string;
   phone: string;
   email: string;
+  address: string;
   status: string;
   amount_due: number;
   created_at: string;
@@ -53,34 +56,128 @@ export interface Customer {
 }
 
 export interface Item {
-    id: number;
-    name: string;
-    price: number;
-    tax: Tax;
-    unit: Unit;
-    description: string;
-    status: string;
+  id: number;
+  uuid: string;
+  name: string;
+  price: number;
+  tax: Tax;
+  unit: Unit;
+  description: string;
+  status: string;
+}
+
+export interface InvoiceLine extends Item {
+  qty: number;
 }
 
 export interface Tax {
-    id: number;
-    name: string;
-    rate: number;
+  id: number;
+  name: string;
+  rate: number;
 }
 
 export interface Unit {
-    id: number;
-    name: string;
+  id: number;
+  name: string;
 }
 
-export interface Unit {
-    id: number;
-    name: string;
+export type DiscountType = {
+  type: 'fixed' | 'percentage';
+  value: number;
+};
+
+export const PaidStatuses = ['paid', 'unpaid', 'partial'] as const;
+
+export type PaidStatus = (typeof PaidStatuses)[number];
+
+export interface Invoice {
+  id: number;
+  uuid: string;
+  number: string;
+  ncf: string;
+  customer: Customer;
+  date: string;
+  due_on?: string;
+  amount: number;
+  discount: DiscountType;
+  tax: number;
+  total: number;
+  payment: PaymentForm;
+  status: string;
+  paid_status: PaidStatus;
+  notes: string;
+}
+
+export interface InvoiceWithLines {
+  header: Invoice;
+  lines: InvoiceLine[];
 }
 
 export interface BreadcrumbItem {
-    title: string;
-    href: string;
+  title: string;
+  href: string;
 }
 
-export type Verb = "create" | "view" | "edit" | "trash"
+export type Verb = 'create' | 'view' | 'edit' | 'trash';
+
+export interface PaymentFormType {
+  amount: number;
+  reference: string;
+}
+
+export type BankOperationFormProps = Partial<PaymentFormType> & {
+  onChange: (value: number | string) => void;
+};
+
+export type CashForm = {
+  amount: number;
+};
+
+export type CheckForm = PaymentFormType & {};
+
+export type PaymentMethod = 'cash' | 'ck' | 'card' | 'bt';
+
+export type CardBrand = {
+  value: string;
+  name: string;
+};
+
+export type CardFormInput = 'last4' | 'brand' | 'reference' | 'amount';
+
+export type CardForm = PaymentFormType & {
+  last4: number;
+  brand: string;
+};
+
+export type BTForm = PaymentFormType & {};
+
+export type PaymentMethodType = {
+  value: PaymentMethod;
+  name: string;
+  amount: number;
+  autoFocus?: boolean;
+};
+
+export type PaymentTerm = {
+  value: number;
+  label: string;
+};
+
+export interface LineForm extends Item {
+  quantity: number;
+  amount: number;
+}
+
+export type PaymentForm = {
+  cash: CashForm;
+  ck: CheckForm;
+  card: CardForm;
+  bt: BTForm;
+};
+
+export interface Nameable {
+  id: string | number;
+  name: string;
+}
+
+export type currencySignature = (value: number | string, precision?: number, inCent?: boolean) => string;
