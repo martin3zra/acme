@@ -194,6 +194,45 @@ func (s *Server) storeInvoiceHandler(i *inertia.Inertia) http.Handler {
 	return http.HandlerFunc(fn)
 }
 
+func (s *Server) updateInvoiceHandler(i *inertia.Inertia) http.Handler {
+
+	fn := func(w http.ResponseWriter, r *http.Request) {
+		uuid := r.PathValue("id")
+		back := func() {
+			http.Redirect(w, r, "/invoices/"+uuid+"/edit", http.StatusSeeOther)
+		}
+		var form UpdateInvoiceForm
+		err := support.ParseRequest(r, &form)
+		if err != nil {
+			// http.Redirect(w, r, "/invoices/"+uuid+"/edit", http.StatusSeeOther)
+			back()
+			return
+		}
+
+		if form.Terms == 1 && form.total != form.paymentTotalAmount() {
+			s.session.Errors("status", "Invoice total amount and the payment details are different.")
+			// http.Redirect(w, r, "/invoices/"+uuid+"/edit", http.StatusSeeOther)
+			back()
+			return
+		}
+
+		user := auth.User(r.Context())
+		err = s.updateInvoice(*user.CurrentCompanyId, uuid, form)
+		if err != nil {
+			log.Printf("Error creating invoice: %v", err)
+			s.session.Errors("status", "Invoice wasn't updated. Something went wrong.")
+			// i.Back(w, r)
+			back()
+			return
+		}
+		s.session.Flash("success", "Invoice was created successfully!")
+
+		http.Redirect(w, r, "/invoices", http.StatusSeeOther)
+	}
+
+	return http.HandlerFunc(fn)
+}
+
 func mapSlice[T, U any](s []T, f func(T) U) []U {
 	result := make([]U, len(s))
 	for i, v := range s {

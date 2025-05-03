@@ -305,3 +305,28 @@ func (form *StoreInvoiceForm) applyDiscount() {
 
 	form.total = form.total - form.Discount.Val
 }
+
+type UpdateInvoiceForm struct {
+	StoreInvoiceForm
+}
+
+func (form UpdateInvoiceForm) Rules() map[string]any {
+	return map[string]any{
+		"customer_id":   "bail|required|exists:customers,id",
+		"date":          "bail|required|date",
+		"terms":         "bail|required|min:1",
+		"tax_receipt":   "bail|required|exists:tax_receipts,id",
+		"lines":         "required|min:1",
+		"lines.*.id":    "required|exists:items,id",
+		"lines.*.unit":  "required|exists:units,id",
+		"lines.*.qty":   "required|min:1",
+		"lines.*.price": "required",
+		"lines.*.rate":  "required",
+		"discount":      "required",
+		"discount.value": []any{
+			"sometimes",
+			validator.Rule{}.When(form.Discount.Type == "percentage", "between:0,100", "min:0"),
+		},
+		"discount.type": "required|in:percentage,fixed",
+	}
+}

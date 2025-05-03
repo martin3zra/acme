@@ -263,7 +263,6 @@ export default function Create({
   };
 
   const placedInvoice = () => {
-    // Check if the total and payment match on cash terms.
     transform((data) => ({
       ...data,
       customer_id: invoiceForm.header.customer?.id,

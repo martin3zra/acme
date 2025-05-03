@@ -18,7 +18,7 @@ import { Textarea } from '@headlessui/react';
 import { router, useForm, usePage } from '@inertiajs/react';
 import { format } from 'date-fns';
 import { CalendarIcon } from 'lucide-react';
-import React, { useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { defaultDiscount, editBreadcrumbs, paymentTerms } from './constants';
 import { CustomerSection } from './Shared/customer-section';
 import { Lines } from './Shared/lines';
@@ -44,7 +44,7 @@ export default function Edit({
     date: new Date(),
     discount: defaultDiscount,
   });
-  const { setItem: storageInvoiceForm, getItem: getStorageInvoiceForm, removeItem: removeStorageIvoinceForm } = useLocalStorage(invoice.uuid);
+  const { setItem: storageInvoiceForm, getItem: getStorageInvoiceForm, removeItem: removeStorageIvoinceForm } = useLocalStorage('invoice-edit');
 
   const writeInvoiceOnLocalStorage = (): InvoiceForm => {
     const _invoice: InvoiceForm = {
@@ -76,11 +76,23 @@ export default function Edit({
   const dedbouncedSearch = useDebounced(search, 500);
   const referenceInputRef = React.useRef<HTMLInputElement>(null);
   const qtyInputRef = React.useRef<HTMLInputElement>(null);
-  const handleCheckout = (event: React.MouseEvent<HTMLButtonElement>) => {};
 
-  // useEffect(() => {
-  //   if (invoice) writeInvoiceOnLocalStorage();
-  // }, [invoice, writeInvoiceOnLocalStorage]);
+  const synInvoiceForm = useCallback(() => {
+    storageInvoiceForm(invoiceForm);
+  }, [invoiceForm, storageInvoiceForm]);
+
+  useEffect(() => synInvoiceForm(), [invoiceForm, synInvoiceForm]);
+
+  useEffect(() => {
+    const searchCustomer = () => {
+      router.reload({ only: ['customers'], data: { search: dedbouncedSearch }, preserveUrl: true });
+    };
+
+    if (dedbouncedSearch) {
+      // Perform search operation
+      searchCustomer();
+    }
+  }, [dedbouncedSearch]);
 
   const handleOnSelectedItem = (item: Item) => {
     setCurrentItem(item);
@@ -109,7 +121,21 @@ export default function Edit({
   };
 
   const performUpdate = () => {
-    put(`/invoices/${invoice.uuid}`, {
+    transform((data) => ({
+      ...data,
+      customer_id: invoiceForm.header.customer?.id,
+      date: invoiceForm.header.date,
+      terms: invoiceForm.header.terms,
+      tax_receipt: invoiceForm.header.taxReceipt,
+      discount: invoiceForm.header.discount,
+      notes: invoiceForm.header.notes || '',
+      lines: invoiceForm.lines.map((line) => {
+        return { id: line.id, quantity: line.quantity, unit: line.unit.id, price: line.price, rate: line.tax.rate };
+      }),
+      payment: invoiceForm.payment,
+    }));
+
+    put(`/invoices/${invoice.header.uuid}`, {
       ...headers,
       preserveState: 'errors',
       onSuccess: () => {
@@ -223,6 +249,18 @@ export default function Edit({
     setInvoiceForm(() => {
       return { ...invoiceForm, header: { ...invoiceForm.header, discount: { ...invoiceForm.header.discount, type: value } } };
     });
+  };
+
+  const handleCheckout = (event: React.MouseEvent<HTMLButtonElement>) => {
+    event.preventDefault();
+    if (computeTotalAmount() === 0) return;
+    if (invoiceForm.header.terms === 1) {
+      Object.keys(propsErrors).forEach((key) => delete propsErrors[key]);
+      setCheckout(true);
+      return;
+    }
+
+    performUpdate();
   };
   return (
     <AuthenticatedLayout user={auth.user} breadcrumbs={editBreadcrumbs}>

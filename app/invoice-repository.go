@@ -204,6 +204,44 @@ func (s *Server) storeInvoice(companyID int, form StoreInvoiceForm) error {
 	return tx.Commit()
 }
 
+func (s *Server) updateInvoice(companyID int, uuid string, form UpdateInvoiceForm) error {
+	invoice, err := s.findInvoicesByUUID(companyID, uuid)
+	if err != nil {
+		return err
+	}
+
+	tx, err := s.db.Begin()
+	if err != nil {
+		return err
+	}
+	// defer tx.Rollback()
+
+	_, err = tx.Exec("UPDATE invoices SET customer_id = $3 WHERE company_id = $1 AND id = $2", companyID, invoice.ID, form.CustomerID)
+	if err != nil {
+		if txErr := tx.Rollback(); txErr != nil {
+			log.Fatalf("Error updating invoice: %v", txErr)
+			return txErr
+		}
+
+		return err
+	}
+
+	if invoice.Customer.ID != form.CustomerID {
+		// Update customer balance. Logs this operations to keep track of it.
+		err = s.updateCustomerAmountDue(tx, companyID, invoice.Customer.ID, -invoice.Amount)
+		if err != nil {
+			return tx.Rollback()
+		}
+
+		err = s.updateCustomerAmountDue(tx, companyID, form.CustomerID, form.total)
+		if err != nil {
+			return tx.Rollback()
+		}
+	}
+
+	return tx.Commit()
+}
+
 func (s *Server) attachInvoiceLines(tx *sql.Tx, companyId, invoiceId int, form StoreInvoiceForm) error {
 	vals := []any{}
 	for _, line := range form.Lines {
