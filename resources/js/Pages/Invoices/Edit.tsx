@@ -10,7 +10,7 @@ import { Separator } from '@/components/ui/separator';
 import { useHeader } from '@/composables/use-headers';
 import { useNumber } from '@/composables/use-number';
 import { useDebounced } from '@/hooks/use-debounced';
-import { useLocalStorage } from '@/hooks/use-local-storage';
+import { usePersistedState } from '@/hooks/use-persisted-state';
 import AuthenticatedLayout from '@/layouts/authenticated-layout';
 import { addDays, cn, isNotEmpty } from '@/lib/utils';
 import { Auth, Customer, InvoiceForm, InvoiceWithLines, Item, Nameable, PageProps } from '@/types';
@@ -18,7 +18,7 @@ import { Textarea } from '@headlessui/react';
 import { router, useForm, usePage } from '@inertiajs/react';
 import { format } from 'date-fns';
 import { CalendarIcon } from 'lucide-react';
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { defaultDiscount, editBreadcrumbs, paymentTerms } from './constants';
 import { CustomerSection } from './Shared/customer-section';
 import { Lines } from './Shared/lines';
@@ -44,9 +44,8 @@ export default function Edit({
     date: new Date(),
     discount: defaultDiscount,
   });
-  const { setItem: storageInvoiceForm, getItem: getStorageInvoiceForm, removeItem: removeStorageIvoinceForm } = useLocalStorage('invoice-edit');
 
-  const writeInvoiceOnLocalStorage = (): InvoiceForm => {
+  const initialAsInvoiceForm = (): InvoiceForm => {
     const _invoice: InvoiceForm = {
       header: {
         customer: invoice.header.customer,
@@ -62,37 +61,30 @@ export default function Edit({
       }),
       payment: invoice.header.payment,
     };
-    // setInvoiceForm(_invoice);
 
     return _invoice;
   };
 
-  const [invoiceForm, setInvoiceForm] = React.useState<InvoiceForm>(writeInvoiceOnLocalStorage());
+  const [invoiceForm, setInvoiceForm, removeInvoiceForm] = usePersistedState<InvoiceForm>('invoice_edit', initialAsInvoiceForm());
+
   const [currentItem, setCurrentItem] = React.useState<Item | undefined>(undefined);
   const [isEditing, setEditing] = React.useState(false);
   const [search, setSearch] = React.useState('');
-  const [notes, setNotes] = React.useState('');
   const [amount, setAmount] = React.useState(0);
-  const dedbouncedSearch = useDebounced(search, 500);
+  const debouncedSearch = useDebounced(search, 500);
   const referenceInputRef = React.useRef<HTMLInputElement>(null);
   const qtyInputRef = React.useRef<HTMLInputElement>(null);
 
-  const synInvoiceForm = useCallback(() => {
-    storageInvoiceForm(invoiceForm);
-  }, [invoiceForm, storageInvoiceForm]);
-
-  useEffect(() => synInvoiceForm(), [invoiceForm, synInvoiceForm]);
-
   useEffect(() => {
     const searchCustomer = () => {
-      router.reload({ only: ['customers'], data: { search: dedbouncedSearch }, preserveUrl: true });
+      router.reload({ only: ['customers'], data: { search: debouncedSearch }, preserveUrl: true });
     };
 
-    if (dedbouncedSearch) {
+    if (debouncedSearch) {
       // Perform search operation
       searchCustomer();
     }
-  }, [dedbouncedSearch]);
+  }, [debouncedSearch]);
 
   const handleOnSelectedItem = (item: Item) => {
     setCurrentItem(item);
@@ -139,7 +131,7 @@ export default function Edit({
       ...headers,
       preserveState: 'errors',
       onSuccess: () => {
-        removeStorageIvoinceForm();
+        removeInvoiceForm();
         router.get('/invoices');
       },
     });
@@ -289,7 +281,7 @@ export default function Edit({
             setSearch={setSearch}
             setOpen={setOpen}
             open={open}
-            dedbouncedSearch={dedbouncedSearch}
+            dedbouncedSearch={debouncedSearch}
           />
           <div className="grid grid-cols-12">
             <div className="col-span-6 flex flex-col gap-y-6">
@@ -401,7 +393,11 @@ export default function Edit({
                   rows={4}
                   className="focus:no-data-focus:outline-none block w-1/2 resize-none rounded-lg border px-3 py-1.5 text-sm/6 data-focus:outline-2 data-focus:-outline-offset-2 data-focus:outline-white/25"
                   defaultValue={invoiceForm.header.notes}
-                  onChange={(e) => setNotes(e.currentTarget.value)}
+                  onChange={(e) =>
+                    setInvoiceForm(() => {
+                      return { ...invoiceForm, header: { ...invoiceForm.header, notes: e.currentTarget.value } };
+                    })
+                  }
                 />
               </div>
               <div className="col-span-2 flex flex-col gap-y-2 rounded-lg border border-gray-300/25 bg-gray-100/10">

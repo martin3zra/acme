@@ -20,7 +20,7 @@ import { Separator } from '@/components/ui/separator';
 import { useHeader } from '@/composables/use-headers';
 import { useNumber } from '@/composables/use-number';
 import { useDebounced } from '@/hooks/use-debounced';
-import { useLocalStorage } from '@/hooks/use-local-storage';
+import { usePersistedState } from '@/hooks/use-persisted-state';
 import AuthenticatedLayout from '@/layouts/authenticated-layout';
 import { addDays, cn, isNotEmpty } from '@/lib/utils';
 import { BTForm, CardForm, CashForm, CheckForm, Customer, InvoiceForm, Item, LineForm, Nameable, PageProps, PaymentMethod } from '@/types';
@@ -41,8 +41,6 @@ export default function Create({
   item,
   tax_receipts,
 }: PageProps<{ customers: Customer[]; items: Item[]; item: Item; tax_receipts: Nameable[] }>) {
-  const { setItem: storageInvoiceForm, getItem: getStorageInvoiceForm, removeItem: removeStorageIvoinceForm } = useLocalStorage('invoice');
-  const getInvoiceFromStorage = () => getStorageInvoiceForm() || defaultInvoiceForm;
   const currency = useNumber().currency;
   const [open, setOpen] = React.useState(false);
   const [openCancelConfirmation, setCancelConfirmation] = React.useState(false);
@@ -51,11 +49,9 @@ export default function Create({
   const referenceInputRef = React.useRef<HTMLInputElement>(null);
   const qtyInputRef = React.useRef<HTMLInputElement>(null);
   const [search, setSearch] = React.useState('');
-  const [notes, setNotes] = React.useState('');
   const dedbouncedSearch = useDebounced(search, 500);
-  const dedbouncedNotes = useDebounced(notes, 500);
   const [amount, setAmount] = React.useState(0);
-  const [invoiceForm, setInvoiceForm] = React.useState<InvoiceForm>(getInvoiceFromStorage);
+  const [invoiceForm, setInvoiceForm, removeInvoiceForm] = usePersistedState<InvoiceForm>('invoice', defaultInvoiceForm);
   const [currentItem, setCurrentItem] = React.useState<Item | undefined>(undefined);
 
   const { headers } = useHeader();
@@ -90,12 +86,6 @@ export default function Create({
     }
   }, [currentItem, findCurrentItem]);
 
-  const synInvoiceForm = useCallback(() => {
-    storageInvoiceForm(invoiceForm);
-  }, [invoiceForm, storageInvoiceForm]);
-
-  useEffect(() => synInvoiceForm(), [invoiceForm, synInvoiceForm]);
-
   useEffect(() => {
     const searchCustomer = () => {
       router.reload({ only: ['customers'], data: { search: dedbouncedSearch }, preserveUrl: true });
@@ -106,14 +96,6 @@ export default function Create({
       searchCustomer();
     }
   }, [dedbouncedSearch]);
-
-  useEffect(() => {
-    if (dedbouncedNotes) {
-      setInvoiceForm(() => {
-        return { ...invoiceForm, header: { ...invoiceForm.header, notes: dedbouncedNotes } };
-      });
-    }
-  }, [dedbouncedNotes, invoiceForm]);
 
   const searchItem = (search: string) => {
     router.reload({
@@ -246,7 +228,7 @@ export default function Create({
 
   const performInvoiceCancelation = (event: React.MouseEvent<HTMLButtonElement>) => {
     event.preventDefault();
-    removeStorageIvoinceForm();
+    removeInvoiceForm();
     router.get('/invoices');
   };
 
@@ -280,7 +262,7 @@ export default function Create({
       ...headers,
       preserveState: 'errors',
       onSuccess: () => {
-        removeStorageIvoinceForm();
+        removeInvoiceForm();
         router.get('/invoices');
       },
     });
@@ -455,7 +437,11 @@ export default function Create({
                   rows={4}
                   className="focus:no-data-focus:outline-none block w-1/2 resize-none rounded-lg border px-3 py-1.5 text-sm/6 data-focus:outline-2 data-focus:-outline-offset-2 data-focus:outline-white/25"
                   defaultValue={invoiceForm.header.notes}
-                  onChange={(e) => setNotes(e.currentTarget.value)}
+                  onChange={(e) =>
+                    setInvoiceForm(() => {
+                      return { ...invoiceForm, header: { ...invoiceForm.header, notes: e.currentTarget.value } };
+                    })
+                  }
                 />
               </div>
               <div className="col-span-2 flex flex-col gap-y-2 rounded-lg border border-gray-300/25 bg-gray-100/10">

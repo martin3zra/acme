@@ -94,7 +94,7 @@ func (s *Server) findInvoicesByUUID(companyId int, uuid string) (*invoice, error
 	i := new(invoice)
 	err := s.db.QueryRow("SELECT invoices.id, invoices.uuid, invoices.date, invoices.due_on, invoices.amount, invoices.discount, invoices.tax, "+
 		"invoices.total, invoices.status, invoices.paid_status, invoices.payment, invoices.note, invoices.tax_receipt_id, "+
-		"tax_receipts.series || tax_receipts.type || LPAD(invoices.tax_receipt_sequence::varchar,8,'0') as NCF, "+
+		"tax_receipts.series || tax_receipts.type || LPAD(invoices.tax_receipt_sequence::varchar,8,'0') as NCF, invoices.note, "+
 		"customers.id as customer, customers.name, customers.email, customers.phone "+
 		"FROM invoices "+
 		"INNER JOIN companies ON (invoices.company_id = companies.id) "+
@@ -116,6 +116,7 @@ func (s *Server) findInvoicesByUUID(companyId int, uuid string) (*invoice, error
 			&i.Notes,
 			&i.TaxReceiptID,
 			&i.NCF,
+			&i.Notes,
 			&i.Customer.ID,
 			&i.Customer.Name,
 			&i.Customer.Email,
@@ -216,7 +217,13 @@ func (s *Server) updateInvoice(companyID int, uuid string, form UpdateInvoiceFor
 	}
 	// defer tx.Rollback()
 
-	_, err = tx.Exec("UPDATE invoices SET customer_id = $3 WHERE company_id = $1 AND id = $2", companyID, invoice.ID, form.CustomerID)
+	_, err = tx.Exec(`
+    UPDATE invoices
+    SET customer_id = $3, date = $4, due_on = $5, amount = $6, discount = $7, tax = $8, total = $9, amount_due = $10, note = $11
+    WHERE company_id = $1 AND id = $2
+  `,
+		companyID, invoice.ID, form.CustomerID, form.Date, form.dueOn, form.amount, foundation.ToJSON(form.Discount), form.tax, form.total, form.amountDue, form.Notes,
+	)
 	if err != nil {
 		if txErr := tx.Rollback(); txErr != nil {
 			log.Fatalf("Error updating invoice: %v", txErr)

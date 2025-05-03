@@ -2,7 +2,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Separator } from '@/components/ui/separator';
 import { useNumber } from '@/composables/use-number';
-import { cn } from '@/lib/utils';
+import { cn, isNotEmpty } from '@/lib/utils';
 import { Auth, InvoiceWithLines, PaidStatuses } from '@/types';
 import { format } from 'date-fns';
 import { Calendar1, CircleCheckIcon, CircleDollarSignIcon, CreditCardIcon, InfoIcon, UserPen } from 'lucide-react';
@@ -114,8 +114,8 @@ export default function Show({ invoice, auth }: Props) {
         <div className="col-span-12 grid grid-cols-12">
           <div className="col-span-8">
             <div className="max-w-sm rounded-md border p-4">
-              <Label className="text-sm/6 font-medium">Notes</Label>
-              <div className="text-muted-foreground text-sm">{invoice.header.notes ? invoice.header.notes : 'No notes left'}</div>
+              <Label className="text-sm/6 font-medium">Notes:</Label>
+              <div className="text-muted-foreground text-sm">{isNotEmpty(invoice.header.notes) ? invoice.header.notes : 'No notes left'}</div>
             </div>
           </div>
           <div className="col-span-4 rounded-md border p-4">
