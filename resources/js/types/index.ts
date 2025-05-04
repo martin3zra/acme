@@ -66,8 +66,11 @@ export interface Item {
   status: string;
 }
 
+export type LineAction = 'added' | 'updated' | 'deleted' | 'unchanged';
+
 export interface InvoiceLine extends Item {
   qty: number;
+  action: LineAction;
 }
 
 export interface Tax {
@@ -166,8 +169,9 @@ export type PaymentTerm = {
 };
 
 export interface LineForm extends Item {
-  quantity: number;
+  qty: number;
   amount: number;
+  action: LineAction;
 }
 
 export type PaymentForm = {

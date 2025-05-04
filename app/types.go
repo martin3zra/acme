@@ -208,11 +208,12 @@ func (d *Payment) Scan(value any) error {
 }
 
 type Line struct {
-	ID    int     `json:"id"`
-	Unit  int     `json:"unit"`
-	Qty   int     `json:"quantity"`
-	Price float64 `json:"price"`
-	Rate  float64 `json:"rate"`
+	ID     int        `json:"id"`
+	Unit   int        `json:"unit"`
+	Qty    int        `json:"qty"`
+	Price  float64    `json:"price"`
+	Rate   float64    `json:"rate"`
+	Action LineAction `json:"action"`
 }
 
 type StoreInvoiceForm struct {
@@ -237,17 +238,18 @@ type StoreInvoiceForm struct {
 
 func (form StoreInvoiceForm) Rules() map[string]any {
 	return map[string]any{
-		"customer_id":   "bail|required|exists:customers,id",
-		"date":          "bail|required|date|after:yesterday",
-		"terms":         "bail|required|min:1",
-		"tax_receipt":   "bail|required|exists:tax_receipts,id",
-		"lines":         "required|min:1",
-		"lines.*.id":    "required|exists:items,id",
-		"lines.*.unit":  "required|exists:units,id",
-		"lines.*.qty":   "required|min:1",
-		"lines.*.price": "required",
-		"lines.*.rate":  "required",
-		"discount":      "required",
+		"customer_id":    "bail|required|exists:customers,id",
+		"date":           "bail|required|date|after:yesterday",
+		"terms":          "bail|required|min:1",
+		"tax_receipt":    "bail|required|exists:tax_receipts,id",
+		"lines":          "required|min:1",
+		"lines.*.id":     "required|exists:items,id",
+		"lines.*.unit":   "required|exists:units,id",
+		"lines.*.qty":    "required|min:1",
+		"lines.*.price":  "required",
+		"lines.*.rate":   "required",
+		"lines.*.action": "required|in:added",
+		"discount":       "required",
 		"discount.value": []any{
 			"sometimes",
 			validator.Rule{}.When(form.Discount.Type == "percentage", "between:0,100", "min:0"),
@@ -287,6 +289,9 @@ func (form *StoreInvoiceForm) paymentTotalAmount() float64 {
 
 func (form *StoreInvoiceForm) computeTax() {
 	for _, line := range form.Lines {
+		if line.Action == DELETED {
+			continue
+		}
 		// we need to add the discount here.
 		lineAmount := (line.Price * float64(line.Qty))
 
@@ -312,17 +317,18 @@ type UpdateInvoiceForm struct {
 
 func (form UpdateInvoiceForm) Rules() map[string]any {
 	return map[string]any{
-		"customer_id":   "bail|required|exists:customers,id",
-		"date":          "bail|required|date",
-		"terms":         "bail|required|min:1",
-		"tax_receipt":   "bail|required|exists:tax_receipts,id",
-		"lines":         "required|min:1",
-		"lines.*.id":    "required|exists:items,id",
-		"lines.*.unit":  "required|exists:units,id",
-		"lines.*.qty":   "required|min:1",
-		"lines.*.price": "required",
-		"lines.*.rate":  "required",
-		"discount":      "required",
+		"customer_id":    "bail|required|exists:customers,id",
+		"date":           "bail|required|date",
+		"terms":          "bail|required|min:1",
+		"tax_receipt":    "bail|required|exists:tax_receipts,id",
+		"lines":          "required|min:1",
+		"lines.*.id":     "required|exists:items,id",
+		"lines.*.unit":   "required|exists:units,id",
+		"lines.*.qty":    "required|min:1", // ADD when rule here, only validate when is the action is added or updated
+		"lines.*.price":  "required",
+		"lines.*.rate":   "required",
+		"lines.*.action": "required|in:added,updated,deleted,unchanged",
+		"discount":       "required",
 		"discount.value": []any{
 			"sometimes",
 			validator.Rule{}.When(form.Discount.Type == "percentage", "between:0,100", "min:0"),

@@ -36,7 +36,7 @@ export default function LinesForm({ referenceInputRef, qtyInputRef, currentItem,
         <Input
           type="number"
           min={1}
-          name="quantity"
+          name="qty"
           className="rounded-none border-none text-end focus-visible:border-none focus-visible:ring-[2px]"
           tabIndex={1}
           ref={qtyInputRef}

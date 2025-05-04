@@ -15,7 +15,7 @@ export default function Line({ line, index, currency, handleRemoveLine }: Props)
       <td className="border border-gray-300 px-1 text-start">{line.name}</td>
       <td className="border border-gray-300 px-1 text-start">{line.description}</td>
       <td className="border border-gray-300 px-1 text-start">{line.unit.name}</td>
-      <td className="border border-gray-300 px-1 text-end">{line.quantity}</td>
+      <td className="border border-gray-300 px-1 text-end">{line.qty}</td>
       <td className="border border-gray-300 px-1 text-end">{currency(line.price || 0)}</td>
       <td className="border border-gray-300 px-1 text-end">{currency(line.amount || 0)}</td>
       <td className="border border-gray-300 px-1 text-end">

@@ -13,12 +13,12 @@ import { useDebounced } from '@/hooks/use-debounced';
 import { usePersistedState } from '@/hooks/use-persisted-state';
 import AuthenticatedLayout from '@/layouts/authenticated-layout';
 import { addDays, cn, isNotEmpty } from '@/lib/utils';
-import { Auth, Customer, InvoiceForm, InvoiceWithLines, Item, Nameable, PageProps } from '@/types';
+import { Auth, Customer, InvoiceForm, InvoiceWithLines, Item, LineForm, Nameable, PageProps } from '@/types';
 import { Textarea } from '@headlessui/react';
 import { router, useForm, usePage } from '@inertiajs/react';
 import { format } from 'date-fns';
 import { CalendarIcon } from 'lucide-react';
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { defaultDiscount, editBreadcrumbs, paymentTerms } from './constants';
 import { CustomerSection } from './Shared/customer-section';
 import { Lines } from './Shared/lines';
@@ -28,8 +28,9 @@ export default function Edit({
   invoice,
   customers,
   items,
+  item,
   tax_receipts,
-}: PageProps<{ auth: Auth; invoice: InvoiceWithLines; customers: Customer[]; items: Item[]; tax_receipts: Nameable[] }>) {
+}: PageProps<{ auth: Auth; invoice: InvoiceWithLines; customers: Customer[]; items: Item[]; item: Item; tax_receipts: Nameable[] }>) {
   const { errors: propsErrors } = usePage<PageProps>().props;
   const [open, setOpen] = React.useState(false);
   const [openCancelConfirmation, setCancelConfirmation] = useState(false);
@@ -57,7 +58,7 @@ export default function Edit({
         discount: invoice.header.discount,
       },
       lines: invoice.lines.map((line) => {
-        return { ...line, amount: line.qty * line.price, quantity: line.qty, tax: { rate: 18, id: 1, name: '18%' } };
+        return { ...line, amount: line.qty * line.price, tax: { rate: 18, id: 1, name: '18%' } };
       }),
       payment: invoice.header.payment,
     };
@@ -85,6 +86,27 @@ export default function Edit({
       searchCustomer();
     }
   }, [debouncedSearch]);
+
+  useEffect(() => setCurrentItem(item), [item]);
+
+  const findCurrentItem = useCallback(() => {
+    const exists = (element: LineForm) => element.id === currentItem?.id;
+    const index = invoiceForm.lines.findIndex(exists);
+    if (index >= 0) {
+      setEditing(true);
+      const line = invoiceForm.lines[index];
+      setCurrentItem(line);
+      qtyInputRef.current!.value = line.qty.toString();
+      setAmount(line.amount);
+    }
+  }, [currentItem, invoiceForm.lines]);
+
+  useEffect(() => {
+    if (currentItem) {
+      findCurrentItem();
+      qtyInputRef.current?.focus();
+    }
+  }, [currentItem, findCurrentItem]);
 
   const handleOnSelectedItem = (item: Item) => {
     setCurrentItem(item);
@@ -122,7 +144,7 @@ export default function Edit({
       discount: invoiceForm.header.discount,
       notes: invoiceForm.header.notes || '',
       lines: invoiceForm.lines.map((line) => {
-        return { id: line.id, quantity: line.quantity, unit: line.unit.id, price: line.price, rate: line.tax.rate };
+        return { id: line.id, unit: line.unit.id, qty: line.qty, price: line.price, rate: line.tax.rate, action: line.action };
       }),
       payment: invoiceForm.payment,
     }));
@@ -153,7 +175,9 @@ export default function Edit({
     // add confirmation screen here.
     const index = parseInt(event.currentTarget.dataset.index || '-1');
     if (index < 0) return;
-    const newItems = invoiceForm.lines.filter((_, i) => i !== index);
+    // const newItems = invoiceForm.lines.filter((_, i) => i !== index);
+    const newItems = invoiceForm.lines;
+    newItems[index].action = 'deleted';
     setInvoiceForm(() => {
       return { ...invoiceForm, lines: newItems };
     });
@@ -165,13 +189,14 @@ export default function Edit({
     if (isEditing) {
       const index = invoiceForm.lines.findIndex((element: LineForm) => element.id === line.id);
       if (index >= 0) {
-        invoiceForm.lines[index].quantity = qtyInputRef.current?.valueAsNumber || 0;
+        invoiceForm.lines[index].qty = qtyInputRef.current?.valueAsNumber || 0;
         invoiceForm.lines[index].amount = amount;
+        invoiceForm.lines[index].action = 'updated';
       }
       setEditing(false);
     } else {
-      // When searching for the current item, if exists on the invoice, then display current values, and update the quantity
-      invoiceForm.lines.push({ ...line, quantity: qtyInputRef.current?.valueAsNumber || 0, amount });
+      // When searching for the current item, if exists on the invoice, then display current values, and update the qty
+      invoiceForm.lines.push({ ...line, qty: qtyInputRef.current?.valueAsNumber || 0, amount, action: 'added' });
     }
     setInvoiceForm(() => {
       return { ...invoiceForm, lines: [...invoiceForm.lines] };
@@ -180,14 +205,14 @@ export default function Edit({
     resetInvoiceFormInput();
   };
 
-  const handleKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
+  const handleOnKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
     if (event.key === 'Enter' || event.key === 'Tab') {
       event.preventDefault(); // Prevent default behavior of Enter key
       if (event.currentTarget.name === 'reference' && isNotEmpty(event.currentTarget.value)) {
         searchItem(event.currentTarget.value);
         return;
       }
-      if (event.currentTarget.name === 'quantity' && currentItem != undefined) {
+      if (event.currentTarget.name === 'qty' && currentItem != undefined) {
         processCurrentItem();
       }
     }
@@ -213,14 +238,18 @@ export default function Edit({
     return discount.value;
   };
 
-  const composeSubTotal = invoiceForm.lines.reduce((acc, line) => {
-    return acc + line.amount;
-  }, 0);
+  const composeSubTotal = invoiceForm.lines
+    .filter((line) => line.action !== 'deleted')
+    .reduce((acc, line) => {
+      return acc + line.amount;
+    }, 0);
 
-  const composeTax = invoiceForm.lines.reduce((acc, line) => {
-    const tax = line.price * (line.tax.rate / 100);
-    return acc + tax * line.quantity;
-  }, 0);
+  const composeTax = invoiceForm.lines
+    .filter((line) => line.action !== 'deleted')
+    .reduce((acc, line) => {
+      const tax = line.price * (line.tax.rate / 100);
+      return acc + tax * line.qty;
+    }, 0);
 
   const computeTotalAmount = (): number => {
     return composeSubTotal + composeTax - computeDiscount();
@@ -373,7 +402,7 @@ export default function Edit({
               lineError={errors.lines}
               currentItem={currentItem}
               handleRemoveLine={handleRemoveLine}
-              handleKeyDown={handleKeyDown}
+              handleKeyDown={handleOnKeyDown}
               handleOnSelected={handleOnSelectedItem}
               amount={amount}
               setAmount={setAmount}

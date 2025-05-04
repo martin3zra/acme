@@ -74,7 +74,7 @@ export default function Create({
       setEditing(true);
       const line = invoiceForm.lines[index];
       setCurrentItem(line);
-      qtyInputRef.current!.value = line.quantity.toString();
+      qtyInputRef.current!.value = line.qty.toString();
       setAmount(line.amount);
     }
   }, [currentItem, invoiceForm.lines]);
@@ -114,14 +114,14 @@ export default function Create({
     qtyInputRef.current!.value = '1';
   };
 
-  const handleKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
+  const handleOnKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
     if (event.key === 'Enter' || event.key === 'Tab') {
       event.preventDefault(); // Prevent default behavior of Enter key
       if (event.currentTarget.name === 'reference' && isNotEmpty(event.currentTarget.value)) {
         searchItem(event.currentTarget.value);
         return;
       }
-      if (event.currentTarget.name === 'quantity' && currentItem != undefined) {
+      if (event.currentTarget.name === 'qty' && currentItem != undefined) {
         processCurrentItem();
       }
     }
@@ -133,13 +133,13 @@ export default function Create({
     if (isEditing) {
       const index = invoiceForm.lines.findIndex((element: LineForm) => element.id === line.id);
       if (index >= 0) {
-        invoiceForm.lines[index].quantity = qtyInputRef.current?.valueAsNumber || 0;
+        invoiceForm.lines[index].qty = qtyInputRef.current?.valueAsNumber || 0;
         invoiceForm.lines[index].amount = amount;
       }
       setEditing(false);
     } else {
-      // When searching for the current item, if exists on the invoice, then display current values, and update the quantity
-      invoiceForm.lines.push({ ...line, quantity: qtyInputRef.current?.valueAsNumber || 0, amount });
+      // When searching for the current item, if exists on the invoice, then display current values, and update the qty
+      invoiceForm.lines.push({ ...line, qty: qtyInputRef.current?.valueAsNumber || 0, amount, action: 'added' });
     }
     setInvoiceForm(() => {
       return { ...invoiceForm, lines: [...invoiceForm.lines] };
@@ -254,7 +254,7 @@ export default function Create({
       discount: invoiceForm.header.discount,
       notes: invoiceForm.header.notes || '',
       lines: invoiceForm.lines.map((line) => {
-        return { id: line.id, quantity: line.quantity, unit: line.unit.id, price: line.price, rate: line.tax.rate };
+        return { id: line.id, qty: line.qty, unit: line.unit.id, price: line.price, rate: line.tax.rate, action: line.action };
       }),
       payment: invoiceForm.payment,
     }));
@@ -286,7 +286,7 @@ export default function Create({
 
   const composeTax = invoiceForm.lines.reduce((acc, line) => {
     const tax = line.price * (line.tax.rate / 100);
-    return acc + tax * line.quantity;
+    return acc + tax * line.qty;
   }, 0);
 
   const computeTotalAmount = (): number => {
@@ -418,7 +418,7 @@ export default function Create({
               lineError={errors.lines}
               currentItem={currentItem}
               handleRemoveLine={handleRemoveLine}
-              handleKeyDown={handleKeyDown}
+              handleKeyDown={handleOnKeyDown}
               handleOnSelected={handleOnSelectedItem}
               amount={amount}
               setAmount={setAmount}

@@ -2,11 +2,21 @@ package app
 
 import (
 	"database/sql"
+	"fmt"
 	"log"
 	"time"
 
 	"github.com/martin3zra/acme/pkg/database"
 	"github.com/martin3zra/acme/pkg/foundation"
+)
+
+type LineAction string
+
+const (
+	ADDED     LineAction = "added"
+	UPDATED   LineAction = "updated"
+	DELETED   LineAction = "deleted"
+	UNCHANGED LineAction = "unchanged"
 )
 
 type invoice struct {
@@ -41,6 +51,7 @@ type line struct {
 	} `json:"unit"`
 	// Add timestamps properties
 	foundation.Timestamps
+	Action LineAction `json:"action"`
 }
 
 func (s *Server) findInvoices(companyId int) ([]*invoice, error) {
@@ -233,16 +244,35 @@ func (s *Server) updateInvoice(companyID int, uuid string, form UpdateInvoiceFor
 		return err
 	}
 
+	if err = s.processInvoiceLines(tx, companyID, invoice.ID, form); err != nil {
+		if txErr := tx.Rollback(); txErr != nil {
+			log.Fatalf("Error updating invoice: %v", txErr)
+			return txErr
+		}
+
+		return err
+	}
+
 	if invoice.Customer.ID != form.CustomerID {
 		// Update customer balance. Logs this operations to keep track of it.
 		err = s.updateCustomerAmountDue(tx, companyID, invoice.Customer.ID, -invoice.Amount)
 		if err != nil {
-			return tx.Rollback()
+			if txErr := tx.Rollback(); txErr != nil {
+				log.Fatalf("Error updating invoice: %v", txErr)
+				return txErr
+			}
+
+			return err
 		}
 
 		err = s.updateCustomerAmountDue(tx, companyID, form.CustomerID, form.total)
 		if err != nil {
-			return tx.Rollback()
+			if txErr := tx.Rollback(); txErr != nil {
+				log.Fatalf("Error updating invoice: %v", txErr)
+				return txErr
+			}
+
+			return err
 		}
 	}
 
@@ -271,10 +301,37 @@ func (s *Server) attachInvoiceLines(tx *sql.Tx, companyId, invoiceId int, form S
 	return nil
 }
 
+func (s *Server) processInvoiceLines(tx *sql.Tx, companyId, invoiceId int, form UpdateInvoiceForm) error {
+
+	lines := s.filterInvoiceLines(form.Lines, ADDED, UPDATED, DELETED)
+	for _, line := range lines {
+		switch line.Action {
+		case ADDED:
+			stmt := "INSERT INTO invoices_items (company_id, invoice_id, item_id, unit_id, qty, price, tax) VALUES($1,$2,$3,$4,$5,$6,$7) "
+			if _, err := tx.Exec(stmt, companyId, invoiceId, line.ID, line.Unit, line.Qty, line.Price, line.Rate); err != nil {
+				return err
+			}
+		case UPDATED:
+			stmt := "UPDATE invoices_items SET qty = $4, unit_id = $5 WHERE company_id = $1 AND invoice_id = $2 AND item_id = $3 "
+			if _, err := tx.Exec(stmt, companyId, invoiceId, line.ID, line.Qty, line.Unit); err != nil {
+				return err
+			}
+		case DELETED:
+			stmt := "DELETE FROM invoices_items WHERE company_id = $1 AND invoice_id = $2 AND item_id = $3"
+			if _, err := tx.Exec(stmt, companyId, invoiceId, line.ID); err != nil {
+				return err
+			}
+		default:
+			fmt.Println("Nothing to happen here.")
+		}
+	}
+	return nil
+}
+
 func (s *Server) findInvoiceLines(companyId int, invoiceId int) ([]*line, error) {
 	rows, err := s.db.Query(`
     SELECT ii.item_id, ii.qty, ii.price, iu.unit_id, it.name, it.description, u.name,
-    ii.created_at, ii.updated_at, ii.deleted_at
+    ii.created_at, ii.updated_at, ii.deleted_at, 'unchanged' as action
     FROM invoices_items AS ii
     INNER JOIN companies AS com ON (ii.company_id = com.id)
     INNER JOIN invoices AS i ON (ii.invoice_id = i.id AND ii.company_id = i.company_id)
@@ -301,6 +358,7 @@ func (s *Server) findInvoiceLines(companyId int, invoiceId int) ([]*line, error)
 			&i.CreatedAt,
 			&i.UpdatedAt,
 			&i.DeletedAt,
+			&i.Action,
 		); err != nil {
 			return nil, err
 		}
@@ -322,4 +380,26 @@ func (s *Server) registerReceivable(tx *sql.Tx, companyId, invoiceId, customerId
 	}
 
 	return err
+}
+
+func (s *Server) filterInvoiceLines(lines []Line, actions ...LineAction) []Line {
+	if len(actions) == 0 {
+		return nil
+	}
+
+	// Convert actions to a lookup map for O(1) checks
+	actionSet := make(map[string]struct{}, len(actions))
+	for _, a := range actions {
+		actionSet[string(a)] = struct{}{}
+	}
+
+	// Filter lines
+	filtered := make([]Line, 0, len(lines))
+	for _, line := range lines {
+		if _, ok := actionSet[string(line.Action)]; ok {
+			filtered = append(filtered, line)
+		}
+	}
+
+	return filtered
 }
