@@ -49,6 +49,7 @@ type line struct {
 		ID   int64  `json:"id"`
 		Name string `json:"name"`
 	} `json:"unit"`
+	Tax tax `json:"tax"`
 	// Add timestamps properties
 	foundation.Timestamps
 	Action LineAction `json:"action"`
@@ -330,14 +331,19 @@ func (s *Server) processInvoiceLines(tx *sql.Tx, companyId, invoiceId int, form 
 
 func (s *Server) findInvoiceLines(companyId int, invoiceId int) ([]*line, error) {
 	rows, err := s.db.Query(`
-    SELECT ii.item_id, ii.qty, ii.price, iu.unit_id, it.name, it.description, u.name,
-    ii.created_at, ii.updated_at, ii.deleted_at, 'unchanged' as action
+    SELECT ii.item_id, ii.qty, ii.price, items_units.unit_id, it.name, it.description, items_units.name,
+    ii.created_at, ii.updated_at, ii.deleted_at, 'unchanged' as action, taxes.id as tax_id, taxes.name as tax_name, taxes.rate
     FROM invoices_items AS ii
     INNER JOIN companies AS com ON (ii.company_id = com.id)
     INNER JOIN invoices AS i ON (ii.invoice_id = i.id AND ii.company_id = i.company_id)
     INNER JOIN items AS it ON(ii.item_id = it.id AND ii.company_id = it.company_id)
-    INNER JOIN items_units AS iu ON(ii.unit_id = iu.unit_id AND ii.item_id = iu.item_id AND ii.company_id = iu.company_id)
-    INNER JOIN units AS u ON (iu.unit_id = u.id AND iu.company_id = u.company_id)
+    LEFT JOIN LATERAL (
+      SELECT items_units.unit_id, units.name
+      FROM items_units
+      INNER JOIN units ON (items_units.unit_id = units.id)
+      WHERE items_units.item_id = it.id limit 1
+    ) items_units ON true
+    INNER JOIN taxes ON (it.company_id = taxes.company_id AND it.tax_id = taxes.id)
     WHERE ii.company_id = $1
     AND ii.invoice_id = $2`, companyId, invoiceId)
 	if err != nil {
@@ -359,6 +365,9 @@ func (s *Server) findInvoiceLines(companyId int, invoiceId int) ([]*line, error)
 			&i.UpdatedAt,
 			&i.DeletedAt,
 			&i.Action,
+			&i.Tax.ID,
+			&i.Tax.Name,
+			&i.Tax.Rate,
 		); err != nil {
 			return nil, err
 		}

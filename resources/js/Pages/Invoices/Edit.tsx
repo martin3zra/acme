@@ -58,7 +58,7 @@ export default function Edit({
         discount: invoice.header.discount,
       },
       lines: invoice.lines.map((line) => {
-        return { ...line, amount: line.qty * line.price, tax: { rate: 18, id: 1, name: '18%' } };
+        return { ...line, amount: line.qty * line.price };
       }),
       payment: invoice.header.payment,
     };
