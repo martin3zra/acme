@@ -70,6 +70,9 @@ export type LineAction = 'added' | 'updated' | 'deleted' | 'unchanged';
 
 export interface InvoiceLine extends Item {
   qty: number;
+  amount: number;
+  total: number;
+  tax: TaxWithAmount;
   action: LineAction;
 }
 
@@ -77,6 +80,10 @@ export interface Tax {
   id: number;
   name: string;
   rate: number;
+}
+
+export interface TaxWithAmount extends Tax {
+  amount: number;
 }
 
 export interface Unit {

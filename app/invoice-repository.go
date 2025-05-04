@@ -49,7 +49,13 @@ type line struct {
 		ID   int64  `json:"id"`
 		Name string `json:"name"`
 	} `json:"unit"`
-	Tax tax `json:"tax"`
+	Tax struct {
+		tax
+		Amount float64 `json:"amount"`
+	} `json:"tax"`
+	Amount float64 `json:"amount"`
+	// TaxAmount float64 `json:"tax_amount"`
+	Total float64 `json:"total"`
 	// Add timestamps properties
 	foundation.Timestamps
 	Action LineAction `json:"action"`
@@ -283,11 +289,11 @@ func (s *Server) updateInvoice(companyID int, uuid string, form UpdateInvoiceFor
 func (s *Server) attachInvoiceLines(tx *sql.Tx, companyId, invoiceId int, form StoreInvoiceForm) error {
 	vals := []any{}
 	for _, line := range form.Lines {
-		vals = append(vals, companyId, invoiceId, line.ID, line.Unit, line.Qty, line.Price, line.Rate)
+		vals = append(vals, companyId, invoiceId, line.ID, line.Unit, line.Qty, line.Price, line.Rate, line.amount, line.tax, line.total)
 	}
 
-	stmt := "INSERT INTO invoices_items (company_id, invoice_id, item_id, unit_id, qty, price, tax) VALUES "
-	stmt += database.PrepareBulkInsert(7, len(form.Lines))
+	stmt := "INSERT INTO invoices_items (company_id, invoice_id, item_id, unit_id, qty, price, rate, amount, tax, total) VALUES "
+	stmt += database.PrepareBulkInsert(10, len(form.Lines))
 
 	_, err := tx.Exec(stmt, vals...)
 	if err != nil {
@@ -332,7 +338,8 @@ func (s *Server) processInvoiceLines(tx *sql.Tx, companyId, invoiceId int, form 
 func (s *Server) findInvoiceLines(companyId int, invoiceId int) ([]*line, error) {
 	rows, err := s.db.Query(`
     SELECT ii.item_id, ii.qty, ii.price, items_units.unit_id, it.name, it.description, items_units.name,
-    ii.created_at, ii.updated_at, ii.deleted_at, 'unchanged' as action, taxes.id as tax_id, taxes.name as tax_name, taxes.rate
+    ii.created_at, ii.updated_at, ii.deleted_at, 'unchanged' as action, ii.amount, ii.total,
+    taxes.id as tax_id, taxes.name as tax_name, ii.rate, ii.tax
     FROM invoices_items AS ii
     INNER JOIN companies AS com ON (ii.company_id = com.id)
     INNER JOIN invoices AS i ON (ii.invoice_id = i.id AND ii.company_id = i.company_id)
@@ -365,9 +372,12 @@ func (s *Server) findInvoiceLines(companyId int, invoiceId int) ([]*line, error)
 			&i.UpdatedAt,
 			&i.DeletedAt,
 			&i.Action,
+			&i.Amount,
+			&i.Total,
 			&i.Tax.ID,
 			&i.Tax.Name,
 			&i.Tax.Rate,
+			&i.Tax.Amount,
 		); err != nil {
 			return nil, err
 		}
@@ -391,7 +401,7 @@ func (s *Server) registerReceivable(tx *sql.Tx, companyId, invoiceId, customerId
 	return err
 }
 
-func (s *Server) filterInvoiceLines(lines []Line, actions ...LineAction) []Line {
+func (s *Server) filterInvoiceLines(lines []*Line, actions ...LineAction) []*Line {
 	if len(actions) == 0 {
 		return nil
 	}
@@ -403,7 +413,7 @@ func (s *Server) filterInvoiceLines(lines []Line, actions ...LineAction) []Line 
 	}
 
 	// Filter lines
-	filtered := make([]Line, 0, len(lines))
+	filtered := make([]*Line, 0, len(lines))
 	for _, line := range lines {
 		if _, ok := actionSet[string(line.Action)]; ok {
 			filtered = append(filtered, line)

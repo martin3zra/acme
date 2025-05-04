@@ -90,6 +90,9 @@ export default function Show({ invoice, auth }: Props) {
                   Price
                 </th>
                 <th scope="col" data-format="number">
+                  Tax
+                </th>
+                <th scope="col" data-format="number">
                   Amount
                 </th>
               </tr>
@@ -104,7 +107,8 @@ export default function Show({ invoice, auth }: Props) {
                     {line.qty}
                   </td>
                   <td data-format="number">{currency(line.price)}</td>
-                  <td data-format="number">{currency(line.qty * line.price)}</td>
+                  <td data-format="number">{currency(line.tax.amount)}</td>
+                  <td data-format="number">{currency(line.amount)}</td>
                 </tr>
               ))}
             </tbody>

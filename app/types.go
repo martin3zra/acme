@@ -214,6 +214,9 @@ type Line struct {
 	Price  float64    `json:"price"`
 	Rate   float64    `json:"rate"`
 	Action LineAction `json:"action"`
+	tax    float64
+	amount float64
+	total  float64
 }
 
 type StoreInvoiceForm struct {
@@ -224,7 +227,7 @@ type StoreInvoiceForm struct {
 	TaxReceipt int       `json:"tax_receipt"`
 	Discount   Discount  `json:"discount"`
 	Notes      string    `json:"notes"`
-	Lines      []Line    `json:"lines"`
+	Lines      []*Line   `json:"lines"`
 	Payment    Payment   `json:"payment"`
 	// considere these fields as protected
 	amount     float64
@@ -293,10 +296,11 @@ func (form *StoreInvoiceForm) computeTax() {
 			continue
 		}
 		// we need to add the discount here.
-		lineAmount := (line.Price * float64(line.Qty))
-
-		form.tax += lineAmount * (line.Rate / 100)
-		form.amount += lineAmount
+		line.amount = (line.Price * float64(line.Qty))
+		line.tax = line.amount * (line.Rate / 100)
+		line.total = line.amount + line.tax
+		form.tax += line.tax
+		form.amount += line.amount
 	}
 
 	form.total = form.amount + form.tax
