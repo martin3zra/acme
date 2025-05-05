@@ -13,13 +13,28 @@ import { useDebounced } from '@/hooks/use-debounced';
 import { usePersistedState } from '@/hooks/use-persisted-state';
 import AuthenticatedLayout from '@/layouts/authenticated-layout';
 import { addDays, cn, isNotEmpty } from '@/lib/utils';
-import { Auth, Customer, InvoiceForm, InvoiceWithLines, Item, LineForm, Nameable, PageProps } from '@/types';
+import {
+  Auth,
+  BTForm,
+  CardForm,
+  CashForm,
+  CheckForm,
+  Customer,
+  InvoiceForm,
+  InvoiceWithLines,
+  Item,
+  LineForm,
+  Nameable,
+  PageProps,
+  PaymentMethod,
+} from '@/types';
 import { Textarea } from '@headlessui/react';
 import { router, useForm, usePage } from '@inertiajs/react';
 import { format } from 'date-fns';
 import { CalendarIcon } from 'lucide-react';
 import React, { useCallback, useEffect, useState } from 'react';
 import { defaultDiscount, editBreadcrumbs, paymentTerms } from './constants';
+import CheckoutForm from './Shared/checkout-form';
 import { CustomerSection } from './Shared/customer-section';
 import { Lines } from './Shared/lines';
 
@@ -58,7 +73,7 @@ export default function Edit({
         discount: invoice.header.discount,
       },
       lines: invoice.lines.map((line) => {
-        return { ...line, amount: line.qty * line.price };
+        return { ...line };
       }),
       payment: invoice.header.payment,
     };
@@ -66,7 +81,7 @@ export default function Edit({
     return _invoice;
   };
 
-  const [invoiceForm, setInvoiceForm, removeInvoiceForm] = usePersistedState<InvoiceForm>('invoice_edit', initialAsInvoiceForm());
+  const [invoiceForm, setInvoiceForm, removeInvoiceForm] = usePersistedState<InvoiceForm>('invoice_edit', initialAsInvoiceForm(), true);
 
   const [currentItem, setCurrentItem] = React.useState<Item | undefined>(undefined);
   const [isEditing, setEditing] = React.useState(false);
@@ -131,6 +146,20 @@ export default function Edit({
 
     setInvoiceForm(() => {
       return { ...invoiceForm, header: { ...invoiceForm.header, date: date as Date } };
+    });
+  };
+
+  const handlePaymentTermsChange = (value: string) => {
+    invoiceForm.header.terms = Number(value);
+
+    if (invoiceForm.header.terms > 1 && invoiceForm.header.date) {
+      invoiceForm.header.due = addDays(invoiceForm.header.date, invoiceForm.header.terms);
+    } else {
+      invoiceForm.header.due = undefined;
+    }
+
+    setInvoiceForm(() => {
+      return { ...invoiceForm, header: { ...invoiceForm.header, terms: Number(value) } };
     });
   };
 
@@ -283,6 +312,13 @@ export default function Edit({
 
     performUpdate();
   };
+  const handleCheckoutChange = (method: PaymentMethod, form: CashForm | CheckForm | CardForm | BTForm) => {
+    // Recalculate totals if the value is set.
+    setInvoiceForm(() => {
+      return { ...invoiceForm, payment: { ...invoiceForm.payment, [method]: form } };
+    });
+  };
+
   return (
     <AuthenticatedLayout user={auth.user} breadcrumbs={editBreadcrumbs}>
       <AuthenticatedLayout.Actions>
@@ -350,10 +386,9 @@ export default function Edit({
                 <Label htmlFor="paymentTerms">Payment terms</Label>
                 <Select
                   name="paymentTerms"
-                  // onValueChange={handlePaymentTermsChange}
+                  onValueChange={handlePaymentTermsChange}
                   defaultValue={String(invoiceForm.header.terms)}
                   value={String(invoiceForm.header.terms)}
-                  disabled={true}
                 >
                   <SelectTrigger className="w-full">
                     <SelectValue placeholder="Select terms" />
@@ -479,6 +514,19 @@ export default function Edit({
             </div>
           </div>
         </div>
+
+        <CheckoutForm
+          openCheckout={openCheckout}
+          setCheckout={setCheckout}
+          paymentForm={invoiceForm.payment}
+          totalAmount={computeTotalAmount()}
+          onPlacedInvoice={performUpdate}
+          processing={processing}
+          setCancelConfirmation={setCancelConfirmation}
+          errors={propsErrors}
+          onCheckoutChange={handleCheckoutChange}
+          currency={currency}
+        />
       </div>
     </AuthenticatedLayout>
   );

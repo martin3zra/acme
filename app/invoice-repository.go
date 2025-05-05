@@ -237,10 +237,13 @@ func (s *Server) updateInvoice(companyID int, uuid string, form UpdateInvoiceFor
 
 	_, err = tx.Exec(`
     UPDATE invoices
-    SET customer_id = $3, date = $4, due_on = $5, amount = $6, discount = $7, tax = $8, total = $9, amount_due = $10, note = $11
+    SET customer_id = $3, date = $4, due_on = $5, amount = $6, discount = $7, tax = $8, total = $9,
+    amount_due = $10, note = $11, payment = $12, type = $13, paid_status = $14
     WHERE company_id = $1 AND id = $2
   `,
-		companyID, invoice.ID, form.CustomerID, form.Date, form.dueOn, form.amount, foundation.ToJSON(form.Discount), form.tax, form.total, form.amountDue, form.Notes,
+		companyID, invoice.ID, form.CustomerID, form.Date, form.dueOn, form.amount,
+		foundation.ToJSON(form.Discount), form.tax, form.total, form.amountDue,
+		form.Notes, foundation.ToJSON(form.Payment), form.termType, form.paidStatus,
 	)
 	if err != nil {
 		if txErr := tx.Rollback(); txErr != nil {
@@ -253,11 +256,41 @@ func (s *Server) updateInvoice(companyID int, uuid string, form UpdateInvoiceFor
 
 	if err = s.processInvoiceLines(tx, companyID, invoice.ID, form); err != nil {
 		if txErr := tx.Rollback(); txErr != nil {
-			log.Fatalf("Error updating invoice: %v", txErr)
+			log.Fatalf("Error updating invoice::processing invoice lines: %v", txErr)
 			return txErr
 		}
 
 		return err
+	}
+
+	// When the invoice terms is been updated from CASH to CREDIT
+	if invoice.DueOn == nil && form.termType == CREDIT {
+		// Ensure to associated the new customer or current one the receivable
+		customerID := invoice.Customer.ID
+		if invoice.Customer.ID != form.CustomerID {
+			customerID = form.CustomerID
+		}
+
+		err = s.registerReceivable(tx, companyID, invoice.ID, customerID)
+		if err != nil {
+			return err
+		}
+	}
+
+	if invoice.DueOn != nil && form.termType == CASH {
+		if err = s.deleteInvoiceFromReceivables(tx, companyID, invoice.ID, invoice.Customer.ID); err != nil {
+			return err
+		}
+
+		err = s.updateCustomerAmountDue(tx, companyID, invoice.Customer.ID, -invoice.Total)
+		if err != nil {
+			if txErr := tx.Rollback(); txErr != nil {
+				log.Fatalf("Error updating invoice::updating previous customer due amount %v", txErr)
+				return txErr
+			}
+
+			return err
+		}
 	}
 
 	if invoice.Customer.ID != form.CustomerID {
@@ -265,7 +298,7 @@ func (s *Server) updateInvoice(companyID int, uuid string, form UpdateInvoiceFor
 		err = s.updateCustomerAmountDue(tx, companyID, invoice.Customer.ID, -invoice.Amount)
 		if err != nil {
 			if txErr := tx.Rollback(); txErr != nil {
-				log.Fatalf("Error updating invoice: %v", txErr)
+				log.Fatalf("Error updating invoice::updating previous customer due amount %v", txErr)
 				return txErr
 			}
 
@@ -275,7 +308,7 @@ func (s *Server) updateInvoice(companyID int, uuid string, form UpdateInvoiceFor
 		err = s.updateCustomerAmountDue(tx, companyID, form.CustomerID, form.total)
 		if err != nil {
 			if txErr := tx.Rollback(); txErr != nil {
-				log.Fatalf("Error updating invoice: %v", txErr)
+				log.Fatalf("Error updating invoice::updating new customer due amount %v", txErr)
 				return txErr
 			}
 
@@ -394,6 +427,18 @@ func (s *Server) registerReceivable(tx *sql.Tx, companyId, invoiceId, customerId
 	if err != nil {
 		if txErr := tx.Rollback(); txErr != nil {
 			log.Fatalf("Error registering receivables: %v", txErr)
+			return txErr
+		}
+	}
+
+	return err
+}
+
+func (s *Server) deleteInvoiceFromReceivables(tx *sql.Tx, companyId, invoiceId, customerId int) error {
+	_, err := tx.Exec("DELETE FROM receivables WHERE company_id = $1 AND invoice_id = $2 AND customer_id = $3", companyId, invoiceId, customerId)
+	if err != nil {
+		if txErr := tx.Rollback(); txErr != nil {
+			log.Fatalf("Error deleting receivable: %v", txErr)
 			return txErr
 		}
 	}

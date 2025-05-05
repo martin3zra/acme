@@ -204,14 +204,12 @@ func (s *Server) updateInvoiceHandler(i *inertia.Inertia) http.Handler {
 		var form UpdateInvoiceForm
 		err := support.ParseRequest(r, &form)
 		if err != nil {
-			// http.Redirect(w, r, "/invoices/"+uuid+"/edit", http.StatusSeeOther)
 			back()
 			return
 		}
 
 		if form.Terms == 1 && form.total != form.paymentTotalAmount() {
 			s.session.Errors("status", "Invoice total amount and the payment details are different.")
-			// http.Redirect(w, r, "/invoices/"+uuid+"/edit", http.StatusSeeOther)
 			back()
 			return
 		}
@@ -219,9 +217,8 @@ func (s *Server) updateInvoiceHandler(i *inertia.Inertia) http.Handler {
 		user := auth.User(r.Context())
 		err = s.updateInvoice(*user.CurrentCompanyId, uuid, form)
 		if err != nil {
-			log.Printf("Error creating invoice: %v", err)
+			log.Printf("Error updating invoice: %v", err)
 			s.session.Errors("status", "Invoice wasn't updated. Something went wrong.")
-			// i.Back(w, r)
 			back()
 			return
 		}
