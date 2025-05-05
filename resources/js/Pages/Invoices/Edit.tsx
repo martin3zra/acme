@@ -1,5 +1,15 @@
 import { AlertDestructive } from '@/components/alert-destructive';
 import InputError from '@/components/input-error';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
 import { Calendar } from '@/components/ui/calendar';
 import { Input } from '@/components/ui/input';
@@ -319,6 +329,12 @@ export default function Edit({
     });
   };
 
+  const performInvoiceCancelation = (event: React.MouseEvent<HTMLButtonElement>) => {
+    event.preventDefault();
+    removeInvoiceForm();
+    router.get('/invoices');
+  };
+
   return (
     <AuthenticatedLayout user={auth.user} breadcrumbs={editBreadcrumbs}>
       <AuthenticatedLayout.Actions>
@@ -515,6 +531,18 @@ export default function Edit({
           </div>
         </div>
 
+        <AlertDialog open={openCancelConfirmation} onOpenChange={setCancelConfirmation}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+              <AlertDialogDescription>This action cannot be undone. Any changes you've done to this invoice will be lost.</AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogAction onClick={performInvoiceCancelation}>Yes, Continue</AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
         <CheckoutForm
           openCheckout={openCheckout}
           setCheckout={setCheckout}
