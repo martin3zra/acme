@@ -96,7 +96,7 @@ export type DiscountType = {
   value: number;
 };
 
-export const PaidStatuses = ['paid', 'unpaid', 'partial'] as const;
+export const PaidStatuses = ['paid', 'unpaid', 'partial', 'removed'] as const;
 
 export type PaidStatus = (typeof PaidStatuses)[number];
 
@@ -131,6 +131,8 @@ export interface BreadcrumbItem {
 }
 
 export type Verb = 'create' | 'view' | 'edit' | 'trash';
+
+export type InvoiceVerb = Exclude<Verb, 'trash'> | 'void';
 
 export interface PaymentFormType {
   amount: number;

@@ -1,9 +1,10 @@
+import { ConfirmsPassword } from '@/components/confirms-password';
 import HeadingSmall from '@/components/heading-small';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import useCallbackState from '@/hooks/use-callback-state';
 import AuthenticatedLayout from '@/layouts/authenticated-layout';
-import { BreadcrumbItem, Invoice, InvoiceWithLines, PageProps, Verb } from '@/types';
+import { BreadcrumbItem, Invoice, InvoiceVerb, InvoiceWithLines, PageProps } from '@/types';
 import { Link, router, usePage } from '@inertiajs/react';
 import { NotebookPen, Printer } from 'lucide-react';
 import { List } from './List/Index';
@@ -22,10 +23,17 @@ const breadcrumbs: BreadcrumbItem[] = [
 ];
 export default function Index({ auth, invoices, invoice }: PageProps<{ invoices: Invoice[]; invoice: InvoiceWithLines }>) {
   const [open, setOpen] = useCallbackState<boolean>(false);
+  const [selectedInvoice, setSelectedInvoice] = useCallbackState<Invoice | undefined>(undefined);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useCallbackState<boolean>(false);
   const page = usePage();
   const hasInvoices = invoices.length > 0;
 
-  const onSelectInvoice = (invoice: Invoice, action: Verb): void => {
+  const onSelectInvoice = (invoice: Invoice, action: InvoiceVerb): void => {
+    setSelectedInvoice(invoice);
+    if (action === 'void') {
+      setDeleteDialogOpen(true);
+      return;
+    }
     if (action === 'edit') {
       router.visit(`/invoices/${invoice.uuid}/edit`);
       return;
@@ -52,6 +60,10 @@ export default function Index({ auth, invoices, invoice }: PageProps<{ invoices:
     setOpen(open);
   };
 
+  const modalHandler = (open: boolean = false) => {
+    onOpenChange(open);
+    setDeleteDialogOpen(open);
+  };
   return (
     <AuthenticatedLayout user={auth.user} breadcrumbs={breadcrumbs}>
       <div className="space-y-6">
@@ -79,12 +91,12 @@ export default function Index({ auth, invoices, invoice }: PageProps<{ invoices:
                     <SheetDescription className="text-[12px]">Invoice details</SheetDescription>
                   </div>
                   <div className="mx-4 flex gap-x-3">
-                    <Button asChild>
+                    <Button asChild disabled={invoice.header.status === 'void'}>
                       <Link href={`/invoices/${invoice.header.uuid}/edit`} as="button">
                         <NotebookPen /> Edit
                       </Link>
                     </Button>
-                    <Button>
+                    <Button disabled={invoice.header.status === 'void'}>
                       <Printer /> Print
                     </Button>
                   </div>
@@ -95,6 +107,18 @@ export default function Index({ auth, invoices, invoice }: PageProps<{ invoices:
               </div>
             </SheetContent>
           </Sheet>
+        )}
+
+        {selectedInvoice && (
+          <ConfirmsPassword
+            title={`Are you sure you want to void ${selectedInvoice.number}?`}
+            description={`Once the invoice is void it will go from ${selectedInvoice.total} to $0.00.`}
+            action={`Void it`}
+            verb={'update'}
+            path={`/invoices/${selectedInvoice.uuid}/void`}
+            open={deleteDialogOpen}
+            onOpenChange={modalHandler}
+          />
         )}
       </div>
     </AuthenticatedLayout>

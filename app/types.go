@@ -130,17 +130,86 @@ func (form UpdateItemForm) Rules() map[string]any {
 type TermType string
 
 const (
-	CASH   TermType = "cash"
-	CREDIT TermType = "credit"
+	_CASH   TermType = "cash"
+	_CREDIT TermType = "credit"
 )
+
+var InvoiceTermType = struct {
+	Cash   TermType
+	Credit TermType
+}{
+	Cash:   _CASH,
+	Credit: _CREDIT,
+}
 
 type PaidStatus string
 
 const (
-	UNPAID  PaidStatus = "unpaid"
-	PARTIAL PaidStatus = "partial"
-	PAID    PaidStatus = "paid"
+	_UNPAID  PaidStatus = "unpaid"
+	_PARTIAL PaidStatus = "partial"
+	_PAID    PaidStatus = "paid"
+	_REMOVED PaidStatus = "removed"
 )
+
+var PaidStatuses = struct {
+	UnPaid  PaidStatus
+	Partial PaidStatus
+	Paid    PaidStatus
+	Removed PaidStatus
+}{
+	UnPaid:  _UNPAID,
+	Partial: _PARTIAL,
+	Paid:    _PAID,
+	Removed: _REMOVED,
+}
+
+type InvoiceStatus string
+
+const (
+	DRAFT     InvoiceStatus = "draft"
+	SENT      InvoiceStatus = "sent"
+	VIEWED    InvoiceStatus = "viewed"
+	OVERDUE   InvoiceStatus = "overdue"
+	COMPLETED InvoiceStatus = "completed"
+	VOID      InvoiceStatus = "void"
+)
+
+var InvoiceStatuses = struct {
+	Draft     InvoiceStatus
+	Sent      InvoiceStatus
+	Viewed    InvoiceStatus
+	Overdue   InvoiceStatus
+	Completed InvoiceStatus
+	Void      InvoiceStatus
+}{
+	Draft:     DRAFT,
+	Sent:      SENT,
+	Viewed:    VIEWED,
+	Overdue:   OVERDUE,
+	Completed: COMPLETED,
+	Void:      VOID,
+}
+
+type LineAction string
+
+const (
+	ADDED     LineAction = "added"
+	UPDATED   LineAction = "updated"
+	DELETED   LineAction = "deleted"
+	UNCHANGED LineAction = "unchanged"
+)
+
+var LineActions = struct {
+	Added     LineAction
+	Updated   LineAction
+	Deleted   LineAction
+	Unchanged LineAction
+}{
+	Added:     ADDED,
+	Updated:   UPDATED,
+	Deleted:   DELETED,
+	Unchanged: UNCHANGED,
+}
 
 type Discount struct {
 	Val  float64 `json:"value"`
@@ -152,6 +221,10 @@ func (d *Discount) Value() (driver.Value, error) {
 }
 
 func (d *Discount) Scan(value any) error {
+	if value == nil {
+		return nil
+	}
+
 	b, ok := value.([]byte)
 	if !ok {
 		return errors.New("type assertion to []byte failed")
@@ -199,6 +272,10 @@ func (d *Payment) Value() (driver.Value, error) {
 }
 
 func (d *Payment) Scan(value any) error {
+	if value == nil {
+		return nil
+	}
+
 	b, ok := value.([]byte)
 	if !ok {
 		return errors.New("type assertion to []byte failed")
@@ -274,12 +351,12 @@ func (form *StoreInvoiceForm) PassedValidation() {
 	form.applyDiscount()
 
 	form.dueOn = nil
-	form.paidStatus = PAID
-	form.termType = CASH
+	form.paidStatus = PaidStatuses.Paid
+	form.termType = InvoiceTermType.Cash
 	if form.Terms > 1 {
 		form.amountDue = form.total
-		form.paidStatus = UNPAID
-		form.termType = CREDIT
+		form.paidStatus = PaidStatuses.UnPaid
+		form.termType = InvoiceTermType.Credit
 
 		dueDate := form.Date.AddDate(0, 0, form.Terms)
 		form.dueOn = &dueDate
@@ -292,7 +369,7 @@ func (form *StoreInvoiceForm) paymentTotalAmount() float64 {
 
 func (form *StoreInvoiceForm) computeTax() {
 	for _, line := range form.Lines {
-		if line.Action == DELETED {
+		if line.Action == LineActions.Deleted {
 			continue
 		}
 		// we need to add the discount here.

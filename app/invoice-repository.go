@@ -10,15 +10,6 @@ import (
 	"github.com/martin3zra/acme/pkg/foundation"
 )
 
-type LineAction string
-
-const (
-	ADDED     LineAction = "added"
-	UPDATED   LineAction = "updated"
-	DELETED   LineAction = "deleted"
-	UNCHANGED LineAction = "unchanged"
-)
-
 type invoice struct {
 	ID           int        `json:"id"`
 	UUID         string     `json:"uuid"`
@@ -264,7 +255,7 @@ func (s *Server) updateInvoice(companyID int, uuid string, form UpdateInvoiceFor
 	}
 
 	// When the invoice terms is been updated from CASH to CREDIT
-	if invoice.DueOn == nil && form.termType == CREDIT {
+	if invoice.DueOn == nil && form.termType == InvoiceTermType.Credit {
 		// Ensure to associated the new customer or current one the receivable
 		customerID := invoice.Customer.ID
 		if invoice.Customer.ID != form.CustomerID {
@@ -277,7 +268,7 @@ func (s *Server) updateInvoice(companyID int, uuid string, form UpdateInvoiceFor
 		}
 	}
 
-	if invoice.DueOn != nil && form.termType == CASH {
+	if invoice.DueOn != nil && form.termType == InvoiceTermType.Cash {
 		if err = s.deleteInvoiceFromReceivables(tx, companyID, invoice.ID, invoice.Customer.ID); err != nil {
 			return err
 		}
@@ -314,6 +305,59 @@ func (s *Server) updateInvoice(companyID int, uuid string, form UpdateInvoiceFor
 
 			return err
 		}
+	}
+
+	return tx.Commit()
+}
+
+func (s *Server) voidInvoice(companyID int, uuid string) error {
+
+	invoice, err := s.findInvoicesByUUID(companyID, uuid)
+	if err != nil {
+		return err
+	}
+
+	tx, err := s.db.Begin()
+	if err != nil {
+		return err
+	}
+
+	_, err = tx.Exec(`
+    UPDATE invoices
+    SET amount = 0, discount = NULL, tax = 0, total = 0,
+    amount_due = 0, payment = NULL, status = $3, paid_status = $4
+    WHERE company_id = $1 AND id = $2
+  `,
+		companyID, invoice.ID, InvoiceStatuses.Void, PaidStatuses.Removed,
+	)
+	if err != nil {
+		if txErr := tx.Rollback(); txErr != nil {
+			log.Fatalf("Error voiding invoice: %v", txErr)
+			return txErr
+		}
+
+		return err
+	}
+
+	_, err = tx.Exec(`
+    UPDATE invoices_items
+    SET amount = 0, qty = 0, price = 0, tax = 0, total = 0
+    WHERE company_id = $1 AND invoice_id = $2
+  `,
+		companyID, invoice.ID,
+	)
+	if err != nil {
+		if txErr := tx.Rollback(); txErr != nil {
+			log.Fatalf("Error voiding invoice lines: %v", txErr)
+			return txErr
+		}
+
+		return err
+	}
+
+	err = s.deleteInvoiceFromReceivables(tx, companyID, invoice.ID, invoice.Customer.ID)
+	if err != nil {
+		return err
 	}
 
 	return tx.Commit()

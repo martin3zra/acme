@@ -159,13 +159,13 @@ export default function Show({ invoice, auth }: Props) {
         {/* add composable/hook to decorate the paid status, to get color and proper labels */}
         <div className="flex h-fit items-center gap-x-1 rounded-md border border-green-300 bg-green-50 px-4 py-3 text-green-800">
           <InfoIcon size={16} />
-          Invoice {invoice.header.paid_status}
+          Paid status: {invoice.header.paid_status}
         </div>
         <Label>Details:</Label>
         <Separator />
         <div className="flex items-center justify-between">
           <Label className="text-lg">{currency(invoice.header.total)}</Label>
-          <Select name="paid_status" defaultValue={'0'} value={invoice.header.paid_status} required>
+          <Select name="paid_status" defaultValue={'0'} value={invoice.header.paid_status} required disabled={invoice.header.status === 'void'}>
             <SelectTrigger className="w-28">
               <SelectValue placeholder="Paid status" />
             </SelectTrigger>

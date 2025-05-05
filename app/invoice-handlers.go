@@ -230,6 +230,37 @@ func (s *Server) updateInvoiceHandler(i *inertia.Inertia) http.Handler {
 	return http.HandlerFunc(fn)
 }
 
+func (s *Server) voidInvoiceHandler(i *inertia.Inertia) http.Handler {
+
+	fn := func(w http.ResponseWriter, r *http.Request) {
+		uuid := r.PathValue("id")
+		back := func() {
+			// get the origin of the request to do a proper redirect
+			http.Redirect(w, r, "/invoices", http.StatusSeeOther)
+		}
+		var form ConfirmsPasswords
+		err := support.ParseRequest(r, &form)
+		if err != nil {
+			back()
+			return
+		}
+
+		user := auth.User(r.Context())
+		err = s.voidInvoice(*user.CurrentCompanyId, uuid)
+		if err != nil {
+			log.Printf("Error voiding invoice: %v", err)
+			s.session.Errors("status", "Invoice wasn't voided. Something went wrong.")
+			back()
+			return
+		}
+		s.session.Flash("success", "Invoice was voided successfully!")
+
+		http.Redirect(w, r, "/invoices", http.StatusSeeOther)
+	}
+
+	return http.HandlerFunc(fn)
+}
+
 func mapSlice[T, U any](s []T, f func(T) U) []U {
 	result := make([]U, len(s))
 	for i, v := range s {
