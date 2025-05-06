@@ -199,7 +199,7 @@ func (s *Server) updateInvoiceHandler(i *inertia.Inertia) http.Handler {
 	fn := func(w http.ResponseWriter, r *http.Request) {
 		uuid := r.PathValue("id")
 		back := func() {
-			http.Redirect(w, r, "/invoices/"+uuid+"/edit", http.StatusSeeOther)
+			i.Back(w, r, http.StatusSeeOther)
 		}
 		var form UpdateInvoiceForm
 		err := support.ParseRequest(r, &form)
@@ -224,7 +224,7 @@ func (s *Server) updateInvoiceHandler(i *inertia.Inertia) http.Handler {
 		}
 		s.session.Flash("success", "Invoice was created successfully!")
 
-		http.Redirect(w, r, "/invoices", http.StatusSeeOther)
+		i.Redirect(w, r, "/invoices", http.StatusSeeOther)
 	}
 
 	return http.HandlerFunc(fn)
@@ -235,8 +235,7 @@ func (s *Server) voidInvoiceHandler(i *inertia.Inertia) http.Handler {
 	fn := func(w http.ResponseWriter, r *http.Request) {
 		uuid := r.PathValue("id")
 		back := func() {
-			// get the origin of the request to do a proper redirect
-			http.Redirect(w, r, "/invoices", http.StatusSeeOther)
+			i.Back(w, r, http.StatusSeeOther)
 		}
 		var form ConfirmsPasswords
 		err := support.ParseRequest(r, &form)
@@ -255,7 +254,7 @@ func (s *Server) voidInvoiceHandler(i *inertia.Inertia) http.Handler {
 		}
 		s.session.Flash("success", "Invoice was voided successfully!")
 
-		http.Redirect(w, r, "/invoices", http.StatusSeeOther)
+		i.Redirect(w, r, "/invoices", http.StatusSeeOther)
 	}
 
 	return http.HandlerFunc(fn)
