@@ -132,18 +132,21 @@ export default function Show({ invoice, auth }: Props) {
               )}
             >
               <div className="flex items-center justify-between">
-                <Label>Amount</Label>
+                <Label>Sub-total</Label>
                 <Label data-slot="label-value">{currency(invoice.header.amount)}</Label>
-              </div>
-              <div className="flex items-center justify-between">
-                <Label>Tax</Label>
-                <Label data-slot="label-value">{currency(invoice.header.tax)}</Label>
               </div>
               <div className="flex items-center justify-between">
                 <Label>Discount</Label>
                 <Label data-slot="label-value">
+                  {invoice.header.discount.type === 'percentage' && (
+                    <span className="text-muted-foreground text-xs">{currency(invoice.header.amount * (invoice.header.discount.value / 100))}</span>
+                  )}
                   {invoice.header.discount.type === 'fixed' ? currency(invoice.header.discount.value) : `${invoice.header.discount.value}%`}
                 </Label>
+              </div>
+              <div className="flex items-center justify-between">
+                <Label>Tax</Label>
+                <Label data-slot="label-value">{currency(invoice.header.tax)}</Label>
               </div>
               <Separator />
               <div className="flex items-center justify-between">

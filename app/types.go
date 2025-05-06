@@ -285,15 +285,16 @@ func (d *Payment) Scan(value any) error {
 }
 
 type Line struct {
-	ID     int        `json:"id"`
-	Unit   int        `json:"unit"`
-	Qty    int        `json:"qty"`
-	Price  float64    `json:"price"`
-	Rate   float64    `json:"rate"`
-	Action LineAction `json:"action"`
-	tax    float64
-	amount float64
-	total  float64
+	ID       int        `json:"id"`
+	Unit     int        `json:"unit"`
+	Qty      int        `json:"qty"`
+	Price    float64    `json:"price"`
+	Rate     float64    `json:"rate"`
+	Action   LineAction `json:"action"`
+	tax      float64
+	amount   float64
+	discount float64
+	total    float64
 }
 
 type StoreInvoiceForm struct {
@@ -348,7 +349,6 @@ func (StoreInvoiceForm) Messages() map[string]string {
 func (form *StoreInvoiceForm) PassedValidation() {
 	// compute tax for each line
 	form.computeTax()
-	form.applyDiscount()
 
 	form.dueOn = nil
 	form.paidStatus = PaidStatuses.Paid
@@ -368,28 +368,33 @@ func (form *StoreInvoiceForm) paymentTotalAmount() float64 {
 }
 
 func (form *StoreInvoiceForm) computeTax() {
+
+	discountPercentage := form.Discount.Val
+	if form.Discount.Type == "fixed" {
+		totalAmount := float64(0)
+		for _, line := range form.Lines {
+			totalAmount += (line.Price * float64(line.Qty))
+		}
+
+		discountPercentage = float64(discountPercentage/totalAmount) * 100
+	}
+
 	for _, line := range form.Lines {
 		if line.Action == LineActions.Deleted {
 			continue
 		}
-		// we need to add the discount here.
+		// We can store the line discoun on the database
+		// We can add a discount value amount to the invoice.
 		line.amount = (line.Price * float64(line.Qty))
-		line.tax = line.amount * (line.Rate / 100)
-		line.total = line.amount + line.tax
+		line.discount = line.amount * (discountPercentage / 100)
+		line.tax = (line.amount - line.discount) * (line.Rate / 100)
+		line.total = line.amount - line.discount + line.tax
+
 		form.tax += line.tax
 		form.amount += line.amount
+		form.total += line.total
 	}
 
-	form.total = form.amount + form.tax
-}
-
-func (form *StoreInvoiceForm) applyDiscount() {
-	if form.Discount.Type == "percentage" {
-		form.total = form.total - (form.total * (form.Discount.Val / 100))
-		return
-	}
-
-	form.total = form.total - form.Discount.Val
 }
 
 type UpdateInvoiceForm struct {

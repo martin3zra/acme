@@ -272,7 +272,7 @@ export default function Create({
     const discount = invoiceForm.header.discount;
     // Percentage calculation
     if (discount.type === 'percentage') {
-      const total = composeSubTotal + composeTax;
+      const total = composeSubTotal;
       return total * (discount.value / 100);
     }
 
@@ -285,12 +285,22 @@ export default function Create({
   }, 0);
 
   const composeTax = invoiceForm.lines.reduce((acc, line) => {
-    const tax = line.price * (line.tax.rate / 100);
-    return acc + tax * line.qty;
+    let discount = invoiceForm.header.discount.value;
+    if (invoiceForm.header.discount.type === 'fixed') {
+      discount = (discount / composeSubTotal) * 100;
+    }
+
+    const lineAmount = line.price * line.qty;
+    const lineDiscount = lineAmount * (discount / 100);
+    const tax = (lineAmount - lineDiscount) * (line.tax.rate / 100);
+
+    return acc + tax;
   }, 0);
 
   const computeTotalAmount = (): number => {
-    return composeSubTotal + composeTax - computeDiscount();
+    const discount = computeDiscount();
+
+    return composeSubTotal - discount + composeTax;
   };
 
   const handleCheckoutChange = (method: PaymentMethod, form: CashForm | CheckForm | CardForm | BTForm) => {
@@ -453,14 +463,14 @@ export default function Create({
                     <span className="block text-base">{currency(composeSubTotal)}</span>
                   </div>
                   <div className="flex w-60 items-center justify-between">
-                    <span className="block text-base">Discount</span>
+                    <span className="block text-base">Discount: {computeDiscount().toFixed(2)}</span>
                     <div className="flex w-40 justify-end">
                       <Input
                         type="number"
                         min={0}
                         defaultValue={invoiceForm.header.discount.value}
                         name="discount"
-                        className="w-20 text-end"
+                        className="w-16 text-end"
                         onChange={handleDiscountValueChange}
                       />
                       <Select
