@@ -98,28 +98,34 @@ export default function Index({ auth, invoices, invoice }: PageProps<{ invoices:
                           <Ban /> Void
                         </Button>
                         <Separator orientation="vertical" />
+                        <Button asChild disabled={invoice.header.status === 'void'}>
+                          <Link href={`/invoices/${invoice.header.uuid}/edit`} as="button">
+                            <NotebookPen /> Edit
+                          </Link>
+                        </Button>
+                        {(invoice.header.paid_status === 'unpaid' || invoice.header.paid_status === 'partial') && (
+                          // when active set as disabled when the invoice is void: ={invoice.header.status === 'void'}
+                          <Button asChild disabled>
+                            <Link href={`/invoices/${invoice.header.uuid}/edit`} as="button">
+                              <DollarSign /> Record payment
+                            </Link>
+                          </Button>
+                        )}
                       </>
                     )}
-                    <Button asChild disabled={invoice.header.status === 'void'}>
-                      <Link href={`/invoices/${invoice.header.uuid}/edit`} as="button">
-                        <NotebookPen /> Edit
-                      </Link>
-                    </Button>
-                    {(invoice.header.paid_status === 'unpaid' || invoice.header.paid_status === 'partial') && (
-                      // when active set as disabled when the invoice is void: ={invoice.header.status === 'void'}
-                      <Button asChild disabled>
-                        <Link href={`/invoices/${invoice.header.uuid}/edit`} as="button">
-                          <DollarSign /> Record payment
-                        </Link>
-                      </Button>
-                    )}
-                    <Button disabled={invoice.header.status === 'void'}>
+
+                    <Button>
                       <Printer /> Print
                     </Button>
                   </div>
                 </div>
               </SheetHeader>
-              <div className="grid gap-4 px-4">
+              <div className="relative grid gap-4 px-4">
+                {invoice.header.status === 'void' && (
+                  <div className="absolute inset-0 flex w-full items-center justify-center overflow-y-hidden bg-transparent">
+                    <h1 className="-rotate-45 border-8 border-red-500/25 p-8 text-8xl font-extrabold text-red-500/25">VOID</h1>
+                  </div>
+                )}
                 <Show invoice={invoice} auth={auth} />
               </div>
             </SheetContent>
