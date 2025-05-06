@@ -63,7 +63,7 @@ func (s *Server) findItems(companyID int) ([]*item, error) {
 		"FROM items i "+
 		"INNER JOIN taxes t ON(i.company_id = t.company_id AND i.tax_id = t.id) "+
 		"LEFT JOIN LATERAL (SELECT iu.unit_id, u.name FROM items_units iu INNER JOIN units u ON (iu.unit_id = u.id) WHERE iu.item_id = i.id limit 1) iu ON true "+
-		"WHERE i.company_id = $1 AND i.deleted_at IS NULL", companyID)
+		"WHERE i.company_id = $1 AND i.deleted_at IS NULL ORDER BY i.name", companyID)
 	if err != nil {
 		return nil, err
 	}
@@ -102,7 +102,7 @@ func (s *Server) findItemsByCriteria(companyID int, term string) ([]*item, error
 		"FROM items i "+
 		"INNER JOIN taxes t ON(i.company_id = t.company_id AND i.tax_id = t.id) "+
 		"LEFT JOIN LATERAL (SELECT iu.unit_id, u.name FROM items_units iu INNER JOIN units u ON (iu.unit_id = u.id) WHERE iu.item_id = i.id limit 1) iu ON true "+
-		"WHERE i.company_id = $1 AND i.name LIKE $2 AND i.deleted_at IS NULL", companyID, "%"+term+"%")
+		"WHERE i.company_id = $1 AND i.name LIKE $2 AND i.deleted_at IS NULL ORDER BY i.name", companyID, "%"+term+"%")
 	if err != nil {
 		return nil, err
 	}
