@@ -7,7 +7,7 @@ import useCallbackState from '@/hooks/use-callback-state';
 import AuthenticatedLayout from '@/layouts/authenticated-layout';
 import { BreadcrumbItem, Invoice, InvoiceVerb, InvoiceWithLines, PageProps } from '@/types';
 import { Link, router, usePage } from '@inertiajs/react';
-import { Ban, NotebookPen, Printer } from 'lucide-react';
+import { Ban, DollarSign, NotebookPen, Printer } from 'lucide-react';
 import { List } from './List/Index';
 import { AddNewInvoice } from './Shared/AddNewInvoice';
 import Show from './Show';
@@ -105,6 +105,14 @@ export default function Index({ auth, invoices, invoice }: PageProps<{ invoices:
                         <NotebookPen /> Edit
                       </Link>
                     </Button>
+                    {(invoice.header.paid_status === 'unpaid' || invoice.header.paid_status === 'partial') && (
+                      // when active set as disabled when the invoice is void: ={invoice.header.status === 'void'}
+                      <Button asChild disabled>
+                        <Link href={`/invoices/${invoice.header.uuid}/edit`} as="button">
+                          <DollarSign /> Record payment
+                        </Link>
+                      </Button>
+                    )}
                     <Button disabled={invoice.header.status === 'void'}>
                       <Printer /> Print
                     </Button>

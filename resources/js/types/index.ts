@@ -132,7 +132,7 @@ export interface BreadcrumbItem {
 
 export type Verb = 'create' | 'view' | 'edit' | 'trash';
 
-export type InvoiceVerb = Exclude<Verb, 'trash'> | 'void';
+export type InvoiceVerb = Exclude<Verb, 'trash'> | 'void' | 'record-payment';
 
 export interface PaymentFormType {
   amount: number;

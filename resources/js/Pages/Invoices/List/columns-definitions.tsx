@@ -166,6 +166,7 @@ export const getColumns = ({ onDidClick }: Props): ColumnDef<Invoice>[] => {
       enableHiding: false,
       cell: (props) => {
         const disabled = props.row.original.status === 'void';
+        const canRecordPayment = props.row.original.paid_status === 'unpaid' || props.row.original.paid_status === 'partial';
         return (
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
@@ -181,6 +182,12 @@ export const getColumns = ({ onDidClick }: Props): ColumnDef<Invoice>[] => {
               <DropdownMenuItem onClick={() => onDidClick(props.row.original, 'edit')} disabled={disabled}>
                 Edit
               </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              {canRecordPayment && (
+                <DropdownMenuItem disabled onClick={() => onDidClick(props.row.original, 'record-payment')}>
+                  Record payment
+                </DropdownMenuItem>
+              )}
               <DropdownMenuItem onClick={() => onDidClick(props.row.original, 'void')} disabled={disabled}>
                 Void
               </DropdownMenuItem>
