@@ -1,12 +1,13 @@
 import { ConfirmsPassword } from '@/components/confirms-password';
 import HeadingSmall from '@/components/heading-small';
 import { Button } from '@/components/ui/button';
+import { Separator } from '@/components/ui/separator';
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import useCallbackState from '@/hooks/use-callback-state';
 import AuthenticatedLayout from '@/layouts/authenticated-layout';
 import { BreadcrumbItem, Invoice, InvoiceVerb, InvoiceWithLines, PageProps } from '@/types';
 import { Link, router, usePage } from '@inertiajs/react';
-import { NotebookPen, Printer } from 'lucide-react';
+import { Ban, NotebookPen, Printer } from 'lucide-react';
 import { List } from './List/Index';
 import { AddNewInvoice } from './Shared/AddNewInvoice';
 import Show from './Show';
@@ -91,6 +92,14 @@ export default function Index({ auth, invoices, invoice }: PageProps<{ invoices:
                     <SheetDescription className="text-[12px]">Invoice details</SheetDescription>
                   </div>
                   <div className="mx-4 flex gap-x-3">
+                    {invoice.header.status !== 'void' && (
+                      <>
+                        <Button variant={'destructive'} onClick={() => onSelectInvoice(invoice.header, 'void')}>
+                          <Ban /> Void
+                        </Button>
+                        <Separator orientation="vertical" />
+                      </>
+                    )}
                     <Button asChild disabled={invoice.header.status === 'void'}>
                       <Link href={`/invoices/${invoice.header.uuid}/edit`} as="button">
                         <NotebookPen /> Edit
