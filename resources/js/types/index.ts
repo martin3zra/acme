@@ -120,6 +120,10 @@ export interface BreadcrumbItem {
 
 export type Verb = 'create' | 'view' | 'edit' | 'trash';
 
+export type InvoiceVerb = Exclude<Verb, 'trash'> | 'void' | 'record-payment';
+
+export type PaymentVerb = Exclude<Verb, 'trash'> | 'void';
+
 export interface PaymentFormType {
   amount: number;
   reference: string;
@@ -181,3 +185,28 @@ export interface Nameable {
 }
 
 export type currencySignature = (value: number | string, precision?: number, inCent?: boolean) => string;
+
+export type HeaderForm = {
+  customer: Customer | undefined;
+  date: Date | undefined;
+  due: Date | undefined;
+  terms: number;
+  taxReceipt: number;
+  notes: string | undefined;
+  discount: DiscountType;
+};
+
+export type InvoiceForm = {
+  header: HeaderForm;
+  lines: LineForm[];
+  payment: PaymentForm;
+};
+
+export type Payment = {
+  uuid: string;
+  number: string;
+  date: Date | undefined;
+  amount: number;
+  created_at: string;
+  updated_at: string;
+};
