@@ -3,7 +3,17 @@ import { NavSecondary } from '@/components/nav-secondary';
 import { NavUser } from '@/components/nav-user';
 import { Sidebar, SidebarContent, SidebarFooter, SidebarHeader, SidebarMenu, SidebarMenuButton, SidebarMenuItem } from '@/components/ui/sidebar';
 import { Link } from '@inertiajs/react';
-import { Command, FilePenIcon, HelpCircleIcon, LayoutDashboardIcon, LayoutListIcon, SearchIcon, SettingsIcon, UsersIcon } from 'lucide-react';
+import {
+  Command,
+  CreditCard,
+  FilePenIcon,
+  HelpCircleIcon,
+  LayoutDashboardIcon,
+  LayoutListIcon,
+  SearchIcon,
+  SettingsIcon,
+  UsersIcon,
+} from 'lucide-react';
 import * as React from 'react';
 
 const data = {
@@ -31,6 +41,12 @@ const data = {
       url: '/items',
       icon: LayoutListIcon,
       component: 'Items/Index',
+    },
+    {
+      title: 'Payments',
+      url: '/payments',
+      icon: CreditCard,
+      component: 'Payments/Index',
     },
   ],
   navSecondary: [

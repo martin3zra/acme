@@ -1,11 +1,13 @@
+import { ConfirmsPassword } from '@/components/confirms-password';
 import HeadingSmall from '@/components/heading-small';
 import { Button } from '@/components/ui/button';
+import { Separator } from '@/components/ui/separator';
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import useCallbackState from '@/hooks/use-callback-state';
 import AuthenticatedLayout from '@/layouts/authenticated-layout';
-import { BreadcrumbItem, Invoice, InvoiceWithLines, PageProps, Verb } from '@/types';
-import { router, usePage } from '@inertiajs/react';
-import { NotebookPen, Printer } from 'lucide-react';
+import { BreadcrumbItem, Invoice, InvoiceVerb, InvoiceWithLines, PageProps } from '@/types';
+import { Link, router, usePage } from '@inertiajs/react';
+import { Ban, DollarSign, NotebookPen, Printer } from 'lucide-react';
 import { List } from './List/Index';
 import { AddNewInvoice } from './Shared/AddNewInvoice';
 import Show from './Show';
@@ -22,30 +24,47 @@ const breadcrumbs: BreadcrumbItem[] = [
 ];
 export default function Index({ auth, invoices, invoice }: PageProps<{ invoices: Invoice[]; invoice: InvoiceWithLines }>) {
   const [open, setOpen] = useCallbackState<boolean>(false);
+  const [selectedInvoice, setSelectedInvoice] = useCallbackState<Invoice | undefined>(undefined);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useCallbackState<boolean>(false);
   const page = usePage();
   const hasInvoices = invoices.length > 0;
 
-  const onSelectInvoice = (invoice: Invoice, action: Verb): void => {
+  const onSelectInvoice = (invoice: Invoice, action: InvoiceVerb): void => {
+    setSelectedInvoice(invoice);
+    if (action === 'void') {
+      setDeleteDialogOpen(true);
+      return;
+    }
+    if (action === 'edit') {
+      router.visit(`/invoices/${invoice.uuid}/edit`);
+      return;
+    }
     if (action !== 'view') return;
     setOpen(
       (open) => !open,
       (newVal) => {
-        if (newVal) {
-          router.visit(page.url, {
-            except: ['invoices'],
-            data: { id: invoice.uuid },
-            preserveScroll: true,
-            preserveState: true,
-          });
-        }
+        if (newVal) findSelectedInvoice(invoice.uuid);
       },
     );
+  };
+
+  const findSelectedInvoice = (uuid: string) => {
+    router.visit(page.url, {
+      except: ['invoices'],
+      data: { id: uuid },
+      preserveScroll: true,
+      preserveState: true,
+    });
   };
 
   const onOpenChange = (open: boolean) => {
     setOpen(open);
   };
 
+  const modalHandler = (open: boolean = false) => {
+    onOpenChange(open);
+    setDeleteDialogOpen(open);
+  };
   return (
     <AuthenticatedLayout user={auth.user} breadcrumbs={breadcrumbs}>
       <div className="space-y-6">
@@ -73,20 +92,56 @@ export default function Index({ auth, invoices, invoice }: PageProps<{ invoices:
                     <SheetDescription className="text-[12px]">Invoice details</SheetDescription>
                   </div>
                   <div className="mx-4 flex gap-x-3">
-                    <Button>
-                      <NotebookPen /> Edit
-                    </Button>
+                    {invoice.header.status !== 'void' && (
+                      <>
+                        <Button variant={'destructive'} onClick={() => onSelectInvoice(invoice.header, 'void')}>
+                          <Ban /> Void
+                        </Button>
+                        <Separator orientation="vertical" />
+                        <Button asChild disabled={invoice.header.status === 'void'}>
+                          <Link href={`/invoices/${invoice.header.uuid}/edit`} as="button">
+                            <NotebookPen /> Edit
+                          </Link>
+                        </Button>
+                        {(invoice.header.paid_status === 'unpaid' || invoice.header.paid_status === 'partial') && (
+                          // when active set as disabled when the invoice is void: ={invoice.header.status === 'void'}
+                          <Button asChild disabled>
+                            <Link href={`/invoices/${invoice.header.uuid}/edit`} as="button">
+                              <DollarSign /> Record payment
+                            </Link>
+                          </Button>
+                        )}
+                      </>
+                    )}
+
                     <Button>
                       <Printer /> Print
                     </Button>
                   </div>
                 </div>
               </SheetHeader>
-              <div className="grid gap-4 px-4">
+              <div className="relative grid gap-4 px-4">
+                {invoice.header.status === 'void' && (
+                  <div className="absolute inset-0 flex w-full items-center justify-center overflow-y-hidden bg-transparent">
+                    <h1 className="-rotate-45 border-8 border-red-500/25 p-8 text-8xl font-extrabold text-red-500/25">VOID</h1>
+                  </div>
+                )}
                 <Show invoice={invoice} auth={auth} />
               </div>
             </SheetContent>
           </Sheet>
+        )}
+
+        {selectedInvoice && (
+          <ConfirmsPassword
+            title={`Are you sure you want to void ${selectedInvoice.number}?`}
+            description={`Once the invoice is void it will go from ${selectedInvoice.total} to $0.00.`}
+            action={`Void it`}
+            verb={'update'}
+            path={`/invoices/${selectedInvoice.uuid}/void`}
+            open={deleteDialogOpen}
+            onOpenChange={modalHandler}
+          />
         )}
       </div>
     </AuthenticatedLayout>

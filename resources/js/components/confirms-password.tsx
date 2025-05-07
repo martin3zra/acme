@@ -7,6 +7,7 @@ import { useDocument } from '@/composables/use-document';
 import { useHeader } from '@/composables/use-headers';
 import { useForm } from '@inertiajs/react';
 import { FC, FormEventHandler, useRef } from 'react';
+import { AlertDestructive } from './alert-destructive';
 
 export type Props = {
   title: string;
@@ -30,7 +31,7 @@ export const ConfirmsPassword: FC<Props> = ({ title, description, action, verb, 
     reset,
     errors,
     clearErrors,
-  } = useForm<Required<{ current_password: string }>>({ current_password: '' });
+  } = useForm<Required<{ current_password: string; status: string }>>({ current_password: '', status: '' });
   const { headers } = useHeader();
 
   const options = {
@@ -63,6 +64,7 @@ export const ConfirmsPassword: FC<Props> = ({ title, description, action, verb, 
             <DialogDescription>{description}</DialogDescription>
           </DialogHeader>
           <form className="space-y-6" onSubmit={onSubmit}>
+            {errors.status && <AlertDestructive description={errors.status} onDestroy={() => delete errors.status} />}
             <div className="grid gap-2">
               <Label htmlFor="password" className="sr-only">
                 Password

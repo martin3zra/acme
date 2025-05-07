@@ -1,7 +1,7 @@
 import { Button } from '@/components/ui/button';
 import { DropdownMenu, DropdownMenuCheckboxItem, DropdownMenuContent, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Invoice, Verb } from '@/types';
+import { Invoice, InvoiceVerb } from '@/types';
 import {
   ColumnFiltersState,
   flexRender,
@@ -19,7 +19,7 @@ import { getColumns } from './columns-definitions';
 
 type Props = {
   data: Invoice[];
-  onSelectInvoice: (invoice: Invoice, action: Verb) => void;
+  onSelectInvoice: (invoice: Invoice, action: InvoiceVerb) => void;
 };
 
 export const List: FC<Props> = ({ data, onSelectInvoice }) => {

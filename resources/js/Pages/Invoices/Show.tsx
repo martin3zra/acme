@@ -2,7 +2,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Separator } from '@/components/ui/separator';
 import { useNumber } from '@/composables/use-number';
-import { cn } from '@/lib/utils';
+import { cn, isNotEmpty } from '@/lib/utils';
 import { Auth, InvoiceWithLines, PaidStatuses } from '@/types';
 import { format } from 'date-fns';
 import { Calendar1, CircleCheckIcon, CircleDollarSignIcon, CreditCardIcon, InfoIcon, UserPen } from 'lucide-react';
@@ -90,6 +90,9 @@ export default function Show({ invoice, auth }: Props) {
                   Price
                 </th>
                 <th scope="col" data-format="number">
+                  Tax
+                </th>
+                <th scope="col" data-format="number">
                   Amount
                 </th>
               </tr>
@@ -104,7 +107,8 @@ export default function Show({ invoice, auth }: Props) {
                     {line.qty}
                   </td>
                   <td data-format="number">{currency(line.price)}</td>
-                  <td data-format="number">{currency(line.qty * line.price)}</td>
+                  <td data-format="number">{currency(line.tax.amount)}</td>
+                  <td data-format="number">{currency(line.amount)}</td>
                 </tr>
               ))}
             </tbody>
@@ -114,8 +118,8 @@ export default function Show({ invoice, auth }: Props) {
         <div className="col-span-12 grid grid-cols-12">
           <div className="col-span-8">
             <div className="max-w-sm rounded-md border p-4">
-              <Label className="text-sm/6 font-medium">Notes</Label>
-              <div className="text-muted-foreground text-sm">{invoice.header.notes ? invoice.header.notes : 'No notes left'}</div>
+              <Label className="text-sm/6 font-medium">Notes:</Label>
+              <div className="text-muted-foreground text-sm">{isNotEmpty(invoice.header.notes) ? invoice.header.notes : 'No notes left'}</div>
             </div>
           </div>
           <div className="col-span-4 rounded-md border p-4">
@@ -128,18 +132,21 @@ export default function Show({ invoice, auth }: Props) {
               )}
             >
               <div className="flex items-center justify-between">
-                <Label>Amount</Label>
+                <Label>Sub-total</Label>
                 <Label data-slot="label-value">{currency(invoice.header.amount)}</Label>
-              </div>
-              <div className="flex items-center justify-between">
-                <Label>Tax</Label>
-                <Label data-slot="label-value">{currency(invoice.header.tax)}</Label>
               </div>
               <div className="flex items-center justify-between">
                 <Label>Discount</Label>
                 <Label data-slot="label-value">
+                  {invoice.header.discount.type === 'percentage' && (
+                    <span className="text-muted-foreground text-xs">{currency(invoice.header.amount * (invoice.header.discount.value / 100))}</span>
+                  )}
                   {invoice.header.discount.type === 'fixed' ? currency(invoice.header.discount.value) : `${invoice.header.discount.value}%`}
                 </Label>
+              </div>
+              <div className="flex items-center justify-between">
+                <Label>Tax</Label>
+                <Label data-slot="label-value">{currency(invoice.header.tax)}</Label>
               </div>
               <Separator />
               <div className="flex items-center justify-between">
@@ -155,13 +162,13 @@ export default function Show({ invoice, auth }: Props) {
         {/* add composable/hook to decorate the paid status, to get color and proper labels */}
         <div className="flex h-fit items-center gap-x-1 rounded-md border border-green-300 bg-green-50 px-4 py-3 text-green-800">
           <InfoIcon size={16} />
-          Invoice {invoice.header.paid_status}
+          Paid status: {invoice.header.paid_status}
         </div>
         <Label>Details:</Label>
         <Separator />
         <div className="flex items-center justify-between">
           <Label className="text-lg">{currency(invoice.header.total)}</Label>
-          <Select name="paid_status" defaultValue={'0'} value={invoice.header.paid_status} required>
+          <Select name="paid_status" defaultValue={'0'} value={invoice.header.paid_status} required disabled={invoice.header.status === 'void'}>
             <SelectTrigger className="w-28">
               <SelectValue placeholder="Paid status" />
             </SelectTrigger>

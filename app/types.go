@@ -130,17 +130,86 @@ func (form UpdateItemForm) Rules() map[string]any {
 type TermType string
 
 const (
-	CASH   TermType = "cash"
-	CREDIT TermType = "credit"
+	_CASH   TermType = "cash"
+	_CREDIT TermType = "credit"
 )
+
+var InvoiceTermType = struct {
+	Cash   TermType
+	Credit TermType
+}{
+	Cash:   _CASH,
+	Credit: _CREDIT,
+}
 
 type PaidStatus string
 
 const (
-	UNPAID  PaidStatus = "unpaid"
-	PARTIAL PaidStatus = "partial"
-	PAID    PaidStatus = "paid"
+	_UNPAID  PaidStatus = "unpaid"
+	_PARTIAL PaidStatus = "partial"
+	_PAID    PaidStatus = "paid"
+	_REMOVED PaidStatus = "removed"
 )
+
+var PaidStatuses = struct {
+	UnPaid  PaidStatus
+	Partial PaidStatus
+	Paid    PaidStatus
+	Removed PaidStatus
+}{
+	UnPaid:  _UNPAID,
+	Partial: _PARTIAL,
+	Paid:    _PAID,
+	Removed: _REMOVED,
+}
+
+type InvoiceStatus string
+
+const (
+	DRAFT     InvoiceStatus = "draft"
+	SENT      InvoiceStatus = "sent"
+	VIEWED    InvoiceStatus = "viewed"
+	OVERDUE   InvoiceStatus = "overdue"
+	COMPLETED InvoiceStatus = "completed"
+	VOID      InvoiceStatus = "void"
+)
+
+var InvoiceStatuses = struct {
+	Draft     InvoiceStatus
+	Sent      InvoiceStatus
+	Viewed    InvoiceStatus
+	Overdue   InvoiceStatus
+	Completed InvoiceStatus
+	Void      InvoiceStatus
+}{
+	Draft:     DRAFT,
+	Sent:      SENT,
+	Viewed:    VIEWED,
+	Overdue:   OVERDUE,
+	Completed: COMPLETED,
+	Void:      VOID,
+}
+
+type LineAction string
+
+const (
+	ADDED     LineAction = "added"
+	UPDATED   LineAction = "updated"
+	DELETED   LineAction = "deleted"
+	UNCHANGED LineAction = "unchanged"
+)
+
+var LineActions = struct {
+	Added     LineAction
+	Updated   LineAction
+	Deleted   LineAction
+	Unchanged LineAction
+}{
+	Added:     ADDED,
+	Updated:   UPDATED,
+	Deleted:   DELETED,
+	Unchanged: UNCHANGED,
+}
 
 type Discount struct {
 	Val  float64 `json:"value"`
@@ -152,6 +221,10 @@ func (d *Discount) Value() (driver.Value, error) {
 }
 
 func (d *Discount) Scan(value any) error {
+	if value == nil {
+		return nil
+	}
+
 	b, ok := value.([]byte)
 	if !ok {
 		return errors.New("type assertion to []byte failed")
@@ -199,6 +272,10 @@ func (d *Payment) Value() (driver.Value, error) {
 }
 
 func (d *Payment) Scan(value any) error {
+	if value == nil {
+		return nil
+	}
+
 	b, ok := value.([]byte)
 	if !ok {
 		return errors.New("type assertion to []byte failed")
@@ -208,11 +285,16 @@ func (d *Payment) Scan(value any) error {
 }
 
 type Line struct {
-	ID    int     `json:"id"`
-	Unit  int     `json:"unit"`
-	Qty   int     `json:"quantity"`
-	Price float64 `json:"price"`
-	Rate  float64 `json:"rate"`
+	ID       int        `json:"id"`
+	Unit     int        `json:"unit"`
+	Qty      int        `json:"qty"`
+	Price    float64    `json:"price"`
+	Rate     float64    `json:"rate"`
+	Action   LineAction `json:"action"`
+	tax      float64
+	amount   float64
+	discount float64
+	total    float64
 }
 
 type StoreInvoiceForm struct {
@@ -223,7 +305,7 @@ type StoreInvoiceForm struct {
 	TaxReceipt int       `json:"tax_receipt"`
 	Discount   Discount  `json:"discount"`
 	Notes      string    `json:"notes"`
-	Lines      []Line    `json:"lines"`
+	Lines      []*Line   `json:"lines"`
 	Payment    Payment   `json:"payment"`
 	// considere these fields as protected
 	amount     float64
@@ -237,17 +319,18 @@ type StoreInvoiceForm struct {
 
 func (form StoreInvoiceForm) Rules() map[string]any {
 	return map[string]any{
-		"customer_id":   "bail|required|exists:customers,id",
-		"date":          "bail|required|date|after:yesterday",
-		"terms":         "bail|required|min:1",
-		"tax_receipt":   "bail|required|exists:tax_receipts,id",
-		"lines":         "required|min:1",
-		"lines.*.id":    "required|exists:items,id",
-		"lines.*.unit":  "required|exists:units,id",
-		"lines.*.qty":   "required|min:1",
-		"lines.*.price": "required",
-		"lines.*.rate":  "required",
-		"discount":      "required",
+		"customer_id":    "bail|required|exists:customers,id",
+		"date":           "bail|required|date|after:yesterday",
+		"terms":          "bail|required|min:1",
+		"tax_receipt":    "bail|required|exists:tax_receipts,id",
+		"lines":          "required|min:1",
+		"lines.*.id":     "required|exists:items,id",
+		"lines.*.unit":   "required|exists:units,id",
+		"lines.*.qty":    "required|min:1",
+		"lines.*.price":  "required",
+		"lines.*.rate":   "required",
+		"lines.*.action": "required|in:added",
+		"discount":       "required",
 		"discount.value": []any{
 			"sometimes",
 			validator.Rule{}.When(form.Discount.Type == "percentage", "between:0,100", "min:0"),
@@ -266,15 +349,14 @@ func (StoreInvoiceForm) Messages() map[string]string {
 func (form *StoreInvoiceForm) PassedValidation() {
 	// compute tax for each line
 	form.computeTax()
-	form.applyDiscount()
 
 	form.dueOn = nil
-	form.paidStatus = PAID
-	form.termType = CASH
+	form.paidStatus = PaidStatuses.Paid
+	form.termType = InvoiceTermType.Cash
 	if form.Terms > 1 {
 		form.amountDue = form.total
-		form.paidStatus = UNPAID
-		form.termType = CREDIT
+		form.paidStatus = PaidStatuses.UnPaid
+		form.termType = InvoiceTermType.Credit
 
 		dueDate := form.Date.AddDate(0, 0, form.Terms)
 		form.dueOn = &dueDate
@@ -286,22 +368,57 @@ func (form *StoreInvoiceForm) paymentTotalAmount() float64 {
 }
 
 func (form *StoreInvoiceForm) computeTax() {
-	for _, line := range form.Lines {
-		// we need to add the discount here.
-		lineAmount := (line.Price * float64(line.Qty))
 
-		form.tax += lineAmount * (line.Rate / 100)
-		form.amount += lineAmount
+	discountPercentage := form.Discount.Val
+	if form.Discount.Type == "fixed" {
+		totalAmount := float64(0)
+		for _, line := range form.Lines {
+			totalAmount += (line.Price * float64(line.Qty))
+		}
+
+		discountPercentage = float64(discountPercentage/totalAmount) * 100
 	}
 
-	form.total = form.amount + form.tax
+	for _, line := range form.Lines {
+		if line.Action == LineActions.Deleted {
+			continue
+		}
+		// We can store the line discoun on the database
+		// We can add a discount value amount to the invoice.
+		line.amount = (line.Price * float64(line.Qty))
+		line.discount = line.amount * (discountPercentage / 100)
+		line.tax = (line.amount - line.discount) * (line.Rate / 100)
+		line.total = line.amount - line.discount + line.tax
+
+		form.tax += line.tax
+		form.amount += line.amount
+		form.total += line.total
+	}
+
 }
 
-func (form *StoreInvoiceForm) applyDiscount() {
-	if form.Discount.Type == "percentage" {
-		form.total = form.total - (form.total * (form.Discount.Val / 100))
-		return
-	}
+type UpdateInvoiceForm struct {
+	StoreInvoiceForm
+}
 
-	form.total = form.total - form.Discount.Val
+func (form UpdateInvoiceForm) Rules() map[string]any {
+	return map[string]any{
+		"customer_id":    "bail|required|exists:customers,id",
+		"date":           "bail|required|date",
+		"terms":          "bail|required|min:1",
+		"tax_receipt":    "bail|required|exists:tax_receipts,id",
+		"lines":          "required|min:1",
+		"lines.*.id":     "required|exists:items,id",
+		"lines.*.unit":   "required|exists:units,id",
+		"lines.*.qty":    "required|min:1", // ADD when rule here, only validate when is the action is added or updated
+		"lines.*.price":  "required",
+		"lines.*.rate":   "required",
+		"lines.*.action": "required|in:added,updated,deleted,unchanged",
+		"discount":       "required",
+		"discount.value": []any{
+			"sometimes",
+			validator.Rule{}.When(form.Discount.Type == "percentage", "between:0,100", "min:0"),
+		},
+		"discount.type": "required|in:percentage,fixed",
+	}
 }

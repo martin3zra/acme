@@ -105,7 +105,7 @@ func (v *Validator) messages(attribute, rule, kind string, value ...any) string 
 			"slice":  "The %s field must not have more than %v items.",
 		},
 		"min": map[string]any{
-			"int":    "The %s field must not be greater than %v.",
+			"int":    "The %s field must be at least %v.",
 			"string": "The %s field must be at least %v characters.",
 			"slice":  "The %s field must has at least %v items.",
 		},

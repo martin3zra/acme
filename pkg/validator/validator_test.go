@@ -61,6 +61,20 @@ func TestNumericRule(t *testing.T) {
 	}
 }
 
+func TestMinOnNumberRule(t *testing.T) {
+	person := Person{
+		Age: 12,
+	}
+
+	var validator = validator.Validator{}
+	validator.Validate(context.Background(), &person, map[string]any{
+		"age": "min:1",
+	})
+	if len(validator.Errors()) > 0 {
+		t.Errorf("validation fails:\n %v", validator.Errors())
+	}
+}
+
 func TestBetweenRule(t *testing.T) {
 	person := Person{
 		Age: 36,

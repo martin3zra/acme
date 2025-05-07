@@ -23,40 +23,46 @@ import { useDebounced } from '@/hooks/use-debounced';
 import { usePersistedState } from '@/hooks/use-persisted-state';
 import AuthenticatedLayout from '@/layouts/authenticated-layout';
 import { addDays, cn, isNotEmpty } from '@/lib/utils';
-import { BTForm, CardForm, CashForm, CheckForm, Customer, InvoiceForm, Item, LineForm, PageProps, PaymentMethod, TaxReceipt } from '@/types';
+import {
+  Auth,
+  BTForm,
+  CardForm,
+  CashForm,
+  CheckForm,
+  Customer,
+  InvoiceForm,
+  InvoiceWithLines,
+  Item,
+  LineForm,
+  Nameable,
+  PageProps,
+  PaymentMethod,
+} from '@/types';
 import { Textarea } from '@headlessui/react';
 import { router, useForm, usePage } from '@inertiajs/react';
 import { format } from 'date-fns';
 import { CalendarIcon } from 'lucide-react';
-import React, { useCallback, useEffect } from 'react';
-import { createBreadcrumbs, defaultDiscount, defaultInvoiceForm, paymentTerms } from './constants';
+import React, { useCallback, useEffect, useState } from 'react';
+import { defaultDiscount, editBreadcrumbs, paymentTerms } from './constants';
 import CheckoutForm from './Shared/checkout-form';
 import { CustomerSection } from './Shared/customer-section';
 import { Lines } from './Shared/lines';
 
-export default function Create({
+export default function Edit({
   auth,
+  invoice,
   customers,
   items,
   item,
   tax_receipts,
-}: PageProps<{ customers: Customer[]; items: Item[]; item: Item; tax_receipts: TaxReceipt[] }>) {
-  const currency = useNumber().currency;
-  const [open, setOpen] = React.useState(false);
-  const [openCancelConfirmation, setCancelConfirmation] = React.useState(false);
-  const [openCheckout, setCheckout] = React.useState(false);
-  const [isEditing, setEditing] = React.useState(false);
-  const referenceInputRef = React.useRef<HTMLInputElement>(null);
-  const qtyInputRef = React.useRef<HTMLInputElement>(null);
-  const [search, setSearch] = React.useState('');
-  const dedbouncedSearch = useDebounced(search, 500);
-  const [amount, setAmount] = React.useState(0);
-  const [invoiceForm, setInvoiceForm, removeInvoiceForm] = usePersistedState<InvoiceForm>('invoice', defaultInvoiceForm);
-  const [currentItem, setCurrentItem] = React.useState<Item | undefined>(undefined);
-
-  const { headers } = useHeader();
+}: PageProps<{ auth: Auth; invoice: InvoiceWithLines; customers: Customer[]; items: Item[]; item: Item; tax_receipts: Nameable[] }>) {
   const { errors: propsErrors } = usePage<PageProps>().props;
-  const { post, transform, processing, errors } = useForm({
+  const [open, setOpen] = React.useState(false);
+  const [openCancelConfirmation, setCancelConfirmation] = useState(false);
+  const [openCheckout, setCheckout] = useState(false);
+  const currency = useNumber().currency;
+  const { headers } = useHeader();
+  const { put, transform, processing, errors } = useForm({
     customer_id: 0,
     terms: 0,
     tax_receipt: 0,
@@ -64,6 +70,47 @@ export default function Create({
     date: new Date(),
     discount: defaultDiscount,
   });
+
+  const initialAsInvoiceForm = (): InvoiceForm => {
+    const _invoice: InvoiceForm = {
+      header: {
+        customer: invoice.header.customer,
+        date: new Date(invoice.header.date),
+        due: invoice.header.due_on ? new Date(invoice.header.due_on) : undefined,
+        terms: invoice.header.terms,
+        taxReceipt: invoice.header.tax_receipt_id,
+        notes: invoice.header.notes,
+        discount: invoice.header.discount,
+      },
+      lines: invoice.lines.map((line) => {
+        return { ...line };
+      }),
+      payment: invoice.header.payment,
+    };
+
+    return _invoice;
+  };
+
+  const [invoiceForm, setInvoiceForm, removeInvoiceForm] = usePersistedState<InvoiceForm>('invoice_edit', initialAsInvoiceForm(), true);
+
+  const [currentItem, setCurrentItem] = React.useState<Item | undefined>(undefined);
+  const [isEditing, setEditing] = React.useState(false);
+  const [search, setSearch] = React.useState('');
+  const [amount, setAmount] = React.useState(0);
+  const debouncedSearch = useDebounced(search, 500);
+  const referenceInputRef = React.useRef<HTMLInputElement>(null);
+  const qtyInputRef = React.useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    const searchCustomer = () => {
+      router.reload({ only: ['customers'], data: { search: debouncedSearch }, preserveUrl: true });
+    };
+
+    if (debouncedSearch) {
+      // Perform search operation
+      searchCustomer();
+    }
+  }, [debouncedSearch]);
 
   useEffect(() => setCurrentItem(item), [item]);
 
@@ -86,74 +133,10 @@ export default function Create({
     }
   }, [currentItem, findCurrentItem]);
 
-  useEffect(() => {
-    const searchCustomer = () => {
-      router.reload({ only: ['customers'], data: { search: dedbouncedSearch }, preserveUrl: true });
-    };
-
-    if (dedbouncedSearch) {
-      // Perform search operation
-      searchCustomer();
-    }
-  }, [dedbouncedSearch]);
-
-  const searchItem = (search: string) => {
-    router.reload({
-      only: ['item'],
-      data: { search },
-      preserveUrl: true,
-      onSuccess: () => {
-        qtyInputRef.current!.value = '1';
-      },
-    });
-  };
-
   const handleOnSelectedItem = (item: Item) => {
     setCurrentItem(item);
     referenceInputRef.current!.value = item.name;
     qtyInputRef.current!.value = '1';
-  };
-
-  const handleOnKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
-    if (event.key === 'Enter' || event.key === 'Tab') {
-      event.preventDefault(); // Prevent default behavior of Enter key
-      if (event.currentTarget.name === 'reference' && isNotEmpty(event.currentTarget.value)) {
-        searchItem(event.currentTarget.value);
-        return;
-      }
-      if (event.currentTarget.name === 'qty' && currentItem != undefined) {
-        processCurrentItem();
-      }
-    }
-  };
-
-  const processCurrentItem = () => {
-    const line = currentItem!;
-
-    if (isEditing) {
-      const index = invoiceForm.lines.findIndex((element: LineForm) => element.id === line.id);
-      if (index >= 0) {
-        invoiceForm.lines[index].qty = qtyInputRef.current?.valueAsNumber || 0;
-        invoiceForm.lines[index].amount = amount;
-      }
-      setEditing(false);
-    } else {
-      // When searching for the current item, if exists on the invoice, then display current values, and update the qty
-      invoiceForm.lines.push({ ...line, qty: qtyInputRef.current?.valueAsNumber || 0, amount, action: 'added' });
-    }
-    setInvoiceForm(() => {
-      return { ...invoiceForm, lines: [...invoiceForm.lines] };
-    });
-
-    resetInvoiceFormInput();
-  };
-
-  const resetInvoiceFormInput = () => {
-    setCurrentItem(undefined);
-    setAmount(0);
-    referenceInputRef.current!.value = '';
-    qtyInputRef.current!.value = '';
-    referenceInputRef.current?.focus();
   };
 
   const handleCustomerSelection = (customer: Customer | undefined) => {
@@ -190,11 +173,39 @@ export default function Create({
     });
   };
 
-  const handleTaxReceiptChange = (value: string) => {
-    invoiceForm.header.taxReceipt = Number(value);
+  const performUpdate = () => {
+    transform((data) => ({
+      ...data,
+      customer_id: invoiceForm.header.customer?.id,
+      date: invoiceForm.header.date,
+      terms: invoiceForm.header.terms,
+      tax_receipt: invoiceForm.header.taxReceipt,
+      discount: invoiceForm.header.discount,
+      notes: invoiceForm.header.notes || '',
+      lines: invoiceForm.lines.map((line) => {
+        return { id: line.id, unit: line.unit.id, qty: line.qty, price: line.price, rate: line.tax.rate, action: line.action };
+      }),
+      payment: invoiceForm.payment,
+    }));
 
-    setInvoiceForm(() => {
-      return { ...invoiceForm, header: { ...invoiceForm.header, taxReceipt: Number(value) } };
+    put(`/invoices/${invoice.header.uuid}`, {
+      ...headers,
+      preserveState: 'errors',
+      onSuccess: () => {
+        removeInvoiceForm();
+        router.get('/invoices');
+      },
+    });
+  };
+
+  const searchItem = (search: string) => {
+    router.reload({
+      only: ['item'],
+      data: { search },
+      preserveUrl: true,
+      onSuccess: () => {
+        qtyInputRef.current!.value = '1';
+      },
     });
   };
 
@@ -203,18 +214,84 @@ export default function Create({
     // add confirmation screen here.
     const index = parseInt(event.currentTarget.dataset.index || '-1');
     if (index < 0) return;
-    const newItems = invoiceForm.lines.filter((_, i) => i !== index);
+    // const newItems = invoiceForm.lines.filter((_, i) => i !== index);
+    const newItems = invoiceForm.lines;
+    newItems[index].action = 'deleted';
     setInvoiceForm(() => {
       return { ...invoiceForm, lines: newItems };
     });
   };
 
-  const handleDiscountTypeChange = (value: 'fixed' | 'percentage') => {
-    invoiceForm.header.discount.type = value;
-    // Recalculate totals if the value is set.
+  const processCurrentItem = () => {
+    const line = currentItem!;
+
+    if (isEditing) {
+      const index = invoiceForm.lines.findIndex((element: LineForm) => element.id === line.id);
+      if (index >= 0) {
+        invoiceForm.lines[index].qty = qtyInputRef.current?.valueAsNumber || 0;
+        invoiceForm.lines[index].amount = amount;
+        invoiceForm.lines[index].action = 'updated';
+      }
+      setEditing(false);
+    } else {
+      // When searching for the current item, if exists on the invoice, then display current values, and update the qty
+      invoiceForm.lines.push({ ...line, qty: qtyInputRef.current?.valueAsNumber || 0, amount, action: 'added' });
+    }
     setInvoiceForm(() => {
-      return { ...invoiceForm, header: { ...invoiceForm.header, discount: { ...invoiceForm.header.discount, type: value } } };
+      return { ...invoiceForm, lines: [...invoiceForm.lines] };
     });
+
+    resetInvoiceFormInput();
+  };
+
+  const handleOnKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
+    if (event.key === 'Enter' || event.key === 'Tab') {
+      event.preventDefault(); // Prevent default behavior of Enter key
+      if (event.currentTarget.name === 'reference' && isNotEmpty(event.currentTarget.value)) {
+        searchItem(event.currentTarget.value);
+        return;
+      }
+      if (event.currentTarget.name === 'qty' && currentItem != undefined) {
+        processCurrentItem();
+      }
+    }
+  };
+
+  const resetInvoiceFormInput = () => {
+    setCurrentItem(undefined);
+    setAmount(0);
+    referenceInputRef.current!.value = '';
+    qtyInputRef.current!.value = '';
+    referenceInputRef.current?.focus();
+  };
+
+  const computeDiscount = (): number => {
+    const discount = invoiceForm.header.discount;
+    // Percentage calculation
+    if (discount.type === 'percentage') {
+      const total = composeSubTotal + composeTax;
+      return total * (discount.value / 100);
+    }
+
+    // Fixed calculation
+    return discount.value;
+  };
+
+  const composeSubTotal = invoiceForm.lines
+    .filter((line) => line.action !== 'deleted')
+    .reduce((acc, line) => {
+      return acc + line.amount;
+    }, 0);
+
+  const composeTax = invoiceForm.lines
+    .filter((line) => line.action !== 'deleted')
+    .reduce((acc, line) => {
+      const tax = line.price * (line.tax.rate / 100);
+      return acc + tax * line.qty;
+    }, 0);
+
+  const computeTotalAmount = (): number => {
+    return composeSubTotal + composeTax - computeDiscount();
   };
 
   const handleDiscountValueChange = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -226,10 +303,12 @@ export default function Create({
     });
   };
 
-  const performInvoiceCancelation = (event: React.MouseEvent<HTMLButtonElement>) => {
-    event.preventDefault();
-    removeInvoiceForm();
-    router.get('/invoices');
+  const handleDiscountTypeChange = (value: 'fixed' | 'percentage') => {
+    invoiceForm.header.discount.type = value;
+    // Recalculate totals if the value is set.
+    setInvoiceForm(() => {
+      return { ...invoiceForm, header: { ...invoiceForm.header, discount: { ...invoiceForm.header.discount, type: value } } };
+    });
   };
 
   const handleCheckout = (event: React.MouseEvent<HTMLButtonElement>) => {
@@ -241,68 +320,8 @@ export default function Create({
       return;
     }
 
-    placedInvoice();
+    performUpdate();
   };
-
-  const placedInvoice = () => {
-    transform((data) => ({
-      ...data,
-      customer_id: invoiceForm.header.customer?.id,
-      date: invoiceForm.header.date,
-      terms: invoiceForm.header.terms,
-      tax_receipt: invoiceForm.header.taxReceipt,
-      discount: invoiceForm.header.discount,
-      notes: invoiceForm.header.notes || '',
-      lines: invoiceForm.lines.map((line) => {
-        return { id: line.id, qty: line.qty, unit: line.unit.id, price: line.price, rate: line.tax.rate, action: line.action };
-      }),
-      payment: invoiceForm.payment,
-    }));
-    post('/invoices', {
-      ...headers,
-      preserveState: 'errors',
-      onSuccess: () => {
-        removeInvoiceForm();
-        router.get('/invoices');
-      },
-    });
-  };
-
-  const computeDiscount = (): number => {
-    const discount = invoiceForm.header.discount;
-    // Percentage calculation
-    if (discount.type === 'percentage') {
-      const total = composeSubTotal;
-      return total * (discount.value / 100);
-    }
-
-    // Fixed calculation
-    return discount.value;
-  };
-
-  const composeSubTotal = invoiceForm.lines.reduce((acc, line) => {
-    return acc + line.amount;
-  }, 0);
-
-  const composeTax = invoiceForm.lines.reduce((acc, line) => {
-    let discount = invoiceForm.header.discount.value;
-    if (invoiceForm.header.discount.type === 'fixed') {
-      discount = (discount / composeSubTotal) * 100;
-    }
-
-    const lineAmount = line.price * line.qty;
-    const lineDiscount = lineAmount * (discount / 100);
-    const tax = (lineAmount - lineDiscount) * (line.tax.rate / 100);
-
-    return acc + tax;
-  }, 0);
-
-  const computeTotalAmount = (): number => {
-    const discount = computeDiscount();
-
-    return composeSubTotal - discount + composeTax;
-  };
-
   const handleCheckoutChange = (method: PaymentMethod, form: CashForm | CheckForm | CardForm | BTForm) => {
     // Recalculate totals if the value is set.
     setInvoiceForm(() => {
@@ -310,15 +329,21 @@ export default function Create({
     });
   };
 
+  const performInvoiceCancelation = (event: React.MouseEvent<HTMLButtonElement>) => {
+    event.preventDefault();
+    removeInvoiceForm();
+    router.get('/invoices');
+  };
+
   return (
-    <AuthenticatedLayout user={auth.user} breadcrumbs={createBreadcrumbs}>
+    <AuthenticatedLayout user={auth.user} breadcrumbs={editBreadcrumbs}>
       <AuthenticatedLayout.Actions>
         <div className="flex justify-end gap-x-6">
           <Button variant={'secondary'} onClick={() => setCancelConfirmation(true)}>
             Cancel
           </Button>
-          <Button onClick={handleCheckout} disabled={processing || computeTotalAmount() === 0}>
-            Checkout
+          <Button onClick={handleCheckout} disabled={processing}>
+            Update
           </Button>
         </div>
       </AuthenticatedLayout.Actions>
@@ -337,7 +362,7 @@ export default function Create({
             setSearch={setSearch}
             setOpen={setOpen}
             open={open}
-            dedbouncedSearch={dedbouncedSearch}
+            dedbouncedSearch={debouncedSearch}
           />
           <div className="grid grid-cols-12">
             <div className="col-span-6 flex flex-col gap-y-6">
@@ -378,9 +403,8 @@ export default function Create({
                 <Select
                   name="paymentTerms"
                   onValueChange={handlePaymentTermsChange}
-                  defaultValue={'0'}
+                  defaultValue={String(invoiceForm.header.terms)}
                   value={String(invoiceForm.header.terms)}
-                  required
                 >
                   <SelectTrigger className="w-full">
                     <SelectValue placeholder="Select terms" />
@@ -399,19 +423,18 @@ export default function Create({
                 <Label htmlFor="paymentTerms">Tax Receipt</Label>
                 <Select
                   name="paymentTerms"
-                  onValueChange={handleTaxReceiptChange}
-                  defaultValue={'0'}
+                  // onValueChange={handleTaxReceiptChange}
+                  defaultValue={String(invoiceForm.header.taxReceipt)}
                   value={String(invoiceForm.header.taxReceipt)}
-                  required
+                  disabled={true}
                 >
                   <SelectTrigger className="w-full">
                     <SelectValue placeholder="Select terms" />
                   </SelectTrigger>
                   <SelectContent className="">
                     {tax_receipts.map((receipt) => (
-                      <SelectItem key={receipt.id} value={String(receipt.id)} disabled={!receipt.available}>
+                      <SelectItem key={receipt.id} value={String(receipt.id)}>
                         {receipt.name}
-                        {!receipt.available && <span className="text-red-500">Limit reached</span>}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -421,6 +444,7 @@ export default function Create({
             </div>
           </div>
         </div>
+
         <div className="col-span-12">
           <div className="flex flex-col">
             <Lines
@@ -438,6 +462,7 @@ export default function Create({
             />
           </div>
         </div>
+
         <div className="col-span-12 min-h-48">
           <div className="flex flex-col gap-y-2">
             <div className="grid grid-cols-12">
@@ -464,14 +489,14 @@ export default function Create({
                     <span className="block text-base">{currency(composeSubTotal)}</span>
                   </div>
                   <div className="flex w-60 items-center justify-between">
-                    <span className="block text-base">Discount: {computeDiscount().toFixed(2)}</span>
+                    <span className="block text-base">Discount</span>
                     <div className="flex w-40 justify-end">
                       <Input
                         type="number"
                         min={0}
                         defaultValue={invoiceForm.header.discount.value}
                         name="discount"
-                        className="w-16 text-end"
+                        className="w-20 text-end"
                         onChange={handleDiscountValueChange}
                       />
                       <Select
@@ -505,13 +530,12 @@ export default function Create({
             </div>
           </div>
         </div>
+
         <AlertDialog open={openCancelConfirmation} onOpenChange={setCancelConfirmation}>
           <AlertDialogContent>
             <AlertDialogHeader>
               <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
-              <AlertDialogDescription>
-                This action cannot be undone. This will permanently delete this invoice and remove the data from our servers.
-              </AlertDialogDescription>
+              <AlertDialogDescription>This action cannot be undone. Any changes you've done to this invoice will be lost.</AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
               <AlertDialogCancel>Cancel</AlertDialogCancel>
@@ -524,7 +548,7 @@ export default function Create({
           setCheckout={setCheckout}
           paymentForm={invoiceForm.payment}
           totalAmount={computeTotalAmount()}
-          onPlacedInvoice={placedInvoice}
+          onPlacedInvoice={performUpdate}
           processing={processing}
           setCancelConfirmation={setCancelConfirmation}
           errors={propsErrors}
@@ -532,8 +556,6 @@ export default function Create({
           currency={currency}
         />
       </div>
-
-      {/* Command to search for customers */}
     </AuthenticatedLayout>
   );
 }
