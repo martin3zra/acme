@@ -171,7 +171,7 @@ class CheckoutForm extends React.Component<CheckoutFormProps, CheckoutFormState>
 
   render() {
     const { receivedAmount, remainingBalance } = this.state;
-    const { openCheckout, setCheckout, errors, totalAmount, onPlacedInvoice, processing, setCancelConfirmation } = this.props;
+    const { openCheckout, setCheckout, errors, totalAmount, onPlacedInvoice, processing, setCancelConfirmation, currency } = this.props;
     return (
       <Sheet open={openCheckout} onOpenChange={setCheckout}>
         <SheetContent side="right" className="m-4 flex h-[calc(~'(100%-var(--spacing)*4)/3')] w-full flex-col rounded-md sm:max-w-4xl">
@@ -225,15 +225,15 @@ class CheckoutForm extends React.Component<CheckoutFormProps, CheckoutFormState>
             <div>
               <div className="flex w-60 items-center justify-between">
                 <span className="block text-2xl">To collect</span>
-                <span className="block text-2xl">{this.currency(totalAmount)}</span>
+                <span className="block text-2xl">{currency(totalAmount)}</span>
               </div>
               <div className="flex w-60 items-center justify-between">
                 <span className="block text-2xl">Received</span>
-                <span className="block text-2xl">{this.currency(receivedAmount)}</span>
+                <span className="block text-2xl">{currency(receivedAmount)}</span>
               </div>
               <div className="flex w-60 items-center justify-between">
                 <span className="block text-2xl">Remaining</span>
-                <span className="block text-2xl font-medium text-red-600">{this.currency(remainingBalance)}</span>
+                <span className="block text-2xl font-medium text-red-600">{currency(remainingBalance)}</span>
               </div>
             </div>
           </div>

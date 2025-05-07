@@ -48,7 +48,7 @@ func (s *Server) findCustomers(companyID int) ([]*customer, error) {
 		"FROM customers c "+
 		"INNER JOIN companies ON (c.company_id = companies.id) "+
 		"WHERE c.company_id = $1 "+
-		"AND c.deleted_at IS NULL", companyID)
+		"AND c.deleted_at IS NULL ORDER BY c.name", companyID)
 	if err != nil {
 		return nil, err
 	}
@@ -86,7 +86,7 @@ func (s *Server) findCustomersBySearchCriteria(companyID int, term string) ([]*c
 		"INNER JOIN companies ON (c.company_id = companies.id) "+
 		"WHERE c.company_id = $1 "+
 		"AND c.name LIKE $2 "+
-		"AND c.deleted_at IS NULL AND c.status = 'enabled' LIMIT 5", companyID, "%"+term+"%")
+		"AND c.deleted_at IS NULL AND c.status = 'enabled' ORDER BY c.name LIMIT 5 ", companyID, "%"+term+"%")
 	if err != nil {
 		return nil, err
 	}

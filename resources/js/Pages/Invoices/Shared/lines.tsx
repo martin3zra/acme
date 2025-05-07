@@ -83,7 +83,9 @@ export const Lines = ({
         </thead>
         <tbody>
           {lines &&
-            lines.map((line, index) => <Line key={index} line={line} index={index} currency={currency} handleRemoveLine={handleRemoveLine} />)}
+            lines
+              .filter((l) => l.action !== 'deleted')
+              .map((line, index) => <Line key={index} line={line} index={index} currency={currency} handleRemoveLine={handleRemoveLine} />)}
         </tbody>
         {lineError && (
           <tfoot>

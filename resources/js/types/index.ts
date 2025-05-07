@@ -66,14 +66,24 @@ export interface Item {
   status: string;
 }
 
+export type LineAction = 'added' | 'updated' | 'deleted' | 'unchanged';
+
 export interface InvoiceLine extends Item {
   qty: number;
+  amount: number;
+  total: number;
+  tax: TaxWithAmount;
+  action: LineAction;
 }
 
 export interface Tax {
   id: number;
   name: string;
   rate: number;
+}
+
+export interface TaxWithAmount extends Tax {
+  amount: number;
 }
 
 export interface Unit {
@@ -86,7 +96,7 @@ export type DiscountType = {
   value: number;
 };
 
-export const PaidStatuses = ['paid', 'unpaid', 'partial'] as const;
+export const PaidStatuses = ['paid', 'unpaid', 'partial', 'removed'] as const;
 
 export type PaidStatus = (typeof PaidStatuses)[number];
 
@@ -98,6 +108,8 @@ export interface Invoice {
   customer: Customer;
   date: string;
   due_on?: string;
+  terms: number;
+  tax_receipt_id: number;
   amount: number;
   discount: DiscountType;
   tax: number;
@@ -121,6 +133,7 @@ export interface BreadcrumbItem {
 export type Verb = 'create' | 'view' | 'edit' | 'trash';
 
 export type InvoiceVerb = Exclude<Verb, 'trash'> | 'void' | 'record-payment';
+
 
 export type PaymentVerb = Exclude<Verb, 'trash'> | 'void';
 
@@ -168,8 +181,9 @@ export type PaymentTerm = {
 };
 
 export interface LineForm extends Item {
-  quantity: number;
+  qty: number;
   amount: number;
+  action: LineAction;
 }
 
 export type PaymentForm = {
@@ -182,6 +196,10 @@ export type PaymentForm = {
 export interface Nameable {
   id: string | number;
   name: string;
+}
+
+export interface TaxReceipt extends Nameable {
+  available: boolean;
 }
 
 export type currencySignature = (value: number | string, precision?: number, inCent?: boolean) => string;
@@ -201,6 +219,7 @@ export type InvoiceForm = {
   lines: LineForm[];
   payment: PaymentForm;
 };
+
 
 export type Payment = {
   uuid: string;

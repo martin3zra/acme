@@ -11,7 +11,7 @@ export default function LinesColumnHeaders() {
         Unit
       </th>
       <th scope="col" className="w-36 border border-gray-300 px-1 text-end">
-        Quantity
+        Qty
       </th>
       <th scope="col" className="w-36 border border-gray-300 px-1 text-end">
         Price
