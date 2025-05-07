@@ -62,7 +62,7 @@ func (s *Server) createInvoiceHandler(i *inertia.Inertia) http.Handler {
 
 		err = i.Render(w, r, "Invoices/Create", inertia.Props{
 			"tax_receipts": mapSlice(taxReceipts, func(receipt *taxReceipt) map[string]any {
-				return map[string]any{"id": receipt.ID, "name": fmt.Sprintf("%s-%s", receipt.Type, receipt.Name)}
+				return map[string]any{"id": receipt.ID, "name": fmt.Sprintf("%s-%s", receipt.Type, receipt.Name), "available": receipt.Current < receipt.SequenceEnd}
 			}),
 			"customers": inertia.Optional(func() (any, error) {
 				customers, err := s.findCustomersBySearchCriteria(*user.CurrentCompanyId, term)

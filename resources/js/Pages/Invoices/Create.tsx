@@ -23,7 +23,7 @@ import { useDebounced } from '@/hooks/use-debounced';
 import { usePersistedState } from '@/hooks/use-persisted-state';
 import AuthenticatedLayout from '@/layouts/authenticated-layout';
 import { addDays, cn, isNotEmpty } from '@/lib/utils';
-import { BTForm, CardForm, CashForm, CheckForm, Customer, InvoiceForm, Item, LineForm, Nameable, PageProps, PaymentMethod } from '@/types';
+import { BTForm, CardForm, CashForm, CheckForm, Customer, InvoiceForm, Item, LineForm, PageProps, PaymentMethod, TaxReceipt } from '@/types';
 import { Textarea } from '@headlessui/react';
 import { router, useForm, usePage } from '@inertiajs/react';
 import { format } from 'date-fns';
@@ -40,7 +40,7 @@ export default function Create({
   items,
   item,
   tax_receipts,
-}: PageProps<{ customers: Customer[]; items: Item[]; item: Item; tax_receipts: Nameable[] }>) {
+}: PageProps<{ customers: Customer[]; items: Item[]; item: Item; tax_receipts: TaxReceipt[] }>) {
   const currency = useNumber().currency;
   const [open, setOpen] = React.useState(false);
   const [openCancelConfirmation, setCancelConfirmation] = React.useState(false);
@@ -409,8 +409,9 @@ export default function Create({
                   </SelectTrigger>
                   <SelectContent className="">
                     {tax_receipts.map((receipt) => (
-                      <SelectItem key={receipt.id} value={String(receipt.id)}>
+                      <SelectItem key={receipt.id} value={String(receipt.id)} disabled={!receipt.available}>
                         {receipt.name}
+                        {!receipt.available && <span className="text-red-500">Limit reached</span>}
                       </SelectItem>
                     ))}
                   </SelectContent>

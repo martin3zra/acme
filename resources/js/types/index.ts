@@ -195,6 +195,10 @@ export interface Nameable {
   name: string;
 }
 
+export interface TaxReceipt extends Nameable {
+  available: boolean;
+}
+
 export type currencySignature = (value: number | string, precision?: number, inCent?: boolean) => string;
 
 export type HeaderForm = {
