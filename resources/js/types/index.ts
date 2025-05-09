@@ -96,9 +96,18 @@ export type DiscountType = {
   value: number;
 };
 
-export const PaidStatuses = ['paid', 'unpaid', 'partial', 'removed'] as const;
+export const InvoiceStatuses = ['draft', 'sent', 'viewed', 'overdue', 'completed', 'void'] as const;
+
+export type InvoiceStatus = (typeof InvoiceStatuses)[number];
+
+export const PaidStatuses = ['paid', 'unpaid', 'partial', 'removed', 'overpaid', 'pending'] as const;
 
 export type PaidStatus = (typeof PaidStatuses)[number];
+
+export const Statuses = ['enabled', 'disabled'] as const;
+export type Status = (typeof Statuses)[number];
+
+export type StatusType = 'paid' | 'invoice' | 'status';
 
 export interface Invoice {
   id: number;

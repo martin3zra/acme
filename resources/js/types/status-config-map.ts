@@ -1,0 +1,118 @@
+import type { StatusType } from '@/types/index';
+import {
+  AlertTriangle,
+  CheckCircle,
+  CheckCircle2,
+  CircleDashed,
+  CircleDollarSign,
+  Clock,
+  Eye,
+  FileText,
+  LucideIcon,
+  Send,
+  ShieldBan,
+  ShieldCheck,
+  Slash,
+  Trash2,
+  XCircle,
+} from 'lucide-react';
+
+type StatusConfig = {
+  label: string;
+  bg: string;
+  text: string;
+  Icon: LucideIcon;
+};
+
+export const statusConfig: Record<StatusType, Record<string, StatusConfig>> = {
+  paid: {
+    paid: {
+      label: 'Paid',
+      bg: 'bg-green-100',
+      text: 'text-green-800',
+      Icon: CheckCircle,
+    },
+    unpaid: {
+      label: 'Unpaid',
+      bg: 'bg-red-100',
+      text: 'text-red-800',
+      Icon: XCircle,
+    },
+    partial: {
+      label: 'Partial',
+      bg: 'bg-yellow-100',
+      text: 'text-yellow-800',
+      Icon: CircleDashed,
+    },
+    removed: {
+      label: 'Removed',
+      bg: 'bg-gray-200',
+      text: 'text-gray-700',
+      Icon: Trash2,
+    },
+    overpaid: {
+      label: 'Overpaid',
+      bg: 'bg-blue-100',
+      text: 'text-blue-800',
+      Icon: CircleDollarSign,
+    },
+    pending: {
+      label: 'Pending',
+      bg: 'bg-orange-100',
+      text: 'text-orange-800',
+      Icon: Clock,
+    },
+  },
+  invoice: {
+    draft: {
+      label: 'Draft',
+      bg: 'bg-gray-100',
+      text: 'text-gray-700',
+      Icon: FileText,
+    },
+    sent: {
+      label: 'Sent',
+      bg: 'bg-blue-100',
+      text: 'text-blue-800',
+      Icon: Send,
+    },
+    viewed: {
+      label: 'Viewed',
+      bg: 'bg-indigo-100',
+      text: 'text-indigo-800',
+      Icon: Eye,
+    },
+    overdue: {
+      label: 'Overdue',
+      bg: 'bg-orange-100',
+      text: 'text-orange-800',
+      Icon: AlertTriangle,
+    },
+    completed: {
+      label: 'Completed',
+      bg: 'bg-green-100',
+      text: 'text-green-800',
+      Icon: CheckCircle2,
+    },
+    void: {
+      label: 'Void',
+      bg: 'bg-red-100',
+      text: 'text-red-800',
+      Icon: Slash,
+    },
+  },
+  status: {
+    enabled: {
+      label: 'Enabled',
+      bg: 'bg-green-100',
+      text: 'text-green-800',
+      Icon: ShieldCheck,
+    },
+    disabled: {
+      label: 'Disabled',
+      bg: 'bg-gray-200',
+      text: 'text-gray-700',
+      Icon: ShieldBan,
+    },
+  },
+};
