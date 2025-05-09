@@ -24,6 +24,7 @@ type invoice struct {
 	Discount     Discount   `json:"discount"`
 	Tax          float64    `json:"tax"`
 	Total        float64    `json:"total"`
+	AmountDue    float64    `json:"amount_due"`
 	Status       string     `json:"status"`
 	PaidStatus   PaidStatus `json:"paid_status"`
 	Payment      Payment    `json:"payment"`
@@ -54,7 +55,7 @@ type line struct {
 
 func (s *Server) findInvoices(companyId int) ([]*invoice, error) {
 	rows, err := s.db.Query("SELECT invoices.id, invoices.uuid, invoices.date, invoices.due_on, invoices.amount, invoices.discount, invoices.tax, "+
-		"invoices.total, invoices.status, invoices.paid_status, invoices.payment, invoices.note, invoices.tax_receipt_id,"+
+		"invoices.total, invoices.amount_due, invoices.status, invoices.paid_status, invoices.payment, invoices.note, invoices.tax_receipt_id,"+
 		"tax_receipts.series || tax_receipts.type || LPAD(invoices.tax_receipt_sequence::varchar,8,'0') as NCF, "+
 		"customers.id as customer, customers.name, customers.email, customers.phone "+
 		"FROM invoices "+
@@ -78,6 +79,7 @@ func (s *Server) findInvoices(companyId int) ([]*invoice, error) {
 			&i.Discount,
 			&i.Tax,
 			&i.Total,
+			&i.AmountDue,
 			&i.Status,
 			&i.PaidStatus,
 			&i.Payment,
@@ -510,4 +512,25 @@ func (s *Server) filterInvoiceLines(lines []*Line, actions ...LineAction) []*Lin
 	}
 
 	return filtered
+}
+
+func (s *Server) updateInvoiceBalance(tx *sql.Tx, companyID, invoiceID int, balance float64) error {
+	stmt := `
+    UPDATE invoices
+    SET amount_due = amount_due + $3, paid_status = CASE
+      WHEN  amount_due + $3 < 0 THEN 'overpaid'::paid_status
+      WHEN  amount_due + $3 = 0 THEN 'paid'::paid_status
+      ELSE 'partial'::paid_status
+    END
+    WHERE company_id = $1 AND id = $2
+  `
+	if _, err := tx.Exec(stmt, companyID, invoiceID, balance); err != nil {
+		if txErr := tx.Rollback(); txErr != nil {
+			log.Fatalf("Error updating invoice amount due: %v", txErr)
+			return txErr
+		}
+
+		return err
+	}
+	return nil
 }

@@ -422,3 +422,32 @@ func (form UpdateInvoiceForm) Rules() map[string]any {
 		"discount.type": "required|in:percentage,fixed",
 	}
 }
+
+type PaymentLine struct {
+	Uuid      string  `json:"uuid"`
+	AmountDue float64 `json:"amount_due"`
+	Payment   float64 `json:"payment"`
+	Discount  float64 `json:"discount"`
+}
+
+type StorePaymentForm struct {
+	support.FormRequest
+	CustomerID string         `json:"customer_id"`
+	Date       time.Time      `json:"date"`
+	Lines      []*PaymentLine `json:"lines"`
+	Payment    Payment        `json:"payment"`
+	Amount     float64        `json:"amount"`
+}
+
+func (form StorePaymentForm) Rules() map[string]any {
+	return map[string]any{
+		"customer_id":        "bail|required|exists:customers,uuid",
+		"date":               "bail|required|date|after:yesterday",
+		"lines":              "required|min:1",
+		"lines.*.uuid":       "required|exists:invoices,uuid",
+		"lines.*.amount_due": "required",
+		"lines.*.payment":    "required|min:0",
+		"lines.*.discount":   "sometimes",
+		// "lines.*.action": "required|in:added",
+	}
+}

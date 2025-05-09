@@ -50,6 +50,7 @@ export const getColumns = ({ onDidClick }: Props): ColumnDef<Invoice>[] => {
     {
       accessorKey: 'ncf',
       meta: 'NCF',
+      enableHiding: true,
       // size: 880,
       header: (props) => {
         return <HeaderCell title="NCF" alignment="left" columnWidth={props.column.getSize()} />;
@@ -124,6 +125,17 @@ export const getColumns = ({ onDidClick }: Props): ColumnDef<Invoice>[] => {
       // size: 880,
       header: (props) => {
         return <HeaderCell title="Total" alignment="right" columnWidth={props.column.getSize()} />;
+      },
+      cell: (props) => {
+        return <CurrencyCell columnWidth={props.column.getSize()} value={props.getValue() as string} />;
+      },
+    },
+    {
+      accessorKey: 'amount_due',
+      meta: 'Balance',
+      // size: 880,
+      header: (props) => {
+        return <HeaderCell title="Balance" alignment="right" columnWidth={props.column.getSize()} />;
       },
       cell: (props) => {
         return <CurrencyCell columnWidth={props.column.getSize()} value={props.getValue() as string} />;

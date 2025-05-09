@@ -66,7 +66,7 @@ export const CustomerSection = ({
         </div>
         <div>{customer?.email}</div>
         <div>{customer?.phone}</div>
-        <div>Address here!!!</div>
+        <div>{customer?.address}</div>
       </div>
     );
   };

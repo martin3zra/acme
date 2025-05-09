@@ -114,7 +114,8 @@ export interface Invoice {
   discount: DiscountType;
   tax: number;
   total: number;
-  payment: PaymentForm;
+  amount_due: number;
+  payment: PaymentMethodsForm;
   status: string;
   paid_status: PaidStatus;
   notes: string;
@@ -133,7 +134,6 @@ export interface BreadcrumbItem {
 export type Verb = 'create' | 'view' | 'edit' | 'trash';
 
 export type InvoiceVerb = Exclude<Verb, 'trash'> | 'void' | 'record-payment';
-
 
 export type PaymentVerb = Exclude<Verb, 'trash'> | 'void';
 
@@ -186,7 +186,7 @@ export interface LineForm extends Item {
   action: LineAction;
 }
 
-export type PaymentForm = {
+export type PaymentMethodsForm = {
   cash: CashForm;
   ck: CheckForm;
   card: CardForm;
@@ -217,15 +217,59 @@ export type HeaderForm = {
 export type InvoiceForm = {
   header: HeaderForm;
   lines: LineForm[];
-  payment: PaymentForm;
+  payment: PaymentMethodsForm;
 };
 
-
 export type Payment = {
+  id: number;
   uuid: string;
   number: string;
   date: Date | undefined;
   amount: number;
   created_at: string;
   updated_at: string;
+  customer: {
+    uuid: string;
+    name: string;
+    amount_due: string;
+  };
 };
+
+export type PaymentHeaderForm = {
+  customer: Customer | undefined;
+  date: Date | undefined;
+};
+
+export type ReceivableInvoiceForm = ReceivableInvoice & {
+  payment: number;
+  discount: number;
+  balance: number;
+};
+
+export type PaymentForm = {
+  header: PaymentHeaderForm;
+  lines: ReceivableInvoiceForm[];
+};
+
+export interface Receivable {
+  id: number;
+  uuid: string;
+  invoice: ReceivableInvoice;
+}
+
+export interface ReceivableInvoice {
+  id: number;
+  uuid: string;
+  number: string;
+  ncf: string;
+  date: string;
+  due_on: string;
+  total: number;
+  amount_due: number;
+  paid_status: string;
+  notes: string;
+}
+
+export interface ReceivableTransfomer extends Receivable {
+  transform(): ReceivableInvoiceForm;
+}

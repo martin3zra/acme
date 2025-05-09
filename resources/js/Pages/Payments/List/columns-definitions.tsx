@@ -14,7 +14,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Payment, PaymentVerb } from '@/types';
 import { ColumnDef } from '@tanstack/react-table';
-import { MoreHorizontal } from 'lucide-react';
+import { ArrowUpDown, MoreHorizontal } from 'lucide-react';
 
 type Props = {
   onDidClick: (item: Payment, action: PaymentVerb) => void;
@@ -36,7 +36,7 @@ export const getColumns = ({ onDidClick }: Props): ColumnDef<Payment>[] => {
       enableHiding: false,
     },
     {
-      accessorKey: 'number',
+      accessorKey: 'id',
       meta: 'ID',
       // size: 880,
       header: (props) => {
@@ -46,20 +46,31 @@ export const getColumns = ({ onDidClick }: Props): ColumnDef<Payment>[] => {
         return <TextCell columnWidth={props.column.getSize()} value={props.getValue() as string} />;
       },
     },
-    // {
-    //   accessorKey: 'customer.name',
-    //   id: 'customer.name',
-    //   header: ({ column }) => {
-    //     return (
-    //       <Button variant="ghost" onClick={() => column.toggleSorting(column.getIsSorted() === 'asc')}>
-    //         Customer <ArrowUpDown />
-    //       </Button>
-    //     );
-    //   },
-    //   cell: (props) => {
-    //     return <TextCell columnWidth={props.column.getSize()} value={props.getValue() as string} />;
-    //   },
-    // },
+    {
+      accessorKey: 'customer.name',
+      id: 'customer.name',
+      header: ({ column }) => {
+        return (
+          <Button variant="ghost" onClick={() => column.toggleSorting(column.getIsSorted() === 'asc')}>
+            Customer <ArrowUpDown />
+          </Button>
+        );
+      },
+      cell: (props) => {
+        return <TextCell columnWidth={props.column.getSize()} value={props.getValue() as string} />;
+      },
+    },
+    {
+      accessorKey: 'customer.amount_due',
+      meta: 'Balance',
+      // size: 880,
+      header: (props) => {
+        return <HeaderCell title="Balance" alignment="right" columnWidth={props.column.getSize()} />;
+      },
+      cell: (props) => {
+        return <CurrencyCell columnWidth={props.column.getSize()} value={props.getValue() as string} />;
+      },
+    },
     {
       accessorKey: 'date',
       meta: 'Date',

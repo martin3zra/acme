@@ -8,7 +8,7 @@ import {
   DiscountType,
   HeaderForm,
   InvoiceForm,
-  PaymentForm,
+  PaymentMethodsForm,
   PaymentMethodType,
   PaymentTerm,
 } from '@/types';
@@ -73,6 +73,21 @@ export const createBreadcrumbs: BreadcrumbItem[] = [
   },
 ];
 
+export const createPaymentBreadcrumbs: BreadcrumbItem[] = [
+  {
+    title: 'Home',
+    href: '/home',
+  },
+  {
+    title: 'Payments',
+    href: '/payments',
+  },
+  {
+    title: 'New Payment',
+    href: '/payments/create',
+  },
+];
+
 export const editBreadcrumbs: BreadcrumbItem[] = [
   {
     title: 'Home',
@@ -88,7 +103,7 @@ export const editBreadcrumbs: BreadcrumbItem[] = [
   },
 ];
 
-export const defaultPaymentForm: PaymentForm = { cash: defaultCashForm, ck: defaultCheckForm, card: defaultCardForm, bt: defaultBTForm };
+export const defaultPaymentForm: PaymentMethodsForm = { cash: defaultCashForm, ck: defaultCheckForm, card: defaultCardForm, bt: defaultBTForm };
 export const defaultDiscount: DiscountType = { value: 0, type: 'fixed' };
 export const defaultHeaderForm: HeaderForm = {
   customer: undefined,
