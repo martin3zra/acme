@@ -15,6 +15,7 @@ type payment struct {
 	Number   string    `json:"number"`
 	Date     time.Time `json:"date"`
 	Amount   float64   `json:"amount"`
+	Notes    string    `json:"notes"`
 	Customer struct {
 		UUID      string  `json:"uuid"`
 		Name      string  `json:"name"`
@@ -44,7 +45,8 @@ type paymentLine struct {
 func (s *Server) findPayments(companyId int) ([]*payment, error) {
 	rows, err := s.db.Query(`
     SELECT
-    receivables_income.id, receivables_income.uuid, receivables_income.date, receivables_income.amount, receivables_income.created_at, receivables_income.updated_at,
+    receivables_income.id, receivables_income.uuid, receivables_income.date, receivables_income.amount,
+    receivables_income.notes, receivables_income.created_at, receivables_income.updated_at,
     (select count(*) from receivables_income_items
     where receivables_income.company_id = receivables_income_items.company_id
     and receivables_income.id = receivables_income_items.receivable_income_id
@@ -67,6 +69,7 @@ func (s *Server) findPayments(companyId int) ([]*payment, error) {
 			&i.UUID,
 			&i.Date,
 			&i.Amount,
+			&i.Notes,
 			&i.CreatedAt,
 			&i.UpdatedAt,
 			&i.Invoices,
@@ -89,7 +92,8 @@ func (s *Server) findPaymentByUUID(companyId int, uuid string) (*payment, error)
 	i := new(payment)
 	err := s.db.QueryRow(`
     SELECT
-    receivables_income.id, receivables_income.uuid, receivables_income.date, receivables_income.amount, receivables_income.created_at, receivables_income.updated_at,
+    receivables_income.id, receivables_income.uuid, receivables_income.date, receivables_income.amount,
+    receivables_income.notes, receivables_income.created_at, receivables_income.updated_at,
     (select count(*) from receivables_income_items
     where receivables_income.company_id = receivables_income_items.company_id
     and receivables_income.id = receivables_income_items.receivable_income_id
@@ -104,6 +108,7 @@ func (s *Server) findPaymentByUUID(companyId int, uuid string) (*payment, error)
 		&i.UUID,
 		&i.Date,
 		&i.Amount,
+		&i.Notes,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.Invoices,
@@ -175,8 +180,8 @@ func (s *Server) storePayment(companyId int, form StorePaymentForm) error {
 	if err != nil {
 		return err
 	}
-	stmt, err := tx.Prepare("INSERT INTO receivables_income (company_id, customer_id, date, amount) " +
-		"VALUES ($1, $2, $3, $4) RETURNING id")
+	stmt, err := tx.Prepare("INSERT INTO receivables_income (company_id, customer_id, date, amount, notes) " +
+		"VALUES ($1, $2, $3, $4, $5) RETURNING id")
 	if err != nil {
 		defer stmt.Close()
 		if txErr := tx.Rollback(); txErr != nil {
@@ -193,6 +198,7 @@ func (s *Server) storePayment(companyId int, form StorePaymentForm) error {
 		customer.ID,
 		form.Date,
 		form.Amount,
+		form.Notes,
 	).Scan(&paymentID)
 
 	if err != nil {

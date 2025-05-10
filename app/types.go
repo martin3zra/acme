@@ -434,6 +434,7 @@ type StorePaymentForm struct {
 	support.FormRequest
 	CustomerID string         `json:"customer_id"`
 	Date       time.Time      `json:"date"`
+	Notes      string         `json:"notes"`
 	Lines      []*PaymentLine `json:"lines"`
 	Payment    Payment        `json:"payment"`
 	Amount     float64        `json:"amount"`
@@ -443,6 +444,7 @@ func (form StorePaymentForm) Rules() map[string]any {
 	return map[string]any{
 		"customer_id":        "bail|required|exists:customers,uuid",
 		"date":               "bail|required|date|after:yesterday",
+		"notes":              "sometime",
 		"lines":              "required|min:1",
 		"lines.*.uuid":       "required|exists:invoices,uuid",
 		"lines.*.amount_due": "required",

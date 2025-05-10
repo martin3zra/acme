@@ -253,6 +253,7 @@ export type Payment = {
 export type PaymentHeaderForm = {
   customer: Customer | undefined;
   date: Date | undefined;
+  notes: string;
 };
 
 export type ReceivableInvoiceForm = ReceivableInvoice & {

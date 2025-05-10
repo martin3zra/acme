@@ -21,6 +21,7 @@ import { usePersistedState } from '@/hooks/use-persisted-state';
 import AuthenticatedLayout from '@/layouts/authenticated-layout';
 import { cn } from '@/lib/utils';
 import { Customer, PageProps, PaymentForm, Receivable, ReceivableInvoiceForm } from '@/types';
+import { Textarea } from '@headlessui/react';
 import { router, useForm, usePage } from '@inertiajs/react';
 import { RowSelectionState } from '@tanstack/table-core/build/lib/features/RowSelection';
 import { format } from 'date-fns/format';
@@ -123,6 +124,7 @@ export default function Create({
       customer_id: paymentForm.header.customer?.uuid,
       date: paymentForm.header.date,
       amount: totalPaid(),
+      notes: paymentForm.header.notes,
       lines: paymentForm.lines
         .filter((line) => line.payment > 0)
         .map((line) => {
@@ -251,12 +253,22 @@ export default function Create({
                 </Popover>
                 <InputError className="mt-2" message={errors.date} />
               </div>
-              {/* <div className="flex flex-col gap-y-2">
-                <Label htmlFor="date">Due Date</Label>
-                <Label className="text-muted-foreground w-70 rounded-sm border p-2.5">
-                  {paymentForm.header.due ? format(paymentForm.header.due, 'PPP') : 'Unknow'}
-                </Label>
-              </div> */}
+              <div className="flex flex-col">
+                <div className="flex flex-col gap-y-2">
+                  <Label className="text-sm/6 font-medium">Notes</Label>
+                  <Textarea
+                    name="notes"
+                    rows={4}
+                    className="focus:no-data-focus:outline-none block resize-none rounded-lg border px-3 py-1.5 text-sm/6 data-focus:outline-2 data-focus:-outline-offset-2 data-focus:outline-white/25"
+                    defaultValue={paymentForm.header.notes}
+                    onChange={(e) =>
+                      setPaymentForm(() => {
+                        return { ...paymentForm, header: { ...paymentForm.header, notes: e.currentTarget.value } };
+                      })
+                    }
+                  />
+                </div>
+              </div>
             </div>
             <div className="col-span-6 grid place-items-end">
               <div className="flex flex-col gap-x-2">

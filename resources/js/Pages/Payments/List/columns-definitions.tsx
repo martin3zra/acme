@@ -14,9 +14,10 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Payment, PaymentVerb } from '@/types';
 import { ColumnDef } from '@tanstack/react-table';
-import { ArrowUpDown, MoreHorizontal } from 'lucide-react';
+import { ArrowUpDown, MessageCircleMore, MoreHorizontal } from 'lucide-react';
 
 type Props = {
   onDidClick: (item: Payment, action: PaymentVerb) => void;
@@ -45,7 +46,23 @@ export const getColumns = ({ onDidClick }: Props): ColumnDef<Payment>[] => {
         return <HeaderCell title="Number" alignment="left" columnWidth={props.column.getSize()} />;
       },
       cell: (props) => {
-        return <TextCell columnWidth={props.column.getSize()} value={props.getValue() as string} />;
+        const hasNotes = !!props.row.original.notes;
+        return (
+          <div className="[&_[data-slot=has-notes]]:-px-6 relative flex [&_[data-slot=has-notes]]:block [&_[data-slot=has-notes]]:text-red-500">
+            <TextCell columnWidth={props.column.getSize()} value={props.getValue() as string} />
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger>
+                  <MessageCircleMore
+                    className="absolute inset-0 -top-0 left-[56%] hidden size-5 -translate-x-1/2 -translate-y-1/2 transform cursor-pointer"
+                    data-slot={hasNotes ? 'has-notes' : 'default'}
+                  />
+                </TooltipTrigger>
+                <TooltipContent>{props.row.original.notes}</TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          </div>
+        );
       },
     },
     {
