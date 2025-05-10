@@ -164,9 +164,8 @@ export const getColumns = ({ onDidClick }: Props): ColumnDef<ReceivableInvoiceFo
             <DropdownMenuContent align="end">
               <DropdownMenuLabel>Actions</DropdownMenuLabel>
               <DropdownMenuSeparator />
-              {/* <DropdownMenuItem onClick={() => onDidClick(props.row.original, 'view')}>View</DropdownMenuItem> */}
               <DropdownMenuItem>
-                <Link href={`/invoices?invoice_id=${props.row.original.uuid}`}>View</Link>
+                <Link href={`/invoices?id=${props.row.original.uuid}`}>View</Link>
               </DropdownMenuItem>
               <DropdownMenuItem onClick={() => onDidClick(props.row.original, 'edit')}>Edit</DropdownMenuItem>
             </DropdownMenuContent>
