@@ -225,6 +225,7 @@ func (s *Server) findCustomeReceivables(companyID int, customerID string) ([]*re
     INNER JOIN tax_receipts ON (invoices.company_id = tax_receipts.company_id AND invoices.tax_receipt_id = tax_receipts.id)
 		INNER JOIN customers ON (receivables.company_id = customers.company_id AND receivables.customer_id = customers.id)
 		WHERE receivables.company_id = $1
+    AND invoices.paid_status != 'paid'::paid_status
     AND customers.uuid = $2
 		AND receivables.deleted_at IS NULL
   `, companyID, customerID)
