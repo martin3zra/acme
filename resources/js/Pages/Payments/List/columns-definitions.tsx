@@ -1,6 +1,8 @@
 import { CurrencyCell } from '@/components/data-table/currency-cell';
 import { DateCell } from '@/components/data-table/date-cell';
 import { HeaderCell } from '@/components/data-table/header-cell';
+import { LinkCell } from '@/components/data-table/link-cell';
+import { NumericCell } from '@/components/data-table/numeric-cell';
 import { TextCell } from '@/components/data-table/text-cell';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -36,11 +38,11 @@ export const getColumns = ({ onDidClick }: Props): ColumnDef<Payment>[] => {
       enableHiding: false,
     },
     {
-      accessorKey: 'id',
-      meta: 'ID',
+      accessorKey: 'number',
+      meta: 'Number',
       // size: 880,
       header: (props) => {
-        return <HeaderCell title="ID" alignment="left" columnWidth={props.column.getSize()} />;
+        return <HeaderCell title="Number" alignment="left" columnWidth={props.column.getSize()} />;
       },
       cell: (props) => {
         return <TextCell columnWidth={props.column.getSize()} value={props.getValue() as string} />;
@@ -57,7 +59,9 @@ export const getColumns = ({ onDidClick }: Props): ColumnDef<Payment>[] => {
         );
       },
       cell: (props) => {
-        return <TextCell columnWidth={props.column.getSize()} value={props.getValue() as string} />;
+        return (
+          <LinkCell href={`/customers/${props.row.original.customer.uuid}`} columnWidth={props.column.getSize()} value={props.getValue() as string} />
+        );
       },
     },
     {
@@ -76,7 +80,7 @@ export const getColumns = ({ onDidClick }: Props): ColumnDef<Payment>[] => {
       meta: 'Date',
       // size: 880,
       header: (props) => {
-        return <HeaderCell title="Date" alignment="right" columnWidth={props.column.getSize()} />;
+        return <HeaderCell title="Date" alignment="left" columnWidth={props.column.getSize()} />;
       },
       cell: (props) => {
         return <DateCell columnWidth={props.column.getSize()} value={props.getValue() as string} />;
@@ -91,6 +95,17 @@ export const getColumns = ({ onDidClick }: Props): ColumnDef<Payment>[] => {
       },
       cell: (props) => {
         return <CurrencyCell columnWidth={props.column.getSize()} value={props.getValue() as string} />;
+      },
+    },
+    {
+      accessorKey: 'invoices',
+      meta: 'Invoices',
+      // size: 880,
+      header: (props) => {
+        return <HeaderCell title="Invoices" alignment="right" columnWidth={props.column.getSize()} />;
+      },
+      cell: (props) => {
+        return <NumericCell columnWidth={props.column.getSize()} value={props.getValue() as string} />;
       },
     },
     {

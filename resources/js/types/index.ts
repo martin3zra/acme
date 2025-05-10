@@ -237,6 +237,7 @@ export type Payment = {
   number: string;
   date: Date | undefined;
   amount: number;
+  invoices: number;
   created_at: string;
   updated_at: string;
   customer: {

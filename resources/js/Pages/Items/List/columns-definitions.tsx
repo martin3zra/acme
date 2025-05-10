@@ -105,7 +105,7 @@ export const getColumns = ({ onDidClick }: Props): ColumnDef<Item>[] => {
       meta: 'Added On',
       // size: 880,
       header: (props) => {
-        return <HeaderCell title="Added On" alignment="right" columnWidth={props.column.getSize()} />;
+        return <HeaderCell title="Added On" alignment="left" columnWidth={props.column.getSize()} />;
       },
       cell: (props) => {
         return <DateCell columnWidth={props.column.getSize()} value={props.getValue() as string} />;

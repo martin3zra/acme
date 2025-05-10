@@ -11,6 +11,7 @@ import (
 
 type payment struct {
 	ID       int       `json:"id"`
+	Number   string    `json:"number"`
 	Date     time.Time `json:"date"`
 	Amount   float64   `json:"amount"`
 	Customer struct {
@@ -18,6 +19,7 @@ type payment struct {
 		Name      string  `json:"name"`
 		AmountDue float64 `json:"amount_due"`
 	} `json:"customer"`
+	Invoices int `json:"invoices"`
 	foundation.Timestamps
 }
 
@@ -25,6 +27,10 @@ func (s *Server) findPayments(companyId int) ([]*payment, error) {
 	rows, err := s.db.Query(`
     SELECT
     receivables_income.id, receivables_income.date, receivables_income.amount, receivables_income.created_at, receivables_income.updated_at,
+    (select count(*) from receivables_income_items
+    where receivables_income.company_id = receivables_income_items.company_id
+    and receivables_income.id = receivables_income_items.receivable_income_id
+    ) as invoices,
     customers.uuid, customers.name, customers.amount_due
     FROM receivables_income
     INNER JOIN customers ON (receivables_income.company_id = customers.company_id AND receivables_income.customer_id = customers.id)
@@ -44,12 +50,16 @@ func (s *Server) findPayments(companyId int) ([]*payment, error) {
 			&i.Amount,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.Invoices,
 			&i.Customer.UUID,
 			&i.Customer.Name,
 			&i.Customer.AmountDue,
 		); err != nil {
 			return nil, err
 		}
+
+		i.Number = s.generatePrefixedPaymentNumber(i.ID)
+
 		data = append(data, i)
 	}
 	return data, nil
@@ -130,4 +140,8 @@ func (s *Server) attachPaymentLines(tx *sql.Tx, companyId, paymentId int, form S
 	}
 
 	return nil
+}
+
+func (s *Server) generatePrefixedPaymentNumber(value int) string {
+	return foundation.GeneratePrefixedNumber("PAY-", 10, value)
 }
