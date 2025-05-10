@@ -290,24 +290,18 @@ func (s *Server) updateInvoice(companyID int, uuid string, form UpdateInvoiceFor
 
 	if invoice.Customer.ID != form.CustomerID {
 		// Update customer balance. Logs this operations to keep track of it.
-		err = s.updateCustomerAmountDue(tx, companyID, invoice.Customer.ID, -invoice.Amount)
-		if err != nil {
-			if txErr := tx.Rollback(); txErr != nil {
-				log.Fatalf("Error updating invoice::updating previous customer due amount %v", txErr)
-				return txErr
-			}
-
+		if err = s.updateCustomerAmountDue(tx, companyID, invoice.Customer.ID, -invoice.Amount); err != nil {
 			return err
 		}
 
-		err = s.updateCustomerAmountDue(tx, companyID, form.CustomerID, form.total)
-		if err != nil {
-			if txErr := tx.Rollback(); txErr != nil {
-				log.Fatalf("Error updating invoice::updating new customer due amount %v", txErr)
-				return txErr
-			}
-
+		if err = s.updateCustomerAmountDue(tx, companyID, form.CustomerID, form.total); err != nil {
 			return err
+		}
+
+		if invoice.DueOn != nil {
+			if err = s.changeCustomerFromReceivables(tx, companyID, invoice.ID, invoice.Customer.ID, form.CustomerID); err != nil {
+				return err
+			}
 		}
 	}
 
@@ -487,6 +481,18 @@ func (s *Server) deleteInvoiceFromReceivables(tx *sql.Tx, companyId, invoiceId, 
 	if err != nil {
 		if txErr := tx.Rollback(); txErr != nil {
 			log.Fatalf("Error deleting receivable: %v", txErr)
+			return txErr
+		}
+	}
+
+	return err
+}
+
+func (s *Server) changeCustomerFromReceivables(tx *sql.Tx, companyId, invoiceId, customerId, newCustomerId int) error {
+	_, err := tx.Exec("UPDATE receivables SET customer_id = $4 WHERE company_id = $1 AND invoice_id = $2 AND customer_id = $3", companyId, invoiceId, customerId, newCustomerId)
+	if err != nil {
+		if txErr := tx.Rollback(); txErr != nil {
+			log.Fatalf("Error changing customer on receivables: %v", txErr)
 			return txErr
 		}
 	}
