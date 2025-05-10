@@ -12,7 +12,6 @@ import {
 } from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
 import { Calendar } from '@/components/ui/calendar';
-import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { useHeader } from '@/composables/use-headers';
@@ -23,21 +22,36 @@ import AuthenticatedLayout from '@/layouts/authenticated-layout';
 import { cn } from '@/lib/utils';
 import { Customer, PageProps, PaymentForm, Receivable, ReceivableInvoiceForm } from '@/types';
 import { router, useForm, usePage } from '@inertiajs/react';
-import { format, formatDate } from 'date-fns/format';
+import { RowSelectionState } from '@tanstack/table-core/build/lib/features/RowSelection';
+import { format } from 'date-fns/format';
 import { CalendarIcon } from 'lucide-react';
 import React, { useEffect } from 'react';
 import { createPaymentBreadcrumbs } from '../Invoices/constants';
 import { CustomerSection } from '../Invoices/Shared/customer-section';
+import { List } from './Shared/lines-payment';
 
-const defaultPaymentForm: PaymentForm = { header: { customer: undefined, date: new Date() }, lines: [] };
-export default function Create({ auth, customers, receivables }: PageProps<{ customers: Customer[]; receivables: Receivable[] }>) {
+type FlagSet = {
+  [key: string]: boolean;
+};
+
+export default function Create({
+  auth,
+  customer,
+  customers,
+  receivables,
+  invoice_uuid,
+  forceInitial,
+}: PageProps<{ customer: Customer; customers: Customer[]; receivables: Receivable[]; invoice_uuid: string; forceInitial: boolean }>) {
+  const defaultPaymentForm: PaymentForm = { header: { customer, date: new Date() }, lines: [] };
+
   const { currency } = useNumber();
   const [openCancelConfirmation, setCancelConfirmation] = React.useState(false);
   const [openCheckout, setCheckout] = React.useState(false);
   const [open, setOpen] = React.useState(false);
   const [search, setSearch] = React.useState('');
   const dedbouncedSearch = useDebounced(search, 500);
-  const [paymentForm, setPaymentForm, removePaymentForm] = usePersistedState<PaymentForm>('payment', defaultPaymentForm);
+  const [paymentForm, setPaymentForm, removePaymentForm] = usePersistedState<PaymentForm>('payment', defaultPaymentForm, forceInitial);
+  const [rowSelection, setRowSelection] = React.useState<RowSelectionState>({});
   const { headers } = useHeader();
   const { errors: propsErrors } = usePage<PageProps>().props;
   const { post, transform, processing, errors } = useForm({
@@ -47,24 +61,43 @@ export default function Create({ auth, customers, receivables }: PageProps<{ cus
   });
 
   useEffect(() => {
-    if (receivables === undefined) return;
-    const lines: ReceivableInvoiceForm[] = [];
+    const _rowSelection: FlagSet = {};
+    paymentForm.lines
+      .filter((line) => line.payment > 0)
+      .map((line) => {
+        _rowSelection[`${line.id.toString()}`] = true;
+      });
 
+    if (Object.keys(_rowSelection).length > 0) {
+      setRowSelection(_rowSelection);
+    }
+    if (receivables === undefined) return;
+
+    const lines: ReceivableInvoiceForm[] = [];
+    let selectedRowId = -1;
     receivables.map((receivable) => {
+      selectedRowId = invoice_uuid === receivable.invoice.uuid ? receivable.invoice.id : -1;
       const line: ReceivableInvoiceForm = {
         ...receivable.invoice,
-        payment: 0,
+        payment: invoice_uuid === receivable.invoice.uuid ? receivable.invoice.amount_due : 0,
         discount: 0,
         balance: 0,
       };
       lines.push(line);
     });
 
+    if (selectedRowId > 0) {
+      setRowSelection((prev) => ({
+        ...prev,
+        [`${selectedRowId.toString()}`]: true,
+      }));
+    }
+
     setPaymentForm((prev) => ({
       ...prev,
       lines,
     }));
-  }, [receivables, setPaymentForm]);
+  }, [receivables, paymentForm, setPaymentForm, invoice_uuid]);
 
   useEffect(() => {
     const searchCustomer = () => {
@@ -123,16 +156,34 @@ export default function Create({ auth, customers, receivables }: PageProps<{ cus
     });
   };
 
-  const handlePaymentAmountChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    event.preventDefault();
-    const current = paymentForm.lines.filter((l) => l.uuid === event.currentTarget.id);
-    if (current.length > 0) {
-      current[0].payment = event.currentTarget.valueAsNumber;
-      setPaymentForm((prev) => ({
-        ...prev,
-        lines: paymentForm.lines,
-      }));
-    }
+  const handleCellChange = (inputId: string, newValue: string | number) => {
+    const index = paymentForm.lines.findIndex((l: ReceivableInvoiceForm) => l.uuid === inputId);
+    if (index === -1) return;
+
+    setRowSelection((prev) => ({
+      ...prev,
+      [`${paymentForm.lines[index].id.toString()}`]: true,
+    }));
+    paymentForm.lines[index].payment = Number(newValue);
+    setPaymentForm((prev) => ({
+      ...prev,
+      lines: [...paymentForm.lines],
+    }));
+  };
+
+  const onSelectionChange = (selection: RowSelectionState) => {
+    paymentForm.lines = paymentForm.lines.map((line) => ({ ...line, payment: 0, balance: line.amount_due }));
+    const selectedIds = Object.keys(selection);
+    selectedIds.map((id) => {
+      const index = paymentForm.lines.findIndex((l: ReceivableInvoiceForm) => l.id === Number(id));
+      if (index === -1) return;
+      paymentForm.lines[index].payment = paymentForm.lines[index].amount_due;
+    });
+
+    setPaymentForm((prev) => ({
+      ...prev,
+      lines: [...paymentForm.lines],
+    }));
   };
 
   const performPaymentCancelation = (event: React.MouseEvent<HTMLButtonElement>) => {
@@ -203,7 +254,11 @@ export default function Create({ auth, customers, receivables }: PageProps<{ cus
                 </Label>
               </div> */}
             </div>
-            <div className="col-span-6 flex flex-col gap-y-6">
+            <div className="col-span-6 grid place-items-end">
+              <div className="flex flex-col gap-x-2">
+                <Label className="text-muted-foreground block text-end text-lg">Amount Received</Label>
+                <Label className="block text-end text-4xl">{currency(totalPaid())}</Label>
+              </div>
               {/* <div className="flex flex-col gap-y-2">
                 <Label htmlFor="paymentTerms">Payment terms</Label>
                 <Select
@@ -253,55 +308,14 @@ export default function Create({ auth, customers, receivables }: PageProps<{ cus
           </div>
         </div>
         <div className="col-span-12">
-          <table
-            className={cn(
-              'w-full table-auto',
-              '[&_th]:border-none [&_th]:border-gray-200 [&_th]:bg-gray-50/25 [&_th]:text-sm [&_th]:font-semibold [&_th]:uppercase',
-              '[&_th]:p-2 [&_th]:text-start [&_th[data-format=number]]:text-end',
-              '[&_td]:border-y [&_td]:p-2 [&_td]:text-start [&_td[data-format=number]]:w-36 [&_td[data-format=number]]:text-end',
-            )}
-          >
-            <thead>
-              <tr>
-                <th>Invoice</th>
-                <th>NCF</th>
-                <th>Date</th>
-                <th>Due On</th>
-                <th data-format="number">Amount</th>
-                <th data-format="number">Balance</th>
-                <th data-format="number">Payment</th>
-                <th data-format="number">Discount</th>
-                <th data-format="number">Remaining</th>
-              </tr>
-            </thead>
-            <tbody>
-              {paymentForm.lines.map((line: ReceivableInvoiceForm) => (
-                <tr key={line.id}>
-                  <td>{line.number}</td>
-                  <td>{line.ncf}</td>
-                  <td>{formatDate(line.date, 'dd-MM-yyyy')}</td>
-                  <td>{formatDate(line.due_on, 'dd-MM-yyyy')}</td>
-                  <td data-format="number">{currency(line.total)}</td>
-                  <td data-format="number">{currency(line.total - line.amount_due)}</td>
-                  <td data-format="number">
-                    <Input
-                      className="border-none p-0 text-end text-lg"
-                      type="number"
-                      id={line.uuid}
-                      value={line.payment}
-                      max={line.amount_due}
-                      min={0}
-                      onChange={handlePaymentAmountChange}
-                    />
-                  </td>
-                  <td data-format="number">{currency(line.discount)}</td>
-                  <td data-format="number" className="font-medium text-red-600">
-                    {currency(line.amount_due - line.payment)}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          <List
+            data={paymentForm}
+            rowSelection={rowSelection}
+            setRowSelection={setRowSelection}
+            onSelectPaymentLine={() => {}}
+            onValueChange={handleCellChange}
+            onSelectionChange={onSelectionChange}
+          />
         </div>
         <AlertDialog open={openCancelConfirmation} onOpenChange={setCancelConfirmation}>
           <AlertDialogContent>
@@ -313,7 +327,7 @@ export default function Create({ auth, customers, receivables }: PageProps<{ cus
             </AlertDialogHeader>
             <AlertDialogFooter>
               <AlertDialogCancel>Cancel</AlertDialogCancel>
-              <AlertDialogAction onClick={performPaymentCancelation}>Yes, Continue</AlertDialogAction>
+              <AlertDialogAction onClick={performPaymentCancelation}>Yes, Cancel</AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>

@@ -57,7 +57,7 @@ func (s *Server) findInvoices(companyId int) ([]*invoice, error) {
 	rows, err := s.db.Query("SELECT invoices.id, invoices.uuid, invoices.date, invoices.due_on, invoices.amount, invoices.discount, invoices.tax, "+
 		"invoices.total, invoices.amount_due, invoices.status, invoices.paid_status, invoices.payment, invoices.note, invoices.tax_receipt_id,"+
 		"tax_receipts.series || tax_receipts.type || LPAD(invoices.tax_receipt_sequence::varchar,8,'0') as NCF, "+
-		"customers.id as customer, customers.name, customers.email, customers.phone "+
+		"customers.id, customers.uuid, customers.name, customers.email, customers.phone "+
 		"FROM invoices "+
 		"INNER JOIN companies ON (invoices.company_id = companies.id) "+
 		"INNER JOIN customers ON (invoices.company_id = customers.company_id AND invoices.customer_id = customers.id) "+
@@ -87,6 +87,7 @@ func (s *Server) findInvoices(companyId int) ([]*invoice, error) {
 			&i.TaxReceiptID,
 			&i.NCF,
 			&i.Customer.ID,
+			&i.Customer.UUID,
 			&i.Customer.Name,
 			&i.Customer.Email,
 			&i.Customer.Phone,
@@ -106,7 +107,7 @@ func (s *Server) findInvoicesByUUID(companyId int, uuid string) (*invoice, error
 	err := s.db.QueryRow("SELECT invoices.id, invoices.uuid, invoices.date, invoices.due_on, invoices.amount, invoices.discount, invoices.tax, "+
 		"invoices.total, invoices.status, invoices.paid_status, invoices.payment, invoices.note, invoices.tax_receipt_id, "+
 		"tax_receipts.series || tax_receipts.type || LPAD(invoices.tax_receipt_sequence::varchar,8,'0') as NCF, invoices.note, "+
-		"customers.id as customer, customers.name, customers.email, customers.phone "+
+		"customers.id, customers.uuid, customers.name, customers.email, customers.phone "+
 		"FROM invoices "+
 		"INNER JOIN companies ON (invoices.company_id = companies.id) "+
 		"INNER JOIN customers ON (invoices.company_id = customers.company_id AND invoices.customer_id = customers.id) "+
@@ -129,6 +130,7 @@ func (s *Server) findInvoicesByUUID(companyId int, uuid string) (*invoice, error
 			&i.NCF,
 			&i.Notes,
 			&i.Customer.ID,
+			&i.Customer.UUID,
 			&i.Customer.Name,
 			&i.Customer.Email,
 			&i.Customer.Phone)

@@ -33,10 +33,13 @@ func (s *Server) paymentsHandler(i *inertia.Inertia) http.Handler {
 
 func (s *Server) createPaymentHandler(i *inertia.Inertia) http.Handler {
 	fn := func(w http.ResponseWriter, r *http.Request) {
+		// what we do when the invoice id is given? only return that invoices?
+		invoiceUuid := r.URL.Query().Get("invoice_id")
 		term := r.URL.Query().Get("search")
 		customerUuid := r.URL.Query().Get("customer_id")
 		user := auth.User(r.Context())
-		err := i.Render(w, r, "Payments/Create", inertia.Props{
+
+		props := inertia.Props{
 			"customers": inertia.Optional(func() (any, error) {
 				customers, err := s.findCustomersBySearchCriteria(*user.CurrentCompanyId, term)
 				if err != nil {
@@ -53,7 +56,28 @@ func (s *Server) createPaymentHandler(i *inertia.Inertia) http.Handler {
 
 				return receivables, err
 			}),
-		})
+		}
+
+		if len(invoiceUuid) > 0 {
+			props["invoice_uuid"] = invoiceUuid
+		}
+		if len(customerUuid) > 0 {
+			customer, err := s.findCustomeByUUID(*user.CurrentCompanyId, customerUuid)
+			if err != nil {
+				s.handleError(w, err)
+				return
+			}
+			receivables, err := s.findCustomeReceivables(*user.CurrentCompanyId, customerUuid)
+			if err != nil {
+				s.handleError(w, err)
+				return
+			}
+
+			props["customer"] = customer
+			props["receivables"] = receivables
+			props["forceInitial"] = true
+		}
+		err := i.Render(w, r, "Payments/Create", props)
 		if err != nil {
 			s.handleError(w, err)
 			return

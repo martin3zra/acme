@@ -4,7 +4,8 @@ import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { useVerb } from '@/composables/use-verbs';
 import AuthenticatedLayout from '@/layouts/authenticated-layout';
-import { BreadcrumbItem, Customer, PageProps, Verb } from '@/types';
+import { BreadcrumbItem, Customer, CustomerVerb, PageProps } from '@/types';
+import { router } from '@inertiajs/react';
 import { Plus } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { List } from './List/Index';
@@ -34,7 +35,11 @@ export default function Index({ auth, customers }: PageProps<{ customers: Custom
     setOpen(!open);
   };
 
-  const onSelectCustomer = (customer: Customer, action: Verb): void => {
+  const onSelectCustomer = (customer: Customer, action: CustomerVerb): void => {
+    if (action === 'record-payment') {
+      router.visit(`/payments/create`, { data: { customer_id: customer.uuid } });
+      return;
+    }
     setSelectedCustomer({ customer, action });
   };
 

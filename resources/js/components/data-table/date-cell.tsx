@@ -24,7 +24,7 @@ export const DateCell: FC<Props> = ({ value, columnWidth }) => {
   const formattedValue = value !== undefined ? formatDate(new Date(value), 'dd-MM-yyyy') : '';
 
   return (
-    <div className="truncate p-1.5 text-right tabular-nums" title={formattedValue} style={{ width: columnWidth }}>
+    <div className="truncate p-1.5 text-left tabular-nums" title={formattedValue} style={{ width: columnWidth }}>
       {formattedValue}
     </div>
   );

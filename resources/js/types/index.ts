@@ -146,6 +146,8 @@ export type InvoiceVerb = Exclude<Verb, 'trash'> | 'void' | 'record-payment';
 
 export type PaymentVerb = Exclude<Verb, 'trash'> | 'void';
 
+export type CustomerVerb = Verb | 'record-payment';
+
 export interface PaymentFormType {
   amount: number;
   reference: string;
@@ -282,3 +284,5 @@ export interface ReceivableInvoice {
 export interface ReceivableTransfomer extends Receivable {
   transform(): ReceivableInvoiceForm;
 }
+
+export type onValueChangeType = (inputId: string, newValue: string | number) => void;

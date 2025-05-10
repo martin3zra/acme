@@ -31,6 +31,11 @@ export default function Index({ auth, invoices, invoice }: PageProps<{ invoices:
 
   const onSelectInvoice = (invoice: Invoice, action: InvoiceVerb): void => {
     setSelectedInvoice(invoice);
+
+    if (action === 'record-payment') {
+      router.visit(`/payments/create`, { data: { customer_id: invoice.customer.uuid, invoice_id: invoice.uuid } });
+      return;
+    }
     if (action === 'void') {
       setDeleteDialogOpen(true);
       return;

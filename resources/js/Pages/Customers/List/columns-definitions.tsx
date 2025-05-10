@@ -13,12 +13,12 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { Customer, Verb } from '@/types';
+import { Customer, CustomerVerb } from '@/types';
 import { ColumnDef } from '@tanstack/react-table';
 import { ArrowUpDown, MoreHorizontal } from 'lucide-react';
 
 type Props = {
-  onDidClick: (customer: Customer, action: Verb) => void;
+  onDidClick: (customer: Customer, action: CustomerVerb) => void;
 };
 
 export const getColumns = ({ onDidClick }: Props): ColumnDef<Customer>[] => {
@@ -132,7 +132,7 @@ export const getColumns = ({ onDidClick }: Props): ColumnDef<Customer>[] => {
               <DropdownMenuItem onClick={() => onDidClick(props.row.original, 'edit')}>Edit</DropdownMenuItem>
               <DropdownMenuItem onClick={() => onDidClick(props.row.original, 'trash')}>Delete</DropdownMenuItem>
               <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={() => onDidClick(props.row.original, 'trash')} disabled={props.row.original.amount_due === 0}>
+              <DropdownMenuItem onClick={() => onDidClick(props.row.original, 'record-payment')} disabled={props.row.original.amount_due === 0}>
                 Receive payment
               </DropdownMenuItem>
             </DropdownMenuContent>

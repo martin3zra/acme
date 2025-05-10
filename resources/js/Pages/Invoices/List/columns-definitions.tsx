@@ -184,9 +184,10 @@ export const getColumns = ({ onDidClick }: Props): ColumnDef<Invoice>[] => {
               </DropdownMenuItem>
               <DropdownMenuSeparator />
               {canRecordPayment && (
-                <DropdownMenuItem disabled onClick={() => onDidClick(props.row.original, 'record-payment')}>
-                  Record payment
-                </DropdownMenuItem>
+                <>
+                  <DropdownMenuItem onClick={() => onDidClick(props.row.original, 'record-payment')}>Record payment</DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                </>
               )}
               <DropdownMenuItem onClick={() => onDidClick(props.row.original, 'void')} disabled={disabled}>
                 Void
