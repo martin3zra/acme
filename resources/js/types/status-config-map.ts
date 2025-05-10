@@ -20,6 +20,7 @@ import {
 type StatusConfig = {
   label: string;
   bg: string;
+  border: string;
   text: string;
   Icon: LucideIcon;
 };
@@ -29,36 +30,42 @@ export const statusConfig: Record<StatusType, Record<string, StatusConfig>> = {
     paid: {
       label: 'Paid',
       bg: 'bg-green-100',
+      border: 'border-green-500',
       text: 'text-green-800',
       Icon: CheckCircle,
     },
     unpaid: {
       label: 'Unpaid',
       bg: 'bg-red-100',
+      border: 'border-red-500',
       text: 'text-red-800',
       Icon: XCircle,
     },
     partial: {
       label: 'Partial',
       bg: 'bg-yellow-100',
+      border: 'border-yellow-500',
       text: 'text-yellow-800',
       Icon: CircleDashed,
     },
     removed: {
       label: 'Removed',
       bg: 'bg-gray-200',
+      border: 'border-gray-500',
       text: 'text-gray-700',
       Icon: Trash2,
     },
     overpaid: {
       label: 'Overpaid',
       bg: 'bg-blue-100',
+      border: 'border-blue-500',
       text: 'text-blue-800',
       Icon: CircleDollarSign,
     },
     pending: {
       label: 'Pending',
       bg: 'bg-orange-100',
+      border: 'border-orange-500',
       text: 'text-orange-800',
       Icon: Clock,
     },
@@ -67,36 +74,42 @@ export const statusConfig: Record<StatusType, Record<string, StatusConfig>> = {
     draft: {
       label: 'Draft',
       bg: 'bg-gray-100',
+      border: 'border-gray-500',
       text: 'text-gray-700',
       Icon: FileText,
     },
     sent: {
       label: 'Sent',
       bg: 'bg-blue-100',
+      border: 'border-blue-500',
       text: 'text-blue-800',
       Icon: Send,
     },
     viewed: {
       label: 'Viewed',
       bg: 'bg-indigo-100',
+      border: 'border-indigo-500',
       text: 'text-indigo-800',
       Icon: Eye,
     },
     overdue: {
       label: 'Overdue',
       bg: 'bg-orange-100',
+      border: 'border-orange-500',
       text: 'text-orange-800',
       Icon: AlertTriangle,
     },
     completed: {
       label: 'Completed',
       bg: 'bg-green-100',
+      border: 'border-green-500',
       text: 'text-green-800',
       Icon: CheckCircle2,
     },
     void: {
       label: 'Void',
       bg: 'bg-red-100',
+      border: 'border-red-500',
       text: 'text-red-800',
       Icon: Slash,
     },
@@ -105,12 +118,14 @@ export const statusConfig: Record<StatusType, Record<string, StatusConfig>> = {
     enabled: {
       label: 'Enabled',
       bg: 'bg-green-100',
+      border: 'border-green-500',
       text: 'text-green-800',
       Icon: ShieldCheck,
     },
     disabled: {
       label: 'Disabled',
       bg: 'bg-gray-200',
+      border: 'border-gray-500',
       text: 'text-gray-700',
       Icon: ShieldBan,
     },

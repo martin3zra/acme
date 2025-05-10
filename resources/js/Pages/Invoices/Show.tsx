@@ -1,3 +1,4 @@
+import { StatusBadge } from '@/components/status-badge';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Separator } from '@/components/ui/separator';
@@ -5,7 +6,7 @@ import { useNumber } from '@/composables/use-number';
 import { cn, isNotEmpty } from '@/lib/utils';
 import { Auth, InvoiceWithLines, PaidStatuses } from '@/types';
 import { format } from 'date-fns';
-import { Calendar1, CircleCheckIcon, CircleDollarSignIcon, CreditCardIcon, InfoIcon, UserPen } from 'lucide-react';
+import { Calendar1, CircleCheckIcon, CircleDollarSignIcon, CreditCardIcon, UserPen } from 'lucide-react';
 import PaymentSummary from './Shared/payment-summary';
 
 type Props = {
@@ -159,11 +160,7 @@ export default function Show({ invoice, auth }: Props) {
       </div>
       {/* side panel with summary */}
       <div className="col-span-3 flex flex-col gap-y-3 rounded-lg border p-3">
-        {/* add composable/hook to decorate the paid status, to get color and proper labels */}
-        <div className="flex h-fit items-center gap-x-1 rounded-md border border-green-300 bg-green-50 px-4 py-3 text-green-800">
-          <InfoIcon size={16} />
-          Paid status: {invoice.header.paid_status}
-        </div>
+        <StatusBadge type="paid" variant="alert" prefix="Paid status:" status={invoice.header.paid_status} />
         <Label>Details:</Label>
         <Separator />
         <div className="flex items-center justify-between">
