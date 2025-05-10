@@ -22,8 +22,13 @@ const breadcrumbs: BreadcrumbItem[] = [
     href: '/invoices',
   },
 ];
-export default function Index({ auth, invoices, invoice }: PageProps<{ invoices: Invoice[]; invoice: InvoiceWithLines }>) {
-  const [open, setOpen] = useCallbackState<boolean>(false);
+export default function Index({
+  auth,
+  invoices,
+  invoice,
+  showInvoice,
+}: PageProps<{ invoices: Invoice[]; invoice: InvoiceWithLines; showInvoice: boolean }>) {
+  const [open, setOpen] = useCallbackState<boolean>(showInvoice);
   const [selectedInvoice, setSelectedInvoice] = useCallbackState<Invoice | undefined>(undefined);
   const [deleteDialogOpen, setDeleteDialogOpen] = useCallbackState<boolean>(false);
   const page = usePage();
@@ -45,6 +50,8 @@ export default function Index({ auth, invoices, invoice }: PageProps<{ invoices:
       return;
     }
     if (action !== 'view') return;
+
+    if (open) return;
     setOpen(
       (open) => !open,
       (newVal) => {
@@ -63,7 +70,15 @@ export default function Index({ auth, invoices, invoice }: PageProps<{ invoices:
   };
 
   const onOpenChange = (open: boolean) => {
-    setOpen(open);
+    if (!open) {
+      // Remove query string from URL
+      setOpen(open);
+      router.replace({
+        url: window.location.pathname,
+        preserveScroll: true,
+        preserveState: true,
+      });
+    }
   };
 
   const modalHandler = (open: boolean = false) => {
@@ -109,9 +124,8 @@ export default function Index({ auth, invoices, invoice }: PageProps<{ invoices:
                           </Link>
                         </Button>
                         {(invoice.header.paid_status === 'unpaid' || invoice.header.paid_status === 'partial') && (
-                          // when active set as disabled when the invoice is void: ={invoice.header.status === 'void'}
-                          <Button asChild disabled>
-                            <Link href={`/invoices/${invoice.header.uuid}/edit`} as="button">
+                          <Button asChild disabled={invoice.header.status === 'void'}>
+                            <Link href={`/payments/create?customer_id=${invoice.header.customer.uuid}&invoice_id=${invoice.header.uuid}`} as="button">
                               <DollarSign /> Record payment
                             </Link>
                           </Button>
