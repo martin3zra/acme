@@ -235,7 +235,7 @@ export type Payment = {
   id: number;
   uuid: string;
   number: string;
-  date: Date | undefined;
+  date: Date;
   amount: number;
   invoices: number;
   created_at: string;

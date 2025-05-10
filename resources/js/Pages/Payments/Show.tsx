@@ -30,7 +30,7 @@ export default function Show({ payment, auth }: Props) {
           </div>
           <div className="col-span-6 flex items-center gap-x-2 [&_[data-slot=label]]:font-normal">
             <Label>Date</Label>
-            <Label className="">{formatDate(payment.header.date!, 'PPP')}</Label>
+            <Label className="">{formatDate(payment.header.date, 'dd-MM-yyyy')}</Label>
           </div>
         </div>
         <Separator />
@@ -105,7 +105,7 @@ export default function Show({ payment, auth }: Props) {
                   <td data-format="number" className="!min-w-20">
                     {currency(line.invoice.amount_due)}
                   </td>
-                  <td>{formatDate(line.created_at, 'dd-MM-yyyy')}</td>
+                  <td>{formatDate(payment.header.date, 'dd-MM-yyyy')}</td>
                   <td data-format="number"> {currency(line.payment)}</td>
                   <td>
                     <StatusBadge type="paid" status={line.invoice.paid_status} />
@@ -159,22 +159,6 @@ export default function Show({ payment, auth }: Props) {
       <div className="col-span-3 flex flex-col gap-y-3 rounded-lg border p-3">
         {/* <StatusBadge type="paid" variant="alert" prefix="Paid status:" status={payment.header.paid_status} /> */}
         <Label>Details:</Label>
-        <Separator />
-        <div className="flex items-center justify-between">
-          <Label className="text-lg">{currency(payment.header.amount)}</Label>
-          {/* <Select name="paid_status" defaultValue={'0'} value={payment.header.paid_status} required disabled={payment.header.status === 'void'}>
-            <SelectTrigger className="w-28">
-              <SelectValue placeholder="Paid status" />
-            </SelectTrigger>
-            <SelectContent className="w-12">
-              {PaidStatuses.map((status) => (
-                <SelectItem key={status} value={status}>
-                  {status}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select> */}
-        </div>
         <Separator />
         <div className="flex items-center gap-x-1 text-sm">
           <UserPen size={14} />
