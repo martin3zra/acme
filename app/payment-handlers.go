@@ -58,10 +58,11 @@ func (s *Server) createPaymentHandler(i *inertia.Inertia) http.Handler {
 			}),
 		}
 
-		if len(invoiceUuid) > 0 {
+		if ensureUUIDIsValid(invoiceUuid) {
 			props["invoice_uuid"] = invoiceUuid
 		}
-		if len(customerUuid) > 0 {
+
+		if ensureUUIDIsValid(customerUuid) {
 			customer, err := s.findCustomeByUUID(*user.CurrentCompanyId, customerUuid)
 			if err != nil {
 				s.handleError(w, err)

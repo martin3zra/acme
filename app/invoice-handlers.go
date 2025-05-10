@@ -25,7 +25,7 @@ func (s *Server) invoicesHandler(i *inertia.Inertia) http.Handler {
 			"invoices": invoices,
 		}
 
-		if len(uuid) > 0 {
+		if ensureUUIDIsValid(uuid) {
 			invoice, err := s.findInvoicesByUUID(*user.CurrentCompanyId, uuid)
 			if err != nil {
 				s.handleError(w, err)
