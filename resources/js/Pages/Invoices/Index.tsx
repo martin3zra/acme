@@ -70,9 +70,9 @@ export default function Index({
   };
 
   const onOpenChange = (open: boolean) => {
+    setOpen(open);
     if (!open) {
       // Remove query string from URL
-      setOpen(open);
       router.replace({
         url: window.location.pathname,
         preserveScroll: true,

@@ -240,9 +240,12 @@ export type Payment = {
   invoices: number;
   created_at: string;
   updated_at: string;
+  notes: string;
   customer: {
     uuid: string;
     name: string;
+    email: string;
+    address: string;
     amount_due: string;
   };
 };
@@ -282,8 +285,23 @@ export interface ReceivableInvoice {
   notes: string;
 }
 
-export interface ReceivableTransfomer extends Receivable {
-  transform(): ReceivableInvoiceForm;
+export interface PaymentLine {
+  id: number;
+  created_at: string;
+  payment: number;
+  invoice: {
+    uuid: string;
+    number: string;
+    amount: number;
+    amount_due: number;
+    date: string;
+    paid_status: PaidStatus;
+  };
+}
+
+export interface PaymentWithLines {
+  header: Payment;
+  lines: PaymentLine[];
 }
 
 export type onValueChangeType = (inputId: string, newValue: string | number) => void;

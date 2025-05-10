@@ -11,17 +11,37 @@ import (
 
 func (s *Server) paymentsHandler(i *inertia.Inertia) http.Handler {
 	fn := func(w http.ResponseWriter, r *http.Request) {
-
+		uuid := r.URL.Query().Get("id")
 		user := auth.User(r.Context())
 		payments, err := s.findPayments(*user.CurrentCompanyId)
 		if err != nil {
 			s.handleError(w, err)
 			return
 		}
-
-		err = i.Render(w, r, "Payments/Index", inertia.Props{
+		props := inertia.Props{
 			"payments": payments,
-		})
+		}
+
+		if ensureUUIDIsValid(uuid) {
+			payment, err := s.findPaymentByUUID(*user.CurrentCompanyId, uuid)
+			if err != nil {
+				s.handleError(w, err)
+				return
+			}
+
+			lines, err := s.findPaymentLines(*user.CurrentCompanyId, payment.ID)
+			if err != nil {
+				s.handleError(w, err)
+				return
+			}
+			props["payment"] = map[string]any{
+				"header": payment,
+				"lines":  lines,
+			}
+			props["showPayment"] = true
+		}
+
+		err = i.Render(w, r, "Payments/Index", props)
 		if err != nil {
 			s.handleError(w, err)
 			return

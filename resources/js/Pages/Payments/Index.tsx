@@ -1,11 +1,15 @@
 import { ConfirmsPassword } from '@/components/confirms-password';
 import HeadingSmall from '@/components/heading-small';
+import { Button } from '@/components/ui/button';
+import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import useCallbackState from '@/hooks/use-callback-state';
 import AuthenticatedLayout from '@/layouts/authenticated-layout';
-import { BreadcrumbItem, PageProps, Payment, PaymentVerb } from '@/types';
+import { BreadcrumbItem, PageProps, Payment, PaymentVerb, PaymentWithLines } from '@/types';
 import { router, usePage } from '@inertiajs/react';
+import { Printer } from 'lucide-react';
 import { List } from './List/Index';
 import { AddNewPayment } from './Shared/add-new-payment';
+import Show from './Show';
 
 const breadcrumbs: BreadcrumbItem[] = [
   {
@@ -17,8 +21,13 @@ const breadcrumbs: BreadcrumbItem[] = [
     href: '/payments',
   },
 ];
-export default function Index({ auth, payments }: PageProps<{ payments: Payment[] }>) {
-  const [open, setOpen] = useCallbackState<boolean>(false);
+export default function Index({
+  auth,
+  payments,
+  payment,
+  showPayment,
+}: PageProps<{ payments: Payment[]; payment: PaymentWithLines; showPayment: boolean }>) {
+  const [open, setOpen] = useCallbackState<boolean>(showPayment);
   const [selectedPayment, setSelectedPayment] = useCallbackState<Payment | undefined>(undefined);
   const [deleteDialogOpen, setDeleteDialogOpen] = useCallbackState<boolean>(false);
   const page = usePage();
@@ -35,6 +44,7 @@ export default function Index({ auth, payments }: PageProps<{ payments: Payment[
       return;
     }
     if (action !== 'view') return;
+
     setOpen(
       (open) => !open,
       (newVal) => {
@@ -54,6 +64,14 @@ export default function Index({ auth, payments }: PageProps<{ payments: Payment[
 
   const onOpenChange = (open: boolean) => {
     setOpen(open);
+    if (!open) {
+      // Remove query string from URL
+      router.replace({
+        url: window.location.pathname,
+        preserveScroll: true,
+        preserveState: true,
+      });
+    }
   };
 
   const modalHandler = (open: boolean = false) => {
@@ -77,37 +95,29 @@ export default function Index({ auth, payments }: PageProps<{ payments: Payment[
 
         {hasPayments && <List data={payments} onSelectPayment={onSelectPayment} />}
 
-        {/* {invoice && (
+        {payment && (
           <Sheet open={open} onOpenChange={onOpenChange}>
             <SheetContent side="right" className="m-4 flex h-[calc(~'(100%-var(--spacing)*4)/3')] w-full flex-col rounded-md sm:max-w-7xl">
               <SheetHeader>
                 <div className="mr-6 flex items-start justify-between">
                   <div className="flex flex-col">
                     <SheetTitle>Acme</SheetTitle>
-                    <SheetDescription className="text-[12px]">Invoice details</SheetDescription>
+                    <SheetDescription className="text-[12px]">payment details</SheetDescription>
                   </div>
                   <div className="mx-4 flex gap-x-3">
-                    {invoice.header.status !== 'void' && (
+                    {/* {payment.header.status !== 'void' && (
                       <>
-                        <Button variant={'destructive'} onClick={() => onSelectPayment(invoice.header, 'void')}>
+                        <Button variant={'destructive'} onClick={() => onSelectPayment(payment.header, 'void')}>
                           <Ban /> Void
                         </Button>
                         <Separator orientation="vertical" />
-                        <Button asChild disabled={invoice.header.status === 'void'}>
-                          <Link href={`/invoices/${invoice.header.uuid}/edit`} as="button">
+                        <Button asChild disabled={payment.header.status === 'void'}>
+                          <Link href={`/payments/${payment.header.uuid}/edit`} as="button">
                             <NotebookPen /> Edit
                           </Link>
                         </Button>
-                        {(invoice.header.paid_status === 'unpaid' || invoice.header.paid_status === 'partial') && (
-                          // when active set as disabled when the invoice is void: ={invoice.header.status === 'void'}
-                          <Button asChild disabled>
-                            <Link href={`/invoices/${invoice.header.uuid}/edit`} as="button">
-                              <DollarSign /> Record payment
-                            </Link>
-                          </Button>
-                        )}
                       </>
-                    )}
+                    )} */}
 
                     <Button>
                       <Printer /> Print
@@ -116,21 +126,21 @@ export default function Index({ auth, payments }: PageProps<{ payments: Payment[
                 </div>
               </SheetHeader>
               <div className="relative grid gap-4 px-4">
-                {invoice.header.status === 'void' && (
+                {/* {payment.header.status === 'void' && (
                   <div className="absolute inset-0 flex w-full items-center justify-center overflow-y-hidden bg-transparent">
                     <h1 className="-rotate-45 border-8 border-red-500/25 p-8 text-8xl font-extrabold text-red-500/25">VOID</h1>
                   </div>
-                )}
-                <Show invoice={invoice} auth={auth} />
+                )} */}
+                <Show payment={payment} auth={auth} />
               </div>
             </SheetContent>
           </Sheet>
-        )} */}
+        )}
 
         {selectedPayment && (
           <ConfirmsPassword
             title={`Are you sure you want to void ${selectedPayment.number}?`}
-            description={`Once the invoice is void it will go from ${selectedPayment.amount} to $0.00.`}
+            description={`Once the payment is void it will go from ${selectedPayment.amount} to $0.00.`}
             action={`Void it`}
             verb={'update'}
             path={`/payments/${selectedPayment.uuid}/void`}

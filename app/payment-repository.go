@@ -11,22 +11,40 @@ import (
 
 type payment struct {
 	ID       int       `json:"id"`
+	UUID     string    `json:"uuid"`
 	Number   string    `json:"number"`
 	Date     time.Time `json:"date"`
 	Amount   float64   `json:"amount"`
 	Customer struct {
 		UUID      string  `json:"uuid"`
 		Name      string  `json:"name"`
+		Email     string  `json:"email"`
 		AmountDue float64 `json:"amount_due"`
+		Address   string  `json:"address"`
 	} `json:"customer"`
 	Invoices int `json:"invoices"`
+	foundation.Timestamps
+}
+
+type paymentLine struct {
+	ID      int64   `json:"id"`
+	Payment float64 `json:"payment"`
+	Invoice struct {
+		ID         int        `json:"_"`
+		UUID       string     `json:"uuid"`
+		Number     string     `json:"number"`
+		Date       time.Time  `json:"date"`
+		PaidStatus PaidStatus `json:"paid_status"`
+		Amount     float64    `json:"amount"`
+		AmountDue  float64    `json:"amount_due"`
+	} `json:"invoice"`
 	foundation.Timestamps
 }
 
 func (s *Server) findPayments(companyId int) ([]*payment, error) {
 	rows, err := s.db.Query(`
     SELECT
-    receivables_income.id, receivables_income.date, receivables_income.amount, receivables_income.created_at, receivables_income.updated_at,
+    receivables_income.id, receivables_income.uuid, receivables_income.date, receivables_income.amount, receivables_income.created_at, receivables_income.updated_at,
     (select count(*) from receivables_income_items
     where receivables_income.company_id = receivables_income_items.company_id
     and receivables_income.id = receivables_income_items.receivable_income_id
@@ -46,6 +64,7 @@ func (s *Server) findPayments(companyId int) ([]*payment, error) {
 
 		if err = rows.Scan(
 			&i.ID,
+			&i.UUID,
 			&i.Date,
 			&i.Amount,
 			&i.CreatedAt,
@@ -59,6 +78,86 @@ func (s *Server) findPayments(companyId int) ([]*payment, error) {
 		}
 
 		i.Number = s.generatePrefixedPaymentNumber(i.ID)
+
+		data = append(data, i)
+	}
+	return data, nil
+}
+
+func (s *Server) findPaymentByUUID(companyId int, uuid string) (*payment, error) {
+
+	i := new(payment)
+	err := s.db.QueryRow(`
+    SELECT
+    receivables_income.id, receivables_income.uuid, receivables_income.date, receivables_income.amount, receivables_income.created_at, receivables_income.updated_at,
+    (select count(*) from receivables_income_items
+    where receivables_income.company_id = receivables_income_items.company_id
+    and receivables_income.id = receivables_income_items.receivable_income_id
+    ) as invoices,
+    customers.uuid, customers.name, customers.email, customers.amount_due
+    FROM receivables_income
+    INNER JOIN customers ON (receivables_income.company_id = customers.company_id AND receivables_income.customer_id = customers.id)
+    WHERE receivables_income.company_id = $1
+    AND receivables_income.uuid = $2
+  `, companyId, uuid).Scan(
+		&i.ID,
+		&i.UUID,
+		&i.Date,
+		&i.Amount,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.Invoices,
+		&i.Customer.UUID,
+		&i.Customer.Name,
+		&i.Customer.Email,
+		&i.Customer.AmountDue,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	i.Customer.Address = "LOUISVILLE, Selby 3864 Johnson Street, United States of America"
+	i.Number = s.generatePrefixedPaymentNumber(i.ID)
+
+	return i, nil
+}
+
+func (s *Server) findPaymentLines(companyID int, paymentID int) ([]*paymentLine, error) {
+	rows, err := s.db.Query(`
+    select receivables_income_items.id, receivables_income_items.payment_amount,
+    receivables_income_items.created_at, receivables_income_items.updated_at,
+    receivables_income_items.deleted_at,
+    invoices.id, invoices.uuid, invoices.date, invoices.total, invoices.amount_due, invoices.paid_status
+    from receivables_income_items
+    inner join companies on receivables_income_items.company_id = companies.id
+    inner join receivables_income on receivables_income_items.company_id = receivables_income.company_id and receivables_income_items.receivable_income_id = receivables_income.id
+    inner join invoices on receivables_income_items.company_id = invoices.company_id and receivables_income_items.invoice_id = invoices.id
+    where receivables_income_items.company_id = $1
+    and receivables_income_items.receivable_income_id = $2
+  `, companyID, paymentID)
+	if err != nil {
+		return nil, err
+	}
+	data := make([]*paymentLine, 0)
+	for rows.Next() {
+		i := new(paymentLine)
+		if err = rows.Scan(
+			&i.ID,
+			&i.Payment,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.DeletedAt,
+			&i.Invoice.ID,
+			&i.Invoice.UUID,
+			&i.Invoice.Date,
+			&i.Invoice.Amount,
+			&i.Invoice.AmountDue,
+			&i.Invoice.PaidStatus,
+		); err != nil {
+			return nil, err
+		}
+
+		i.Invoice.Number = s.generatePrefixedInvoiceNumber(i.Invoice.ID)
 
 		data = append(data, i)
 	}
