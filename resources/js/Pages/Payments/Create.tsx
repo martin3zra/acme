@@ -47,6 +47,8 @@ export default function Create({
   const { currency } = useNumber();
   const [openCancelConfirmation, setCancelConfirmation] = React.useState(false);
   const [openCheckout, setCheckout] = React.useState(false);
+
+  const [initialized, setInitialized] = React.useState(false);
   const [open, setOpen] = React.useState(false);
   const [search, setSearch] = React.useState('');
   const dedbouncedSearch = useDebounced(search, 500);
@@ -71,7 +73,7 @@ export default function Create({
     if (Object.keys(_rowSelection).length > 0) {
       setRowSelection(_rowSelection);
     }
-    if (receivables === undefined) return;
+    if (receivables === undefined || initialized) return;
 
     const lines: ReceivableInvoiceForm[] = [];
     let selectedRowId = -1;
@@ -95,9 +97,11 @@ export default function Create({
 
     setPaymentForm((prev) => ({
       ...prev,
-      lines,
+      lines: [...lines],
     }));
-  }, [receivables, paymentForm, setPaymentForm, invoice_uuid]);
+
+    setInitialized(true);
+  }, [receivables, paymentForm, setPaymentForm, invoice_uuid, initialized]);
 
   useEffect(() => {
     const searchCustomer = () => {
