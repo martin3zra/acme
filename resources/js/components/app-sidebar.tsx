@@ -4,9 +4,9 @@ import { NavUser } from '@/components/nav-user';
 import { Sidebar, SidebarContent, SidebarFooter, SidebarHeader, SidebarMenu, SidebarMenuButton, SidebarMenuItem } from '@/components/ui/sidebar';
 import { Link } from '@inertiajs/react';
 import {
+  ClipboardList,
   Command,
   CreditCard,
-  FilePenIcon,
   HelpCircleIcon,
   LayoutDashboardIcon,
   LayoutListIcon,
@@ -27,7 +27,7 @@ const data = {
     {
       title: 'Invoices',
       url: '/invoices',
-      icon: FilePenIcon,
+      icon: ClipboardList,
       components: ['Invoices/Index', 'Invoices/Create'],
     },
     {
