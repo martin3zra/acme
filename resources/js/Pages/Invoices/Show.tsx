@@ -124,7 +124,7 @@ export default function Show({ invoice, auth }: Props) {
             </div>
           </div>
           <div className="col-span-4 rounded-md border p-4">
-            <Label>Order summary</Label>
+            <Label>Invoice total summary</Label>
             <div
               className={cn(
                 'flex flex-col gap-y-3 py-4',
@@ -154,6 +154,18 @@ export default function Show({ invoice, auth }: Props) {
                 <Label>Total</Label>
                 <Label data-slot="label-value">{currency(invoice.header.total)}</Label>
               </div>
+              {invoice.header.due_on && (
+                <>
+                  <div className="flex items-center justify-between">
+                    <Label>Payment Applied</Label>
+                    <Label data-slot="label-value">{currency(invoice.header.total - invoice.header.amount_due)}</Label>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <Label>Balance Due</Label>
+                    <Label data-slot="label-value">{currency(invoice.header.amount_due)}</Label>
+                  </div>
+                </>
+              )}
             </div>
           </div>
         </div>

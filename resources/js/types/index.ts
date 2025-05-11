@@ -248,6 +248,7 @@ export type Payment = {
     address: string;
     amount_due: string;
   };
+  payment: PaymentMethodsForm;
 };
 
 export type PaymentHeaderForm = {

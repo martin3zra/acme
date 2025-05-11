@@ -23,7 +23,8 @@ type payment struct {
 		AmountDue float64 `json:"amount_due"`
 		Address   string  `json:"address"`
 	} `json:"customer"`
-	Invoices int `json:"invoices"`
+	Invoices int     `json:"invoices"`
+	Payment  Payment `json:"payment"`
 	foundation.Timestamps
 }
 
@@ -46,7 +47,7 @@ func (s *Server) findPayments(companyId int) ([]*payment, error) {
 	rows, err := s.db.Query(`
     SELECT
     receivables_income.id, receivables_income.uuid, receivables_income.date, receivables_income.amount,
-    receivables_income.notes, receivables_income.created_at, receivables_income.updated_at,
+    receivables_income.payment, receivables_income.notes, receivables_income.created_at, receivables_income.updated_at,
     (select count(*) from receivables_income_items
     where receivables_income.company_id = receivables_income_items.company_id
     and receivables_income.id = receivables_income_items.receivable_income_id
@@ -56,6 +57,7 @@ func (s *Server) findPayments(companyId int) ([]*payment, error) {
     INNER JOIN customers ON (receivables_income.company_id = customers.company_id AND receivables_income.customer_id = customers.id)
     WHERE receivables_income.company_id = $1
     AND receivables_income.deleted_at IS NULL
+    ORDER BY receivables_income.id
   `, companyId)
 	if err != nil {
 		return nil, err
@@ -69,6 +71,7 @@ func (s *Server) findPayments(companyId int) ([]*payment, error) {
 			&i.UUID,
 			&i.Date,
 			&i.Amount,
+			&i.Payment,
 			&i.Notes,
 			&i.CreatedAt,
 			&i.UpdatedAt,
@@ -93,7 +96,7 @@ func (s *Server) findPaymentByUUID(companyId int, uuid string) (*payment, error)
 	err := s.db.QueryRow(`
     SELECT
     receivables_income.id, receivables_income.uuid, receivables_income.date, receivables_income.amount,
-    receivables_income.notes, receivables_income.created_at, receivables_income.updated_at,
+    receivables_income.payment, receivables_income.notes, receivables_income.created_at, receivables_income.updated_at,
     (select count(*) from receivables_income_items
     where receivables_income.company_id = receivables_income_items.company_id
     and receivables_income.id = receivables_income_items.receivable_income_id
@@ -108,6 +111,7 @@ func (s *Server) findPaymentByUUID(companyId int, uuid string) (*payment, error)
 		&i.UUID,
 		&i.Date,
 		&i.Amount,
+		&i.Payment,
 		&i.Notes,
 		&i.CreatedAt,
 		&i.UpdatedAt,
@@ -139,6 +143,7 @@ func (s *Server) findPaymentLines(companyID int, paymentID int) ([]*paymentLine,
     inner join invoices on receivables_income_items.company_id = invoices.company_id and receivables_income_items.invoice_id = invoices.id
     where receivables_income_items.company_id = $1
     and receivables_income_items.receivable_income_id = $2
+    ORDER BY receivables_income_items.id
   `, companyID, paymentID)
 	if err != nil {
 		return nil, err
@@ -180,8 +185,8 @@ func (s *Server) storePayment(companyId int, form StorePaymentForm) error {
 	if err != nil {
 		return err
 	}
-	stmt, err := tx.Prepare("INSERT INTO receivables_income (company_id, customer_id, date, amount, notes) " +
-		"VALUES ($1, $2, $3, $4, $5) RETURNING id")
+	stmt, err := tx.Prepare("INSERT INTO receivables_income (company_id, customer_id, date, amount, notes, payment) " +
+		"VALUES ($1, $2, $3, $4, $5, $6) RETURNING id")
 	if err != nil {
 		defer stmt.Close()
 		if txErr := tx.Rollback(); txErr != nil {
@@ -199,6 +204,7 @@ func (s *Server) storePayment(companyId int, form StorePaymentForm) error {
 		form.Date,
 		form.Amount,
 		form.Notes,
+		foundation.ToJSON(form.Payment),
 	).Scan(&paymentID)
 
 	if err != nil {

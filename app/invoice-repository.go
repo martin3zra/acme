@@ -104,7 +104,7 @@ func (s *Server) findInvoices(companyId int) ([]*invoice, error) {
 
 func (s *Server) findInvoicesByUUID(companyId int, uuid string) (*invoice, error) {
 	i := new(invoice)
-	err := s.db.QueryRow("SELECT invoices.id, invoices.uuid, invoices.date, invoices.due_on, invoices.amount, invoices.discount, invoices.tax, "+
+	err := s.db.QueryRow("SELECT invoices.id, invoices.uuid, invoices.date, invoices.due_on, invoices.amount, invoices.amount_due, invoices.discount, invoices.tax, "+
 		"invoices.total, invoices.status, invoices.paid_status, invoices.payment, invoices.note, invoices.tax_receipt_id, "+
 		"tax_receipts.series || tax_receipts.type || LPAD(invoices.tax_receipt_sequence::varchar,8,'0') as NCF, invoices.note, "+
 		"customers.id, customers.uuid, customers.name, customers.email, customers.phone "+
@@ -119,6 +119,7 @@ func (s *Server) findInvoicesByUUID(companyId int, uuid string) (*invoice, error
 			&i.Date,
 			&i.DueOn,
 			&i.Amount,
+			&i.AmountDue,
 			&i.Discount,
 			&i.Tax,
 			&i.Total,

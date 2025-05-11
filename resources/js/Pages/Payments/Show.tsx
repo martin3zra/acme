@@ -4,8 +4,10 @@ import { Separator } from '@/components/ui/separator';
 import { useNumber } from '@/composables/use-number';
 import { cn, isNotEmpty } from '@/lib/utils';
 import { Auth, PaymentWithLines } from '@/types';
+import { Link } from '@inertiajs/react';
 import { format, formatDate } from 'date-fns/format';
-import { CircleCheckIcon, CircleDollarSignIcon, CreditCardIcon, UserPen } from 'lucide-react';
+import { CircleCheckIcon, CircleDollarSignIcon, CreditCardIcon, Eye, UserPen } from 'lucide-react';
+import PaymentSummary from '../Invoices/Shared/payment-summary';
 
 type Props = {
   payment: PaymentWithLines;
@@ -107,8 +109,11 @@ export default function Show({ payment, auth }: Props) {
                   </td>
                   <td>{formatDate(payment.header.date, 'dd-MM-yyyy')}</td>
                   <td data-format="number"> {currency(line.payment)}</td>
-                  <td>
+                  <td className="flex items-center gap-x-1">
                     <StatusBadge type="paid" status={line.invoice.paid_status} />
+                    <Link href={`/invoices?id=${line.invoice.uuid}`}>
+                      <Eye className="text-muted-foreground" />
+                    </Link>
                   </td>
                 </tr>
               ))}
@@ -176,7 +181,7 @@ export default function Show({ payment, auth }: Props) {
           <span className="font-medium">Payment summary</span>
         </div>
 
-        {/* <PaymentSummary paymentData={payment.header.payment} /> */}
+        <PaymentSummary paymentData={payment.header.payment} />
         <Separator />
         <div className="px-1 py-4">
           <ol

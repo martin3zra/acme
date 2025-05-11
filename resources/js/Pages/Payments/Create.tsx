@@ -134,6 +134,7 @@ export default function Create({
         .map((line) => {
           return { uuid: line.uuid, amount_due: line.amount_due, payment: line.payment, discount: line.discount };
         }),
+      payment: paymentForm.payment,
     };
     transform((data) => ({
       ...data,
@@ -224,7 +225,7 @@ export default function Create({
             Cancel
           </Button>
           <Button onClick={handleCheckout} disabled={totalPaid() === 0 || processing}>
-            Record Payment
+            Checkout
           </Button>
         </div>
       </AuthenticatedLayout.Actions>
@@ -366,11 +367,12 @@ export default function Create({
           </AlertDialogContent>
         </AlertDialog>
         <CheckoutForm
+          action="Record Payment"
           openCheckout={openCheckout}
           setCheckout={setCheckout}
           paymentForm={paymentForm.payment}
           totalAmount={totalPaid()}
-          onPlacedInvoice={handleRecordPayment}
+          onCompleteCheckout={handleRecordPayment}
           processing={processing}
           setCancelConfirmation={setCancelConfirmation}
           errors={propsErrors}

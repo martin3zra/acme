@@ -524,7 +524,7 @@ export default function Create({
           setCheckout={setCheckout}
           paymentForm={invoiceForm.payment}
           totalAmount={computeTotalAmount()}
-          onPlacedInvoice={placedInvoice}
+          onCompleteCheckout={placedInvoice}
           processing={processing}
           setCancelConfirmation={setCancelConfirmation}
           errors={propsErrors}

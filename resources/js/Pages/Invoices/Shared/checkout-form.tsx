@@ -16,13 +16,14 @@ type errorBag = {
 };
 
 type CheckoutFormProps = {
+  action: string;
   openCheckout: boolean;
   setCheckout: React.Dispatch<React.SetStateAction<boolean>>;
   paymentForm: PaymentMethodsForm;
   errors: errorBag;
   setCancelConfirmation: React.Dispatch<React.SetStateAction<boolean>>;
   totalAmount: number;
-  onPlacedInvoice: (event: React.MouseEvent<HTMLButtonElement>) => void;
+  onCompleteCheckout: (event: React.MouseEvent<HTMLButtonElement>) => void;
   processing: boolean;
   onCheckoutChange: (method: PaymentMethod, form: CashForm | CheckForm | CardForm | BTForm) => void;
   currency: (value: number | string, precision?: number, inCent?: boolean) => string;
@@ -171,7 +172,7 @@ class CheckoutForm extends React.Component<CheckoutFormProps, CheckoutFormState>
 
   render() {
     const { receivedAmount, remainingBalance } = this.state;
-    const { openCheckout, setCheckout, errors, totalAmount, onPlacedInvoice, processing, setCancelConfirmation, currency } = this.props;
+    const { action, openCheckout, setCheckout, errors, totalAmount, onCompleteCheckout, processing, setCancelConfirmation, currency } = this.props;
     return (
       <Sheet open={openCheckout} onOpenChange={setCheckout}>
         <SheetContent side="right" className="m-4 flex h-[calc(~'(100%-var(--spacing)*4)/3')] w-full flex-col rounded-md sm:max-w-4xl">
@@ -242,8 +243,8 @@ class CheckoutForm extends React.Component<CheckoutFormProps, CheckoutFormState>
               <Button variant={'secondary'} onClick={() => setCancelConfirmation(true)}>
                 Cancel
               </Button>
-              <Button onClick={onPlacedInvoice} disabled={processing || remainingBalance !== 0}>
-                Complete Invoice
+              <Button onClick={onCompleteCheckout} disabled={processing || remainingBalance !== 0}>
+                {action}
               </Button>
             </div>
           </SheetFooter>

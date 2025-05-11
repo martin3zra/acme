@@ -548,7 +548,7 @@ export default function Edit({
           setCheckout={setCheckout}
           paymentForm={invoiceForm.payment}
           totalAmount={computeTotalAmount()}
-          onPlacedInvoice={performUpdate}
+          onCompleteCheckout={performUpdate}
           processing={processing}
           setCancelConfirmation={setCancelConfirmation}
           errors={propsErrors}
