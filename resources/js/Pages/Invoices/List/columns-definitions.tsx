@@ -1,6 +1,7 @@
 import { CurrencyCell } from '@/components/data-table/currency-cell';
 import { DateCell } from '@/components/data-table/date-cell';
 import { HeaderCell } from '@/components/data-table/header-cell';
+import { LinkCell } from '@/components/data-table/link-cell';
 import { TextCell } from '@/components/data-table/text-cell';
 import { StatusBadge } from '@/components/status-badge';
 import { Button } from '@/components/ui/button';
@@ -62,6 +63,7 @@ export const getColumns = ({ onDidClick }: Props): ColumnDef<Invoice>[] => {
     {
       accessorKey: 'customer.name',
       id: 'customer.name',
+      size: 200,
       header: ({ column }) => {
         return (
           <Button variant="ghost" onClick={() => column.toggleSorting(column.getIsSorted() === 'asc')}>
@@ -70,15 +72,21 @@ export const getColumns = ({ onDidClick }: Props): ColumnDef<Invoice>[] => {
         );
       },
       cell: (props) => {
-        return <TextCell columnWidth={props.column.getSize()} value={props.getValue() as string} />;
+        return (
+          <LinkCell
+            href={`/customers?id=${props.row.original.customer.uuid}`}
+            columnWidth={props.column.getSize()}
+            value={props.getValue() as string}
+          />
+        );
       },
     },
     {
       accessorKey: 'date',
       meta: 'Date',
-      // size: 880,
+      size: 100,
       header: (props) => {
-        return <HeaderCell title="Date" alignment="right" columnWidth={props.column.getSize()} />;
+        return <HeaderCell title="Date" alignment="left" columnWidth={props.column.getSize()} />;
       },
       cell: (props) => {
         return <DateCell columnWidth={props.column.getSize()} value={props.getValue() as string} />;
@@ -87,7 +95,7 @@ export const getColumns = ({ onDidClick }: Props): ColumnDef<Invoice>[] => {
     {
       accessorKey: 'amount',
       meta: 'Amount',
-      // size: 880,
+      size: 100,
       header: (props) => {
         return <HeaderCell title="Amount" alignment="right" columnWidth={props.column.getSize()} />;
       },

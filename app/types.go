@@ -145,10 +145,10 @@ var InvoiceTermType = struct {
 type PaidStatus string
 
 const (
-	_UNPAID  PaidStatus = "unpaid"
-	_PARTIAL PaidStatus = "partial"
-	_PAID    PaidStatus = "paid"
-	_REMOVED PaidStatus = "removed"
+	_PAID_UNPAID  PaidStatus = "unpaid"
+	_PAID_PARTIAL PaidStatus = "partial"
+	_PAID_PAID    PaidStatus = "paid"
+	_PAID_REMOVED PaidStatus = "removed"
 )
 
 var PaidStatuses = struct {
@@ -157,37 +157,64 @@ var PaidStatuses = struct {
 	Paid    PaidStatus
 	Removed PaidStatus
 }{
-	UnPaid:  _UNPAID,
-	Partial: _PARTIAL,
-	Paid:    _PAID,
-	Removed: _REMOVED,
+	UnPaid:  _PAID_UNPAID,
+	Partial: _PAID_PARTIAL,
+	Paid:    _PAID_PAID,
+	Removed: _PAID_REMOVED,
 }
 
 type InvoiceStatus string
 
 const (
-	DRAFT     InvoiceStatus = "draft"
-	SENT      InvoiceStatus = "sent"
-	VIEWED    InvoiceStatus = "viewed"
-	OVERDUE   InvoiceStatus = "overdue"
-	COMPLETED InvoiceStatus = "completed"
-	VOID      InvoiceStatus = "void"
+	_INVOICE_DRAFT     InvoiceStatus = "draft"
+	_INVOICE_OPEN      InvoiceStatus = "open"
+	_INVOICE_SENT      InvoiceStatus = "sent"
+	_INVOICE_VIEWED    InvoiceStatus = "viewed"
+	_INVOICE_OVERDUE   InvoiceStatus = "overdue"
+	_INVOICE_COMPLETED InvoiceStatus = "completed"
+	_INVOICE_VOID      InvoiceStatus = "void"
+	_INVOICE_PARTIAL   InvoiceStatus = "partial"
 )
 
 var InvoiceStatuses = struct {
+	Open      InvoiceStatus
 	Draft     InvoiceStatus
 	Sent      InvoiceStatus
 	Viewed    InvoiceStatus
 	Overdue   InvoiceStatus
 	Completed InvoiceStatus
 	Void      InvoiceStatus
+	Partial   InvoiceStatus
 }{
-	Draft:     DRAFT,
-	Sent:      SENT,
-	Viewed:    VIEWED,
-	Overdue:   OVERDUE,
-	Completed: COMPLETED,
-	Void:      VOID,
+	Open:      _INVOICE_OPEN,
+	Draft:     _INVOICE_DRAFT,
+	Sent:      _INVOICE_SENT,
+	Viewed:    _INVOICE_VIEWED,
+	Overdue:   _INVOICE_OVERDUE,
+	Completed: _INVOICE_COMPLETED,
+	Void:      _INVOICE_VOID,
+	Partial:   _INVOICE_PARTIAL,
+}
+
+type PaymentStatus string
+
+const (
+	_PAYMENT_VOID      PaymentStatus = "void"
+	_PAYMENT_PENDING   PaymentStatus = "void"
+	_PAYMENT_COMPLETED PaymentStatus = "void"
+	_PAYMENT_FAILED    PaymentStatus = "void"
+)
+
+var PaymentStatuses = struct {
+	Void      PaymentStatus
+	Pending   PaymentStatus
+	Completed PaymentStatus
+	Failed    PaymentStatus
+}{
+	Void:      _PAYMENT_VOID,
+	Pending:   _PAYMENT_PENDING,
+	Completed: _PAYMENT_COMPLETED,
+	Failed:    _PAYMENT_FAILED,
 }
 
 type LineAction string

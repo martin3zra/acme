@@ -7,6 +7,7 @@ import {
   CircleDollarSign,
   Clock,
   Eye,
+  FileCheck,
   FileText,
   LucideIcon,
   Send,
@@ -14,6 +15,7 @@ import {
   ShieldCheck,
   Slash,
   Trash2,
+  Wallet,
   XCircle,
 } from 'lucide-react';
 
@@ -71,6 +73,13 @@ export const statusConfig: Record<StatusType, Record<string, StatusConfig>> = {
     },
   },
   invoice: {
+    open: {
+      label: 'Open',
+      bg: 'bg-yellow-100',
+      border: 'border-yellow-500',
+      text: 'text-yellow-700',
+      Icon: FileCheck,
+    },
     draft: {
       label: 'Draft',
       bg: 'bg-gray-100',
@@ -112,6 +121,13 @@ export const statusConfig: Record<StatusType, Record<string, StatusConfig>> = {
       border: 'border-red-500',
       text: 'text-red-800',
       Icon: Slash,
+    },
+    partial: {
+      label: 'Partial',
+      bg: 'bg-teal-100',
+      border: 'border-teal-500',
+      text: 'text-teal-800',
+      Icon: Wallet,
     },
   },
   status: {

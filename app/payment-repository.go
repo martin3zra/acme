@@ -2,6 +2,7 @@ package app
 
 import (
 	"database/sql"
+	"errors"
 	"log"
 	"time"
 
@@ -23,8 +24,9 @@ type payment struct {
 		AmountDue float64 `json:"amount_due"`
 		Address   string  `json:"address"`
 	} `json:"customer"`
-	Invoices int     `json:"invoices"`
-	Payment  Payment `json:"payment"`
+	Invoices int           `json:"invoices"`
+	Payment  Payment       `json:"payment"`
+	Status   PaymentStatus `json:"status"`
 	foundation.Timestamps
 }
 
@@ -255,4 +257,45 @@ func (s *Server) attachPaymentLines(tx *sql.Tx, companyId, paymentId int, form S
 
 func (s *Server) generatePrefixedPaymentNumber(value int) string {
 	return foundation.GeneratePrefixedNumber("PAY-", 10, value)
+}
+
+func (s *Server) voidPayment(companyID int, uuid string) error {
+	payment, err := s.findPaymentByUUID(companyID, uuid)
+	if err != nil {
+		return err
+	}
+
+	if payment.Status == PaymentStatuses.Void {
+		return errors.New("payment already voided")
+	}
+
+	lines, err := s.findPaymentLines(companyID, payment.ID)
+	if err != nil {
+		return err
+	}
+
+	for _, pl := range lines {
+		invoice, err := s.findInvoicesByUUID(companyID, pl.Invoice.UUID)
+		if err != nil {
+			return err
+		}
+		// pl.Invoice.AmountDue
+		invoice.AmountDue += pl.Payment
+		if invoice.AmountDue >= invoice.Total {
+			invoice.Status = InvoiceStatuses.Open
+		} else {
+			invoice.Status = InvoiceStatuses.Partial
+		}
+		// pending to send the transaction.s
+		// s.updateInvoiceBalance(nil, companyID, pl.Invoice.ID, pl.Payment)
+	}
+
+	// Adjust customer balance
+	// balance += payment.amount
+
+	// Mark payment as voided
+	payment.Status = PaymentStatuses.Void
+	// Reset all amount on the receivable incomes items
+
+	return nil
 }

@@ -11,24 +11,24 @@ import (
 )
 
 type invoice struct {
-	ID           int        `json:"id"`
-	UUID         string     `json:"uuid"`
-	Number       string     `json:"number"`
-	NCF          string     `json:"ncf"`
-	Customer     customer   `json:"customer"`
-	Date         time.Time  `json:"date"`
-	DueOn        *time.Time `json:"due_on"`
-	Terms        int        `json:"terms"`
-	TaxReceiptID int        `json:"tax_receipt_id"`
-	Amount       float64    `json:"amount"`
-	Discount     Discount   `json:"discount"`
-	Tax          float64    `json:"tax"`
-	Total        float64    `json:"total"`
-	AmountDue    float64    `json:"amount_due"`
-	Status       string     `json:"status"`
-	PaidStatus   PaidStatus `json:"paid_status"`
-	Payment      Payment    `json:"payment"`
-	Notes        string     `json:"notes"`
+	ID           int           `json:"id"`
+	UUID         string        `json:"uuid"`
+	Number       string        `json:"number"`
+	NCF          string        `json:"ncf"`
+	Customer     customer      `json:"customer"`
+	Date         time.Time     `json:"date"`
+	DueOn        *time.Time    `json:"due_on"`
+	Terms        int           `json:"terms"`
+	TaxReceiptID int           `json:"tax_receipt_id"`
+	Amount       float64       `json:"amount"`
+	Discount     Discount      `json:"discount"`
+	Tax          float64       `json:"tax"`
+	Total        float64       `json:"total"`
+	AmountDue    float64       `json:"amount_due"`
+	Status       InvoiceStatus `json:"status"`
+	PaidStatus   PaidStatus    `json:"paid_status"`
+	Payment      Payment       `json:"payment"`
+	Notes        string        `json:"notes"`
 }
 
 type line struct {
@@ -166,7 +166,7 @@ func (s *Server) storeInvoice(companyID int, form StoreInvoiceForm) error {
 		return err
 	}
 
-	stmt, err := tx.Prepare("INSERT INTO invoices (company_id, tax_receipt_id, tax_receipt_sequence, date, type, due_on, customer_id, amount, discount, tax, amount_due, total, note, paid_status, payment) " +
+	stmt, err := tx.Prepare("INSERT INTO invoices (company_id, tax_receipt_id, tax_receipt_sequence, date, type, due_on, customer_id, amount, discount, tax, amount_due, total, note, status, paid_status, payment) " +
 		"VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15) RETURNING id")
 	if err != nil {
 		defer stmt.Close()
@@ -193,6 +193,7 @@ func (s *Server) storeInvoice(companyID int, form StoreInvoiceForm) error {
 		form.amountDue,
 		form.total,
 		form.Notes,
+		InvoiceStatuses.Open,
 		form.paidStatus,
 		foundation.ToJSON(form.Payment),
 	).Scan(&invoiceID)
@@ -530,6 +531,11 @@ func (s *Server) updateInvoiceBalance(tx *sql.Tx, companyID, invoiceID int, bala
       WHEN  amount_due + $3 < 0 THEN 'overpaid'::paid_status
       WHEN  amount_due + $3 = 0 THEN 'paid'::paid_status
       ELSE 'partial'::paid_status
+    END,
+    SET status = CASE
+      WHEN amount_due + $3 = 0 THEN 'completed'::invoice_status
+      WHEN amount_due + $3 >= total THEN 'open'::invoice_status
+      ELSE 'partial'::invoice_status
     END
     WHERE company_id = $1 AND id = $2
   `

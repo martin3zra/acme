@@ -53,8 +53,8 @@ func (s *Server) paymentsHandler(i *inertia.Inertia) http.Handler {
 
 func (s *Server) createPaymentHandler(i *inertia.Inertia) http.Handler {
 	fn := func(w http.ResponseWriter, r *http.Request) {
-		// what we do when the invoice id is given? only return that invoices?
-		invoiceUuid := r.URL.Query().Get("invoice_id")
+		// what we do when the Payment id is given? only return that Payments?
+		PaymentUuid := r.URL.Query().Get("Payment_id")
 		term := r.URL.Query().Get("search")
 		customerUuid := r.URL.Query().Get("customer_id")
 		user := auth.User(r.Context())
@@ -78,8 +78,8 @@ func (s *Server) createPaymentHandler(i *inertia.Inertia) http.Handler {
 			}),
 		}
 
-		if ensureUUIDIsValid(invoiceUuid) {
-			props["invoice_uuid"] = invoiceUuid
+		if ensureUUIDIsValid(PaymentUuid) {
+			props["Payment_uuid"] = PaymentUuid
 		}
 
 		if ensureUUIDIsValid(customerUuid) {
@@ -129,6 +129,36 @@ func (s *Server) storePaymentHandler(i *inertia.Inertia) http.Handler {
 		s.session.Flash("success", "Payment was recorded successfully!")
 
 		i.Back(w, r)
+	}
+
+	return http.HandlerFunc(fn)
+}
+
+func (s *Server) voidPaymentHandler(i *inertia.Inertia) http.Handler {
+
+	fn := func(w http.ResponseWriter, r *http.Request) {
+		uuid := r.PathValue("id")
+		back := func() {
+			i.Back(w, r, http.StatusSeeOther)
+		}
+		var form ConfirmsPasswords
+		err := support.ParseRequest(r, &form)
+		if err != nil {
+			back()
+			return
+		}
+
+		user := auth.User(r.Context())
+		err = s.voidPayment(*user.CurrentCompanyId, uuid)
+		if err != nil {
+			log.Printf("Error voiding payment: %v", err)
+			s.session.Errors("status", "Payment wasn't voided. Something went wrong.")
+			back()
+			return
+		}
+		s.session.Flash("success", "Payment was voided successfully!")
+
+		i.Redirect(w, r, "/payments", http.StatusSeeOther)
 	}
 
 	return http.HandlerFunc(fn)

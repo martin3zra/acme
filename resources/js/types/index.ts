@@ -96,7 +96,7 @@ export type DiscountType = {
   value: number;
 };
 
-export const InvoiceStatuses = ['draft', 'sent', 'viewed', 'overdue', 'completed', 'void'] as const;
+export const InvoiceStatuses = ['open', 'draft', 'sent', 'viewed', 'overdue', 'completed', 'void', 'partial'] as const;
 
 export type InvoiceStatus = (typeof InvoiceStatuses)[number];
 
