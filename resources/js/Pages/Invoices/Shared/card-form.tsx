@@ -2,8 +2,8 @@ import FormSection from '@/components/form-section';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { defaultCardBrands } from '@/constants';
 import { CardFormInput, PaymentFormType } from '@/types';
-import { defaultCardBrands } from '../constants';
 
 type CardFormProps = PaymentFormType & {
   last4: number;

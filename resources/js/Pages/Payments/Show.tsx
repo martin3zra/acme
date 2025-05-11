@@ -72,7 +72,7 @@ export default function Show({ payment, auth }: Props) {
             <thead>
               <tr className="bg-gray-50/50">
                 <th scope="col" className="text-start">
-                  Number
+                  Invoice Number
                 </th>
                 <th scope="col" className="text-start">
                   Date

@@ -20,7 +20,7 @@ import { useDebounced } from '@/hooks/use-debounced';
 import { usePersistedState } from '@/hooks/use-persisted-state';
 import AuthenticatedLayout from '@/layouts/authenticated-layout';
 import { cn } from '@/lib/utils';
-import { Customer, PageProps, PaymentForm, Receivable, ReceivableInvoiceForm } from '@/types';
+import { BTForm, CardForm, CashForm, CheckForm, Customer, PageProps, PaymentForm, PaymentMethod, Receivable, ReceivableInvoiceForm } from '@/types';
 import { Textarea } from '@headlessui/react';
 import { router, useForm, usePage } from '@inertiajs/react';
 import { RowSelectionState } from '@tanstack/table-core/build/lib/features/RowSelection';
@@ -28,7 +28,9 @@ import { format } from 'date-fns/format';
 import { CalendarIcon } from 'lucide-react';
 import React, { useEffect } from 'react';
 import { createPaymentBreadcrumbs } from '../Invoices/constants';
+import CheckoutForm from '../Invoices/Shared/checkout-form';
 import { CustomerSection } from '../Invoices/Shared/customer-section';
+import { defaultPaymentForm } from './constants';
 import { List } from './Shared/lines-payment';
 
 type FlagSet = {
@@ -43,8 +45,6 @@ export default function Create({
   invoice_uuid,
   forceInitial,
 }: PageProps<{ customer: Customer; customers: Customer[]; receivables: Receivable[]; invoice_uuid: string; forceInitial: boolean }>) {
-  const defaultPaymentForm: PaymentForm = { header: { customer, date: new Date() }, lines: [] };
-
   const { currency } = useNumber();
   const [openCancelConfirmation, setCancelConfirmation] = React.useState(false);
   const [openCheckout, setCheckout] = React.useState(false);
@@ -53,7 +53,11 @@ export default function Create({
   const [open, setOpen] = React.useState(false);
   const [search, setSearch] = React.useState('');
   const dedbouncedSearch = useDebounced(search, 500);
-  const [paymentForm, setPaymentForm, removePaymentForm] = usePersistedState<PaymentForm>('payment', defaultPaymentForm, forceInitial);
+  const [paymentForm, setPaymentForm, removePaymentForm] = usePersistedState<PaymentForm>(
+    'payment',
+    { ...defaultPaymentForm, header: { ...defaultPaymentForm.header, customer } },
+    forceInitial,
+  );
   const [rowSelection, setRowSelection] = React.useState<RowSelectionState>({});
   const { headers } = useHeader();
   const { errors: propsErrors } = usePage<PageProps>().props;
@@ -198,6 +202,20 @@ export default function Create({
     router.get('/payments');
   };
 
+  const handleCheckout = (event: React.MouseEvent<HTMLButtonElement>) => {
+    event.preventDefault();
+    if (totalPaid() === 0) return;
+
+    setCheckout(true);
+  };
+
+  const handleCheckoutChange = (method: PaymentMethod, form: CashForm | CheckForm | CardForm | BTForm) => {
+    // Recalculate totals if the value is set.
+    setPaymentForm(() => {
+      return { ...paymentForm, payment: { ...paymentForm.payment, [method]: form } };
+    });
+  };
+
   return (
     <AuthenticatedLayout user={auth.user} breadcrumbs={createPaymentBreadcrumbs}>
       <AuthenticatedLayout.Actions>
@@ -205,7 +223,7 @@ export default function Create({
           <Button variant={'secondary'} onClick={() => setCancelConfirmation(true)}>
             Cancel
           </Button>
-          <Button onClick={handleRecordPayment} disabled={totalPaid() === 0 || processing}>
+          <Button onClick={handleCheckout} disabled={totalPaid() === 0 || processing}>
             Record Payment
           </Button>
         </div>
@@ -347,6 +365,18 @@ export default function Create({
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
+        <CheckoutForm
+          openCheckout={openCheckout}
+          setCheckout={setCheckout}
+          paymentForm={paymentForm.payment}
+          totalAmount={totalPaid()}
+          onPlacedInvoice={handleRecordPayment}
+          processing={processing}
+          setCancelConfirmation={setCancelConfirmation}
+          errors={propsErrors}
+          onCheckoutChange={handleCheckoutChange}
+          currency={currency}
+        />
       </div>
     </AuthenticatedLayout>
   );

@@ -254,6 +254,7 @@ export type PaymentHeaderForm = {
   customer: Customer | undefined;
   date: Date | undefined;
   notes: string;
+  discount: number;
 };
 
 export type ReceivableInvoiceForm = ReceivableInvoice & {
@@ -265,6 +266,7 @@ export type ReceivableInvoiceForm = ReceivableInvoice & {
 export type PaymentForm = {
   header: PaymentHeaderForm;
   lines: ReceivableInvoiceForm[];
+  payment: PaymentMethodsForm;
 };
 
 export interface Receivable {
