@@ -77,7 +77,11 @@ export const getColumns = ({ onDidClick }: Props): ColumnDef<Payment>[] => {
       },
       cell: (props) => {
         return (
-          <LinkCell href={`/customers/${props.row.original.customer.uuid}`} columnWidth={props.column.getSize()} value={props.getValue() as string} />
+          <LinkCell
+            href={`/customers?id=${props.row.original.customer.uuid}`}
+            columnWidth={props.column.getSize()}
+            value={props.getValue() as string}
+          />
         );
       },
     },

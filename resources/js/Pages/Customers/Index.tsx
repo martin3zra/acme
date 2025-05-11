@@ -22,10 +22,13 @@ const breadcrumbs: BreadcrumbItem[] = [
   },
 ];
 
-export default function Index({ auth, customers }: PageProps<{ customers: Customer[] }>) {
-  const [open, setOpen] = useState(false);
+export default function Index({ auth, customers, customer }: PageProps<{ customers: Customer[]; customer: Customer }>) {
+  const [open, setOpen] = useState(customer !== undefined);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  const [selectedCustomer, setSelectedCustomer] = useState<CreateFormParams>({ customer: undefined, action: 'create' });
+  const [selectedCustomer, setSelectedCustomer] = useState<CreateFormParams>({
+    customer: customer,
+    action: customer !== undefined ? 'view' : 'create',
+  });
 
   const verbName = useVerb().action(selectedCustomer.action);
   const hasCustomers = customers.length > 0;
