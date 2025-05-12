@@ -201,13 +201,23 @@ func (s *Server) toggleCustomerStatus(companyID int, customer *customer) error {
 
 func (s *Server) updateCustomerAmountDue(tx *sql.Tx, companyId, customerId int, amountDue float64) error {
 
-	_, err := tx.Exec("UPDATE customers SET amount_due = amount_due + $3 WHERE company_id = $1 AND id = $2",
+	result, err := tx.Exec("UPDATE customers SET amount_due = amount_due + $3 WHERE company_id = $1 AND id = $2",
 		companyId, customerId, amountDue,
 	)
 	if err != nil {
 		if txErr := tx.Rollback(); txErr != nil {
 			log.Fatalf("Error updating customer amount due: %v", txErr)
 			return txErr
+		}
+	}
+
+	if affected, err := result.RowsAffected(); err == nil {
+		if affected != 1 {
+			txErr := tx.Rollback()
+			if txErr != nil {
+				return txErr
+			}
+			return errors.New("unable to update customer balance") //new(ErrUnprocessableEntity)
 		}
 	}
 

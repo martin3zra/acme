@@ -105,7 +105,7 @@ func (s *Server) findPaymentByUUID(companyId int, uuid string) (*payment, error)
     where receivables_income.company_id = receivables_income_items.company_id
     and receivables_income.id = receivables_income_items.receivable_income_id
     ) as invoices,
-    customers.uuid, customers.name, customers.email, customers.amount_due
+    customers.id, customers.uuid, customers.name, customers.email, customers.amount_due
     FROM receivables_income
     INNER JOIN customers ON (receivables_income.company_id = customers.company_id AND receivables_income.customer_id = customers.id)
     WHERE receivables_income.company_id = $1
@@ -121,6 +121,7 @@ func (s *Server) findPaymentByUUID(companyId int, uuid string) (*payment, error)
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.Invoices,
+		&i.Customer.ID,
 		&i.Customer.UUID,
 		&i.Customer.Name,
 		&i.Customer.Email,
@@ -297,13 +298,11 @@ func (s *Server) voidPayment(companyID int, uuid string) error {
 	}
 
 	// Adjust customer balance
-	// balance += payment.amount
 	if err = s.updateCustomerAmountDue(tx, companyID, payment.Customer.ID, payment.Amount); err != nil {
 		return err
 	}
 
 	// Mark payment as voided
-	payment.Status = PaymentStatuses.Void
 	// Reset all amount on the receivable incomes items
 	_, err = tx.Exec("UPDATE receivables_income SET amount = 0, status = 'void'::payment_status, payment = NULL WHERE company_id = $1 AND id = $2", companyID, payment.ID)
 	if err != nil {
