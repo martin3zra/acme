@@ -1,12 +1,13 @@
 import { ConfirmsPassword } from '@/components/confirms-password';
 import HeadingSmall from '@/components/heading-small';
 import { Button } from '@/components/ui/button';
+import { Separator } from '@/components/ui/separator';
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import useCallbackState from '@/hooks/use-callback-state';
 import AuthenticatedLayout from '@/layouts/authenticated-layout';
 import { BreadcrumbItem, PageProps, Payment, PaymentVerb, PaymentWithLines } from '@/types';
 import { router, usePage } from '@inertiajs/react';
-import { Printer } from 'lucide-react';
+import { Ban, Printer } from 'lucide-react';
 import { List } from './List/Index';
 import { AddNewPayment } from './Shared/add-new-payment';
 import Show from './Show';
@@ -105,19 +106,19 @@ export default function Index({
                     <SheetDescription className="text-[12px]">payment details</SheetDescription>
                   </div>
                   <div className="mx-4 flex gap-x-3">
-                    {/* {payment.header.status !== 'void' && (
+                    {payment.header.status !== 'void' && (
                       <>
                         <Button variant={'destructive'} onClick={() => onSelectPayment(payment.header, 'void')}>
                           <Ban /> Void
                         </Button>
                         <Separator orientation="vertical" />
-                        <Button asChild disabled={payment.header.status === 'void'}>
+                        {/* <Button asChild disabled={payment.header.status === 'void'}>
                           <Link href={`/payments/${payment.header.uuid}/edit`} as="button">
                             <NotebookPen /> Edit
                           </Link>
-                        </Button>
+                        </Button> */}
                       </>
-                    )} */}
+                    )}
 
                     <Button>
                       <Printer /> Print
