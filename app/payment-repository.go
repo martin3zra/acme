@@ -191,7 +191,7 @@ func (s *Server) storePayment(companyId int, form StorePaymentForm) error {
 		return err
 	}
 	stmt, err := tx.Prepare("INSERT INTO receivables_income (company_id, customer_id, date, amount, notes, payment, status) " +
-		"VALUES ($1, $2, $3, $4, $5, $6) RETURNING id")
+		"VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id")
 	if err != nil {
 		defer stmt.Close()
 		if txErr := tx.Rollback(); txErr != nil {

@@ -103,12 +103,7 @@ export const getColumns = ({ onDidClick }: Props): ColumnDef<ReceivableInvoiceFo
         return <HeaderCell title="Balance" alignment="right" columnWidth={props.column.getSize()} />;
       },
       cell: (props) => {
-        return (
-          <CurrencyCell
-            columnWidth={props.column.getSize()}
-            value={(props.row.original.total - props.row.original.amount_due) as unknown as string}
-          />
-        );
+        return <CurrencyCell columnWidth={props.column.getSize()} value={props.row.original.amount_due as unknown as string} />;
       },
     },
     {

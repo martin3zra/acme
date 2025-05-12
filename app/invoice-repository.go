@@ -167,7 +167,7 @@ func (s *Server) storeInvoice(companyID int, form StoreInvoiceForm) error {
 	}
 
 	stmt, err := tx.Prepare("INSERT INTO invoices (company_id, tax_receipt_id, tax_receipt_sequence, date, type, due_on, customer_id, amount, discount, tax, amount_due, total, note, status, paid_status, payment) " +
-		"VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15) RETURNING id")
+		"VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16) RETURNING id")
 	if err != nil {
 		defer stmt.Close()
 		if txErr := tx.Rollback(); txErr != nil {

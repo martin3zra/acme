@@ -9,7 +9,7 @@ type Props = {
 
 export const CurrencyCell: FC<Props> = ({ value, columnWidth, suffix }) => {
   const { currency } = useNumber();
-  let formattedValue = value !== undefined ? currency(value) : '';
+  let formattedValue = value !== undefined ? currency(value) : '$0.00';
   formattedValue = suffix !== undefined ? formattedValue.substring(1) : formattedValue;
   return (
     <div className="p-1.5 text-right" title={formattedValue} style={{ width: columnWidth }}>
