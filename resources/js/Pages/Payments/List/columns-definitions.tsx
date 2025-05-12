@@ -4,6 +4,7 @@ import { HeaderCell } from '@/components/data-table/header-cell';
 import { LinkCell } from '@/components/data-table/link-cell';
 import { NumericCell } from '@/components/data-table/numeric-cell';
 import { TextCell } from '@/components/data-table/text-cell';
+import { StatusBadge } from '@/components/status-badge';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import {
@@ -127,6 +128,16 @@ export const getColumns = ({ onDidClick }: Props): ColumnDef<Payment>[] => {
       },
       cell: (props) => {
         return <NumericCell columnWidth={props.column.getSize()} value={props.getValue() as string} />;
+      },
+    },
+    {
+      accessorKey: 'status',
+      size: 70,
+      header: (props) => {
+        return <HeaderCell title="Status" alignment="center" columnWidth={props.column.getSize()} />;
+      },
+      cell: (props) => {
+        return <StatusBadge type="payment" status={props.row.original.status} />;
       },
     },
     {

@@ -200,9 +200,9 @@ type PaymentStatus string
 
 const (
 	_PAYMENT_VOID      PaymentStatus = "void"
-	_PAYMENT_PENDING   PaymentStatus = "void"
-	_PAYMENT_COMPLETED PaymentStatus = "void"
-	_PAYMENT_FAILED    PaymentStatus = "void"
+	_PAYMENT_PENDING   PaymentStatus = "pending"
+	_PAYMENT_COMPLETED PaymentStatus = "completed"
+	_PAYMENT_FAILED    PaymentStatus = "failed"
 )
 
 var PaymentStatuses = struct {

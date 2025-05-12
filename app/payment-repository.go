@@ -18,6 +18,7 @@ type payment struct {
 	Amount   float64   `json:"amount"`
 	Notes    string    `json:"notes"`
 	Customer struct {
+		ID        int     `json:"_"`
 		UUID      string  `json:"uuid"`
 		Name      string  `json:"name"`
 		Email     string  `json:"email"`
@@ -49,7 +50,7 @@ func (s *Server) findPayments(companyId int) ([]*payment, error) {
 	rows, err := s.db.Query(`
     SELECT
     receivables_income.id, receivables_income.uuid, receivables_income.date, receivables_income.amount,
-    receivables_income.payment, receivables_income.notes, receivables_income.created_at, receivables_income.updated_at,
+    receivables_income.payment, receivables_income.status, receivables_income.notes, receivables_income.created_at, receivables_income.updated_at,
     (select count(*) from receivables_income_items
     where receivables_income.company_id = receivables_income_items.company_id
     and receivables_income.id = receivables_income_items.receivable_income_id
@@ -74,6 +75,7 @@ func (s *Server) findPayments(companyId int) ([]*payment, error) {
 			&i.Date,
 			&i.Amount,
 			&i.Payment,
+			&i.Status,
 			&i.Notes,
 			&i.CreatedAt,
 			&i.UpdatedAt,
@@ -98,7 +100,7 @@ func (s *Server) findPaymentByUUID(companyId int, uuid string) (*payment, error)
 	err := s.db.QueryRow(`
     SELECT
     receivables_income.id, receivables_income.uuid, receivables_income.date, receivables_income.amount,
-    receivables_income.payment, receivables_income.notes, receivables_income.created_at, receivables_income.updated_at,
+    receivables_income.payment, receivables_income.status, receivables_income.notes, receivables_income.created_at, receivables_income.updated_at,
     (select count(*) from receivables_income_items
     where receivables_income.company_id = receivables_income_items.company_id
     and receivables_income.id = receivables_income_items.receivable_income_id
@@ -114,6 +116,7 @@ func (s *Server) findPaymentByUUID(companyId int, uuid string) (*payment, error)
 		&i.Date,
 		&i.Amount,
 		&i.Payment,
+		&i.Status,
 		&i.Notes,
 		&i.CreatedAt,
 		&i.UpdatedAt,
@@ -187,7 +190,7 @@ func (s *Server) storePayment(companyId int, form StorePaymentForm) error {
 	if err != nil {
 		return err
 	}
-	stmt, err := tx.Prepare("INSERT INTO receivables_income (company_id, customer_id, date, amount, notes, payment) " +
+	stmt, err := tx.Prepare("INSERT INTO receivables_income (company_id, customer_id, date, amount, notes, payment, status) " +
 		"VALUES ($1, $2, $3, $4, $5, $6) RETURNING id")
 	if err != nil {
 		defer stmt.Close()
@@ -207,6 +210,7 @@ func (s *Server) storePayment(companyId int, form StorePaymentForm) error {
 		form.Amount,
 		form.Notes,
 		foundation.ToJSON(form.Payment),
+		PaymentStatuses.Completed,
 	).Scan(&paymentID)
 
 	if err != nil {
@@ -273,29 +277,41 @@ func (s *Server) voidPayment(companyID int, uuid string) error {
 	if err != nil {
 		return err
 	}
-
+	tx, err := s.db.Begin()
+	if err != nil {
+		return err
+	}
 	for _, pl := range lines {
-		invoice, err := s.findInvoicesByUUID(companyID, pl.Invoice.UUID)
+		_, err = tx.Exec("UPDATE receivables_income_items SET payment_amount = 0 WHERE company_id = $1 AND receivable_income_id = $2 AND invoice_id = $3", companyID, payment.ID, pl.Invoice.ID)
 		if err != nil {
+			if txErr := tx.Rollback(); txErr != nil {
+				log.Fatalf("Error updating invoice payment amount: %v", txErr)
+				return txErr
+			}
+
 			return err
 		}
-		// pl.Invoice.AmountDue
-		invoice.AmountDue += pl.Payment
-		if invoice.AmountDue >= invoice.Total {
-			invoice.Status = InvoiceStatuses.Open
-		} else {
-			invoice.Status = InvoiceStatuses.Partial
+		if err = s.updateInvoiceBalance(tx, companyID, pl.Invoice.ID, pl.Payment); err != nil {
+			return err
 		}
-		// pending to send the transaction.s
-		// s.updateInvoiceBalance(nil, companyID, pl.Invoice.ID, pl.Payment)
 	}
 
 	// Adjust customer balance
 	// balance += payment.amount
+	if err = s.updateCustomerAmountDue(tx, companyID, payment.Customer.ID, payment.Amount); err != nil {
+		return err
+	}
 
 	// Mark payment as voided
 	payment.Status = PaymentStatuses.Void
 	// Reset all amount on the receivable incomes items
+	_, err = tx.Exec("UPDATE receivables_income SET amount = 0, status = 'void'::payment_status, payment = NULL WHERE company_id = $1 AND id = $2", companyID, payment.ID)
+	if err != nil {
+		if txErr := tx.Rollback(); txErr != nil {
+			log.Fatalf("Error updating customer amount due: %v", txErr)
+			return txErr
+		}
+	}
 
-	return nil
+	return tx.Commit()
 }

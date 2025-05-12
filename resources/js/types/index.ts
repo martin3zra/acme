@@ -107,7 +107,7 @@ export type PaidStatus = (typeof PaidStatuses)[number];
 export const Statuses = ['enabled', 'disabled'] as const;
 export type Status = (typeof Statuses)[number];
 
-export type StatusType = 'paid' | 'invoice' | 'status';
+export type StatusType = 'paid' | 'invoice' | 'status' | 'payment';
 
 export interface Invoice {
   id: number;
@@ -238,6 +238,7 @@ export type Payment = {
   date: Date;
   amount: number;
   invoices: number;
+  status: string;
   created_at: string;
   updated_at: string;
   notes: string;
