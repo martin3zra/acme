@@ -1,7 +1,7 @@
 import { Button } from '@/components/ui/button';
 import { DropdownMenu, DropdownMenuCheckboxItem, DropdownMenuContent, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { onValueChangeType, PaymentForm, PaymentVerb, ReceivableInvoiceForm } from '@/types';
+import { onValueChangeType, PaymentVerb, ReceivableInvoiceForm } from '@/types';
 import {
   ColumnFiltersState,
   flexRender,
@@ -19,7 +19,7 @@ import { FC, useState } from 'react';
 import { getColumns } from './columns-definitions';
 
 type Props = {
-  data: PaymentForm;
+  data: ReceivableInvoiceForm[];
   rowSelection: RowSelectionState;
   setRowSelection: React.Dispatch<React.SetStateAction<RowSelectionState>>;
   onSelectPaymentLine: (receivableInvoiceForm: ReceivableInvoiceForm, action: PaymentVerb) => void;
@@ -35,7 +35,7 @@ export const List: FC<Props> = ({ data, rowSelection, setRowSelection, onSelectP
   const columns = getColumns({ onDidClick: onSelectPayment });
 
   const table = useReactTable({
-    data: data.lines,
+    data: data,
     columns,
     getRowId: (row: ReceivableInvoiceForm) => row.id.toString(),
     onSortingChange: setSorting,

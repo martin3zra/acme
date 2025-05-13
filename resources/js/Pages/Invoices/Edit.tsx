@@ -544,6 +544,7 @@ export default function Edit({
           </AlertDialogContent>
         </AlertDialog>
         <CheckoutForm
+          action="Update"
           openCheckout={openCheckout}
           setCheckout={setCheckout}
           paymentForm={invoiceForm.payment}

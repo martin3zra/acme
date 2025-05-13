@@ -102,9 +102,7 @@ export const getColumns = ({ onDidClick }: Props): ColumnDef<ReceivableInvoiceFo
       header: (props) => {
         return <HeaderCell title="Balance" alignment="right" columnWidth={props.column.getSize()} />;
       },
-      cell: (props) => {
-        return <CurrencyCell columnWidth={props.column.getSize()} value={props.row.original.amount_due as unknown as string} />;
-      },
+      cell: (props) => <CurrencyCell columnWidth={props.column.getSize()} value={props.row.original.amount_due as unknown as string} />,
     },
     {
       accessorKey: 'payment',
@@ -136,13 +134,7 @@ export const getColumns = ({ onDidClick }: Props): ColumnDef<ReceivableInvoiceFo
         return <HeaderCell title="Remaining" alignment="right" columnWidth={props.column.getSize()} />;
       },
       cell: (props) => {
-        let remaining = props.row.original.amount_due - props.row.original.payment;
-        // if (props.row.original.action !== undefined) {
-        //   remaining = props.row.original.amount_due;
-        // }
-        // if (props.row.original.action === 'updated') {
-        //   remaining = props.row.original.amount_due - props.row.original.payment;
-        // }
+        const remaining = props.row.original.amount_due - props.row.original.payment;
         return <CurrencyCell columnWidth={props.column.getSize()} value={remaining as unknown as string} />;
       },
     },
@@ -164,7 +156,7 @@ export const getColumns = ({ onDidClick }: Props): ColumnDef<ReceivableInvoiceFo
               <DropdownMenuItem>
                 <Link href={`/invoices?id=${props.row.original.uuid}`}>View</Link>
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => onDidClick(props.row.original, 'edit')}>Edit</DropdownMenuItem>
+              <DropdownMenuItem onClick={() => onDidClick(props.row.original, 'trash')}>Delete</DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
         );

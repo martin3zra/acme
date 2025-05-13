@@ -520,6 +520,7 @@ export default function Create({
           </AlertDialogContent>
         </AlertDialog>
         <CheckoutForm
+          action="Place it"
           openCheckout={openCheckout}
           setCheckout={setCheckout}
           paymentForm={invoiceForm.payment}

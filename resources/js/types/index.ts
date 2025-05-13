@@ -144,7 +144,7 @@ export type Verb = 'create' | 'view' | 'edit' | 'trash';
 
 export type InvoiceVerb = Exclude<Verb, 'trash'> | 'void' | 'record-payment';
 
-export type PaymentVerb = Exclude<Verb, 'trash'> | 'void';
+export type PaymentVerb = Verb | 'void';
 
 export type CustomerVerb = Verb | 'record-payment';
 
@@ -254,6 +254,7 @@ export type PaymentHeaderForm = {
 };
 
 export type ReceivableInvoiceForm = ReceivableInvoice & {
+  original_payment: number;
   payment: number;
   discount: number;
   balance: number;
@@ -323,6 +324,7 @@ export function mapPaymentLineToReceivableInvoice(paymentLine: PaymentLine): Rec
     amount_due: invoice.amount_due,
     paid_status: invoice.paid_status,
     notes: invoice.notes, // Placeholder since notes don't exist in PaymentLine
+    original_payment: paymentLine.payment,
     payment: paymentLine.payment,
     discount: 0,
     balance: 0,

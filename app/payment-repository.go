@@ -389,6 +389,10 @@ func (s *Server) processPaymentLines(tx *sql.Tx, companyId, paymentId int, custo
 
 	lines := s.filterPaymentLines(form.Lines, ADDED, UPDATED, DELETED)
 	for _, line := range lines {
+		pLines := filter(paymentLines, func(pl *paymentLine) bool { return pl.ID == line.ID })
+		if len(pLines) == 0 {
+			return errors.New("payment line not found")
+		}
 		switch line.Action {
 		case ADDED:
 			invoice, err := s.findInvoicesByUUID(companyId, line.Uuid)
@@ -408,11 +412,6 @@ func (s *Server) processPaymentLines(tx *sql.Tx, companyId, paymentId int, custo
 				return err
 			}
 		case UPDATED:
-			pLines := filter(paymentLines, func(pl *paymentLine) bool { return pl.ID == line.ID })
-			if len(pLines) == 0 {
-				return errors.New("payment line not found")
-			}
-
 			invoice, err := s.findInvoicesByID(companyId, pLines[0].Invoice.ID)
 			if err != nil {
 				return err
@@ -444,10 +443,10 @@ func (s *Server) processPaymentLines(tx *sql.Tx, companyId, paymentId int, custo
 			if err != nil {
 				return err
 			}
-			if err = s.updateInvoiceBalance(tx, companyId, line.ID, line.Payment); err != nil {
+			if err = s.updateInvoiceBalance(tx, companyId, pLines[0].Invoice.ID, line.Payment); err != nil {
 				return err
 			}
-			if err = s.updateCustomerAmountDue(tx, companyId, customer.ID, -line.Payment); err != nil {
+			if err = s.updateCustomerAmountDue(tx, companyId, customer.ID, line.Payment); err != nil {
 				return err
 			}
 		default:

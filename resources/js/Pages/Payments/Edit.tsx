@@ -30,6 +30,7 @@ import {
   PageProps,
   PaymentForm,
   PaymentMethod,
+  PaymentVerb,
   PaymentWithLines,
   Receivable,
   ReceivableInvoiceForm,
@@ -56,14 +57,12 @@ export default function Edit({
   customers,
   receivables,
   invoice_uuid,
-  forceInitial,
 }: PageProps<{
   payment: PaymentWithLines;
   customer: Customer;
   customers: Customer[];
   receivables: Receivable[];
   invoice_uuid: string;
-  forceInitial: boolean;
 }>) {
   const { currency } = useNumber();
   const [openCancelConfirmation, setCancelConfirmation] = React.useState(false);
@@ -89,12 +88,7 @@ export default function Edit({
     };
     return _payment;
   };
-  const [paymentForm, setPaymentForm, removePaymentForm] = usePersistedState<PaymentForm>(
-    'payment',
-    initialAsPaymentForm(),
-    // { ...defaultPaymentForm, header: { ...defaultPaymentForm.header, customer } },
-    forceInitial,
-  );
+  const [paymentForm, setPaymentForm, removePaymentForm] = usePersistedState<PaymentForm>('payment', initialAsPaymentForm(), true);
   const [rowSelection, setRowSelection] = React.useState<RowSelectionState>({});
   const { headers } = useHeader();
   const { errors: propsErrors } = usePage<PageProps>().props;
@@ -155,9 +149,11 @@ export default function Edit({
   }, [dedbouncedSearch]);
 
   const totalPaid = (): number => {
-    return paymentForm.lines.reduce((acc, line) => {
-      return acc + line.payment;
-    }, 0);
+    return paymentForm.lines
+      .filter((line) => line.action !== 'deleted')
+      .reduce((acc, line) => {
+        return acc + line.payment;
+      }, 0);
   };
 
   const handleRecordPayment = (event: React.MouseEvent<HTMLButtonElement>) => {
@@ -187,6 +183,19 @@ export default function Edit({
         router.get('/payments');
       },
     });
+  };
+
+  const onSelectPaymentLine = (line: ReceivableInvoiceForm, action: PaymentVerb) => {
+    if (action !== 'trash') return;
+    const index = paymentForm.lines.findIndex((l: ReceivableInvoiceForm) => l.uuid === line.uuid);
+    if (index === -1) return;
+
+    paymentForm.lines[index].payment = line.payment;
+    paymentForm.lines[index].action = 'deleted';
+    setPaymentForm((prev) => ({
+      ...prev,
+      lines: [...paymentForm.lines],
+    }));
   };
 
   const handleCustomerSelection = (customer: Customer | undefined) => {
@@ -384,10 +393,10 @@ export default function Edit({
         </div>
         <div className="col-span-12">
           <List
-            data={paymentForm}
+            data={paymentForm.lines.filter((line) => line?.action !== 'deleted')}
             rowSelection={rowSelection}
             setRowSelection={setRowSelection}
-            onSelectPaymentLine={() => {}}
+            onSelectPaymentLine={onSelectPaymentLine}
             onValueChange={handleCellChange}
             onSelectionChange={onSelectionChange}
           />

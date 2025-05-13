@@ -344,7 +344,7 @@ export default function Create({
         </div>
         <div className="col-span-12">
           <List
-            data={paymentForm}
+            data={paymentForm.lines}
             rowSelection={rowSelection}
             setRowSelection={setRowSelection}
             onSelectPaymentLine={() => {}}
