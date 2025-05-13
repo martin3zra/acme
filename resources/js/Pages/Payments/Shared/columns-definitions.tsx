@@ -136,12 +136,14 @@ export const getColumns = ({ onDidClick }: Props): ColumnDef<ReceivableInvoiceFo
         return <HeaderCell title="Remaining" alignment="right" columnWidth={props.column.getSize()} />;
       },
       cell: (props) => {
-        return (
-          <CurrencyCell
-            columnWidth={props.column.getSize()}
-            value={(props.row.original.amount_due - props.row.original.payment) as unknown as string}
-          />
-        );
+        let remaining = props.row.original.amount_due - props.row.original.payment;
+        // if (props.row.original.action !== undefined) {
+        //   remaining = props.row.original.amount_due;
+        // }
+        // if (props.row.original.action === 'updated') {
+        //   remaining = props.row.original.amount_due - props.row.original.payment;
+        // }
+        return <CurrencyCell columnWidth={props.column.getSize()} value={remaining as unknown as string} />;
       },
     },
     {

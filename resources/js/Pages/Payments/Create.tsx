@@ -27,9 +27,9 @@ import { RowSelectionState } from '@tanstack/table-core/build/lib/features/RowSe
 import { format } from 'date-fns/format';
 import { CalendarIcon } from 'lucide-react';
 import React, { useEffect } from 'react';
-import { createPaymentBreadcrumbs } from '../Invoices/constants';
 import CheckoutForm from '../Invoices/Shared/checkout-form';
 import { CustomerSection } from '../Invoices/Shared/customer-section';
+import { createPaymentBreadcrumbs } from '../Payments/constants';
 import { defaultPaymentForm } from './constants';
 import { List } from './Shared/lines-payment';
 

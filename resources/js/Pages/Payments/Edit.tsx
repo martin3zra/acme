@@ -40,10 +40,10 @@ import { RowSelectionState } from '@tanstack/table-core/build/lib/features/RowSe
 import { format } from 'date-fns/format';
 import { CalendarIcon } from 'lucide-react';
 import React, { useEffect } from 'react';
-import { createPaymentBreadcrumbs } from '../Invoices/constants';
 import CheckoutForm from '../Invoices/Shared/checkout-form';
 import { CustomerSection } from '../Invoices/Shared/customer-section';
 import { List } from './Shared/lines-payment';
+import { editPaymentBreadcrumbs } from './constants';
 
 type FlagSet = {
   [key: string]: boolean;
@@ -258,7 +258,7 @@ export default function Edit({
   };
 
   return (
-    <AuthenticatedLayout user={auth.user} breadcrumbs={createPaymentBreadcrumbs}>
+    <AuthenticatedLayout user={auth.user} breadcrumbs={editPaymentBreadcrumbs}>
       <AuthenticatedLayout.Actions>
         <div className="flex justify-end gap-x-6">
           <Button variant={'secondary'} onClick={() => setCancelConfirmation(true)}>

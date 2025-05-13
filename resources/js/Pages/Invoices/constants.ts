@@ -26,21 +26,6 @@ export const createBreadcrumbs: BreadcrumbItem[] = [
   },
 ];
 
-export const createPaymentBreadcrumbs: BreadcrumbItem[] = [
-  {
-    title: 'Home',
-    href: '/home',
-  },
-  {
-    title: 'Payments',
-    href: '/payments',
-  },
-  {
-    title: 'New Payment',
-    href: '/payments/create',
-  },
-];
-
 export const editBreadcrumbs: BreadcrumbItem[] = [
   {
     title: 'Home',

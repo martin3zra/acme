@@ -1,5 +1,5 @@
 import { defaultBTForm, defaultCardForm, defaultCashForm, defaultCheckForm } from '@/constants';
-import { DiscountType, PaymentForm, PaymentHeaderForm, PaymentMethodsForm } from '@/types';
+import { BreadcrumbItem, DiscountType, PaymentForm, PaymentHeaderForm, PaymentMethodsForm } from '@/types';
 
 export const defaultPaymentMethodsForm: PaymentMethodsForm = {
   cash: defaultCashForm,
@@ -16,3 +16,33 @@ export const defaultHeaderForm: PaymentHeaderForm = {
 };
 
 export const defaultPaymentForm: PaymentForm = { header: defaultHeaderForm, lines: [], payment: defaultPaymentMethodsForm };
+
+export const createPaymentBreadcrumbs: BreadcrumbItem[] = [
+  {
+    title: 'Home',
+    href: '/home',
+  },
+  {
+    title: 'Payments',
+    href: '/payments',
+  },
+  {
+    title: 'New Payment',
+    href: '/payments/create',
+  },
+];
+
+export const editPaymentBreadcrumbs: BreadcrumbItem[] = [
+  {
+    title: 'Home',
+    href: '/home',
+  },
+  {
+    title: 'Payments',
+    href: '/payments',
+  },
+  {
+    title: 'Edit Payment',
+    href: '',
+  },
+];

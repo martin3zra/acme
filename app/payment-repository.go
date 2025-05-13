@@ -3,6 +3,7 @@ package app
 import (
 	"database/sql"
 	"errors"
+	"fmt"
 	"log"
 	"time"
 
@@ -32,7 +33,7 @@ type payment struct {
 }
 
 type paymentLine struct {
-	ID      int64   `json:"id"`
+	ID      int     `json:"id"`
 	Payment float64 `json:"payment"`
 	Invoice struct {
 		ID         int        `json:"_"`
@@ -46,6 +47,7 @@ type paymentLine struct {
 		NCF        string     `json:"ncf"`
 		Notes      string     `json:"notes"`
 	} `json:"invoice"`
+	Action LineAction `json:"action"`
 	foundation.Timestamps
 }
 
@@ -145,7 +147,7 @@ func (s *Server) findPaymentLines(companyID int, paymentID int) ([]*paymentLine,
     select receivables_income_items.id, receivables_income_items.payment_amount,
     receivables_income_items.created_at, receivables_income_items.updated_at,
     receivables_income_items.deleted_at,
-    invoices.id, invoices.uuid, invoices.date, invoices.due_on, invoices.total, invoices.amount_due,
+    invoices.id, invoices.uuid, invoices.date, invoices.due_on, invoices.total, receivables_income_items.amount_due,
     invoices.paid_status, tax_receipts.series || tax_receipts.type || LPAD(invoices.tax_receipt_sequence::varchar,8,'0') as NCF, invoices.note
     from receivables_income_items
     inner join companies on receivables_income_items.company_id = companies.id
@@ -247,7 +249,7 @@ func (s *Server) attachPaymentLines(tx *sql.Tx, companyId, paymentId int, form S
 		vals = append(vals, companyId, paymentId, form.Date, invoice.ID, line.AmountDue, line.Payment)
 
 		// Update invoice balance and payment status.
-		if err = s.updateInvoiceBalance(tx, companyId, invoice.ID, -form.Amount); err != nil {
+		if err = s.updateInvoiceBalance(tx, companyId, invoice.ID, -line.Payment); err != nil {
 			return err
 		}
 	}
@@ -291,7 +293,7 @@ func (s *Server) voidPayment(companyID int, uuid string) error {
 		return err
 	}
 	for _, pl := range lines {
-		_, err = tx.Exec("UPDATE receivables_income_items SET payment_amount = 0 WHERE company_id = $1 AND receivable_income_id = $2 AND invoice_id = $3", companyID, payment.ID, pl.Invoice.ID)
+		_, err = tx.Exec("UPDATE receivables_income_items SET payment_amount = 0, amount_due = 0 WHERE company_id = $1 AND receivable_income_id = $2 AND invoice_id = $3", companyID, payment.ID, pl.Invoice.ID)
 		if err != nil {
 			if txErr := tx.Rollback(); txErr != nil {
 				log.Fatalf("Error updating invoice payment amount: %v", txErr)
@@ -342,7 +344,7 @@ func (s *Server) updatePayment(companyId int, uuid string, form UpdatePaymentFor
 	if err != nil {
 		return err
 	}
-	stmt, err := tx.Prepare("UPDATE receivables_income SET customer_id = $1, date = $2, amount = $3, notes = $4, payment = $5 WHERE company_id = $6 AND uuid = $7")
+	stmt, err := tx.Prepare("UPDATE receivables_income SET customer_id = $1, date = $2, amount = $3, notes = $4, payment = $5 WHERE company_id = $6 AND id = $7")
 	if err != nil {
 		defer stmt.Close()
 		if txErr := tx.Rollback(); txErr != nil {
@@ -359,21 +361,117 @@ func (s *Server) updatePayment(companyId int, uuid string, form UpdatePaymentFor
 		form.Amount,
 		form.Notes,
 		foundation.ToJSON(form.Payment),
+		companyId,
 		payment.ID,
-		uuid,
 	)
 
 	if err != nil {
 		return err
 	}
 
-	// if err = s.attachPaymentLines(tx, companyId, payment.ID, form); err != nil {
-	//   return err
-	// }
+	if err = s.processPaymentLines(tx, companyId, payment.ID, customer, form); err != nil {
+		if txErr := tx.Rollback(); txErr != nil {
+			log.Fatalf("Error processing payment lines: %v", txErr)
+			return txErr
+		}
+		return err
+	}
 
-	// if err = s.updateCustomerAmountDue(tx, companyId, customer.ID, -form.Amount); err != nil {
-	//   return err
-	// }
+	return tx.Commit()
+}
 
-	return tx.Rollback()
+func (s *Server) processPaymentLines(tx *sql.Tx, companyId, paymentId int, customer *customer, form UpdatePaymentForm) error {
+
+	paymentLines, err := s.findPaymentLines(companyId, paymentId)
+	if err != nil {
+		return err
+	}
+
+	lines := s.filterPaymentLines(form.Lines, ADDED, UPDATED, DELETED)
+	for _, line := range lines {
+		switch line.Action {
+		case ADDED:
+			invoice, err := s.findInvoicesByUUID(companyId, line.Uuid)
+			if err != nil {
+				return err
+			}
+			_, err = tx.Exec(
+				"INSERT INTO receivables_income_items (company_id, receivable_income_id, date, invoice_id, amount_due, payment_amount) VALUES ($1, $2, $3, $4, $5, $6)",
+				companyId, paymentId, form.Date, invoice.ID, line.AmountDue, line.Payment)
+			if err != nil {
+				return err
+			}
+			if err = s.updateInvoiceBalance(tx, companyId, invoice.ID, -line.Payment); err != nil {
+				return err
+			}
+			if err = s.updateCustomerAmountDue(tx, companyId, invoice.Customer.ID, -line.Payment); err != nil {
+				return err
+			}
+		case UPDATED:
+			pLines := filter(paymentLines, func(pl *paymentLine) bool { return pl.ID == line.ID })
+			if len(pLines) == 0 {
+				return errors.New("payment line not found")
+			}
+
+			invoice, err := s.findInvoicesByID(companyId, pLines[0].Invoice.ID)
+			if err != nil {
+				return err
+			}
+
+			diff := pLines[0].Payment - line.Payment
+			invoice.AmountDue += diff
+			if invoice.AmountDue < 0 {
+				invoice.AmountDue = 0
+			}
+
+			_, err = tx.Exec(
+				"UPDATE receivables_income_items SET payment_amount = $4, amount_due = $5 WHERE company_id = $1 AND receivable_income_id = $2 AND id = $3",
+				companyId, paymentId, line.ID, line.Payment, invoice.AmountDue)
+			if err != nil {
+				return err
+			}
+			if err = s.updateInvoiceBalance(tx, companyId, pLines[0].Invoice.ID, diff); err != nil {
+				return err
+			}
+
+			if err = s.updateCustomerAmountDue(tx, companyId, customer.ID, diff); err != nil {
+				return err
+			}
+		case DELETED:
+			_, err := tx.Exec(
+				"DELETE FROM receivables_income_items WHERE company_id = $1 AND receivable_income_id = $2 AND id = $3",
+				companyId, paymentId, line.ID)
+			if err != nil {
+				return err
+			}
+			if err = s.updateInvoiceBalance(tx, companyId, line.ID, line.Payment); err != nil {
+				return err
+			}
+			if err = s.updateCustomerAmountDue(tx, companyId, customer.ID, -line.Payment); err != nil {
+				return err
+			}
+		default:
+			fmt.Println("Unknown action:", line.Action)
+			return errors.New("unknown action")
+		}
+	}
+	return nil
+}
+
+func (s *Server) filterPaymentLines(lines []*PaymentLine, actions ...LineAction) []*PaymentLine {
+	if len(actions) == 0 {
+		return nil
+	}
+
+	actionSet := make(map[string]struct{}, len(actions))
+	for _, action := range actions {
+		actionSet[string(action)] = struct{}{}
+	}
+	filteredLines := make([]*PaymentLine, 0, len(lines))
+	for _, line := range lines {
+		if _, ok := actionSet[string(line.Action)]; ok {
+			filteredLines = append(filteredLines, line)
+		}
+	}
+	return filteredLines
 }

@@ -6,8 +6,8 @@ import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '
 import useCallbackState from '@/hooks/use-callback-state';
 import AuthenticatedLayout from '@/layouts/authenticated-layout';
 import { BreadcrumbItem, PageProps, Payment, PaymentVerb, PaymentWithLines } from '@/types';
-import { router, usePage } from '@inertiajs/react';
-import { Ban, Printer } from 'lucide-react';
+import { Link, router, usePage } from '@inertiajs/react';
+import { Ban, NotebookPen, Printer } from 'lucide-react';
 import { List } from './List/Index';
 import { AddNewPayment } from './Shared/add-new-payment';
 import Show from './Show';
@@ -112,11 +112,11 @@ export default function Index({
                           <Ban /> Void
                         </Button>
                         <Separator orientation="vertical" />
-                        {/* <Button asChild disabled={payment.header.status === 'void'}>
+                        <Button asChild disabled={payment.header.status === 'void'}>
                           <Link href={`/payments/${payment.header.uuid}/edit`} as="button">
                             <NotebookPen /> Edit
                           </Link>
-                        </Button> */}
+                        </Button>
                       </>
                     )}
 

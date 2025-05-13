@@ -151,6 +151,55 @@ func (s *Server) findInvoicesByUUID(companyId int, uuid string) (*invoice, error
 	return i, nil
 }
 
+func (s *Server) findInvoicesByID(companyId, invoiceId int) (*invoice, error) {
+	i := new(invoice)
+	err := s.db.QueryRow("SELECT invoices.id, invoices.uuid, invoices.date, invoices.due_on, invoices.amount, invoices.amount_due, invoices.discount, invoices.tax, "+
+		"invoices.total, invoices.status, invoices.paid_status, invoices.payment, invoices.note, invoices.tax_receipt_id, "+
+		"tax_receipts.series || tax_receipts.type || LPAD(invoices.tax_receipt_sequence::varchar,8,'0') as NCF, invoices.note, "+
+		"customers.id, customers.uuid, customers.name, customers.email, customers.phone "+
+		"FROM invoices "+
+		"INNER JOIN companies ON (invoices.company_id = companies.id) "+
+		"INNER JOIN customers ON (invoices.company_id = customers.company_id AND invoices.customer_id = customers.id) "+
+		"INNER JOIN tax_receipts ON (invoices.company_id = tax_receipts.company_id AND invoices.tax_receipt_id = tax_receipts.id) "+
+		"WHERE invoices.company_id = $1 AND invoices.id = $2", companyId, invoiceId).
+		Scan(
+			&i.ID,
+			&i.UUID,
+			&i.Date,
+			&i.DueOn,
+			&i.Amount,
+			&i.AmountDue,
+			&i.Discount,
+			&i.Tax,
+			&i.Total,
+			&i.Status,
+			&i.PaidStatus,
+			&i.Payment,
+			&i.Notes,
+			&i.TaxReceiptID,
+			&i.NCF,
+			&i.Notes,
+			&i.Customer.ID,
+			&i.Customer.UUID,
+			&i.Customer.Name,
+			&i.Customer.Email,
+			&i.Customer.Phone)
+	if err != nil {
+		return nil, err
+	}
+	i.Terms = 1
+	if i.DueOn != nil {
+		difference := i.DueOn.Sub(i.Date)
+		// Difference in days
+		i.Terms = int(difference.Hours()) / 24
+	}
+
+	i.Number = s.generatePrefixedInvoiceNumber(i.ID)
+	i.Customer.Address = "LOUISVILLE, Selby 3864 Johnson Street, United States of America"
+
+	return i, nil
+}
+
 func (s *Server) generatePrefixedInvoiceNumber(value int) string {
 	return foundation.GeneratePrefixedNumber("INV-", 10, value)
 }
