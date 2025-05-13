@@ -235,20 +235,14 @@ export type Payment = {
   id: number;
   uuid: string;
   number: string;
-  date: Date;
+  date: string;
   amount: number;
   invoices: number;
   status: string;
   created_at: string;
   updated_at: string;
   notes: string;
-  customer: {
-    uuid: string;
-    name: string;
-    email: string;
-    address: string;
-    amount_due: string;
-  };
+  customer: Customer;
   payment: PaymentMethodsForm;
 };
 
@@ -263,6 +257,7 @@ export type ReceivableInvoiceForm = ReceivableInvoice & {
   payment: number;
   discount: number;
   balance: number;
+  action: LineAction;
 };
 
 export type PaymentForm = {
@@ -282,8 +277,8 @@ export interface ReceivableInvoice {
   uuid: string;
   number: string;
   ncf: string;
-  date: string;
-  due_on: string;
+  date: Date;
+  due_on: Date;
   total: number;
   amount_due: number;
   paid_status: string;
@@ -300,7 +295,10 @@ export interface PaymentLine {
     amount: number;
     amount_due: number;
     date: string;
+    due_on: string;
     paid_status: PaidStatus;
+    ncf: string;
+    notes: string;
   };
 }
 
@@ -310,3 +308,24 @@ export interface PaymentWithLines {
 }
 
 export type onValueChangeType = (inputId: string, newValue: string | number) => void;
+
+export function mapPaymentLineToReceivableInvoice(paymentLine: PaymentLine): ReceivableInvoiceForm {
+  const { invoice } = paymentLine;
+
+  return {
+    id: paymentLine.id,
+    uuid: invoice.uuid,
+    number: invoice.number,
+    ncf: invoice.ncf, // Placeholder since PaymentLine does not have this field
+    date: new Date(invoice.date),
+    due_on: new Date(invoice.due_on), // Placeholder, not present in PaymentLine
+    total: invoice.amount,
+    amount_due: invoice.amount_due,
+    paid_status: invoice.paid_status,
+    notes: invoice.notes, // Placeholder since notes don't exist in PaymentLine
+    payment: paymentLine.payment,
+    discount: 0,
+    balance: 0,
+    action: 'unchanged', // Placeholder, as the action is not defined in PaymentLine
+  };
+}

@@ -39,9 +39,12 @@ type paymentLine struct {
 		UUID       string     `json:"uuid"`
 		Number     string     `json:"number"`
 		Date       time.Time  `json:"date"`
+		DueOn      *time.Time `json:"due_on"`
 		PaidStatus PaidStatus `json:"paid_status"`
 		Amount     float64    `json:"amount"`
 		AmountDue  float64    `json:"amount_due"`
+		NCF        string     `json:"ncf"`
+		Notes      string     `json:"notes"`
 	} `json:"invoice"`
 	foundation.Timestamps
 }
@@ -142,11 +145,13 @@ func (s *Server) findPaymentLines(companyID int, paymentID int) ([]*paymentLine,
     select receivables_income_items.id, receivables_income_items.payment_amount,
     receivables_income_items.created_at, receivables_income_items.updated_at,
     receivables_income_items.deleted_at,
-    invoices.id, invoices.uuid, invoices.date, invoices.total, invoices.amount_due, invoices.paid_status
+    invoices.id, invoices.uuid, invoices.date, invoices.due_on, invoices.total, invoices.amount_due,
+    invoices.paid_status, tax_receipts.series || tax_receipts.type || LPAD(invoices.tax_receipt_sequence::varchar,8,'0') as NCF, invoices.note
     from receivables_income_items
     inner join companies on receivables_income_items.company_id = companies.id
     inner join receivables_income on receivables_income_items.company_id = receivables_income.company_id and receivables_income_items.receivable_income_id = receivables_income.id
     inner join invoices on receivables_income_items.company_id = invoices.company_id and receivables_income_items.invoice_id = invoices.id
+    INNER JOIN tax_receipts ON (invoices.company_id = tax_receipts.company_id AND invoices.tax_receipt_id = tax_receipts.id)
     where receivables_income_items.company_id = $1
     and receivables_income_items.receivable_income_id = $2
     ORDER BY receivables_income_items.id
@@ -166,9 +171,12 @@ func (s *Server) findPaymentLines(companyID int, paymentID int) ([]*paymentLine,
 			&i.Invoice.ID,
 			&i.Invoice.UUID,
 			&i.Invoice.Date,
+			&i.Invoice.DueOn,
 			&i.Invoice.Amount,
 			&i.Invoice.AmountDue,
 			&i.Invoice.PaidStatus,
+			&i.Invoice.NCF,
+			&i.Invoice.Notes,
 		); err != nil {
 			return nil, err
 		}
@@ -313,4 +321,59 @@ func (s *Server) voidPayment(companyID int, uuid string) error {
 	}
 
 	return tx.Commit()
+}
+
+func (s *Server) updatePayment(companyId int, uuid string, form UpdatePaymentForm) error {
+	payment, err := s.findPaymentByUUID(companyId, uuid)
+	if err != nil {
+		return err
+	}
+
+	if payment.Status == PaymentStatuses.Void {
+		return errors.New("payment already voided")
+	}
+
+	customer, err := s.findCustomeByUUID(companyId, form.CustomerID)
+	if err != nil {
+		return err
+	}
+
+	tx, err := s.db.Begin()
+	if err != nil {
+		return err
+	}
+	stmt, err := tx.Prepare("UPDATE receivables_income SET customer_id = $1, date = $2, amount = $3, notes = $4, payment = $5 WHERE company_id = $6 AND uuid = $7")
+	if err != nil {
+		defer stmt.Close()
+		if txErr := tx.Rollback(); txErr != nil {
+			log.Fatalf("Error updating item: %v", txErr)
+			return txErr
+		}
+
+		return err
+	}
+
+	_, err = stmt.Exec(
+		customer.ID,
+		form.Date,
+		form.Amount,
+		form.Notes,
+		foundation.ToJSON(form.Payment),
+		payment.ID,
+		uuid,
+	)
+
+	if err != nil {
+		return err
+	}
+
+	// if err = s.attachPaymentLines(tx, companyId, payment.ID, form); err != nil {
+	//   return err
+	// }
+
+	// if err = s.updateCustomerAmountDue(tx, companyId, customer.ID, -form.Amount); err != nil {
+	//   return err
+	// }
+
+	return tx.Rollback()
 }

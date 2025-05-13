@@ -157,11 +157,11 @@ export const getColumns = ({ onDidClick }: Props): ColumnDef<Payment>[] => {
               <DropdownMenuLabel>Actions</DropdownMenuLabel>
               <DropdownMenuSeparator />
               <DropdownMenuItem onClick={() => onDidClick(props.row.original, 'view')}>View</DropdownMenuItem>
-              <DropdownMenuItem onClick={() => onDidClick(props.row.original, 'edit')} disabled={disabled}>
-                Edit
-              </DropdownMenuItem>
               {props.row.original.status !== 'void' && (
                 <>
+                  <DropdownMenuItem onClick={() => onDidClick(props.row.original, 'edit')} disabled={disabled}>
+                    Edit
+                  </DropdownMenuItem>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem onClick={() => onDidClick(props.row.original, 'void')} disabled={disabled}>
                     Void

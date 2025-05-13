@@ -163,3 +163,74 @@ func (s *Server) voidPaymentHandler(i *inertia.Inertia) http.Handler {
 
 	return http.HandlerFunc(fn)
 }
+
+func (s *Server) editPaymentHandler(i *inertia.Inertia) http.Handler {
+	fn := func(w http.ResponseWriter, r *http.Request) {
+		uuid := r.PathValue("id")
+		back := func() {
+			i.Back(w, r, http.StatusSeeOther)
+		}
+		user := auth.User(r.Context())
+
+		if !ensureUUIDIsValid(uuid) {
+			back()
+			return
+		}
+
+		payment, err := s.findPaymentByUUID(*user.CurrentCompanyId, uuid)
+		if err != nil {
+			s.handleError(w, err)
+			return
+		}
+
+		lines, err := s.findPaymentLines(*user.CurrentCompanyId, payment.ID)
+		if err != nil {
+			s.handleError(w, err)
+			return
+		}
+
+		err = i.Render(w, r, "Payments/Edit", inertia.Props{
+			"payment": map[string]any{
+				"header": payment,
+				"lines":  lines,
+			},
+			"showPayment": true,
+		})
+		if err != nil {
+			s.handleError(w, err)
+			return
+		}
+	}
+
+	return http.HandlerFunc(fn)
+}
+
+func (s *Server) updatePaymentHandler(i *inertia.Inertia) http.Handler {
+	fn := func(w http.ResponseWriter, r *http.Request) {
+		uuid := r.PathValue("id")
+		back := func() {
+			i.Back(w, r, http.StatusSeeOther)
+		}
+		var form UpdatePaymentForm
+		err := support.ParseRequest(r, &form)
+		if err != nil {
+			back()
+			return
+		}
+
+		user := auth.User(r.Context())
+		err = s.updatePayment(*user.CurrentCompanyId, uuid, form)
+		if err != nil {
+			log.Printf("Error recording payment: %v", err)
+			s.session.Errors("status", "Payment wasn't recorded. Something went wrong.")
+			back()
+			return
+		}
+
+		s.session.Flash("success", "Payment was recorded successfully!")
+
+		i.Redirect(w, r, "/payments", http.StatusSeeOther)
+	}
+
+	return http.HandlerFunc(fn)
+}

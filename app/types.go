@@ -451,10 +451,12 @@ func (form UpdateInvoiceForm) Rules() map[string]any {
 }
 
 type PaymentLine struct {
-	Uuid      string  `json:"uuid"`
-	AmountDue float64 `json:"amount_due"`
-	Payment   float64 `json:"payment"`
-	Discount  float64 `json:"discount"`
+	ID        int        `json:"id"`
+	Uuid      string     `json:"uuid"`
+	AmountDue float64    `json:"amount_due"`
+	Payment   float64    `json:"payment"`
+	Discount  float64    `json:"discount"`
+	Action    LineAction `json:"action"`
 }
 
 type StorePaymentForm struct {
@@ -478,5 +480,30 @@ func (form StorePaymentForm) Rules() map[string]any {
 		"lines.*.payment":    "required|min:0",
 		"lines.*.discount":   "sometimes",
 		// "lines.*.action": "required|in:added",
+	}
+}
+
+type UpdatePaymentForm struct {
+	support.FormRequest
+	CustomerID string         `json:"customer_id"`
+	Date       time.Time      `json:"date"`
+	Notes      string         `json:"notes"`
+	Lines      []*PaymentLine `json:"lines"`
+	Payment    Payment        `json:"payment"`
+	Amount     float64        `json:"amount"`
+}
+
+func (form UpdatePaymentForm) Rules() map[string]any {
+	return map[string]any{
+		"customer_id":        "bail|required|exists:customers,uuid",
+		"date":               "bail|required|date",
+		"notes":              "sometime",
+		"lines":              "required|min:1",
+		"lines.*.id":         "required|exists:receivables_income_items,id",
+		"lines.*.uuid":       "required|exists:invoices,uuid",
+		"lines.*.amount_due": "required",
+		"lines.*.payment":    "required|min:0",
+		"lines.*.discount":   "sometimes",
+		"lines.*.action":     "required|in:added,updated,deleted,unchanged",
 	}
 }
