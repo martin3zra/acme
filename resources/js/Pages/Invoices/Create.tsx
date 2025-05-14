@@ -520,11 +520,12 @@ export default function Create({
           </AlertDialogContent>
         </AlertDialog>
         <CheckoutForm
+          action="Place it"
           openCheckout={openCheckout}
           setCheckout={setCheckout}
           paymentForm={invoiceForm.payment}
           totalAmount={computeTotalAmount()}
-          onPlacedInvoice={placedInvoice}
+          onCompleteCheckout={placedInvoice}
           processing={processing}
           setCancelConfirmation={setCancelConfirmation}
           errors={propsErrors}

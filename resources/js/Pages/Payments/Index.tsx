@@ -5,11 +5,11 @@ import { Separator } from '@/components/ui/separator';
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import useCallbackState from '@/hooks/use-callback-state';
 import AuthenticatedLayout from '@/layouts/authenticated-layout';
-import { BreadcrumbItem, Invoice, InvoiceVerb, InvoiceWithLines, PageProps } from '@/types';
+import { BreadcrumbItem, PageProps, Payment, PaymentVerb, PaymentWithLines } from '@/types';
 import { Link, router, usePage } from '@inertiajs/react';
-import { Ban, DollarSign, NotebookPen, Printer } from 'lucide-react';
+import { Ban, NotebookPen, Printer } from 'lucide-react';
 import { List } from './List/Index';
-import { AddNewInvoice } from './Shared/AddNewInvoice';
+import { AddNewPayment } from './Shared/add-new-payment';
 import Show from './Show';
 
 const breadcrumbs: BreadcrumbItem[] = [
@@ -18,51 +18,45 @@ const breadcrumbs: BreadcrumbItem[] = [
     href: '/home',
   },
   {
-    title: 'Invoices',
-    href: '/invoices',
+    title: 'Payments',
+    href: '/payments',
   },
 ];
 export default function Index({
   auth,
-  invoices,
-  invoice,
-  showInvoice,
-}: PageProps<{ invoices: Invoice[]; invoice: InvoiceWithLines; showInvoice: boolean }>) {
-  const [open, setOpen] = useCallbackState<boolean>(showInvoice);
-  const [selectedInvoice, setSelectedInvoice] = useCallbackState<Invoice | undefined>(undefined);
+  payments,
+  payment,
+  showPayment,
+}: PageProps<{ payments: Payment[]; payment: PaymentWithLines; showPayment: boolean }>) {
+  const [open, setOpen] = useCallbackState<boolean>(showPayment);
+  const [selectedPayment, setSelectedPayment] = useCallbackState<Payment | undefined>(undefined);
   const [deleteDialogOpen, setDeleteDialogOpen] = useCallbackState<boolean>(false);
   const page = usePage();
-  const hasInvoices = invoices.length > 0;
+  const hasPayments = payments.length > 0;
 
-  const onSelectInvoice = (invoice: Invoice, action: InvoiceVerb): void => {
-    setSelectedInvoice(invoice);
-
-    if (action === 'record-payment') {
-      router.visit(`/payments/create`, { data: { customer_id: invoice.customer.uuid, invoice_id: invoice.uuid } });
-      return;
-    }
+  const onSelectPayment = (payment: Payment, action: PaymentVerb): void => {
+    setSelectedPayment(payment);
     if (action === 'void') {
       setDeleteDialogOpen(true);
       return;
     }
     if (action === 'edit') {
-      router.visit(`/invoices/${invoice.uuid}/edit`);
+      router.visit(`/payments/${payment.uuid}/edit`);
       return;
     }
     if (action !== 'view') return;
 
-    if (open) return;
     setOpen(
       (open) => !open,
       (newVal) => {
-        if (newVal) findSelectedInvoice(invoice.uuid);
+        if (newVal) findSelectedPayment(payment.uuid);
       },
     );
   };
 
-  const findSelectedInvoice = (uuid: string) => {
+  const findSelectedPayment = (uuid: string) => {
     router.visit(page.url, {
-      except: ['invoices'],
+      except: ['payments'],
       data: { id: uuid },
       preserveScroll: true,
       preserveState: true,
@@ -88,48 +82,41 @@ export default function Index({
   return (
     <AuthenticatedLayout user={auth.user} breadcrumbs={breadcrumbs}>
       <div className="space-y-6">
-        {hasInvoices && <HeadingSmall title="Invoices" description="All created invoices are shown here" rightPanel={<AddNewInvoice />} />}
+        {hasPayments && <HeadingSmall title="Payments" description="All created payments are shown here" rightPanel={<AddNewPayment />} />}
 
-        {!hasInvoices && (
+        {!hasPayments && (
           <>
             <div className="absolute top-1/2 left-1/2 flex h-[244px] min-w-3xl -translate-x-1/2 -translate-y-1/2 flex-col items-center gap-4 rounded-[16px] bg-white p-[40px] shadow-[0px_8px_12px_-4px_rgba(16,12,12,0.08),0px_0px_2px_rgba(16,12,12,0.1),0px_1px_2px_rgba(16,12,12,0.1)]">
-              <h4 className="text-2xl">Create your first invoice</h4>
-              <p className="text-sm text-gray-400">Once you create your invoice, it will appear here.</p>
-              <AddNewInvoice />
+              <h4 className="text-2xl">Create your first payment</h4>
+              <p className="text-sm text-gray-400">Once you create your payment, it will appear here.</p>
+              <AddNewPayment />
             </div>
           </>
         )}
 
-        {hasInvoices && <List data={invoices} onSelectInvoice={onSelectInvoice} />}
+        {hasPayments && <List data={payments} onSelectPayment={onSelectPayment} />}
 
-        {invoice && (
+        {payment && (
           <Sheet open={open} onOpenChange={onOpenChange}>
             <SheetContent side="right" className="m-4 flex h-[calc(~'(100%-var(--spacing)*4)/3')] w-full flex-col rounded-md sm:max-w-7xl">
               <SheetHeader>
                 <div className="mr-6 flex items-start justify-between">
                   <div className="flex flex-col">
                     <SheetTitle>Acme</SheetTitle>
-                    <SheetDescription className="text-[12px]">Invoice details</SheetDescription>
+                    <SheetDescription className="text-[12px]">payment details</SheetDescription>
                   </div>
                   <div className="mx-4 flex gap-x-3">
-                    {invoice.header.status !== 'void' && (
+                    {payment.header.status !== 'void' && (
                       <>
-                        <Button variant={'destructive'} onClick={() => onSelectInvoice(invoice.header, 'void')}>
+                        <Button variant={'destructive'} onClick={() => onSelectPayment(payment.header, 'void')}>
                           <Ban /> Void
                         </Button>
                         <Separator orientation="vertical" />
-                        <Button asChild disabled={invoice.header.status === 'void'}>
-                          <Link href={`/invoices/${invoice.header.uuid}/edit`} as="button">
+                        <Button asChild disabled={payment.header.status === 'void'}>
+                          <Link href={`/payments/${payment.header.uuid}/edit`} as="button">
                             <NotebookPen /> Edit
                           </Link>
                         </Button>
-                        {(invoice.header.paid_status === 'unpaid' || invoice.header.paid_status === 'partial') && (
-                          <Button asChild disabled={invoice.header.status === 'void'}>
-                            <Link href={`/payments/create?customer_id=${invoice.header.customer.uuid}&invoice_id=${invoice.header.uuid}`} as="button">
-                              <DollarSign /> Record payment
-                            </Link>
-                          </Button>
-                        )}
                       </>
                     )}
 
@@ -140,24 +127,24 @@ export default function Index({
                 </div>
               </SheetHeader>
               <div className="relative grid gap-4 px-4">
-                {invoice.header.status === 'void' && (
+                {payment.header.status === 'void' && (
                   <div className="absolute inset-0 flex w-full items-center justify-center overflow-y-hidden bg-transparent">
                     <h1 className="-rotate-45 border-8 border-red-500/25 p-8 text-8xl font-extrabold text-red-500/25">VOID</h1>
                   </div>
                 )}
-                <Show invoice={invoice} auth={auth} />
+                <Show payment={payment} auth={auth} />
               </div>
             </SheetContent>
           </Sheet>
         )}
 
-        {selectedInvoice && (
+        {selectedPayment && (
           <ConfirmsPassword
-            title={`Are you sure you want to void ${selectedInvoice.number}?`}
-            description={`Once the invoice is void it will go from ${selectedInvoice.total} to $0.00.`}
+            title={`Are you sure you want to void ${selectedPayment.number}?`}
+            description={`Once the payment is void it will go from ${selectedPayment.amount} to $0.00.`}
             action={`Void it`}
             verb={'update'}
-            path={`/invoices/${selectedInvoice.uuid}/void`}
+            path={`/payments/${selectedPayment.uuid}/void`}
             open={deleteDialogOpen}
             onOpenChange={modalHandler}
           />

@@ -4,9 +4,9 @@ import { NavUser } from '@/components/nav-user';
 import { Sidebar, SidebarContent, SidebarFooter, SidebarHeader, SidebarMenu, SidebarMenuButton, SidebarMenuItem } from '@/components/ui/sidebar';
 import { Link } from '@inertiajs/react';
 import {
+  ClipboardList,
   Command,
   CreditCard,
-  FilePenIcon,
   HelpCircleIcon,
   LayoutDashboardIcon,
   LayoutListIcon,
@@ -22,31 +22,31 @@ const data = {
       title: 'Dashboard',
       url: '/home',
       icon: LayoutDashboardIcon,
-      component: 'Home/Index',
+      components: ['Home/Index'],
     },
     {
       title: 'Invoices',
       url: '/invoices',
-      icon: FilePenIcon,
-      component: 'Invoices/Index',
+      icon: ClipboardList,
+      components: ['Invoices/Index', 'Invoices/Create'],
     },
     {
       title: 'Customers',
       url: '/customers',
       icon: UsersIcon,
-      component: 'Customers/Index',
+      components: ['Customers/Index'],
     },
     {
       title: 'Items',
       url: '/items',
       icon: LayoutListIcon,
-      component: 'Items/Index',
+      components: ['Items/Index'],
     },
     {
       title: 'Payments',
       url: '/payments',
       icon: CreditCard,
-      component: 'Payments/Index',
+      components: ['Payments/Index', 'Payments/Create'],
     },
   ],
   navSecondary: [

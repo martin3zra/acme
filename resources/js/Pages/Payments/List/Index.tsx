@@ -1,7 +1,7 @@
 import { Button } from '@/components/ui/button';
 import { DropdownMenu, DropdownMenuCheckboxItem, DropdownMenuContent, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Invoice, InvoiceVerb } from '@/types';
+import { Payment, PaymentVerb } from '@/types';
 import {
   ColumnFiltersState,
   flexRender,
@@ -18,19 +18,17 @@ import { FC, useState } from 'react';
 import { getColumns } from './columns-definitions';
 
 type Props = {
-  data: Invoice[];
-  onSelectInvoice: (invoice: Invoice, action: InvoiceVerb) => void;
+  data: Payment[];
+  onSelectPayment: (Payment: Payment, action: PaymentVerb) => void;
 };
 
-export const List: FC<Props> = ({ data, onSelectInvoice }) => {
+export const List: FC<Props> = ({ data, onSelectPayment }) => {
   const [sorting, setSorting] = useState<SortingState>([]);
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
-  const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({
-    ncf: false,
-  });
+  const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({});
   const [rowSelection, setRowSelection] = useState({});
 
-  const columns = getColumns({ onDidClick: onSelectInvoice });
+  const columns = getColumns({ onDidClick: onSelectPayment });
 
   const table = useReactTable({
     data,

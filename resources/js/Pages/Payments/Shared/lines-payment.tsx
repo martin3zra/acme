@@ -1,7 +1,7 @@
 import { Button } from '@/components/ui/button';
 import { DropdownMenu, DropdownMenuCheckboxItem, DropdownMenuContent, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Invoice, InvoiceVerb } from '@/types';
+import { onValueChangeType, PaymentVerb, ReceivableInvoiceForm } from '@/types';
 import {
   ColumnFiltersState,
   flexRender,
@@ -9,6 +9,7 @@ import {
   getFilteredRowModel,
   getPaginationRowModel,
   getSortedRowModel,
+  RowSelectionState,
   SortingState,
   useReactTable,
   VisibilityState,
@@ -18,23 +19,25 @@ import { FC, useState } from 'react';
 import { getColumns } from './columns-definitions';
 
 type Props = {
-  data: Invoice[];
-  onSelectInvoice: (invoice: Invoice, action: InvoiceVerb) => void;
+  data: ReceivableInvoiceForm[];
+  rowSelection: RowSelectionState;
+  setRowSelection: React.Dispatch<React.SetStateAction<RowSelectionState>>;
+  onSelectPaymentLine: (receivableInvoiceForm: ReceivableInvoiceForm, action: PaymentVerb) => void;
+  onValueChange?: onValueChangeType;
+  onSelectionChange: (selection: RowSelectionState) => void;
 };
 
-export const List: FC<Props> = ({ data, onSelectInvoice }) => {
+export const List: FC<Props> = ({ data, rowSelection, setRowSelection, onSelectPaymentLine: onSelectPayment, onValueChange, onSelectionChange }) => {
   const [sorting, setSorting] = useState<SortingState>([]);
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
-  const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({
-    ncf: false,
-  });
-  const [rowSelection, setRowSelection] = useState({});
+  const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({});
 
-  const columns = getColumns({ onDidClick: onSelectInvoice });
+  const columns = getColumns({ onDidClick: onSelectPayment });
 
   const table = useReactTable({
-    data,
+    data: data,
     columns,
+    getRowId: (row: ReceivableInvoiceForm) => row.id.toString(),
     onSortingChange: setSorting,
     onColumnFiltersChange: setColumnFilters,
     getCoreRowModel: getCoreRowModel(),
@@ -42,7 +45,16 @@ export const List: FC<Props> = ({ data, onSelectInvoice }) => {
     getSortedRowModel: getSortedRowModel(),
     getFilteredRowModel: getFilteredRowModel(),
     onColumnVisibilityChange: setColumnVisibility,
-    onRowSelectionChange: setRowSelection,
+    onRowSelectionChange: (updater) => {
+      const nextSelection = typeof updater === 'function' ? updater(rowSelection) : updater;
+      onSelectionChange(nextSelection);
+      setRowSelection(nextSelection);
+    },
+    meta: {
+      updateData: (inputId: string, rowIndex: number, columnId: string, value: string) => {
+        onValueChange?.(inputId, value);
+      },
+    },
     state: {
       sorting,
       columnFilters,
@@ -85,7 +97,7 @@ export const List: FC<Props> = ({ data, onSelectInvoice }) => {
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
-      <div className="rounded-md border">
+      <div className="rounded-md border [&_[data-type=number]]:text-right">
         <Table>
           <TableHeader>
             {table.getHeaderGroups().map((headerGroup) => (

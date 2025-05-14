@@ -11,17 +11,25 @@ import (
 
 func (s *Server) customersHandler(i *inertia.Inertia) http.Handler {
 	fn := func(w http.ResponseWriter, r *http.Request) {
-
+		uuid := r.URL.Query().Get("id")
 		user := auth.User(r.Context())
 		customers, err := s.findCustomers(*user.CurrentCompanyId)
 		if err != nil {
 			s.handleError(w, err)
 			return
 		}
-
-		err = i.Render(w, r, "Customers/Index", inertia.Props{
+		props := inertia.Props{
 			"customers": customers,
-		})
+		}
+		if ensureUUIDIsValid(uuid) {
+			customer, err := s.findCustomeByUUID(*user.CurrentCompanyId, uuid)
+			if err != nil {
+				s.handleError(w, err)
+				return
+			}
+			props["customer"] = customer
+		}
+		err = i.Render(w, r, "Customers/Index", props)
 		if err != nil {
 			s.handleError(w, err)
 			return

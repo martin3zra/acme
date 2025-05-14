@@ -96,9 +96,18 @@ export type DiscountType = {
   value: number;
 };
 
-export const PaidStatuses = ['paid', 'unpaid', 'partial', 'removed'] as const;
+export const InvoiceStatuses = ['open', 'draft', 'sent', 'viewed', 'overdue', 'completed', 'void', 'partial'] as const;
+
+export type InvoiceStatus = (typeof InvoiceStatuses)[number];
+
+export const PaidStatuses = ['paid', 'unpaid', 'partial', 'removed', 'overpaid', 'pending'] as const;
 
 export type PaidStatus = (typeof PaidStatuses)[number];
+
+export const Statuses = ['enabled', 'disabled'] as const;
+export type Status = (typeof Statuses)[number];
+
+export type StatusType = 'paid' | 'invoice' | 'status' | 'payment';
 
 export interface Invoice {
   id: number;
@@ -114,7 +123,8 @@ export interface Invoice {
   discount: DiscountType;
   tax: number;
   total: number;
-  payment: PaymentForm;
+  amount_due: number;
+  payment: PaymentMethodsForm;
   status: string;
   paid_status: PaidStatus;
   notes: string;
@@ -133,6 +143,10 @@ export interface BreadcrumbItem {
 export type Verb = 'create' | 'view' | 'edit' | 'trash';
 
 export type InvoiceVerb = Exclude<Verb, 'trash'> | 'void' | 'record-payment';
+
+export type PaymentVerb = Verb | 'void';
+
+export type CustomerVerb = Verb | 'record-payment';
 
 export interface PaymentFormType {
   amount: number;
@@ -183,7 +197,7 @@ export interface LineForm extends Item {
   action: LineAction;
 }
 
-export type PaymentForm = {
+export type PaymentMethodsForm = {
   cash: CashForm;
   ck: CheckForm;
   card: CardForm;
@@ -214,5 +228,106 @@ export type HeaderForm = {
 export type InvoiceForm = {
   header: HeaderForm;
   lines: LineForm[];
-  payment: PaymentForm;
+  payment: PaymentMethodsForm;
 };
+
+export type Payment = {
+  id: number;
+  uuid: string;
+  number: string;
+  date: string;
+  amount: number;
+  invoices: number;
+  status: string;
+  created_at: string;
+  updated_at: string;
+  notes: string;
+  customer: Customer;
+  payment: PaymentMethodsForm;
+};
+
+export type PaymentHeaderForm = {
+  customer: Customer | undefined;
+  date: Date | undefined;
+  notes: string;
+  discount: number;
+};
+
+export type ReceivableInvoiceForm = ReceivableInvoice & {
+  original_payment: number;
+  payment: number;
+  discount: number;
+  balance: number;
+  action: LineAction;
+};
+
+export type PaymentForm = {
+  header: PaymentHeaderForm;
+  lines: ReceivableInvoiceForm[];
+  payment: PaymentMethodsForm;
+};
+
+export interface Receivable {
+  id: number;
+  uuid: string;
+  invoice: ReceivableInvoice;
+}
+
+export interface ReceivableInvoice {
+  id: number;
+  uuid: string;
+  number: string;
+  ncf: string;
+  date: Date;
+  due_on: Date;
+  total: number;
+  amount_due: number;
+  paid_status: string;
+  notes: string;
+}
+
+export interface PaymentLine {
+  id: number;
+  created_at: string;
+  payment: number;
+  invoice: {
+    uuid: string;
+    number: string;
+    amount: number;
+    amount_due: number;
+    date: string;
+    due_on: string;
+    paid_status: PaidStatus;
+    ncf: string;
+    notes: string;
+  };
+}
+
+export interface PaymentWithLines {
+  header: Payment;
+  lines: PaymentLine[];
+}
+
+export type onValueChangeType = (inputId: string, newValue: string | number) => void;
+
+export function mapPaymentLineToReceivableInvoice(paymentLine: PaymentLine): ReceivableInvoiceForm {
+  const { invoice } = paymentLine;
+
+  return {
+    id: paymentLine.id,
+    uuid: invoice.uuid,
+    number: invoice.number,
+    ncf: invoice.ncf, // Placeholder since PaymentLine does not have this field
+    date: new Date(invoice.date),
+    due_on: new Date(invoice.due_on), // Placeholder, not present in PaymentLine
+    total: invoice.amount,
+    amount_due: invoice.amount_due,
+    paid_status: invoice.paid_status,
+    notes: invoice.notes, // Placeholder since notes don't exist in PaymentLine
+    original_payment: paymentLine.payment,
+    payment: paymentLine.payment,
+    discount: 0,
+    balance: 0,
+    action: 'unchanged', // Placeholder, as the action is not defined in PaymentLine
+  };
+}

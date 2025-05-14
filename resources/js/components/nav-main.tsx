@@ -11,7 +11,7 @@ export function NavMain({
     title: string;
     url: string;
     icon: LucideIcon;
-    component: string;
+    components: string[];
   }[];
 }) {
   const { component } = usePage();
@@ -25,7 +25,7 @@ export function NavMain({
               <SidebarMenuButton
                 asChild
                 tooltip={item.title}
-                className={`${component === item.component ? 'bg-primary text-primary-foreground hover:bg-primary/90 hover:text-primary-foreground active:text-primary-foreground duration-200 ease-linear' : ''} cursor-pointer`}
+                className={`${item.components.includes(component) ? 'bg-primary text-primary-foreground hover:bg-primary/90 hover:text-primary-foreground active:text-primary-foreground duration-200 ease-linear' : ''} cursor-pointer`}
               >
                 <div>
                   <item.icon />

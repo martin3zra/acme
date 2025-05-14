@@ -2,7 +2,7 @@ import { CurrencyCell } from '@/components/data-table/currency-cell';
 import { DateCell } from '@/components/data-table/date-cell';
 import { HeaderCell } from '@/components/data-table/header-cell';
 import { TextCell } from '@/components/data-table/text-cell';
-import { Badge } from '@/components/ui/badge';
+import { StatusBadge } from '@/components/status-badge';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import {
@@ -86,13 +86,7 @@ export const getColumns = ({ onDidClick }: Props): ColumnDef<Item>[] => {
         return <HeaderCell title="Status" alignment="center" columnWidth={props.column.getSize()} />;
       },
       cell: (props) => {
-        const isEnabled = props.row.original.status === 'enabled';
-        const capitalized = props.row.original.status.charAt(0).toUpperCase() + props.row.original.status.slice(1);
-        return (
-          <div className={`pl-1.5 w-[${props.column.getSize()}px]`}>
-            <Badge variant={`${isEnabled ? 'default' : 'destructive'}`}>{capitalized}</Badge>
-          </div>
-        );
+        return <StatusBadge type="status" status={props.row.original.status} />;
       },
     },
     {
@@ -111,7 +105,7 @@ export const getColumns = ({ onDidClick }: Props): ColumnDef<Item>[] => {
       meta: 'Added On',
       // size: 880,
       header: (props) => {
-        return <HeaderCell title="Added On" alignment="right" columnWidth={props.column.getSize()} />;
+        return <HeaderCell title="Added On" alignment="left" columnWidth={props.column.getSize()} />;
       },
       cell: (props) => {
         return <DateCell columnWidth={props.column.getSize()} value={props.getValue() as string} />;

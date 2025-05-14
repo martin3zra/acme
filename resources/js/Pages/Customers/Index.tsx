@@ -4,7 +4,8 @@ import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { useVerb } from '@/composables/use-verbs';
 import AuthenticatedLayout from '@/layouts/authenticated-layout';
-import { BreadcrumbItem, Customer, PageProps, Verb } from '@/types';
+import { BreadcrumbItem, Customer, CustomerVerb, PageProps } from '@/types';
+import { router } from '@inertiajs/react';
 import { Plus } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { List } from './List/Index';
@@ -21,10 +22,13 @@ const breadcrumbs: BreadcrumbItem[] = [
   },
 ];
 
-export default function Index({ auth, customers }: PageProps<{ customers: Customer[] }>) {
-  const [open, setOpen] = useState(false);
+export default function Index({ auth, customers, customer }: PageProps<{ customers: Customer[]; customer: Customer }>) {
+  const [open, setOpen] = useState(customer !== undefined);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  const [selectedCustomer, setSelectedCustomer] = useState<CreateFormParams>({ customer: undefined, action: 'create' });
+  const [selectedCustomer, setSelectedCustomer] = useState<CreateFormParams>({
+    customer: customer,
+    action: customer !== undefined ? 'view' : 'create',
+  });
 
   const verbName = useVerb().action(selectedCustomer.action);
   const hasCustomers = customers.length > 0;
@@ -34,7 +38,11 @@ export default function Index({ auth, customers }: PageProps<{ customers: Custom
     setOpen(!open);
   };
 
-  const onSelectCustomer = (customer: Customer, action: Verb): void => {
+  const onSelectCustomer = (customer: Customer, action: CustomerVerb): void => {
+    if (action === 'record-payment') {
+      router.visit(`/payments/create`, { data: { customer_id: customer.uuid } });
+      return;
+    }
     setSelectedCustomer({ customer, action });
   };
 

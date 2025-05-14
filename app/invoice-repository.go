@@ -11,23 +11,24 @@ import (
 )
 
 type invoice struct {
-	ID           int        `json:"id"`
-	UUID         string     `json:"uuid"`
-	Number       string     `json:"number"`
-	NCF          string     `json:"ncf"`
-	Customer     customer   `json:"customer"`
-	Date         time.Time  `json:"date"`
-	DueOn        *time.Time `json:"due_on"`
-	Terms        int        `json:"terms"`
-	TaxReceiptID int        `json:"tax_receipt_id"`
-	Amount       float64    `json:"amount"`
-	Discount     Discount   `json:"discount"`
-	Tax          float64    `json:"tax"`
-	Total        float64    `json:"total"`
-	Status       string     `json:"status"`
-	PaidStatus   PaidStatus `json:"paid_status"`
-	Payment      Payment    `json:"payment"`
-	Notes        string     `json:"notes"`
+	ID           int           `json:"id"`
+	UUID         string        `json:"uuid"`
+	Number       string        `json:"number"`
+	NCF          string        `json:"ncf"`
+	Customer     customer      `json:"customer"`
+	Date         time.Time     `json:"date"`
+	DueOn        *time.Time    `json:"due_on"`
+	Terms        int           `json:"terms"`
+	TaxReceiptID int           `json:"tax_receipt_id"`
+	Amount       float64       `json:"amount"`
+	Discount     Discount      `json:"discount"`
+	Tax          float64       `json:"tax"`
+	Total        float64       `json:"total"`
+	AmountDue    float64       `json:"amount_due"`
+	Status       InvoiceStatus `json:"status"`
+	PaidStatus   PaidStatus    `json:"paid_status"`
+	Payment      Payment       `json:"payment"`
+	Notes        string        `json:"notes"`
 }
 
 type line struct {
@@ -54,9 +55,9 @@ type line struct {
 
 func (s *Server) findInvoices(companyId int) ([]*invoice, error) {
 	rows, err := s.db.Query("SELECT invoices.id, invoices.uuid, invoices.date, invoices.due_on, invoices.amount, invoices.discount, invoices.tax, "+
-		"invoices.total, invoices.status, invoices.paid_status, invoices.payment, invoices.note, invoices.tax_receipt_id,"+
+		"invoices.total, invoices.amount_due, invoices.status, invoices.paid_status, invoices.payment, invoices.note, invoices.tax_receipt_id,"+
 		"tax_receipts.series || tax_receipts.type || LPAD(invoices.tax_receipt_sequence::varchar,8,'0') as NCF, "+
-		"customers.id as customer, customers.name, customers.email, customers.phone "+
+		"customers.id, customers.uuid, customers.name, customers.email, customers.phone "+
 		"FROM invoices "+
 		"INNER JOIN companies ON (invoices.company_id = companies.id) "+
 		"INNER JOIN customers ON (invoices.company_id = customers.company_id AND invoices.customer_id = customers.id) "+
@@ -78,6 +79,7 @@ func (s *Server) findInvoices(companyId int) ([]*invoice, error) {
 			&i.Discount,
 			&i.Tax,
 			&i.Total,
+			&i.AmountDue,
 			&i.Status,
 			&i.PaidStatus,
 			&i.Payment,
@@ -85,6 +87,7 @@ func (s *Server) findInvoices(companyId int) ([]*invoice, error) {
 			&i.TaxReceiptID,
 			&i.NCF,
 			&i.Customer.ID,
+			&i.Customer.UUID,
 			&i.Customer.Name,
 			&i.Customer.Email,
 			&i.Customer.Phone,
@@ -101,10 +104,10 @@ func (s *Server) findInvoices(companyId int) ([]*invoice, error) {
 
 func (s *Server) findInvoicesByUUID(companyId int, uuid string) (*invoice, error) {
 	i := new(invoice)
-	err := s.db.QueryRow("SELECT invoices.id, invoices.uuid, invoices.date, invoices.due_on, invoices.amount, invoices.discount, invoices.tax, "+
+	err := s.db.QueryRow("SELECT invoices.id, invoices.uuid, invoices.date, invoices.due_on, invoices.amount, invoices.amount_due, invoices.discount, invoices.tax, "+
 		"invoices.total, invoices.status, invoices.paid_status, invoices.payment, invoices.note, invoices.tax_receipt_id, "+
 		"tax_receipts.series || tax_receipts.type || LPAD(invoices.tax_receipt_sequence::varchar,8,'0') as NCF, invoices.note, "+
-		"customers.id as customer, customers.name, customers.email, customers.phone "+
+		"customers.id, customers.uuid, customers.name, customers.email, customers.phone "+
 		"FROM invoices "+
 		"INNER JOIN companies ON (invoices.company_id = companies.id) "+
 		"INNER JOIN customers ON (invoices.company_id = customers.company_id AND invoices.customer_id = customers.id) "+
@@ -116,6 +119,7 @@ func (s *Server) findInvoicesByUUID(companyId int, uuid string) (*invoice, error
 			&i.Date,
 			&i.DueOn,
 			&i.Amount,
+			&i.AmountDue,
 			&i.Discount,
 			&i.Tax,
 			&i.Total,
@@ -127,6 +131,56 @@ func (s *Server) findInvoicesByUUID(companyId int, uuid string) (*invoice, error
 			&i.NCF,
 			&i.Notes,
 			&i.Customer.ID,
+			&i.Customer.UUID,
+			&i.Customer.Name,
+			&i.Customer.Email,
+			&i.Customer.Phone)
+	if err != nil {
+		return nil, err
+	}
+	i.Terms = 1
+	if i.DueOn != nil {
+		difference := i.DueOn.Sub(i.Date)
+		// Difference in days
+		i.Terms = int(difference.Hours()) / 24
+	}
+
+	i.Number = s.generatePrefixedInvoiceNumber(i.ID)
+	i.Customer.Address = "LOUISVILLE, Selby 3864 Johnson Street, United States of America"
+
+	return i, nil
+}
+
+func (s *Server) findInvoicesByID(companyId, invoiceId int) (*invoice, error) {
+	i := new(invoice)
+	err := s.db.QueryRow("SELECT invoices.id, invoices.uuid, invoices.date, invoices.due_on, invoices.amount, invoices.amount_due, invoices.discount, invoices.tax, "+
+		"invoices.total, invoices.status, invoices.paid_status, invoices.payment, invoices.note, invoices.tax_receipt_id, "+
+		"tax_receipts.series || tax_receipts.type || LPAD(invoices.tax_receipt_sequence::varchar,8,'0') as NCF, invoices.note, "+
+		"customers.id, customers.uuid, customers.name, customers.email, customers.phone "+
+		"FROM invoices "+
+		"INNER JOIN companies ON (invoices.company_id = companies.id) "+
+		"INNER JOIN customers ON (invoices.company_id = customers.company_id AND invoices.customer_id = customers.id) "+
+		"INNER JOIN tax_receipts ON (invoices.company_id = tax_receipts.company_id AND invoices.tax_receipt_id = tax_receipts.id) "+
+		"WHERE invoices.company_id = $1 AND invoices.id = $2", companyId, invoiceId).
+		Scan(
+			&i.ID,
+			&i.UUID,
+			&i.Date,
+			&i.DueOn,
+			&i.Amount,
+			&i.AmountDue,
+			&i.Discount,
+			&i.Tax,
+			&i.Total,
+			&i.Status,
+			&i.PaidStatus,
+			&i.Payment,
+			&i.Notes,
+			&i.TaxReceiptID,
+			&i.NCF,
+			&i.Notes,
+			&i.Customer.ID,
+			&i.Customer.UUID,
 			&i.Customer.Name,
 			&i.Customer.Email,
 			&i.Customer.Phone)
@@ -161,8 +215,8 @@ func (s *Server) storeInvoice(companyID int, form StoreInvoiceForm) error {
 		return err
 	}
 
-	stmt, err := tx.Prepare("INSERT INTO invoices (company_id, tax_receipt_id, tax_receipt_sequence, date, type, due_on, customer_id, amount, discount, tax, amount_due, total, note, paid_status, payment) " +
-		"VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15) RETURNING id")
+	stmt, err := tx.Prepare("INSERT INTO invoices (company_id, tax_receipt_id, tax_receipt_sequence, date, type, due_on, customer_id, amount, discount, tax, amount_due, total, note, status, paid_status, payment) " +
+		"VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16) RETURNING id")
 	if err != nil {
 		defer stmt.Close()
 		if txErr := tx.Rollback(); txErr != nil {
@@ -188,6 +242,7 @@ func (s *Server) storeInvoice(companyID int, form StoreInvoiceForm) error {
 		form.amountDue,
 		form.total,
 		form.Notes,
+		InvoiceStatuses.Open,
 		form.paidStatus,
 		foundation.ToJSON(form.Payment),
 	).Scan(&invoiceID)
@@ -286,24 +341,18 @@ func (s *Server) updateInvoice(companyID int, uuid string, form UpdateInvoiceFor
 
 	if invoice.Customer.ID != form.CustomerID {
 		// Update customer balance. Logs this operations to keep track of it.
-		err = s.updateCustomerAmountDue(tx, companyID, invoice.Customer.ID, -invoice.Amount)
-		if err != nil {
-			if txErr := tx.Rollback(); txErr != nil {
-				log.Fatalf("Error updating invoice::updating previous customer due amount %v", txErr)
-				return txErr
-			}
-
+		if err = s.updateCustomerAmountDue(tx, companyID, invoice.Customer.ID, -invoice.Amount); err != nil {
 			return err
 		}
 
-		err = s.updateCustomerAmountDue(tx, companyID, form.CustomerID, form.total)
-		if err != nil {
-			if txErr := tx.Rollback(); txErr != nil {
-				log.Fatalf("Error updating invoice::updating new customer due amount %v", txErr)
-				return txErr
-			}
-
+		if err = s.updateCustomerAmountDue(tx, companyID, form.CustomerID, form.total); err != nil {
 			return err
+		}
+
+		if invoice.DueOn != nil {
+			if err = s.changeCustomerFromReceivables(tx, companyID, invoice.ID, invoice.Customer.ID, form.CustomerID); err != nil {
+				return err
+			}
 		}
 	}
 
@@ -490,6 +539,18 @@ func (s *Server) deleteInvoiceFromReceivables(tx *sql.Tx, companyId, invoiceId, 
 	return err
 }
 
+func (s *Server) changeCustomerFromReceivables(tx *sql.Tx, companyId, invoiceId, customerId, newCustomerId int) error {
+	_, err := tx.Exec("UPDATE receivables SET customer_id = $4 WHERE company_id = $1 AND invoice_id = $2 AND customer_id = $3", companyId, invoiceId, customerId, newCustomerId)
+	if err != nil {
+		if txErr := tx.Rollback(); txErr != nil {
+			log.Fatalf("Error changing customer on receivables: %v", txErr)
+			return txErr
+		}
+	}
+
+	return err
+}
+
 func (s *Server) filterInvoiceLines(lines []*Line, actions ...LineAction) []*Line {
 	if len(actions) == 0 {
 		return nil
@@ -510,4 +571,31 @@ func (s *Server) filterInvoiceLines(lines []*Line, actions ...LineAction) []*Lin
 	}
 
 	return filtered
+}
+
+func (s *Server) updateInvoiceBalance(tx *sql.Tx, companyID, invoiceID int, balance float64) error {
+	stmt := `
+    UPDATE invoices
+    SET amount_due = amount_due + $3, paid_status = CASE
+      WHEN  amount_due + $3 < 0 THEN 'overpaid'::paid_status
+      WHEN  amount_due + $3 = 0 THEN 'paid'::paid_status
+      WHEN  amount_due + $3 = total THEN 'unpaid'::paid_status
+      ELSE 'partial'::paid_status
+    END,
+    status = CASE
+      WHEN amount_due + $3 = 0 THEN 'completed'::invoice_status
+      WHEN amount_due + $3 >= total THEN 'open'::invoice_status
+      ELSE 'partial'::invoice_status
+    END
+    WHERE company_id = $1 AND id = $2
+  `
+	if _, err := tx.Exec(stmt, companyID, invoiceID, balance); err != nil {
+		if txErr := tx.Rollback(); txErr != nil {
+			log.Fatalf("Error updating invoice amount due: %v", txErr)
+			return txErr
+		}
+
+		return err
+	}
+	return nil
 }

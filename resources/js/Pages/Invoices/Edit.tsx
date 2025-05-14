@@ -544,11 +544,12 @@ export default function Edit({
           </AlertDialogContent>
         </AlertDialog>
         <CheckoutForm
+          action="Update"
           openCheckout={openCheckout}
           setCheckout={setCheckout}
           paymentForm={invoiceForm.payment}
           totalAmount={computeTotalAmount()}
-          onPlacedInvoice={performUpdate}
+          onCompleteCheckout={performUpdate}
           processing={processing}
           setCancelConfirmation={setCancelConfirmation}
           errors={propsErrors}

@@ -2,7 +2,8 @@ import InputError from '@/components/input-error';
 import InputSearchable from '@/components/input-searchable';
 import { cn } from '@/lib/utils';
 import { Customer } from '@/types';
-import { User, UserPlus, XCircleIcon } from 'lucide-react';
+import { Link } from '@inertiajs/react';
+import { Eye, User, UserPlus, XCircleIcon } from 'lucide-react';
 import React, { JSX } from 'react';
 
 type CustomerSectionProps = {
@@ -60,13 +61,18 @@ export const CustomerSection = ({
       <div className="flex h-full flex-col overflow-y-hidden p-2">
         <div className="flex w-full items-center justify-between">
           <div>{customer?.name}</div>
-          <button onClick={handleOnCloseClick} className="cursor-pointer p-1">
-            <XCircleIcon />
-          </button>
+          <div className="flex items-center gap-x-1.5 p-1">
+            <Link href={`/customers?id=${customer?.uuid}`}>
+              <Eye className="text-muted-foreground size-8 stroke-1" />
+            </Link>
+            <button onClick={handleOnCloseClick} className="cursor-pointer">
+              <XCircleIcon />
+            </button>
+          </div>
         </div>
         <div>{customer?.email}</div>
         <div>{customer?.phone}</div>
-        <div>Address here!!!</div>
+        <div>{customer?.address}</div>
       </div>
     );
   };

@@ -1,22 +1,20 @@
 import { StatusBadge } from '@/components/status-badge';
 import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Separator } from '@/components/ui/separator';
 import { useNumber } from '@/composables/use-number';
 import { cn, isNotEmpty } from '@/lib/utils';
-import { Auth, InvoiceWithLines, PaidStatuses } from '@/types';
-import { format } from 'date-fns';
-import { Calendar1, CircleCheckIcon, CircleDollarSignIcon, CreditCardIcon, UserPen } from 'lucide-react';
-import PaymentSummary from './Shared/payment-summary';
+import { Auth, PaymentWithLines } from '@/types';
+import { Link } from '@inertiajs/react';
+import { format, formatDate } from 'date-fns/format';
+import { CircleCheckIcon, CircleDollarSignIcon, CreditCardIcon, Eye, UserPen } from 'lucide-react';
+import PaymentSummary from '../Invoices/Shared/payment-summary';
 
 type Props = {
-  invoice: InvoiceWithLines;
+  payment: PaymentWithLines;
   auth: Auth;
 };
-
-export default function Show({ invoice, auth }: Props) {
+export default function Show({ payment, auth }: Props) {
   const { currency } = useNumber();
-
   return (
     <div className="grid grid-cols-12 gap-x-4">
       <div className="col-span-12 pb-6">
@@ -24,17 +22,17 @@ export default function Show({ invoice, auth }: Props) {
         <div className="flex justify-between py-6 [&_[data-slot=label]]:text-base/2 [&_[data-slot=label]]:font-medium">
           <div className="col-span-6 flex items-center gap-x-6 [&>div]:flex [&>div]:gap-x-2">
             <div>
-              <Label>Invoice</Label>
-              <Label>#{invoice.header.number}</Label>
+              <Label>Payment</Label>
+              <Label>#{payment.header.number}</Label>
             </div>
-            <div>
+            {/* <div>
               <Label>NCF</Label>
-              <Label>{invoice.header.ncf}</Label>
-            </div>
+              <Label>{payment.header.ncf}</Label>
+            </div> */}
           </div>
           <div className="col-span-6 flex items-center gap-x-2 [&_[data-slot=label]]:font-normal">
             <Label>Date</Label>
-            <Label className="">{format(invoice.header.date, 'PPP')}</Label>
+            <Label className="">{formatDate(payment.header.date, 'dd-MM-yyyy')}</Label>
           </div>
         </div>
         <Separator />
@@ -49,17 +47,17 @@ export default function Show({ invoice, auth }: Props) {
                 <span className="text-sm font-semibold">{auth.company.name}</span>
                 <address className="text-muted-foreground text-sm font-normal">{auth.company.address}</address>
               </div>
-              <div className="text-sm font-medium">{invoice.header.customer.email}</div>
+              <div className="text-sm font-medium">{payment.header.customer.email}</div>
             </div>
           </div>
           <div className="col-span-6 place-items-end">
             <div className="w-56">
-              <Label className="font-bold">Invoice to:</Label>
+              <Label className="font-bold">Payment from:</Label>
               <div className="pt-2">
-                <span className="text-sm font-semibold">{invoice.header.customer.name}</span>
-                <address className="text-muted-foreground text-sm font-normal">{invoice.header.customer.address}</address>
+                <span className="text-sm font-semibold">{payment.header.customer.name}</span>
+                <address className="text-muted-foreground text-sm font-normal">{payment.header.customer.address}</address>
               </div>
-              <div className="text-sm font-medium">{invoice.header.customer.email}</div>
+              <div className="text-sm font-medium">{payment.header.customer.email}</div>
             </div>
           </div>
         </div>
@@ -76,40 +74,47 @@ export default function Show({ invoice, auth }: Props) {
             <thead>
               <tr className="bg-gray-50/50">
                 <th scope="col" className="text-start">
-                  ID
+                  Invoice Number
                 </th>
                 <th scope="col" className="text-start">
-                  Name
+                  Date
                 </th>
-                <th scope="col" className="w-40 text-start">
-                  Unit
-                </th>
-                <th scope="col" data-format="number" className="!w-20">
-                  Qty
-                </th>
-                <th scope="col" data-format="number">
-                  Price
-                </th>
-                <th scope="col" data-format="number">
-                  Tax
-                </th>
-                <th scope="col" data-format="number">
+                <th scope="col" data-format="number" className="!min-w-20">
                   Amount
+                </th>
+                <th scope="col" data-format="number" className="!min-w-20">
+                  Balance
+                </th>
+                <th scope="col" className="text-start">
+                  PayDate
+                </th>
+                <th scope="col" data-format="number" className="!min-w-20">
+                  Payment
+                </th>
+                <th scope="col" className="text-start">
+                  Paid Status
                 </th>
               </tr>
             </thead>
             <tbody>
-              {invoice.lines.map((line) => (
+              {payment.lines.map((line) => (
                 <tr key={line.id}>
-                  <td>{line.id}</td>
-                  <td>{line.name}</td>
-                  <td>{line.unit.name}</td>
-                  <td data-format="number" className="!w-20">
-                    {line.qty}
+                  <td>{line.invoice.number}</td>
+                  <td>{formatDate(line.invoice.date, 'dd-MM-yyyy')}</td>
+                  <td data-format="number" className="!min-w-20">
+                    {currency(line.invoice.amount)}
                   </td>
-                  <td data-format="number">{currency(line.price)}</td>
-                  <td data-format="number">{currency(line.tax.amount)}</td>
-                  <td data-format="number">{currency(line.amount)}</td>
+                  <td data-format="number" className="!min-w-20">
+                    {currency(line.invoice.amount_due)}
+                  </td>
+                  <td>{formatDate(payment.header.date, 'dd-MM-yyyy')}</td>
+                  <td data-format="number"> {currency(line.payment)}</td>
+                  <td className="flex items-center gap-x-1">
+                    <StatusBadge type="paid" status={line.invoice.paid_status} />
+                    <Link href={`/invoices?id=${line.invoice.uuid}`}>
+                      <Eye className="text-muted-foreground" />
+                    </Link>
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -120,11 +125,11 @@ export default function Show({ invoice, auth }: Props) {
           <div className="col-span-8">
             <div className="max-w-sm rounded-md border p-4">
               <Label className="text-sm/6 font-medium">Notes:</Label>
-              <div className="text-muted-foreground text-sm">{isNotEmpty(invoice.header.notes) ? invoice.header.notes : 'No notes left'}</div>
+              <div className="text-muted-foreground text-sm">{isNotEmpty(payment.header.notes) ? payment.header.notes : 'No notes left'}</div>
             </div>
           </div>
           <div className="col-span-4 rounded-md border p-4">
-            <Label>Invoice total summary</Label>
+            <Label>Payment summary</Label>
             <div
               className={cn(
                 'flex flex-col gap-y-3 py-4',
@@ -134,75 +139,38 @@ export default function Show({ invoice, auth }: Props) {
             >
               <div className="flex items-center justify-between">
                 <Label>Sub-total</Label>
-                <Label data-slot="label-value">{currency(invoice.header.amount)}</Label>
+                <Label data-slot="label-value">{currency(payment.header.amount)}</Label>
               </div>
               <div className="flex items-center justify-between">
                 <Label>Discount</Label>
                 <Label data-slot="label-value">
-                  {invoice.header.discount.type === 'percentage' && (
-                    <span className="text-muted-foreground text-xs">{currency(invoice.header.amount * (invoice.header.discount.value / 100))}</span>
+                  {currency(0)}
+                  {/* {payment.header.discount.type === 'percentage' && (
+                    <span className="text-muted-foreground text-xs">{currency(payment.header.amount * (payment.header.discount.value / 100))}</span>
                   )}
-                  {invoice.header.discount.type === 'fixed' ? currency(invoice.header.discount.value) : `${invoice.header.discount.value}%`}
+                  {payment.header.discount.type === 'fixed' ? currency(payment.header.discount.value) : `${payment.header.discount.value}%`} */}
                 </Label>
-              </div>
-              <div className="flex items-center justify-between">
-                <Label>Tax</Label>
-                <Label data-slot="label-value">{currency(invoice.header.tax)}</Label>
               </div>
               <Separator />
               <div className="flex items-center justify-between">
                 <Label>Total</Label>
-                <Label data-slot="label-value">{currency(invoice.header.total)}</Label>
+                <Label data-slot="label-value">{currency(payment.header.amount)}</Label>
               </div>
-              {invoice.header.due_on && (
-                <>
-                  <div className="flex items-center justify-between">
-                    <Label>Payment Applied</Label>
-                    <Label data-slot="label-value">{currency(invoice.header.total - invoice.header.amount_due)}</Label>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <Label>Balance Due</Label>
-                    <Label data-slot="label-value">{currency(invoice.header.amount_due)}</Label>
-                  </div>
-                </>
-              )}
             </div>
           </div>
         </div>
       </div>
       {/* side panel with summary */}
       <div className="col-span-3 flex flex-col gap-y-3 rounded-lg border p-3">
-        <StatusBadge type="paid" variant="alert" prefix="Paid status:" status={invoice.header.paid_status} />
+        {/* <StatusBadge type="paid" variant="alert" prefix="Paid status:" status={payment.header.paid_status} /> */}
         <Label>Details:</Label>
-        <Separator />
-        <div className="flex items-center justify-between">
-          <Label className="text-lg">{currency(invoice.header.total)}</Label>
-          <Select name="paid_status" defaultValue={'0'} value={invoice.header.paid_status} required disabled={invoice.header.status === 'void'}>
-            <SelectTrigger className="w-28">
-              <SelectValue placeholder="Paid status" />
-            </SelectTrigger>
-            <SelectContent className="w-12">
-              {PaidStatuses.map((status) => (
-                <SelectItem key={status} value={status}>
-                  {status}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
         <Separator />
         <div className="flex items-center gap-x-1 text-sm">
           <UserPen size={14} />
           <span className="font-medium">Created by:</span>
           <span className="text-muted-foreground">Jane Doe</span>
         </div>
-        {invoice.header.due_on && (
-          <div className="flex items-center gap-x-1 text-sm">
-            <Calendar1 size={14} />
-            <span className="font-medium">Due date:</span>
-            <span className="text-muted-foreground">{format(invoice.header.due_on, 'PPP')}</span>
-          </div>
-        )}
+
         <div className="flex items-center gap-x-1 text-sm">
           <CircleDollarSignIcon size={14} />
           <span className="font-medium">Currency:</span>
@@ -212,8 +180,8 @@ export default function Show({ invoice, auth }: Props) {
           <CreditCardIcon size={14} />
           <span className="font-medium">Payment summary</span>
         </div>
-        {invoice.header.due_on !== null && <span className="text-muted-foreground -m-1.5 block px-1.5 text-sm">No available yet</span>}
-        <PaymentSummary paymentData={invoice.header.payment} />
+
+        <PaymentSummary paymentData={payment.header.payment} />
         <Separator />
         <div className="px-1 py-4">
           <ol
@@ -229,23 +197,23 @@ export default function Show({ invoice, auth }: Props) {
             <li>
               <div>
                 <CircleCheckIcon />
-                <div>Invoice created</div>
+                <div>payment created</div>
               </div>
-              <Label>{format(invoice.header.date, 'P')}</Label>
+              <Label>{format(payment.header.date!, 'P')}</Label>
             </li>
             <li>
               <div>
                 <CircleCheckIcon />
-                <div>Invoice sent</div>
+                <div>payment sent</div>
               </div>
-              <Label>{format(invoice.header.date, 'P')}</Label>
+              <Label>{format(payment.header.date!, 'P')}</Label>
             </li>
             <li>
               <div>
                 <CircleCheckIcon data-status="pending" />
-                <div>Invoice paid</div>
+                <div>payment paid</div>
               </div>
-              <Label>{format(invoice.header.date, 'P')}</Label>
+              <Label>{format(payment.header.date!, 'P')}</Label>
             </li>
           </ol>
         </div>
