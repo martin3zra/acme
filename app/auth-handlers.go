@@ -14,7 +14,9 @@ import (
 func (s *Server) loginHandler(i *inertia.Inertia) http.Handler {
 	fn := func(w http.ResponseWriter, r *http.Request) {
 
-		err := i.Render(w, r, "Auth/Login")
+		err := i.Render(w, r, "Auth/Login", inertia.Props{
+			"translations": mergeTranslations(r.Context(), loadTranslations("auth")),
+		})
 		if err != nil {
 			s.handleError(w, err)
 			return

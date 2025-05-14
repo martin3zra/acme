@@ -1,0 +1,23 @@
+{
+  "global":{
+    "ok": "Aceptar",
+    "cancel": "Cancelar",
+    "close": "Cerrar",
+    "delete": "Eliminar",
+    "edit": "Editar",
+    "save": "Guardar",
+    "email": "Correo electrónico",
+    "password": "Contraseña",
+    "processing": "Procesando..."
+  },
+  "auth": {
+    "login": {
+      "action": {
+        "login": "Iniciar sesión",
+        "logout": "Cerrar sesión"
+      },
+      "title": "Inicia sesión en tu cuenta",
+      "description": "Ingrese su correo electrónico y contraseña a continuación para iniciar sesión."
+    }
+  }
+}

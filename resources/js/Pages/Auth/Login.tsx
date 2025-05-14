@@ -2,6 +2,7 @@ import InputError from '@/components/input-error';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { useTranslation } from '@/hooks/use-translation';
 import AuthLayout from '@/layouts/auth-layout';
 import { useForm, usePage } from '@inertiajs/react';
 import { FormEventHandler } from 'react';
@@ -20,6 +21,7 @@ export default function Login() {
   });
 
   const props = usePage().props;
+  const t = useTranslation().trans;
 
   const submit: FormEventHandler = (e) => {
     e.preventDefault();
@@ -32,11 +34,11 @@ export default function Login() {
   };
 
   return (
-    <AuthLayout title="Log in to your account" description={'Enter your email and password below to log in'}>
+    <AuthLayout title={t('auth.login.title')} description={t('auth.login.description')}>
       <form className="flex flex-col gap-6" onSubmit={submit}>
         <div className="grid gap-6">
           <div className="grid gap-2">
-            <Label htmlFor="email">Email Address</Label>
+            <Label htmlFor="email">{t('global.email')}</Label>
             <Input
               id="email"
               type="email"
@@ -51,7 +53,7 @@ export default function Login() {
 
           <div className="grid gap-2">
             <div className="flex items-center">
-              <Label htmlFor="password">Password</Label>
+              <Label htmlFor="password">{t('global.password')}</Label>
             </div>
             <Input
               id="password"
@@ -65,7 +67,7 @@ export default function Login() {
           </div>
 
           <Button type="submit" className="w-full" tabIndex={3} disabled={processing}>
-            {processing ? <div>Processing...</div> : <span>Log In</span>}
+            {processing ? <div>{t('global.processing')}</div> : <span>{t('auth.login.action.login')}</span>}
           </Button>
         </div>
       </form>

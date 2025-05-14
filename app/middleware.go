@@ -62,9 +62,10 @@ func (s *Server) SharedProps(next http.Handler) http.Handler {
 				"user":    user,
 				"company": currentCompany,
 			},
-			"csrf_token": session.Get("csrf_token"),
-			"errors":     session.Get("errors"),
-			"flash":      session.Get("flash"),
+			"csrf_token":   session.Get("csrf_token"),
+			"errors":       session.Get("errors"),
+			"flash":        session.Get("flash"),
+			"translations": loadTranslations("global"),
 		})
 
 		s.sessionManager.AgeFlash(session)
