@@ -1,6 +1,7 @@
 'use client';
 
 import { SidebarGroup, SidebarGroupLabel, SidebarMenu, SidebarMenuButton, SidebarMenuItem } from '@/components/ui/sidebar';
+import { useTranslation } from '@/hooks/use-translation';
 import { Link, usePage } from '@inertiajs/react';
 import { type LucideIcon } from 'lucide-react';
 
@@ -15,6 +16,7 @@ export function NavMain({
   }[];
 }) {
   const { component } = usePage();
+  const t = useTranslation().trans;
   return (
     <SidebarGroup>
       <SidebarGroupLabel>Platform</SidebarGroupLabel>
@@ -24,12 +26,12 @@ export function NavMain({
             <Link href={item.url}>
               <SidebarMenuButton
                 asChild
-                tooltip={item.title}
+                tooltip={t(item.title)}
                 className={`${item.components.includes(component) ? 'bg-primary text-primary-foreground hover:bg-primary/90 hover:text-primary-foreground active:text-primary-foreground duration-200 ease-linear' : ''} cursor-pointer`}
               >
                 <div>
                   <item.icon />
-                  <span>{item.title}</span>
+                  <span>{t(item.title)}</span>
                 </div>
               </SidebarMenuButton>
             </Link>

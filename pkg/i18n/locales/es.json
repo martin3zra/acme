@@ -8,7 +8,26 @@
     "save": "Guardar",
     "email": "Correo electrónico",
     "password": "Contraseña",
-    "processing": "Procesando..."
+    "processing": "Procesando...",
+    "navMain": {
+      "dashboard": "Panel",
+      "invoices": "Facturas",
+      "customers": "Clientes",
+      "items": "Productos",
+      "payments": "Pagos"
+    },
+    "navSecondary": {
+      "settings": "Ajustes",
+      "get-help": "Obtener ayuda",
+      "search": "Buscar"
+    },
+    "navUser": {
+      "upgrade-to-pro": "Actualizar a Pro",
+      "account": "Cuenta",
+      "billing": "Facturación",
+      "notifications": "Notificaciones",
+      "logout": "Cerrar sesión"
+    }
   },
   "auth": {
     "login": {
