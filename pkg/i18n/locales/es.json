@@ -14,6 +14,7 @@
     "number": "Número",
     "date": "Fecha",
     "dueDate": "Fecha de vencimiento",
+    "datePlaceholder": "Elige una fecha",
     "status": "Estado",
     "amount": "Monto",
     "discount": "Descuento",
@@ -26,6 +27,8 @@
     "customer": "Cliente",
     "voided": "Anulada",
     "name": "Nombre",
+    "description": "Descripción",
+    "reference": "Referencia",
     "unit": "Unidad",
     "qty": "Cantidad",
     "price": "Precio",
@@ -33,6 +36,7 @@
     "noNotesWasLeft": "No se dejó ninguna nota.",
     "createdBy": "Creado por",
     "paymentSummary": "Resumen de pago",
+    "limitReached": "Límite alcanzado",
     "noAvailable": {
       "default": "No disponible",
       "yet": "No disponible aún"
@@ -50,7 +54,9 @@
       "unarchive": "Desarchivar",
       "recordPayment": "Registrar pago",
       "void": "Anular",
-      "cancel": "Cancelar"
+      "cancel": "Cancelar",
+      "save": "Salvar",
+      "checkout": "Metodo de pago"
     },
     "pagination": {
       "showing": "Mostrando",
@@ -81,6 +87,11 @@
       "billing": "Facturación",
       "notifications": "Notificaciones",
       "logout": "Cerrar sesión"
+    },
+    "customerSection": {
+      "search": "Buscar cliente...",
+      "addNew": "Registrar nuevo cliente",
+      "emptyText": "No se encontraron clientes"
     }
   },
   "auth": {
@@ -97,6 +108,15 @@
     "title": "Facturas",
     "description": "Aquí puedes ver y gestionar todas tus facturas.",
     "paidStatus": "Pagada",
+    "paymentTerms": "Condiciones de pago",
+    "taxReceipt": "Tipo NCF",
+    "line": {
+      "form": {
+        "placeholder": "Referencia o presione ⌘K",
+        "addNew": "Registrar nuevo artículo",
+        "search": "Escriba un nombre de artículo..."
+      }
+    },
     "single": {
       "title": "Factura",
       "description": "Detalles de la factura seleccionada.",
@@ -128,6 +148,12 @@
       "title": "¿Estás seguro que deseas anular :invoice?",
       "description": "¿Estás seguro de que deseas anular esta factura? Esta acción no se puede deshacer. Una vez que la factura quede nula pasará de :total a $0.00.",
       "confirm": "Si, anular",
+      "cancel": "Cancelar"
+    },
+    "confirmsCancelation": {
+      "title": "¿Estás seguro que deseas cancelar?",
+      "description": "Esta acción no se puede deshacer. Eliminará permanentemente los cambios sin guardar de la factura y los datos de nuestros servidores.",
+      "confirm": "Si, continuar",
       "cancel": "Cancelar"
     },
     "paidStatuses": {

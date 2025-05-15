@@ -68,6 +68,7 @@ func (s *Server) createInvoiceHandler(i *inertia.Inertia) http.Handler {
 		}
 
 		err = i.Render(w, r, "Invoices/Create", inertia.Props{
+			"translations": mergeTranslations(r.Context(), loadTranslations("invoices")),
 			"tax_receipts": mapSlice(taxReceipts, func(receipt *taxReceipt) map[string]any {
 				return map[string]any{"id": receipt.ID, "name": fmt.Sprintf("%s-%s", receipt.Type, receipt.Name), "available": receipt.Current < receipt.SequenceEnd}
 			}),

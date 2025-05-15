@@ -1,5 +1,6 @@
 import InputError from '@/components/input-error';
 import InputSearchable from '@/components/input-searchable';
+import { useTranslation } from '@/hooks/use-translation';
 import { cn } from '@/lib/utils';
 import { Customer } from '@/types';
 import { Link } from '@inertiajs/react';
@@ -27,6 +28,7 @@ export const CustomerSection = ({
   setOpen,
   dedbouncedSearch,
 }: CustomerSectionProps) => {
+  const t = useTranslation().trans;
   const handleOnCloseClick = (event: React.MouseEvent<HTMLButtonElement>) => {
     event.preventDefault();
     handleCustomerSelection(undefined);
@@ -48,7 +50,7 @@ export const CustomerSection = ({
             <User className="size-6 *:data-[slot=customer-error]:text-red-500" />
           </div>
           <div data-label="true" className="text-lg">
-            Customer
+            {t('global.customer')}
           </div>
         </button>
         <InputError className="mt-2" message={errors.customer_id} />
@@ -81,10 +83,10 @@ export const CustomerSection = ({
     <div className="rounded-lg bg-white shadow">
       <InputSearchable
         open={open}
-        title="customer"
+        title={t('global.customerSection.search')}
         valueKey={'id'}
         renderText={(customer: Customer) => `${customer.name}`}
-        renderEmptyText="No customers found"
+        renderEmptyText={t('global.customerSection.emptyText')}
         onSelected={handleCustomerSelection}
         onChange={(value) => setSearch(value)}
         onOpenChange={setOpen}
@@ -101,7 +103,7 @@ export const CustomerSection = ({
         <InputSearchable.Actions>
           <div className="flex w-full items-center justify-center rounded-b-lg border bg-gray-100/25 py-2">
             <button className="flex cursor-pointer items-center justify-center gap-x-2 text-indigo-400" onClick={() => alert('Create new customer')}>
-              <UserPlus className="size-4" /> Add New Customer
+              <UserPlus className="size-4" /> {t('global.customerSection.addNew')}
             </button>
           </div>
         </InputSearchable.Actions>

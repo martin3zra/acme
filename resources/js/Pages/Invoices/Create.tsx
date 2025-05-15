@@ -21,6 +21,7 @@ import { useHeader } from '@/composables/use-headers';
 import { useNumber } from '@/composables/use-number';
 import { useDebounced } from '@/hooks/use-debounced';
 import { usePersistedState } from '@/hooks/use-persisted-state';
+import { useTranslation } from '@/hooks/use-translation';
 import AuthenticatedLayout from '@/layouts/authenticated-layout';
 import { addDays, cn, isNotEmpty } from '@/lib/utils';
 import { BTForm, CardForm, CashForm, CheckForm, Customer, InvoiceForm, Item, LineForm, PageProps, PaymentMethod, TaxReceipt } from '@/types';
@@ -41,6 +42,7 @@ export default function Create({
   item,
   tax_receipts,
 }: PageProps<{ customers: Customer[]; items: Item[]; item: Item; tax_receipts: TaxReceipt[] }>) {
+  const t = useTranslation().trans;
   const currency = useNumber().currency;
   const [open, setOpen] = React.useState(false);
   const [openCancelConfirmation, setCancelConfirmation] = React.useState(false);
@@ -315,10 +317,10 @@ export default function Create({
       <AuthenticatedLayout.Actions>
         <div className="flex justify-end gap-x-6">
           <Button variant={'secondary'} onClick={() => setCancelConfirmation(true)}>
-            Cancel
+            {t('global.actions.cancel')}
           </Button>
           <Button onClick={handleCheckout} disabled={processing || computeTotalAmount() === 0}>
-            Checkout
+            {invoiceForm.header.terms === 1 ? t('global.actions.checkout') : t('global.actions.save')}
           </Button>
         </div>
       </AuthenticatedLayout.Actions>
@@ -342,7 +344,7 @@ export default function Create({
           <div className="grid grid-cols-12">
             <div className="col-span-6 flex flex-col gap-y-6">
               <div className="flex flex-col gap-y-2">
-                <Label htmlFor="date">Date</Label>
+                <Label htmlFor="date">{t('global.date')}</Label>
                 <Popover>
                   <PopoverTrigger asChild>
                     <Button
@@ -350,7 +352,7 @@ export default function Create({
                       className={cn('w-[280px] justify-start text-left font-normal', !invoiceForm.header.date && 'text-muted-foreground')}
                     >
                       <CalendarIcon />
-                      {invoiceForm.header.date ? format(invoiceForm.header.date, 'PPP') : <span>Pick a date</span>}
+                      {invoiceForm.header.date ? format(invoiceForm.header.date, 'PPP') : <span>{t('global.datePlaceholder')}</span>}
                     </Button>
                   </PopoverTrigger>
                   <PopoverContent className="w-auto p-0">
@@ -366,15 +368,15 @@ export default function Create({
                 <InputError className="mt-2" message={errors.date} />
               </div>
               <div className="flex flex-col gap-y-2">
-                <Label htmlFor="date">Due Date</Label>
+                <Label htmlFor="date">{t('global.dueDate')}</Label>
                 <Label className="text-muted-foreground w-70 rounded-sm border p-2.5">
-                  {invoiceForm.header.due ? format(invoiceForm.header.due, 'PPP') : 'Unknow'}
+                  {invoiceForm.header.due ? format(invoiceForm.header.due, 'PPP') : t('global.noAvailable.default')}
                 </Label>
               </div>
             </div>
             <div className="col-span-6 flex flex-col gap-y-6">
               <div className="flex flex-col gap-y-2">
-                <Label htmlFor="paymentTerms">Payment terms</Label>
+                <Label htmlFor="paymentTerms">{t('invoices.paymentTerms')}</Label>
                 <Select
                   name="paymentTerms"
                   onValueChange={handlePaymentTermsChange}
@@ -396,7 +398,7 @@ export default function Create({
                 <InputError className="mt-2" message={errors.terms} />
               </div>
               <div className="flex flex-col gap-y-2">
-                <Label htmlFor="paymentTerms">Tax Receipt</Label>
+                <Label htmlFor="paymentTerms">{t('invoices.taxReceipt')}</Label>
                 <Select
                   name="paymentTerms"
                   onValueChange={handleTaxReceiptChange}
@@ -411,7 +413,7 @@ export default function Create({
                     {tax_receipts.map((receipt) => (
                       <SelectItem key={receipt.id} value={String(receipt.id)} disabled={!receipt.available}>
                         {receipt.name}
-                        {!receipt.available && <span className="text-red-500">Limit reached</span>}
+                        {!receipt.available && <span className="text-red-500">{t('global.limitReached')}</span>}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -442,7 +444,7 @@ export default function Create({
           <div className="flex flex-col gap-y-2">
             <div className="grid grid-cols-12">
               <div className="col-span-10 flex flex-col gap-y-2 p-2">
-                <Label className="text-sm/6 font-medium">Notes</Label>
+                <Label className="text-sm/6 font-medium">{t('global.notes')}</Label>
                 <Textarea
                   name="notes"
                   rows={4}
@@ -460,11 +462,18 @@ export default function Create({
                   {/* Add red border as the customer card, using data attributes */}
                   <InputError message={errors['discount.value']} />
                   <div className="flex w-60 items-center justify-between">
-                    <span className="block text-base">Subtotal</span>
+                    <span className="block text-base">{t('global.subTotal')}</span>
                     <span className="block text-base">{currency(composeSubTotal)}</span>
                   </div>
                   <div className="flex w-60 items-center justify-between">
-                    <span className="block text-base">Discount: {computeDiscount().toFixed(2)}</span>
+                    <span className="block text-base">
+                      {t('global.discount')}
+                      {invoiceForm.header.discount.type === 'percentage' && (
+                        <>
+                          : <span className="text-muted-foreground text-xs">{currency(computeDiscount())}</span>
+                        </>
+                      )}
+                    </span>
                     <div className="flex w-40 justify-end">
                       <Input
                         type="number"
@@ -482,7 +491,7 @@ export default function Create({
                         required
                       >
                         <SelectTrigger className="w-16">
-                          <SelectValue placeholder="Discount" />
+                          <SelectValue placeholder={t('global.discount')} />
                         </SelectTrigger>
                         <SelectContent className="">
                           <SelectItem value={'fixed'}>$</SelectItem>
@@ -492,12 +501,12 @@ export default function Create({
                     </div>
                   </div>
                   <div className="flex w-60 items-center justify-between">
-                    <span className="block text-base">Tax</span>
+                    <span className="block text-base">{t('global.tax')}</span>
                     <span className="block text-base">{currency(composeTax)}</span>
                   </div>
                   <Separator />
                   <div className="flex w-60 items-center justify-between">
-                    <span className="block text-xl">Total</span>
+                    <span className="block text-xl">{t('global.total')}</span>
                     <span className="block text-xl">{currency(computeTotalAmount())}</span>
                   </div>
                 </div>
@@ -508,14 +517,12 @@ export default function Create({
         <AlertDialog open={openCancelConfirmation} onOpenChange={setCancelConfirmation}>
           <AlertDialogContent>
             <AlertDialogHeader>
-              <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
-              <AlertDialogDescription>
-                This action cannot be undone. This will permanently delete this invoice and remove the data from our servers.
-              </AlertDialogDescription>
+              <AlertDialogTitle>{t('invoices.confirmsCancelation.title')}</AlertDialogTitle>
+              <AlertDialogDescription>{t('invoices.confirmsCancelation.description')}</AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
-              <AlertDialogCancel>Cancel</AlertDialogCancel>
-              <AlertDialogAction onClick={performInvoiceCancelation}>Yes, Continue</AlertDialogAction>
+              <AlertDialogCancel>{t('global.cancel')}</AlertDialogCancel>
+              <AlertDialogAction onClick={performInvoiceCancelation}>{t('invoices.confirmsCancelation.confirm')}</AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>

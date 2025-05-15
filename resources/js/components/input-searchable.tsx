@@ -68,7 +68,7 @@ class InputSearchable<T extends object> extends React.Component<Props<T>, InputS
         </PopoverTrigger>
         <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0" onOpenAutoFocus={(e) => e.preventDefault()}>
           <Command shouldFilter={false} className="w-full">
-            <CommandInput placeholder={`Search ${title}`} value={typeof search === 'string' ? search : ''} onValueChange={this.handleOnValueChange} />
+            <CommandInput placeholder={`${title}`} value={typeof search === 'string' ? search : ''} onValueChange={this.handleOnValueChange} />
             <CommandList>
               <CommandGroup className="max-h-60 overflow-y-auto">
                 <PopoverClose asChild>

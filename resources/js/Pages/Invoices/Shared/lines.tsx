@@ -2,6 +2,7 @@ import { AlertDestructive } from '@/components/alert-destructive';
 import { Command, CommandDialog, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
 import { useNumber } from '@/composables/use-number';
 import { useDebounced } from '@/hooks/use-debounced';
+import { useTranslation } from '@/hooks/use-translation';
 import { Item, LineForm } from '@/types';
 import { router } from '@inertiajs/react';
 import { LayoutListIcon } from 'lucide-react';
@@ -36,6 +37,7 @@ export const Lines = ({
   setAmount,
   items,
 }: LinesProps) => {
+  const t = useTranslation().trans;
   const [open, setOpen] = useState<boolean>(false);
   const [search, setSearch] = useState<string>('');
   const dedbouncedSearch = useDebounced(search, 500);
@@ -100,7 +102,7 @@ export const Lines = ({
         )}
       </table>
       <CommandDialog open={open} onOpenChange={setOpen}>
-        <CommandInput placeholder="Type a item name..." value={typeof search === 'string' ? search : ''} onValueChange={setSearch} />
+        <CommandInput placeholder={t('invoices.line.form.search')} value={typeof search === 'string' ? search : ''} onValueChange={setSearch} />
         <Command>
           <CommandList className="min-h-40">
             <CommandGroup className="max-h-60 min-h-40 overflow-y-auto">
@@ -129,7 +131,7 @@ export const Lines = ({
         </Command>
         <div className="flex w-full items-center justify-center rounded-b-lg border bg-gray-100/25 py-2">
           <button className="flex cursor-pointer items-center justify-center gap-x-2 text-indigo-400" onClick={() => alert('Create new item')}>
-            <LayoutListIcon className="size-4" /> Add New Item
+            <LayoutListIcon className="size-4" /> {t('invoices.line.form.addNew')}
           </button>
         </div>
       </CommandDialog>

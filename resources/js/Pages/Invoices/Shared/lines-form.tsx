@@ -1,5 +1,6 @@
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { useTranslation } from '@/hooks/use-translation';
 import { currencySignature, Item } from '@/types';
 
 type Props = {
@@ -13,6 +14,7 @@ type Props = {
 };
 
 export default function LinesForm({ referenceInputRef, qtyInputRef, currentItem, amount, currency, handleOnKeyDown, computedItemAmount }: Props) {
+  const t = useTranslation().trans;
   return (
     <tr>
       <th scope="col" className="w-60 border border-gray-300 pe-1">
@@ -20,7 +22,7 @@ export default function LinesForm({ referenceInputRef, qtyInputRef, currentItem,
           name="reference"
           ref={referenceInputRef}
           data-reset={false}
-          placeholder="Item reference or press ⌘k"
+          placeholder={t('invoices.line.form.placeholder')}
           onKeyDown={handleOnKeyDown}
           className="rounded-none border-none focus-visible:border-none focus-visible:ring-[2px]"
           tabIndex={0}
