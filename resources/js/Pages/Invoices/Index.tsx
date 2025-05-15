@@ -9,10 +9,10 @@ import AuthenticatedLayout from '@/layouts/authenticated-layout';
 import { Invoice, InvoiceVerb, InvoiceWithLines, PageProps } from '@/types';
 import { Link, router, usePage } from '@inertiajs/react';
 import { Ban, DollarSign, NotebookPen, Printer } from 'lucide-react';
+import { breadcrumbs } from './constants';
 import { List } from './List/Index';
 import { AddNewInvoice } from './Shared/AddNewInvoice';
 import Show from './Show';
-import { breadcrumbs } from './constants';
 
 export default function Index({
   auth,

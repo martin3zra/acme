@@ -13,14 +13,30 @@
     "noResults": "No hay resultados.",
     "number": "Número",
     "date": "Fecha",
+    "dueDate": "Fecha de vencimiento",
     "status": "Estado",
     "amount": "Monto",
     "discount": "Descuento",
     "tax": "Impuesto",
+    "subTotal": "Sub-total",
     "total": "Total",
     "balance": "Balance",
+    "totalPaymentApplied": "Total de pagos aplicados",
+    "currency": "Moneda",
     "customer": "Cliente",
     "voided": "Anulada",
+    "name": "Nombre",
+    "unit": "Unidad",
+    "qty": "Cantidad",
+    "price": "Precio",
+    "notes": "Notas",
+    "noNotesWasLeft": "No se dejó ninguna nota.",
+    "createdBy": "Creado por",
+    "paymentSummary": "Resumen de pago",
+    "noAvailable": {
+      "default": "No disponible",
+      "yet": "No disponible aún"
+    },
     "actions": {
       "title": "Acciones",
       "view": "Ver",
@@ -85,7 +101,8 @@
       "title": "Factura",
       "description": "Detalles de la factura seleccionada.",
       "payTo": "Pagar a",
-      "invoiceTo": "Factura a"
+      "invoiceTo": "Factura a",
+      "totalSummary": "Resumen total de la factura"
     },
     "viewInvoice": {
       "title": "Ver factura",
@@ -99,6 +116,10 @@
       "title": "Editar factura",
       "description": "Edita los detalles de la factura seleccionada."
     },
+    "voidInvoice": {
+      "title": "Anular factura",
+      "description": "Anula los detalles de la factura seleccionada."
+    },
     "emptyState": {
       "title": "Crea tu primera factura",
       "description": "Una vez que cree su factura, aparecerá aquí."
@@ -108,6 +129,24 @@
       "description": "¿Estás seguro de que deseas anular esta factura? Esta acción no se puede deshacer. Una vez que la factura quede nula pasará de :total a $0.00.",
       "confirm": "Si, anular",
       "cancel": "Cancelar"
+    },
+    "paidStatuses": {
+      "paid": "Pagada",
+      "unpaid": "No pagada",
+      "partial": "Parcialmente pagada",
+      "overpaid": "Pagado en exceso",
+      "pending": "Pendiente",
+      "removed": "Eliminado"
+    },
+    "statuses": {
+      "open": "Abierta",
+      "draft": "Borrador",
+      "sent": "Enviada",
+      "viewed": "Vista",
+      "overdue": "Atrasada",
+      "completed": "Terminada",
+      "void": "Nula",
+      "partial": "Parcial"
     }
   }
 }

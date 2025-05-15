@@ -1,3 +1,4 @@
+import { useTranslation } from '@/hooks/use-translation';
 import { cn } from '@/lib/utils';
 import type { StatusType } from '@/types/index';
 import { statusConfig } from '@/types/status-config-map';
@@ -12,11 +13,21 @@ interface StatusBadgeProps {
 }
 
 export const StatusBadge: React.FC<StatusBadgeProps> = ({ type, status, className = '', variant = 'badge', prefix }) => {
+  const t = useTranslation().trans;
   const config = statusConfig[type][status];
 
   if (!config) return null;
 
   const { Icon, label, bg, border, text } = config;
+
+  const resolveLabel = (): string => {
+    return {
+      invoice: t('invoices.statuses.' + status),
+      status: label,
+      paid: t('invoices.paidStatuses.' + status),
+      payment: label,
+    }[type];
+  };
 
   return (
     <div
@@ -29,7 +40,7 @@ export const StatusBadge: React.FC<StatusBadgeProps> = ({ type, status, classNam
       <Icon className={`h-4 w-4 ${text}`} />
       <span>
         {prefix && <span className="pe-1">{prefix}</span>}
-        {label}
+        {resolveLabel()}
       </span>
     </div>
   );

@@ -64,7 +64,7 @@ export const getColumns = ({ onDidClick, t }: Props): ColumnDef<Invoice>[] => {
     {
       accessorKey: 'customer.name',
       id: 'customer.name',
-      meta: t('customers.customer'),
+      meta: t('global.customer'),
       size: 200,
       header: ({ column }) => {
         return (
@@ -164,6 +164,7 @@ export const getColumns = ({ onDidClick, t }: Props): ColumnDef<Invoice>[] => {
     {
       accessorKey: 'paid_status',
       size: 70,
+      meta: t('invoices.paidStatus'),
       header: (props) => {
         return <HeaderCell title={t('invoices.paidStatus')} alignment="center" columnWidth={props.column.getSize()} />;
       },
@@ -188,9 +189,9 @@ export const getColumns = ({ onDidClick, t }: Props): ColumnDef<Invoice>[] => {
             <DropdownMenuContent align="end">
               <DropdownMenuLabel>{t('global.actions.title')}</DropdownMenuLabel>
               <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={() => onDidClick(props.row.original, 'view')}>{t('global.actions.view')}</DropdownMenuItem>
+              <DropdownMenuItem onClick={() => onDidClick(props.row.original, 'view')}>{t('invoices.viewInvoice.title')}</DropdownMenuItem>
               <DropdownMenuItem onClick={() => onDidClick(props.row.original, 'edit')} disabled={disabled}>
-                {t('global.actions.edit')}
+                {t('invoices.editInvoice.title')}
               </DropdownMenuItem>
               <DropdownMenuSeparator />
               {canRecordPayment && (
@@ -202,7 +203,7 @@ export const getColumns = ({ onDidClick, t }: Props): ColumnDef<Invoice>[] => {
                 </>
               )}
               <DropdownMenuItem onClick={() => onDidClick(props.row.original, 'void')} disabled={disabled}>
-                {t('global.actions.void')}
+                {t('invoices.voidInvoice.title')}
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
