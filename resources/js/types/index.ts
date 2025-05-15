@@ -331,3 +331,5 @@ export function mapPaymentLineToReceivableInvoice(paymentLine: PaymentLine): Rec
     action: 'unchanged', // Placeholder, as the action is not defined in PaymentLine
   };
 }
+
+export type Replacements = { [key: string]: string | number };

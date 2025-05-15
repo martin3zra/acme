@@ -5,6 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useDocument } from '@/composables/use-document';
 import { useHeader } from '@/composables/use-headers';
+import { useTranslation } from '@/hooks/use-translation';
 import { useForm } from '@inertiajs/react';
 import { FC, FormEventHandler, useRef } from 'react';
 import { AlertDestructive } from './alert-destructive';
@@ -20,6 +21,7 @@ export type Props = {
 };
 
 export const ConfirmsPassword: FC<Props> = ({ title, description, action, verb, path, open, onOpenChange }) => {
+  const t = useTranslation().trans;
   const { removeElementParent } = useDocument();
   const passwordInput = useRef<HTMLInputElement>(null);
   const {
@@ -77,18 +79,18 @@ export const ConfirmsPassword: FC<Props> = ({ title, description, action, verb, 
                 ref={passwordInput}
                 value={data.current_password}
                 onChange={(e) => setData('current_password', e.target.value)}
-                placeholder="Password"
+                placeholder={t('global.password')}
               />
 
               <InputError message={errors.current_password} />
             </div>
             <DialogFooter>
               <DialogClose asChild>
-                <Button type="button" variant="secondary">
-                  Close
+                <Button type="button" variant="secondary" className="uppercase">
+                  {t('global.actions.cancel')}
                 </Button>
               </DialogClose>
-              <Button variant="destructive" disabled={processing} asChild>
+              <Button variant="destructive" disabled={processing} asChild className="uppercase">
                 <button type="submit">{action}</button>
               </Button>
             </DialogFooter>

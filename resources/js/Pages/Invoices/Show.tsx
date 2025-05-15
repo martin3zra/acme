@@ -3,6 +3,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Separator } from '@/components/ui/separator';
 import { useNumber } from '@/composables/use-number';
+import { useTranslation } from '@/hooks/use-translation';
 import { cn, isNotEmpty } from '@/lib/utils';
 import { Auth, InvoiceWithLines, PaidStatuses } from '@/types';
 import { format } from 'date-fns';
@@ -15,6 +16,7 @@ type Props = {
 };
 
 export default function Show({ invoice, auth }: Props) {
+  const t = useTranslation().trans;
   const { currency } = useNumber();
 
   return (
@@ -24,7 +26,7 @@ export default function Show({ invoice, auth }: Props) {
         <div className="flex justify-between py-6 [&_[data-slot=label]]:text-base/2 [&_[data-slot=label]]:font-medium">
           <div className="col-span-6 flex items-center gap-x-6 [&>div]:flex [&>div]:gap-x-2">
             <div>
-              <Label>Invoice</Label>
+              <Label>{t('invoices.single.title')}</Label>
               <Label>#{invoice.header.number}</Label>
             </div>
             <div>
@@ -33,7 +35,7 @@ export default function Show({ invoice, auth }: Props) {
             </div>
           </div>
           <div className="col-span-6 flex items-center gap-x-2 [&_[data-slot=label]]:font-normal">
-            <Label>Date</Label>
+            <Label>{t('global.date')}</Label>
             <Label className="">{format(invoice.header.date, 'PPP')}</Label>
           </div>
         </div>
@@ -44,7 +46,7 @@ export default function Show({ invoice, auth }: Props) {
         <div className="col-span-12 grid grid-cols-12">
           <div className="col-span-6">
             <div className="w-56">
-              <Label className="font-bold">Pay to:</Label>
+              <Label className="font-bold">{t('invoices.single.payTo')}:</Label>
               <div className="pt-2">
                 <span className="text-sm font-semibold">{auth.company.name}</span>
                 <address className="text-muted-foreground text-sm font-normal">{auth.company.address}</address>
@@ -54,7 +56,7 @@ export default function Show({ invoice, auth }: Props) {
           </div>
           <div className="col-span-6 place-items-end">
             <div className="w-56">
-              <Label className="font-bold">Invoice to:</Label>
+              <Label className="font-bold">{t('invoices.single.invoiceTo')}:</Label>
               <div className="pt-2">
                 <span className="text-sm font-semibold">{invoice.header.customer.name}</span>
                 <address className="text-muted-foreground text-sm font-normal">{invoice.header.customer.address}</address>

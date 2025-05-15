@@ -22,7 +22,8 @@ func (s *Server) invoicesHandler(i *inertia.Inertia) http.Handler {
 		}
 
 		props := inertia.Props{
-			"invoices": invoices,
+			"translations": mergeTranslations(r.Context(), loadTranslations("invoices")),
+			"invoices":     invoices,
 		}
 
 		if ensureUUIDIsValid(uuid) {

@@ -9,6 +9,44 @@
     "email": "Correo electrónico",
     "password": "Contraseña",
     "processing": "Procesando...",
+    "columns": "Columnas",
+    "noResults": "No hay resultados.",
+    "number": "Número",
+    "date": "Fecha",
+    "status": "Estado",
+    "amount": "Monto",
+    "discount": "Descuento",
+    "tax": "Impuesto",
+    "total": "Total",
+    "balance": "Balance",
+    "customer": "Cliente",
+    "voided": "Anulada",
+    "actions": {
+      "title": "Acciones",
+      "view": "Ver",
+      "edit": "Editar",
+      "delete": "Eliminar",
+      "download": "Descargar",
+      "send": "Enviar",
+      "print": "Imprimir",
+      "copy": "Copiar",
+      "archive": "Archivar",
+      "unarchive": "Desarchivar",
+      "recordPayment": "Registrar pago",
+      "void": "Anular",
+      "cancel": "Cancelar"
+    },
+    "pagination": {
+      "showing": "Mostrando",
+      "of": "de",
+      "results": "resultados",
+      "previous": "Anterior",
+      "next": "Siguiente",
+      "first": "Primero",
+      "last": "Último",
+      "page": "Página",
+      "selectedOf": ":rows de :total seleccionadas"
+    },
     "navMain": {
       "dashboard": "Panel",
       "invoices": "Facturas",
@@ -37,6 +75,39 @@
       },
       "title": "Inicia sesión en tu cuenta",
       "description": "Ingrese su correo electrónico y contraseña a continuación para iniciar sesión."
+    }
+  },
+  "invoices": {
+    "title": "Facturas",
+    "description": "Aquí puedes ver y gestionar todas tus facturas.",
+    "paidStatus": "Pagada",
+    "single": {
+      "title": "Factura",
+      "description": "Detalles de la factura seleccionada.",
+      "payTo": "Pagar a",
+      "invoiceTo": "Factura a"
+    },
+    "viewInvoice": {
+      "title": "Ver factura",
+      "description": "Detalles de la factura seleccionada."
+    },
+    "newInvoice": {
+      "title": "Nueva factura",
+      "description": "Crea una nueva factura para enviar a tu cliente."
+    },
+    "editInvoice": {
+      "title": "Editar factura",
+      "description": "Edita los detalles de la factura seleccionada."
+    },
+    "emptyState": {
+      "title": "Crea tu primera factura",
+      "description": "Una vez que cree su factura, aparecerá aquí."
+    },
+    "confirmsPassword": {
+      "title": "¿Estás seguro que deseas anular :invoice?",
+      "description": "¿Estás seguro de que deseas anular esta factura? Esta acción no se puede deshacer. Una vez que la factura quede nula pasará de :total a $0.00.",
+      "confirm": "Si, anular",
+      "cancel": "Cancelar"
     }
   }
 }

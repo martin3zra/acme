@@ -11,17 +11,21 @@ export const paymentTerms: PaymentTerm[] = [
   { value: 90, label: '90 Days' },
 ];
 
-export const createBreadcrumbs: BreadcrumbItem[] = [
+export const breadcrumbs: BreadcrumbItem[] = [
   {
-    title: 'Home',
+    title: 'global.navMain.dashboard',
     href: '/home',
   },
   {
-    title: 'Invoices',
+    title: 'invoices.title',
     href: '/invoices',
   },
+];
+
+export const createBreadcrumbs: BreadcrumbItem[] = [
+  ...breadcrumbs,
   {
-    title: 'New Invoice',
+    title: 'invoices.newInvoice.title',
     href: '/invoices/create',
   },
 ];
