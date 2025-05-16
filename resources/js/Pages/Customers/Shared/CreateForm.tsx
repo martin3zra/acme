@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useHeader } from '@/composables/use-headers';
 import { useVerb } from '@/composables/use-verbs';
+import { useTranslation } from '@/hooks/use-translation';
 import { Customer, PageProps, Verb } from '@/types';
 import { useForm, usePage } from '@inertiajs/react';
 import { FormEventHandler, useState } from 'react';
@@ -29,6 +30,7 @@ type CustomerForm = {
 };
 
 export default function CreateForm({ onFinish, params }: CreateFormProps) {
+  const t = useTranslation().trans;
   const [dialogOpen, setDialogOpen] = useState(false);
   const { headers } = useHeader();
   const { errors: propsErrors } = usePage<PageProps>().props;
@@ -86,7 +88,7 @@ export default function CreateForm({ onFinish, params }: CreateFormProps) {
       <form onSubmit={submit} className="space-y-6">
         <div className="grid grid-cols-2 gap-2">
           <div className="grid gap-2">
-            <Label htmlFor="name">Name</Label>
+            <Label htmlFor="name">{t('global.name')}</Label>
             <Input
               id="name"
               className="mt-1 block w-full"
@@ -94,15 +96,15 @@ export default function CreateForm({ onFinish, params }: CreateFormProps) {
               onChange={(e) => setData('name', e.target.value)}
               required
               autoComplete="name"
-              placeholder="Full name"
+              placeholder={t('global.name')}
               readOnly={viewMode}
             />
             <InputError className="mt-2" message={errors.name} />
           </div>
           <div className="grid gap-2">
-            <Label htmlFor="contact">Contact</Label>
+            <Label htmlFor="contact">{t('global.contact')}</Label>
             <Input
-              id="name"
+              id="contact"
               className="mt-1 block w-full"
               value={data.contact}
               onChange={(e) => setData('contact', e.target.value)}
@@ -114,7 +116,7 @@ export default function CreateForm({ onFinish, params }: CreateFormProps) {
         </div>
         <div className="grid grid-cols-2 gap-2">
           <div className="grid gap-2">
-            <Label htmlFor="email">Email</Label>
+            <Label htmlFor="email">{t('global.email')}</Label>
             <Input
               id="email"
               type="email"
@@ -128,7 +130,7 @@ export default function CreateForm({ onFinish, params }: CreateFormProps) {
             <InputError className="mt-2" message={errors.email} />
           </div>
           <div className="grid gap-2">
-            <Label htmlFor="phone">Phone</Label>
+            <Label htmlFor="phone">{t('global.phone')}</Label>
             <Input
               id="phone"
               className="mt-1 block w-full"
@@ -142,7 +144,9 @@ export default function CreateForm({ onFinish, params }: CreateFormProps) {
         </div>
         {!viewMode && (
           <div className="flex items-center gap-4">
-            <Button disabled={processing}>{verbName} Customer</Button>
+            <Button disabled={processing}>
+              {t(`global.actions.${verbName}`)} {t('global.customer')}
+            </Button>
           </div>
         )}
       </form>

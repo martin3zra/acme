@@ -14,6 +14,7 @@
     "number": "Número",
     "date": "Fecha",
     "dueDate": "Fecha de vencimiento",
+    "addedAt": "Creado en",
     "datePlaceholder": "Elige una fecha",
     "status": "Estado",
     "amount": "Monto",
@@ -27,8 +28,10 @@
     "totalReceived": "Total recibido",
     "currency": "Moneda",
     "customer": "Cliente",
+    "contact": "Contacto",
     "voided": "Anulada",
     "name": "Nombre",
+    "phone": "Teléfono",
     "description": "Descripción",
     "reference": "Referencia",
     "unit": "Unidad",
@@ -44,6 +47,10 @@
       "yet": "No disponible aún"
     },
     "checkoutProcess": "Proceso de pago",
+    "statuses": {
+      "enabled": "Activo",
+      "disabled": "Inactivo"
+    },
     "actions": {
       "title": "Acciones",
       "view": "Ver",
@@ -57,10 +64,12 @@
       "archive": "Archivar",
       "unarchive": "Desarchivar",
       "recordPayment": "Registrar pago",
+      "makePayment": "Realizar un pago",
       "void": "Anular",
       "cancel": "Cancelar",
       "save": "Salvar",
-      "checkout": "Metodo de pago"
+      "checkout": "Metodo de pago",
+      "create": "Crear"
     },
     "paymentMethods": {
       "cash": {
@@ -208,6 +217,46 @@
       "completed": "Terminada",
       "void": "Nula",
       "partial": "Parcial"
+    }
+  },
+  "customers": {
+    "title": "Clientes",
+    "description": "Todos los clientes creados se muestran aquí.",
+    "paidStatus": "Pagada",
+    "paymentTerms": "Condiciones de pago",
+    "taxReceipt": "Tipo NCF",
+    "line": {
+      "form": {
+        "placeholder": "Referencia o presione ⌘K",
+        "addNew": "Registrar nuevo artículo",
+        "search": "Escriba un nombre de artículo..."
+      }
+    },
+    "viewCustomer": {
+      "title": "Ver cliente",
+      "description": "Detalles del cliente seleccionado."
+    },
+    "newCustomer": {
+      "title": "Nuevo cliente",
+      "description": "Crea un nuevo cliente para facturarle."
+    },
+    "editCustomer": {
+      "title": "Editar cliente",
+      "description": "Edita los detalles del cliente seleccionado"
+    },
+    "trashCustomer": {
+      "title": "Borrar cliente",
+      "description": "Borra los detalles del cliente seleccionado."
+    },
+    "emptyState": {
+      "title": "Crea tu primer cliente",
+      "description": "Una vez que cree su cliente, aparecerá aquí."
+    },
+    "confirmsPassword": {
+      "title": "¿Estás seguro que deseas borrar a :customer?",
+      "description": "Una vez que se elimine :customer, todos sus recursos seguirán estando disponibles, pero no se podrá realizar ninguna operación nueva.",
+      "confirm": "Si, borralo",
+      "cancel": "Cancelar"
     }
   }
 }

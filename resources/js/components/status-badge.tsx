@@ -23,7 +23,7 @@ export const StatusBadge: React.FC<StatusBadgeProps> = ({ type, status, classNam
   const resolveLabel = (): string => {
     return {
       invoice: t('invoices.statuses.' + status),
-      status: label,
+      status: t('global.statuses.' + status),
       paid: t('invoices.paidStatuses.' + status),
       payment: label,
     }[type];

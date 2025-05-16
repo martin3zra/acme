@@ -53,13 +53,11 @@ type FlagSet = {
 export default function Edit({
   auth,
   payment,
-  customer,
   customers,
   receivables,
   invoice_uuid,
 }: PageProps<{
   payment: PaymentWithLines;
-  customer: Customer;
   customers: Customer[];
   receivables: Receivable[];
   invoice_uuid: string;

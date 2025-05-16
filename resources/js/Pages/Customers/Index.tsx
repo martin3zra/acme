@@ -3,6 +3,7 @@ import HeadingSmall from '@/components/heading-small';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { useVerb } from '@/composables/use-verbs';
+import { useTranslation } from '@/hooks/use-translation';
 import AuthenticatedLayout from '@/layouts/authenticated-layout';
 import { BreadcrumbItem, Customer, CustomerVerb, PageProps } from '@/types';
 import { router } from '@inertiajs/react';
@@ -23,6 +24,7 @@ const breadcrumbs: BreadcrumbItem[] = [
 ];
 
 export default function Index({ auth, customers, customer }: PageProps<{ customers: Customer[]; customer: Customer }>) {
+  const t = useTranslation().trans;
   const [open, setOpen] = useState(customer !== undefined);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [selectedCustomer, setSelectedCustomer] = useState<CreateFormParams>({
@@ -71,11 +73,11 @@ export default function Index({ auth, customers, customer }: PageProps<{ custome
       <div className="space-y-6">
         {hasCustomers && (
           <HeadingSmall
-            title="Customers"
-            description="All created customers are shown here."
+            title={t('customers.title')}
+            description={t('customers.description')}
             rightPanel={
               <Button onClick={onCreateNewCustomer}>
-                <Plus /> Add Customers
+                <Plus /> {t('customers.newCustomer.title')}
               </Button>
             }
           />
@@ -84,9 +86,11 @@ export default function Index({ auth, customers, customer }: PageProps<{ custome
         {!hasCustomers && (
           <>
             <div className="absolute top-1/2 left-1/2 flex h-[244px] min-w-3xl -translate-x-1/2 -translate-y-1/2 flex-col items-center gap-4 rounded-[16px] bg-white p-[40px] shadow-[0px_8px_12px_-4px_rgba(16,12,12,0.08),0px_0px_2px_rgba(16,12,12,0.1),0px_1px_2px_rgba(16,12,12,0.1)]">
-              <h4 className="text-2xl">Create your first customer</h4>
-              <p className="text-sm text-gray-400">Once you create your customer, it will appear here.</p>
-              <Button onClick={onCreateNewCustomer}>+ Create Customer</Button>
+              <h4 className="text-2xl">{t('customers.emptyState.title')}</h4>
+              <p className="text-sm text-gray-400">{t('customers.emptyState.description')}</p>
+              <Button onClick={onCreateNewCustomer}>
+                <Plus /> {t('customers.newCustomer.title')}
+              </Button>
             </div>
           </>
         )}
@@ -96,8 +100,10 @@ export default function Index({ auth, customers, customer }: PageProps<{ custome
         <Sheet open={open} onOpenChange={onOpenChange}>
           <SheetContent side="right" className="m-4 flex h-[calc(~'(100%-var(--spacing)*4)/3')] w-full flex-col rounded-md sm:max-w-4xl">
             <SheetHeader>
-              <SheetTitle>{verbName} Customer</SheetTitle>
-              <SheetDescription className="text-[12px]">Create a new customer</SheetDescription>
+              <SheetTitle>
+                {t(`global.actions.${verbName}`)} {t(`global.customer`).toLocaleLowerCase()}
+              </SheetTitle>
+              <SheetDescription className="text-[12px]">{t(`customers.newCustomer.description`)}</SheetDescription>
             </SheetHeader>
             <div className="grid gap-4 px-4">
               <CreateForm params={selectedCustomer} onFinish={() => modalHandler(false)} />
@@ -107,9 +113,9 @@ export default function Index({ auth, customers, customer }: PageProps<{ custome
 
         {selectedCustomer.customer && (
           <ConfirmsPassword
-            title={`Are you sure you want to delete ${selectedCustomer?.customer?.name}?`}
-            description={`Once ${selectedCustomer?.customer?.name} is deleted, all of its resources will continue to be available, but no new operation can be performed.`}
-            action={`Delete it`}
+            title={t(`customers.confirmsPassword.title`, { customer: selectedCustomer?.customer?.name })}
+            description={t(`customers.confirmsPassword.description`, { customer: selectedCustomer?.customer?.name })}
+            action={t(`customers.confirmsPassword.confirm`)}
             verb={'destroy'}
             path={`/customers/${selectedCustomer?.customer?.id}`}
             open={deleteDialogOpen}

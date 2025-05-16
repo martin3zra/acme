@@ -18,6 +18,7 @@ import { useHeader } from '@/composables/use-headers';
 import { useNumber } from '@/composables/use-number';
 import { useDebounced } from '@/hooks/use-debounced';
 import { usePersistedState } from '@/hooks/use-persisted-state';
+import { useTranslation } from '@/hooks/use-translation';
 import AuthenticatedLayout from '@/layouts/authenticated-layout';
 import { cn } from '@/lib/utils';
 import { BTForm, CardForm, CashForm, CheckForm, Customer, PageProps, PaymentForm, PaymentMethod, Receivable, ReceivableInvoiceForm } from '@/types';
@@ -45,6 +46,7 @@ export default function Create({
   invoice_uuid,
   forceInitial,
 }: PageProps<{ customer: Customer; customers: Customer[]; receivables: Receivable[]; invoice_uuid: string; forceInitial: boolean }>) {
+  const t = useTranslation().trans;
   const { currency } = useNumber();
   const [openCancelConfirmation, setCancelConfirmation] = React.useState(false);
   const [openCheckout, setCheckout] = React.useState(false);
@@ -378,6 +380,7 @@ export default function Create({
           errors={propsErrors}
           onCheckoutChange={handleCheckoutChange}
           currency={currency}
+          t={t}
         />
       </div>
     </AuthenticatedLayout>
