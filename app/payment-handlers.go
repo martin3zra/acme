@@ -19,7 +19,8 @@ func (s *Server) paymentsHandler(i *inertia.Inertia) http.Handler {
 			return
 		}
 		props := inertia.Props{
-			"payments": payments,
+			"translations": mergeTranslations(r.Context(), loadTranslations("payments")),
+			"payments":     payments,
 		}
 
 		if ensureUUIDIsValid(uuid) {

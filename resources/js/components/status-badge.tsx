@@ -18,14 +18,14 @@ export const StatusBadge: React.FC<StatusBadgeProps> = ({ type, status, classNam
 
   if (!config) return null;
 
-  const { Icon, label, bg, border, text } = config;
+  const { Icon, bg, border, text } = config;
 
   const resolveLabel = (): string => {
     return {
       invoice: t('invoices.statuses.' + status),
       status: t('global.statuses.' + status),
-      paid: t('invoices.paidStatuses.' + status),
-      payment: label,
+      paid: t('global.paidStatuses.' + status),
+      payment: t('global.paidStatuses.' + status),
     }[type];
   };
 

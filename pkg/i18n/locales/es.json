@@ -15,9 +15,11 @@
     "date": "Fecha",
     "dueDate": "Fecha de vencimiento",
     "addedAt": "Creado en",
+    "payDate": "Pagado en",
     "datePlaceholder": "Elige una fecha",
     "status": "Estado",
     "amount": "Monto",
+    "payment": "Pago",
     "discount": "Descuento",
     "tax": "Impuesto",
     "taxRate": "Tasa impositiva",
@@ -47,6 +49,15 @@
     "noAvailable": {
       "default": "No disponible",
       "yet": "No disponible aún"
+    },
+    "paidStatuses": {
+      "paid": "Pagada",
+      "unpaid": "No pagada",
+      "partial": "Parcialmente",
+      "overpaid": "Pagado en exceso",
+      "pending": "Pendiente",
+      "removed": "Eliminado",
+      "completed": "Completo"
     },
     "checkoutProcess": "Proceso de pago",
     "statuses": {
@@ -206,14 +217,6 @@
       "confirm": "Si, continuar",
       "cancel": "Cancelar"
     },
-    "paidStatuses": {
-      "paid": "Pagada",
-      "unpaid": "No pagada",
-      "partial": "Parcialmente pagada",
-      "overpaid": "Pagado en exceso",
-      "pending": "Pendiente",
-      "removed": "Eliminado"
-    },
     "statuses": {
       "open": "Abierta",
       "draft": "Borrador",
@@ -355,6 +358,58 @@
           "variant": "primary"
         }
       }
+    }
+  },
+  "payments": {
+    "title": "Pagos",
+    "description": "Todos los pagos registrados se muestran aquí.",
+    "paidStatus": "Pagada",
+    "line": {
+      "form": {
+        "placeholder": "Referencia o presione ⌘K",
+        "addNew": "Registrar nuevo artículo",
+        "search": "Escriba un nombre de artículo..."
+      }
+    },
+    "single": {
+      "title": "Pago",
+      "description": "Detalles del pago seleccionado.",
+      "payTo": "Pagar a",
+      "paymentFrom": "Pago de",
+      "totalSummary": "Resumen total del pago",
+      "invoice": "Factura"
+    },
+    "viewPayment": {
+      "title": "Ver pago",
+      "description": "Detalles del pago seleccionado."
+    },
+    "newPayment": {
+      "title": "Nuevo pago",
+      "description": "Registra un nuevo pago."
+    },
+    "editPayment": {
+      "title": "Editar pago",
+      "description": "Edita los detalles del pago seleccionado"
+    },
+    "voidPayment": {
+      "title": "Anular pago",
+      "description": "Anula los detalles del pago seleccionado."
+    },
+    "emptyState": {
+      "title": "Registra tu primer pago",
+      "description": "Una vez que registres tus pagos, aparecerán aquí."
+    },
+    "confirmsPassword": {
+      "title": "¿Estás seguro que deseas borrar a :item?",
+      "description": "Una vez que se elimine :item, todos sus recursos seguirán estando disponibles, pero no se podrá realizar ninguna operación nueva.",
+      "confirm": "Si, borralo",
+      "cancel": "Cancelar"
+    },
+    "statuses": {
+      "pending": "Abierta",
+      "failed": "Enviada",
+      "completed": "Terminada",
+      "void": "Nula"
     }
   }
 }

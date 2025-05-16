@@ -36,7 +36,7 @@ export default function Show({ invoice, auth }: Props) {
           </div>
           <div className="col-span-6 flex items-center gap-x-2 [&_[data-slot=label]]:font-normal">
             <Label>{t('global.date')}</Label>
-            <Label className="">{format(invoice.header.date, 'PPP')}</Label>
+            <Label className="">{format(invoice.header.date, 'dd-MM-yyyy')}</Label>
           </div>
         </div>
         <Separator />
@@ -83,7 +83,7 @@ export default function Show({ invoice, auth }: Props) {
                 <th scope="col" className="text-start">
                   {t('global.name')}
                 </th>
-                <th scope="col" className="w-40 text-start">
+                <th scope="col" className="w-20 text-start">
                   {t('global.unit')}
                 </th>
                 <th scope="col" data-format="number" className="!w-20">
@@ -106,7 +106,7 @@ export default function Show({ invoice, auth }: Props) {
                   <td>{line.id}</td>
                   <td>{line.name}</td>
                   <td>{line.unit.name}</td>
-                  <td data-format="number" className="!w-20">
+                  <td data-format="number" className="!w-16">
                     {line.qty}
                   </td>
                   <td data-format="number">{currency(line.price)}</td>
@@ -188,7 +188,7 @@ export default function Show({ invoice, auth }: Props) {
             <SelectContent className="w-46">
               {PaidStatuses.map((status) => (
                 <SelectItem key={status} value={status}>
-                  {t(`invoices.paidStatuses.${status}`)}
+                  {t(`global.paidStatuses.${status}`)}
                 </SelectItem>
               ))}
             </SelectContent>

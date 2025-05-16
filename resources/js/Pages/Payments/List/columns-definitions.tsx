@@ -16,15 +16,16 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { Payment, PaymentVerb } from '@/types';
+import { Payment, PaymentVerb, Replacements } from '@/types';
 import { ColumnDef } from '@tanstack/react-table';
 import { ArrowUpDown, MessageCircleMore, MoreHorizontal } from 'lucide-react';
 
 type Props = {
   onDidClick: (item: Payment, action: PaymentVerb) => void;
+  t: (key: string, replacements?: Replacements) => string;
 };
 
-export const getColumns = ({ onDidClick }: Props): ColumnDef<Payment>[] => {
+export const getColumns = ({ onDidClick, t }: Props): ColumnDef<Payment>[] => {
   return [
     {
       id: 'select',
@@ -41,10 +42,10 @@ export const getColumns = ({ onDidClick }: Props): ColumnDef<Payment>[] => {
     },
     {
       accessorKey: 'number',
-      meta: 'Number',
+      meta: t('global.number'),
       // size: 880,
       header: (props) => {
-        return <HeaderCell title="Number" alignment="left" columnWidth={props.column.getSize()} />;
+        return <HeaderCell title={t('global.number')} alignment="left" columnWidth={props.column.getSize()} />;
       },
       cell: (props) => {
         const hasNotes = !!props.row.original.notes;
@@ -69,10 +70,11 @@ export const getColumns = ({ onDidClick }: Props): ColumnDef<Payment>[] => {
     {
       accessorKey: 'customer.name',
       id: 'customer.name',
+      meta: t('global.customer'),
       header: ({ column }) => {
         return (
-          <Button variant="ghost" onClick={() => column.toggleSorting(column.getIsSorted() === 'asc')}>
-            Customer <ArrowUpDown />
+          <Button className="uppercase" variant="ghost" onClick={() => column.toggleSorting(column.getIsSorted() === 'asc')}>
+            {t('global.customer')} <ArrowUpDown />
           </Button>
         );
       },
@@ -88,10 +90,10 @@ export const getColumns = ({ onDidClick }: Props): ColumnDef<Payment>[] => {
     },
     {
       accessorKey: 'customer.amount_due',
-      meta: 'Balance',
+      meta: t('global.balance'),
       // size: 880,
       header: (props) => {
-        return <HeaderCell title="Balance" alignment="right" columnWidth={props.column.getSize()} />;
+        return <HeaderCell title={t('global.balance')} alignment="right" columnWidth={props.column.getSize()} />;
       },
       cell: (props) => {
         return <CurrencyCell columnWidth={props.column.getSize()} value={props.getValue() as string} />;
@@ -99,10 +101,10 @@ export const getColumns = ({ onDidClick }: Props): ColumnDef<Payment>[] => {
     },
     {
       accessorKey: 'date',
-      meta: 'Date',
+      meta: t('global.date'),
       // size: 880,
       header: (props) => {
-        return <HeaderCell title="Date" alignment="left" columnWidth={props.column.getSize()} />;
+        return <HeaderCell title={t('global.date')} alignment="left" columnWidth={props.column.getSize()} />;
       },
       cell: (props) => {
         return <DateCell columnWidth={props.column.getSize()} value={props.getValue() as string} />;
@@ -110,10 +112,10 @@ export const getColumns = ({ onDidClick }: Props): ColumnDef<Payment>[] => {
     },
     {
       accessorKey: 'amount',
-      meta: 'Amount',
+      meta: t('global.amount'),
       // size: 880,
       header: (props) => {
-        return <HeaderCell title="Amount" alignment="right" columnWidth={props.column.getSize()} />;
+        return <HeaderCell title={t('global.amount')} alignment="right" columnWidth={props.column.getSize()} />;
       },
       cell: (props) => {
         return <CurrencyCell columnWidth={props.column.getSize()} value={props.getValue() as string} />;
@@ -121,10 +123,10 @@ export const getColumns = ({ onDidClick }: Props): ColumnDef<Payment>[] => {
     },
     {
       accessorKey: 'invoices',
-      meta: 'Invoices',
+      meta: t('global.navMain.invoices'),
       // size: 880,
       header: (props) => {
-        return <HeaderCell title="Invoices" alignment="right" columnWidth={props.column.getSize()} />;
+        return <HeaderCell title={t('global.navMain.invoices')} alignment="right" columnWidth={props.column.getSize()} />;
       },
       cell: (props) => {
         return <NumericCell columnWidth={props.column.getSize()} value={props.getValue() as string} />;
@@ -132,9 +134,10 @@ export const getColumns = ({ onDidClick }: Props): ColumnDef<Payment>[] => {
     },
     {
       accessorKey: 'status',
+      meta: t('global.status'),
       size: 70,
       header: (props) => {
-        return <HeaderCell title="Status" alignment="center" columnWidth={props.column.getSize()} />;
+        return <HeaderCell title={t('global.status')} alignment="center" columnWidth={props.column.getSize()} />;
       },
       cell: (props) => {
         return <StatusBadge type="payment" status={props.row.original.status} />;
@@ -149,22 +152,22 @@ export const getColumns = ({ onDidClick }: Props): ColumnDef<Payment>[] => {
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="ghost" className="size-8 p-0">
-                <span className="sr-only">Open menu</span>
+                <span className="sr-only">{t('global.openMenu')}</span>
                 <MoreHorizontal />
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-              <DropdownMenuLabel>Actions</DropdownMenuLabel>
+              <DropdownMenuLabel>{t('global.actions.title')}</DropdownMenuLabel>
               <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={() => onDidClick(props.row.original, 'view')}>View</DropdownMenuItem>
+              <DropdownMenuItem onClick={() => onDidClick(props.row.original, 'view')}>{t('payments.viewPayment.title')}</DropdownMenuItem>
               {props.row.original.status !== 'void' && (
                 <>
                   <DropdownMenuItem onClick={() => onDidClick(props.row.original, 'edit')} disabled={disabled}>
-                    Edit
+                    {t('payments.editPayment.title')}
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem onClick={() => onDidClick(props.row.original, 'void')} disabled={disabled}>
-                    Void
+                    {t('payments.voidPayment.title')}
                   </DropdownMenuItem>
                 </>
               )}

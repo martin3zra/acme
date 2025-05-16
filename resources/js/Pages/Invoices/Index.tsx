@@ -97,7 +97,7 @@ export default function Index({
 
         {invoice && (
           <Sheet open={open} onOpenChange={onOpenChange}>
-            <SheetContent side="right" className="m-4 flex h-[calc(~'(100%-var(--spacing)*4)/3')] w-full flex-col rounded-md sm:max-w-7xl">
+            <SheetContent side="right" className="m-4 flex h-[calc(~'(100%-var(--spacing)*4)/3')] w-full flex-col rounded-md sm:max-w-[1380px]">
               <SheetHeader>
                 <div className="mr-6 flex items-start justify-between">
                   <div className="flex flex-col">
