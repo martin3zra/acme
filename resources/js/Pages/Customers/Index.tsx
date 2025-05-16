@@ -5,23 +5,13 @@ import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '
 import { useVerb } from '@/composables/use-verbs';
 import { useTranslation } from '@/hooks/use-translation';
 import AuthenticatedLayout from '@/layouts/authenticated-layout';
-import { BreadcrumbItem, Customer, CustomerVerb, PageProps } from '@/types';
+import { Customer, CustomerVerb, PageProps } from '@/types';
 import { router } from '@inertiajs/react';
 import { Plus } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { List } from './List/Index';
 import CreateForm, { CreateFormParams } from './Shared/CreateForm';
-
-const breadcrumbs: BreadcrumbItem[] = [
-  {
-    title: 'Home',
-    href: '/home',
-  },
-  {
-    title: 'Customers',
-    href: '/customers',
-  },
-];
+import { breadcrumbs } from './constants';
 
 export default function Index({ auth, customers, customer }: PageProps<{ customers: Customer[]; customer: Customer }>) {
   const t = useTranslation().trans;

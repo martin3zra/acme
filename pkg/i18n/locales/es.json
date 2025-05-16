@@ -53,6 +53,10 @@
       "enabled": "Activo",
       "disabled": "Inactivo"
     },
+    "warning": {
+      "title": "Advertencia",
+      "description": "Proceda con precaución, esto no es permanente."
+    },
     "actions": {
       "title": "Acciones",
       "view": "Ver",
@@ -259,6 +263,32 @@
       "description": "Una vez que se elimine :customer, todos sus recursos seguirán estando disponibles, pero no se podrá realizar ninguna operación nueva.",
       "confirm": "Si, borralo",
       "cancel": "Cancelar"
+    },
+    "statuses": {
+      "enabled":{
+        "section": {
+          "title": "Deshabilitar cliente",
+          "description": "Bloquear cliente y todos sus recursos"
+        },
+        "confirmsPassword": {
+          "title": "¿Está seguro de que desea deshabilitar :customer?",
+          "description": "Al desactivar este cliente, se bloquearán todos sus recursos y datos. Ingrese su contraseña para confirmar que desea desactivarlo.",
+          "confirm": "Sí, desactívalo",
+          "variant": "destructive"
+        }
+      },
+      "disabled":{
+        "section": {
+          "title": "Habilitar cliente",
+          "description": "Desbloquear cliente y todos sus recursos"
+        },
+        "confirmsPassword": {
+          "title": "¿Está seguro de que desea activar :customer?",
+          "description": "Al activar este cliente, se desbloquearán todos sus recursos y datos. Ingrese su contraseña para confirmar que desea activarlo.",
+          "confirm": "Sí, actívalo",
+          "variant": "primary"
+        }
+      }
     }
   },
   "items": {
@@ -299,6 +329,32 @@
       "description": "Una vez que se elimine :item, todos sus recursos seguirán estando disponibles, pero no se podrá realizar ninguna operación nueva.",
       "confirm": "Si, borralo",
       "cancel": "Cancelar"
+    },
+    "statuses": {
+      "enabled":{
+        "section": {
+          "title": "Deshabilitar producto",
+          "description": "Bloquear producto y todos sus recursos"
+        },
+        "confirmsPassword": {
+          "title": "¿Está seguro de que desea deshabilitar :item?",
+          "description": "Al desactivar este producto, se bloquearán todos sus recursos y datos. Ingrese su contraseña para confirmar que desea desactivarlo.",
+          "confirm": "Sí, desactívalo",
+          "variant": "destructive"
+        }
+      },
+      "disabled":{
+        "section": {
+          "title": "Habilitar producto",
+          "description": "Desbloquear producto y todos sus recursos"
+        },
+        "confirmsPassword": {
+          "title": "¿Está seguro de que desea activar :item?",
+          "description": "Al activar este producto, se desbloquearán todos sus recursos y datos. Ingrese su contraseña para confirmar que desea activarlo.",
+          "confirm": "Sí, actívalo",
+          "variant": "primary"
+        }
+      }
     }
   }
 }
