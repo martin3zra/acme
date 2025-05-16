@@ -20,6 +20,7 @@
     "amount": "Monto",
     "discount": "Descuento",
     "tax": "Impuesto",
+    "taxRate": "Tasa impositiva",
     "subTotal": "Sub-total",
     "total": "Total",
     "balance": "Balance",
@@ -28,6 +29,7 @@
     "totalReceived": "Total recibido",
     "currency": "Moneda",
     "customer": "Cliente",
+    "item": "Producto",
     "contact": "Contacto",
     "voided": "Anulada",
     "name": "Nombre",
@@ -255,6 +257,46 @@
     "confirmsPassword": {
       "title": "¿Estás seguro que deseas borrar a :customer?",
       "description": "Una vez que se elimine :customer, todos sus recursos seguirán estando disponibles, pero no se podrá realizar ninguna operación nueva.",
+      "confirm": "Si, borralo",
+      "cancel": "Cancelar"
+    }
+  },
+  "items": {
+    "title": "Productos",
+    "description": "Todos los productos creados se muestran aquí.",
+    "paidStatus": "Pagada",
+    "paymentTerms": "Condiciones de pago",
+    "taxReceipt": "Tipo NCF",
+    "line": {
+      "form": {
+        "placeholder": "Referencia o presione ⌘K",
+        "addNew": "Registrar nuevo artículo",
+        "search": "Escriba un nombre de artículo..."
+      }
+    },
+    "viewItem": {
+      "title": "Ver producto",
+      "description": "Detalles del cliente seleccionado."
+    },
+    "newItem": {
+      "title": "Nuevo producto",
+      "description": "Crea un nuevo producto para facturar."
+    },
+    "editItem": {
+      "title": "Editar producto",
+      "description": "Edita los detalles del cliente seleccionado"
+    },
+    "trashItem": {
+      "title": "Borrar producto",
+      "description": "Borra los detalles del cliente seleccionado."
+    },
+    "emptyState": {
+      "title": "Crea tu primer producto",
+      "description": "Una vez que cree tus productos, aparecerán aquí."
+    },
+    "confirmsPassword": {
+      "title": "¿Estás seguro que deseas borrar a :item?",
+      "description": "Una vez que se elimine :item, todos sus recursos seguirán estando disponibles, pero no se podrá realizar ninguna operación nueva.",
       "confirm": "Si, borralo",
       "cancel": "Cancelar"
     }

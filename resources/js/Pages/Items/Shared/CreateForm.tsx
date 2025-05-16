@@ -7,6 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useHeader } from '@/composables/use-headers';
 import { useVerb } from '@/composables/use-verbs';
+import { useTranslation } from '@/hooks/use-translation';
 import { Item, PageProps, Tax, Unit, Verb } from '@/types';
 import { useForm, usePage } from '@inertiajs/react';
 import { FormEventHandler, useState } from 'react';
@@ -33,6 +34,7 @@ type ItemForm = {
 };
 
 export default function CreateForm({ onFinish, params }: CreateFormProps) {
+  const t = useTranslation().trans;
   const [dialogOpen, setDialogOpen] = useState(false);
   const { headers } = useHeader();
   const { errors: propsErrors } = usePage<PageProps>().props;
@@ -91,7 +93,7 @@ export default function CreateForm({ onFinish, params }: CreateFormProps) {
       <form onSubmit={submit} className="space-y-6">
         <div className="grid grid-cols-2 gap-2">
           <div className="grid gap-2">
-            <Label htmlFor="name">Name</Label>
+            <Label htmlFor="name">{t('global.name')}</Label>
             <Input
               id="name"
               className="mt-1 block w-full"
@@ -105,7 +107,7 @@ export default function CreateForm({ onFinish, params }: CreateFormProps) {
             <InputError className="mt-2" message={errors.name} />
           </div>
           <div className="grid gap-2">
-            <Label>Unit</Label>
+            <Label>{t('global.unit')}</Label>
             <Select
               onValueChange={(value) => setData('unit_id', Number(value))}
               disabled={viewMode}
@@ -130,7 +132,7 @@ export default function CreateForm({ onFinish, params }: CreateFormProps) {
         <div className="grid grid-cols-2 gap-2">
           <div className="flex items-center justify-between">
             <div className="flex flex-col gap-2">
-              <Label>Tax</Label>
+              <Label>{t('global.tax')}</Label>
               <Select
                 onValueChange={(value) => setData('tax_id', Number(value))}
                 disabled={viewMode}
@@ -153,7 +155,7 @@ export default function CreateForm({ onFinish, params }: CreateFormProps) {
             </div>
 
             <div className="flex flex-col gap-2">
-              <Label htmlFor="price">Price</Label>
+              <Label htmlFor="price">{t('global.price')}</Label>
               <Input
                 id="price"
                 type="number"
@@ -169,7 +171,7 @@ export default function CreateForm({ onFinish, params }: CreateFormProps) {
         </div>
         <div className="grid grid-cols-2 gap-2">
           <div className="grid gap-2">
-            <Label htmlFor="description">Description</Label>
+            <Label htmlFor="description">{t('global.description')}</Label>
             <textarea
               id="description"
               className="mt-1 block w-full rounded-lg border border-gray-300 bg-gray-50 p-2.5 text-sm text-gray-900 focus:border-blue-500 focus:ring-blue-500"
@@ -196,7 +198,9 @@ export default function CreateForm({ onFinish, params }: CreateFormProps) {
         </div>
         {!viewMode && (
           <div className="flex items-center gap-4">
-            <Button disabled={processing}>{verbName} Item</Button>
+            <Button disabled={processing}>
+              {t(`global.actions.${verbName}`)} {t('global.item')}
+            </Button>
           </div>
         )}
       </form>

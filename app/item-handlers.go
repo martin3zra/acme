@@ -20,7 +20,8 @@ func (s *Server) itemsHandler(i *inertia.Inertia) http.Handler {
 		}
 
 		err = i.Render(w, r, "Items/Index", inertia.Props{
-			"items": items,
+			"translations": mergeTranslations(r.Context(), loadTranslations("items")),
+			"items":        items,
 			"units": inertia.Defer(func() (any, error) {
 				units, err := s.findUnits(*user.CurrentCompanyId)
 				if err != nil {
