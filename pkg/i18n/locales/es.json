@@ -23,6 +23,8 @@
     "total": "Total",
     "balance": "Balance",
     "totalPaymentApplied": "Total de pagos aplicados",
+    "totalToBeCollected": "Total a cobrar",
+    "totalReceived": "Total recibido",
     "currency": "Moneda",
     "customer": "Cliente",
     "voided": "Anulada",
@@ -41,6 +43,7 @@
       "default": "No disponible",
       "yet": "No disponible aún"
     },
+    "checkoutProcess": "Proceso de pago",
     "actions": {
       "title": "Acciones",
       "view": "Ver",
@@ -57,6 +60,37 @@
       "cancel": "Cancelar",
       "save": "Salvar",
       "checkout": "Metodo de pago"
+    },
+    "paymentMethods": {
+      "cash": {
+        "title": "Efectivo"
+      },
+      "ck": {
+        "title": "Cheque",
+        "form": {
+          "title": "Pago con cheque",
+          "description": "Especifique el monto del cheque y el número para futura referencia.",
+          "reference": "Número de cheque"
+        }
+      },
+      "card": {
+        "title": "Tarjeta",
+        "form": {
+          "title": "Pago con débito/crédito",
+          "description": "Especifique el monto de la Tarjeta de Débito/Crédito y los últimos 4 dígitos para futura referencia.",
+          "last4": "Últimos 4 dígitos",
+          "authorization": "Autorización",
+          "brand": "Marca"
+        }
+      },
+      "bt": {
+        "title": "Transferencia",
+        "form": {
+          "title": "Pago mediante transferencia bancaria",
+          "description": "Especifique el importe de la Transferencia Bancaria y el número para futura referencia.",
+          "reference": "Número de transferencia"
+        }
+      }
     },
     "pagination": {
       "showing": "Mostrando",

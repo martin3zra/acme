@@ -145,7 +145,7 @@ export const getColumns = ({ onDidClick, t }: Props): ColumnDef<Invoice>[] => {
       meta: t('global.balance'),
       // size: 880,
       header: (props) => {
-        return <HeaderCell title={t('global.discount')} alignment="right" columnWidth={props.column.getSize()} />;
+        return <HeaderCell title={t('global.balance')} alignment="right" columnWidth={props.column.getSize()} />;
       },
       cell: (props) => {
         return <CurrencyCell columnWidth={props.column.getSize()} value={props.getValue() as string} />;

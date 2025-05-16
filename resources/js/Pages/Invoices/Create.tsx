@@ -527,7 +527,7 @@ export default function Create({
           </AlertDialogContent>
         </AlertDialog>
         <CheckoutForm
-          action="Place it"
+          action={t('global.actions.save')}
           openCheckout={openCheckout}
           setCheckout={setCheckout}
           paymentForm={invoiceForm.payment}
@@ -538,6 +538,7 @@ export default function Create({
           errors={propsErrors}
           onCheckoutChange={handleCheckoutChange}
           currency={currency}
+          t={t}
         />
       </div>
 
