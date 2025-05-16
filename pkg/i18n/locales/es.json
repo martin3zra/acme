@@ -48,6 +48,7 @@
       "title": "Acciones",
       "view": "Ver",
       "edit": "Editar",
+      "update": "Actualizar",
       "delete": "Eliminar",
       "download": "Descargar",
       "send": "Enviar",

@@ -130,6 +130,7 @@ func (s *Server) editInvoiceHandler(i *inertia.Inertia) http.Handler {
 		}
 
 		err = i.Render(w, r, "Invoices/Edit", inertia.Props{
+			"translations": mergeTranslations(r.Context(), loadTranslations("invoices")),
 			"invoice": map[string]any{
 				"header": invoice,
 				"lines":  lines,

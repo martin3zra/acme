@@ -227,15 +227,15 @@ class CheckoutForm extends React.Component<CheckoutFormProps, CheckoutFormState>
             <div className="pb-6">{this.renderPaymentMethodForm()}</div>
             <Separator className="" />
             <div>
-              <div className="flex w-60 items-center justify-between">
+              <div className="flex w-80 items-center justify-between">
                 <span className="block text-2xl">{t('global.totalToBeCollected')}</span>
                 <span className="block text-2xl">{currency(totalAmount)}</span>
               </div>
-              <div className="flex w-60 items-center justify-between">
+              <div className="flex w-80 items-center justify-between">
                 <span className="block text-2xl">{t('global.totalReceived')}</span>
                 <span className="block text-2xl">{currency(receivedAmount)}</span>
               </div>
-              <div className="flex w-60 items-center justify-between">
+              <div className="flex w-80 items-center justify-between">
                 <span className="block text-2xl">{t('global.balance')}</span>
                 <span className="block text-2xl font-medium text-red-600">{currency(remainingBalance)}</span>
               </div>
