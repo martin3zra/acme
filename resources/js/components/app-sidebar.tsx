@@ -2,48 +2,40 @@ import { NavMain } from '@/components/nav-main';
 import { NavSecondary } from '@/components/nav-secondary';
 import { NavUser } from '@/components/nav-user';
 import { Sidebar, SidebarContent, SidebarFooter, SidebarHeader, SidebarMenu, SidebarMenuButton, SidebarMenuItem } from '@/components/ui/sidebar';
-import { Link } from '@inertiajs/react';
-import {
-  ClipboardList,
-  Command,
-  CreditCard,
-  HelpCircleIcon,
-  LayoutDashboardIcon,
-  LayoutListIcon,
-  SearchIcon,
-  SettingsIcon,
-  UsersIcon,
-} from 'lucide-react';
+import { PageProps } from '@/types';
+import { Link, usePage } from '@inertiajs/react';
+import { ClipboardList, CreditCard, HelpCircleIcon, LayoutDashboardIcon, LayoutListIcon, SearchIcon, SettingsIcon, UsersIcon } from 'lucide-react';
 import * as React from 'react';
+import AppLogoIcon from './app-logo-icon';
 
 const data = {
   navMain: [
     {
-      title: 'Dashboard',
+      title: 'global.navMain.dashboard',
       url: '/home',
       icon: LayoutDashboardIcon,
       components: ['Home/Index'],
     },
     {
-      title: 'Invoices',
+      title: 'global.navMain.invoices',
       url: '/invoices',
       icon: ClipboardList,
       components: ['Invoices/Index', 'Invoices/Create'],
     },
     {
-      title: 'Customers',
+      title: 'global.navMain.customers',
       url: '/customers',
       icon: UsersIcon,
       components: ['Customers/Index'],
     },
     {
-      title: 'Items',
+      title: 'global.navMain.items',
       url: '/items',
       icon: LayoutListIcon,
       components: ['Items/Index'],
     },
     {
-      title: 'Payments',
+      title: 'global.navMain.payments',
       url: '/payments',
       icon: CreditCard,
       components: ['Payments/Index', 'Payments/Create'],
@@ -51,17 +43,17 @@ const data = {
   ],
   navSecondary: [
     {
-      title: 'Settings',
+      title: 'global.navSecondary.settings',
       url: '#',
       icon: SettingsIcon,
     },
     {
-      title: 'Get Help',
+      title: 'global.navSecondary.get-help',
       url: '#',
       icon: HelpCircleIcon,
     },
     {
-      title: 'Search',
+      title: 'global.navSecondary.search',
       url: '#',
       icon: SearchIcon,
     },
@@ -69,6 +61,7 @@ const data = {
 };
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
+  const { auth } = usePage<PageProps>().props;
   return (
     <Sidebar variant="inset" {...props}>
       <SidebarHeader>
@@ -77,10 +70,10 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
             <SidebarMenuButton size="lg" asChild>
               <Link href="/home">
                 <div className="bg-sidebar-primary text-sidebar-primary-foreground flex aspect-square size-8 items-center justify-center rounded-lg">
-                  <Command className="size-4" />
+                  <AppLogoIcon className="size-4" />
                 </div>
                 <div className="grid flex-1 text-left text-sm leading-tight">
-                  <span className="truncate font-medium">Acme Inc</span>
+                  <span className="truncate font-medium">{auth.company.name}</span>
                   <span className="truncate text-xs">Enterprise</span>
                 </div>
               </Link>

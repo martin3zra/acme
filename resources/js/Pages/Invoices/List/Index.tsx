@@ -1,6 +1,7 @@
 import { Button } from '@/components/ui/button';
 import { DropdownMenu, DropdownMenuCheckboxItem, DropdownMenuContent, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { useTranslation } from '@/hooks/use-translation';
 import { Invoice, InvoiceVerb } from '@/types';
 import {
   ColumnFiltersState,
@@ -23,6 +24,7 @@ type Props = {
 };
 
 export const List: FC<Props> = ({ data, onSelectInvoice }) => {
+  const t = useTranslation().trans;
   const [sorting, setSorting] = useState<SortingState>([]);
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
   const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({
@@ -30,7 +32,7 @@ export const List: FC<Props> = ({ data, onSelectInvoice }) => {
   });
   const [rowSelection, setRowSelection] = useState({});
 
-  const columns = getColumns({ onDidClick: onSelectInvoice });
+  const columns = getColumns({ onDidClick: onSelectInvoice, t });
 
   const table = useReactTable({
     data,
@@ -63,7 +65,7 @@ export const List: FC<Props> = ({ data, onSelectInvoice }) => {
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button variant="outline" className="ml-auto">
-              Columns <ChevronDown />
+              {t('global.columns')} <ChevronDown />
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
@@ -112,7 +114,7 @@ export const List: FC<Props> = ({ data, onSelectInvoice }) => {
             ) : (
               <TableRow>
                 <TableCell colSpan={columns.length} className="h-24 text-center">
-                  No results.
+                  {t('global.noResults')}
                 </TableCell>
               </TableRow>
             )}
@@ -121,14 +123,17 @@ export const List: FC<Props> = ({ data, onSelectInvoice }) => {
       </div>
       <div className="flex items-center justify-end space-x-2 py-4">
         <div className="text-muted-foreground flex-1 text-sm">
-          {table.getFilteredSelectedRowModel().rows.length} of {table.getFilteredRowModel().rows.length} row(s) selected.
+          {t('global.pagination.selectedOf', {
+            rows: table.getFilteredSelectedRowModel().rows.length,
+            total: table.getFilteredRowModel().rows.length,
+          })}
         </div>
         <div className="space-x-2">
           <Button value="outline" size="sm" onClick={() => table.previousPage()} disabled={!table.getCanPreviousPage()}>
-            Previous
+            {t('global.pagination.previous')}
           </Button>
           <Button value="outline" size="sm" onClick={() => table.nextPage()} disabled={!table.getCanNextPage()}>
-            Next
+            {t('global.pagination.next')}
           </Button>
         </div>
       </div>

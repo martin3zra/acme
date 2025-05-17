@@ -22,7 +22,8 @@ func (s *Server) invoicesHandler(i *inertia.Inertia) http.Handler {
 		}
 
 		props := inertia.Props{
-			"invoices": invoices,
+			"translations": mergeTranslations(r.Context(), loadTranslations("invoices")),
+			"invoices":     invoices,
 		}
 
 		if ensureUUIDIsValid(uuid) {
@@ -67,6 +68,7 @@ func (s *Server) createInvoiceHandler(i *inertia.Inertia) http.Handler {
 		}
 
 		err = i.Render(w, r, "Invoices/Create", inertia.Props{
+			"translations": mergeTranslations(r.Context(), loadTranslations("invoices")),
 			"tax_receipts": mapSlice(taxReceipts, func(receipt *taxReceipt) map[string]any {
 				return map[string]any{"id": receipt.ID, "name": fmt.Sprintf("%s-%s", receipt.Type, receipt.Name), "available": receipt.Current < receipt.SequenceEnd}
 			}),
@@ -128,6 +130,7 @@ func (s *Server) editInvoiceHandler(i *inertia.Inertia) http.Handler {
 		}
 
 		err = i.Render(w, r, "Invoices/Edit", inertia.Props{
+			"translations": mergeTranslations(r.Context(), loadTranslations("invoices")),
 			"invoice": map[string]any{
 				"header": invoice,
 				"lines":  lines,

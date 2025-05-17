@@ -14,7 +14,9 @@ import (
 func (s *Server) loginHandler(i *inertia.Inertia) http.Handler {
 	fn := func(w http.ResponseWriter, r *http.Request) {
 
-		err := i.Render(w, r, "Auth/Login")
+		err := i.Render(w, r, "Auth/Login", inertia.Props{
+			"translations": mergeTranslations(r.Context(), loadTranslations("auth")),
+		})
 		if err != nil {
 			s.handleError(w, err)
 			return
@@ -40,7 +42,7 @@ func (s *Server) authHandler(i *inertia.Inertia) http.Handler {
 		auth := auth.NewAuth(r.Context())
 		user, err := auth.Authenticate(form.Email, form.Password)
 		if err != nil {
-			session.Errors("email", "These credentials do not match our records.")
+			session.Errors("email", s.t["global.credentialsDoesNotMatch"])
 			i.Back(w, r, http.StatusSeeOther)
 			return
 		}
@@ -55,8 +57,6 @@ func (s *Server) authHandler(i *inertia.Inertia) http.Handler {
 			s.handleError(w, err)
 			return
 		}
-
-		session.Flash("success", "Congrats!!!")
 
 		i.Redirect(w, r, "/home")
 	}

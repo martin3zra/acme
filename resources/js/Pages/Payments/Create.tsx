@@ -18,6 +18,7 @@ import { useHeader } from '@/composables/use-headers';
 import { useNumber } from '@/composables/use-number';
 import { useDebounced } from '@/hooks/use-debounced';
 import { usePersistedState } from '@/hooks/use-persisted-state';
+import { useTranslation } from '@/hooks/use-translation';
 import AuthenticatedLayout from '@/layouts/authenticated-layout';
 import { cn } from '@/lib/utils';
 import { BTForm, CardForm, CashForm, CheckForm, Customer, PageProps, PaymentForm, PaymentMethod, Receivable, ReceivableInvoiceForm } from '@/types';
@@ -45,6 +46,7 @@ export default function Create({
   invoice_uuid,
   forceInitial,
 }: PageProps<{ customer: Customer; customers: Customer[]; receivables: Receivable[]; invoice_uuid: string; forceInitial: boolean }>) {
+  const t = useTranslation().trans;
   const { currency } = useNumber();
   const [openCancelConfirmation, setCancelConfirmation] = React.useState(false);
   const [openCheckout, setCheckout] = React.useState(false);
@@ -222,10 +224,10 @@ export default function Create({
       <AuthenticatedLayout.Actions>
         <div className="flex justify-end gap-x-6">
           <Button variant={'secondary'} onClick={() => setCancelConfirmation(true)}>
-            Cancel
+            {t('global.actions.cancel')}
           </Button>
           <Button onClick={handleCheckout} disabled={totalPaid() === 0 || processing}>
-            Checkout
+            {t('global.actions.checkout')}
           </Button>
         </div>
       </AuthenticatedLayout.Actions>
@@ -249,7 +251,7 @@ export default function Create({
           <div className="grid grid-cols-12">
             <div className="col-span-6 flex flex-col gap-y-6">
               <div className="flex flex-col gap-y-2">
-                <Label htmlFor="date">Date</Label>
+                <Label htmlFor="date">{t('global.date')}</Label>
                 <Popover>
                   <PopoverTrigger asChild>
                     <Button
@@ -257,7 +259,7 @@ export default function Create({
                       className={cn('w-[280px] justify-start text-left font-normal', !paymentForm.header.date && 'text-muted-foreground')}
                     >
                       <CalendarIcon />
-                      {paymentForm.header.date ? format(paymentForm.header.date, 'PPP') : <span>Pick a date</span>}
+                      {paymentForm.header.date ? format(paymentForm.header.date, 'PPP') : <span>{t('global.datePlaceholder')}</span>}
                     </Button>
                   </PopoverTrigger>
                   <PopoverContent className="w-auto p-0">
@@ -274,7 +276,7 @@ export default function Create({
               </div>
               <div className="flex flex-col">
                 <div className="flex flex-col gap-y-2">
-                  <Label className="text-sm/6 font-medium">Notes</Label>
+                  <Label className="text-sm/6 font-medium">{t('global.notes')}</Label>
                   <Textarea
                     name="notes"
                     rows={4}
@@ -291,7 +293,7 @@ export default function Create({
             </div>
             <div className="col-span-6 grid place-items-end">
               <div className="flex flex-col gap-x-2">
-                <Label className="text-muted-foreground block text-end text-lg">Amount Received</Label>
+                <Label className="text-muted-foreground block text-end text-lg">{t('global.totalReceived')}</Label>
                 <Label className="block text-end text-4xl">{currency(totalPaid())}</Label>
               </div>
               {/* <div className="flex flex-col gap-y-2">
@@ -355,19 +357,17 @@ export default function Create({
         <AlertDialog open={openCancelConfirmation} onOpenChange={setCancelConfirmation}>
           <AlertDialogContent>
             <AlertDialogHeader>
-              <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
-              <AlertDialogDescription>
-                This action cannot be undone. This will permanently delete this invoice and remove the data from our servers.
-              </AlertDialogDescription>
+              <AlertDialogTitle>{t('payments.confirmsCancelation.title')}</AlertDialogTitle>
+              <AlertDialogDescription>{t('payments.confirmsCancelation.description')}</AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
-              <AlertDialogCancel>Cancel</AlertDialogCancel>
-              <AlertDialogAction onClick={performPaymentCancelation}>Yes, Cancel</AlertDialogAction>
+              <AlertDialogCancel>{t('global.actions.cancel')}</AlertDialogCancel>
+              <AlertDialogAction onClick={performPaymentCancelation}>{t('payments.confirmsCancelation.confirm')}</AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
         <CheckoutForm
-          action="Record Payment"
+          action={t('global.actions.recordPayment')}
           openCheckout={openCheckout}
           setCheckout={setCheckout}
           paymentForm={paymentForm.payment}
@@ -378,6 +378,7 @@ export default function Create({
           errors={propsErrors}
           onCheckoutChange={handleCheckoutChange}
           currency={currency}
+          t={t}
         />
       </div>
     </AuthenticatedLayout>

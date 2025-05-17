@@ -1,0 +1,425 @@
+{
+  "global":{
+    "ok": "Aceptar",
+    "cancel": "Cancelar",
+    "close": "Cerrar",
+    "delete": "Eliminar",
+    "edit": "Editar",
+    "save": "Guardar",
+    "email": "Correo electrónico",
+    "password": "Contraseña",
+    "processing": "Procesando...",
+    "columns": "Columnas",
+    "noResults": "No hay resultados.",
+    "number": "Número",
+    "date": "Fecha",
+    "dueDate": "Fecha de vencimiento",
+    "addedAt": "Creado en",
+    "payDate": "Pagado en",
+    "datePlaceholder": "Elige una fecha",
+    "status": "Estado",
+    "amount": "Monto",
+    "payment": "Pago",
+    "discount": "Descuento",
+    "tax": "Impuesto",
+    "taxRate": "Tasa impositiva",
+    "subTotal": "Sub-total",
+    "total": "Total",
+    "balance": "Balance",
+    "totalPaymentApplied": "Total de pagos aplicados",
+    "totalToBeCollected": "Total a cobrar",
+    "totalReceived": "Total recibido",
+    "currency": "Moneda",
+    "customer": "Cliente",
+    "item": "Producto",
+    "contact": "Contacto",
+    "voided": "Anulada",
+    "name": "Nombre",
+    "phone": "Teléfono",
+    "description": "Descripción",
+    "reference": "Referencia",
+    "unit": "Unidad",
+    "qty": "Cantidad",
+    "price": "Precio",
+    "notes": "Notas",
+    "noNotesWasLeft": "No se dejó ninguna nota.",
+    "createdBy": "Creado por",
+    "paymentSummary": "Resumen de pago",
+    "limitReached": "Límite alcanzado",
+    "credentialsDoesNotMatch": "Estas credenciales no coinciden con nuestros registros.",
+    "platform": "Plataforma",
+    "noAvailable": {
+      "default": "No disponible",
+      "yet": "No disponible aún"
+    },
+    "paidStatuses": {
+      "paid": "Pagada",
+      "unpaid": "No pagada",
+      "partial": "Parcialmente",
+      "overpaid": "Pagado en exceso",
+      "pending": "Pendiente",
+      "removed": "Eliminado",
+      "completed": "Completo"
+    },
+    "checkoutProcess": "Proceso de pago",
+    "statuses": {
+      "enabled": "Activo",
+      "disabled": "Inactivo"
+    },
+    "warning": {
+      "title": "Advertencia",
+      "description": "Proceda con precaución, esto no es permanente."
+    },
+    "actions": {
+      "title": "Acciones",
+      "view": "Ver",
+      "edit": "Editar",
+      "update": "Actualizar",
+      "delete": "Eliminar",
+      "download": "Descargar",
+      "send": "Enviar",
+      "print": "Imprimir",
+      "copy": "Copiar",
+      "archive": "Archivar",
+      "unarchive": "Desarchivar",
+      "recordPayment": "Registrar pago",
+      "makePayment": "Realizar un pago",
+      "void": "Anular",
+      "cancel": "Cancelar",
+      "save": "Salvar",
+      "checkout": "Metodo de pago",
+      "create": "Crear"
+    },
+    "paymentMethods": {
+      "primary": "Método primario",
+      "cash": {
+        "title": "Efectivo"
+      },
+      "ck": {
+        "title": "Cheque",
+        "form": {
+          "title": "Pago con cheque",
+          "description": "Especifique el monto del cheque y el número para futura referencia.",
+          "reference": "Número de cheque"
+        }
+      },
+      "card": {
+        "title": "Tarjeta",
+        "form": {
+          "title": "Pago con débito/crédito",
+          "description": "Especifique el monto de la Tarjeta de Débito/Crédito y los últimos 4 dígitos para futura referencia.",
+          "last4": "Últimos 4 dígitos",
+          "authorization": "Autorización",
+          "brand": "Marca"
+        }
+      },
+      "bt": {
+        "title": "Transferencia",
+        "form": {
+          "title": "Pago mediante transferencia bancaria",
+          "description": "Especifique el importe de la Transferencia Bancaria y el número para futura referencia.",
+          "reference": "Número de transferencia"
+        }
+      }
+    },
+    "pagination": {
+      "showing": "Mostrando",
+      "of": "de",
+      "results": "resultados",
+      "previous": "Anterior",
+      "next": "Siguiente",
+      "first": "Primero",
+      "last": "Último",
+      "page": "Página",
+      "selectedOf": ":rows de :total seleccionadas"
+    },
+    "navMain": {
+      "dashboard": "Panel",
+      "invoices": "Facturas",
+      "customers": "Clientes",
+      "items": "Productos",
+      "payments": "Pagos"
+    },
+    "navSecondary": {
+      "settings": "Ajustes",
+      "get-help": "Obtener ayuda",
+      "search": "Buscar"
+    },
+    "navUser": {
+      "upgrade-to-pro": "Actualizar a Pro",
+      "account": "Cuenta",
+      "billing": "Facturación",
+      "notifications": "Notificaciones",
+      "logout": "Cerrar sesión"
+    },
+    "customerSection": {
+      "search": "Buscar cliente...",
+      "addNew": "Registrar nuevo cliente",
+      "emptyText": "No se encontraron clientes"
+    }
+  },
+  "auth": {
+    "login": {
+      "action": {
+        "login": "Iniciar sesión",
+        "logout": "Cerrar sesión"
+      },
+      "title": "Inicia sesión en tu cuenta",
+      "description": "Ingrese su correo electrónico y contraseña a continuación para iniciar sesión."
+    }
+  },
+  "invoices": {
+    "title": "Facturas",
+    "description": "Aquí puedes ver y gestionar todas tus facturas.",
+    "paidStatus": "Pagada",
+    "paymentTerms": "Condiciones de pago",
+    "taxReceipt": "Tipo NCF",
+    "line": {
+      "form": {
+        "placeholder": "Referencia o presione ⌘K",
+        "addNew": "Registrar nuevo artículo",
+        "search": "Escriba un nombre de artículo..."
+      }
+    },
+    "single": {
+      "title": "Factura",
+      "description": "Detalles de la factura seleccionada.",
+      "payTo": "Pagar a",
+      "invoiceTo": "Factura a",
+      "totalSummary": "Resumen total de la factura"
+    },
+    "viewInvoice": {
+      "title": "Ver factura",
+      "description": "Detalles de la factura seleccionada."
+    },
+    "newInvoice": {
+      "title": "Nueva factura",
+      "description": "Crea una nueva factura para enviar a tu cliente."
+    },
+    "editInvoice": {
+      "title": "Editar factura",
+      "description": "Edita los detalles de la factura seleccionada."
+    },
+    "voidInvoice": {
+      "title": "Anular factura",
+      "description": "Anula los detalles de la factura seleccionada."
+    },
+    "emptyState": {
+      "title": "Crea tu primera factura",
+      "description": "Una vez que cree su factura, aparecerá aquí."
+    },
+    "confirmsPassword": {
+      "title": "¿Estás seguro que deseas anular :invoice?",
+      "description": "¿Estás seguro de que deseas anular esta factura? Esta acción no se puede deshacer. Una vez que la factura quede nula pasará de :total a $0.00.",
+      "confirm": "Si, anular",
+      "cancel": "Cancelar"
+    },
+    "confirmsCancelation": {
+      "title": "¿Estás seguro que deseas cancelar?",
+      "description": "Esta acción no se puede deshacer. Eliminará permanentemente los cambios sin guardar de la factura y los datos de nuestros servidores.",
+      "confirm": "Si, continuar",
+      "cancel": "Cancelar"
+    },
+    "statuses": {
+      "open": "Abierta",
+      "draft": "Borrador",
+      "sent": "Enviada",
+      "viewed": "Vista",
+      "overdue": "Atrasada",
+      "completed": "Terminada",
+      "void": "Nula",
+      "partial": "Parcial"
+    }
+  },
+  "customers": {
+    "title": "Clientes",
+    "description": "Todos los clientes creados se muestran aquí.",
+    "paidStatus": "Pagada",
+    "paymentTerms": "Condiciones de pago",
+    "taxReceipt": "Tipo NCF",
+    "line": {
+      "form": {
+        "placeholder": "Referencia o presione ⌘K",
+        "addNew": "Registrar nuevo artículo",
+        "search": "Escriba un nombre de artículo..."
+      }
+    },
+    "viewCustomer": {
+      "title": "Ver cliente",
+      "description": "Detalles del cliente seleccionado."
+    },
+    "newCustomer": {
+      "title": "Nuevo cliente",
+      "description": "Crea un nuevo cliente para facturarle."
+    },
+    "editCustomer": {
+      "title": "Editar cliente",
+      "description": "Edita los detalles del cliente seleccionado"
+    },
+    "trashCustomer": {
+      "title": "Borrar cliente",
+      "description": "Borra los detalles del cliente seleccionado."
+    },
+    "emptyState": {
+      "title": "Crea tu primer cliente",
+      "description": "Una vez que cree su cliente, aparecerá aquí."
+    },
+    "confirmsPassword": {
+      "title": "¿Estás seguro que deseas borrar a :customer?",
+      "description": "Una vez que se elimine :customer, todos sus recursos seguirán estando disponibles, pero no se podrá realizar ninguna operación nueva.",
+      "confirm": "Si, borralo",
+      "cancel": "Cancelar"
+    },
+    "statuses": {
+      "enabled":{
+        "section": {
+          "title": "Deshabilitar cliente",
+          "description": "Bloquear cliente y todos sus recursos"
+        },
+        "confirmsPassword": {
+          "title": "¿Está seguro de que desea deshabilitar :customer?",
+          "description": "Al desactivar este cliente, se bloquearán todos sus recursos y datos. Ingrese su contraseña para confirmar que desea desactivarlo.",
+          "confirm": "Sí, desactívalo",
+          "variant": "destructive"
+        }
+      },
+      "disabled":{
+        "section": {
+          "title": "Habilitar cliente",
+          "description": "Desbloquear cliente y todos sus recursos"
+        },
+        "confirmsPassword": {
+          "title": "¿Está seguro de que desea activar :customer?",
+          "description": "Al activar este cliente, se desbloquearán todos sus recursos y datos. Ingrese su contraseña para confirmar que desea activarlo.",
+          "confirm": "Sí, actívalo",
+          "variant": "primary"
+        }
+      }
+    }
+  },
+  "items": {
+    "title": "Productos",
+    "description": "Todos los productos creados se muestran aquí.",
+    "paidStatus": "Pagada",
+    "paymentTerms": "Condiciones de pago",
+    "taxReceipt": "Tipo NCF",
+    "line": {
+      "form": {
+        "placeholder": "Referencia o presione ⌘K",
+        "addNew": "Registrar nuevo artículo",
+        "search": "Escriba un nombre de artículo..."
+      }
+    },
+    "viewItem": {
+      "title": "Ver producto",
+      "description": "Detalles del cliente seleccionado."
+    },
+    "newItem": {
+      "title": "Nuevo producto",
+      "description": "Crea un nuevo producto para facturar."
+    },
+    "editItem": {
+      "title": "Editar producto",
+      "description": "Edita los detalles del cliente seleccionado"
+    },
+    "trashItem": {
+      "title": "Borrar producto",
+      "description": "Borra los detalles del cliente seleccionado."
+    },
+    "emptyState": {
+      "title": "Crea tu primer producto",
+      "description": "Una vez que cree tus productos, aparecerán aquí."
+    },
+    "confirmsPassword": {
+      "title": "¿Estás seguro que deseas borrar a :item?",
+      "description": "Una vez que se elimine :item, todos sus recursos seguirán estando disponibles, pero no se podrá realizar ninguna operación nueva.",
+      "confirm": "Si, borralo",
+      "cancel": "Cancelar"
+    },
+    "statuses": {
+      "enabled":{
+        "section": {
+          "title": "Deshabilitar producto",
+          "description": "Bloquear producto y todos sus recursos"
+        },
+        "confirmsPassword": {
+          "title": "¿Está seguro de que desea deshabilitar :item?",
+          "description": "Al desactivar este producto, se bloquearán todos sus recursos y datos. Ingrese su contraseña para confirmar que desea desactivarlo.",
+          "confirm": "Sí, desactívalo",
+          "variant": "destructive"
+        }
+      },
+      "disabled":{
+        "section": {
+          "title": "Habilitar producto",
+          "description": "Desbloquear producto y todos sus recursos"
+        },
+        "confirmsPassword": {
+          "title": "¿Está seguro de que desea activar :item?",
+          "description": "Al activar este producto, se desbloquearán todos sus recursos y datos. Ingrese su contraseña para confirmar que desea activarlo.",
+          "confirm": "Sí, actívalo",
+          "variant": "primary"
+        }
+      }
+    }
+  },
+  "payments": {
+    "title": "Pagos",
+    "description": "Todos los pagos registrados se muestran aquí.",
+    "paidStatus": "Pagada",
+    "line": {
+      "form": {
+        "placeholder": "Referencia o presione ⌘K",
+        "addNew": "Registrar nuevo artículo",
+        "search": "Escriba un nombre de artículo..."
+      }
+    },
+    "single": {
+      "title": "Pago",
+      "description": "Detalles del pago seleccionado.",
+      "payTo": "Pagar a",
+      "paymentFrom": "Pago de",
+      "totalSummary": "Resumen total del pago",
+      "invoice": "Factura",
+      "viewInvoice": "Ver factura"
+    },
+    "viewPayment": {
+      "title": "Ver pago",
+      "description": "Detalles del pago seleccionado."
+    },
+    "newPayment": {
+      "title": "Nuevo pago",
+      "description": "Registra un nuevo pago."
+    },
+    "editPayment": {
+      "title": "Editar pago",
+      "description": "Edita los detalles del pago seleccionado"
+    },
+    "voidPayment": {
+      "title": "Anular pago",
+      "description": "Anula los detalles del pago seleccionado."
+    },
+    "emptyState": {
+      "title": "Registra tu primer pago",
+      "description": "Una vez que registres tus pagos, aparecerán aquí."
+    },
+    "confirmsPassword": {
+      "title": "¿Estás seguro que deseas anular el pago :payment?",
+      "description": "¿Estás seguro de que deseas anular este pago? Esta acción no se puede deshacer. Una vez que el pago quede nulo pasará de :total a $0.00.",
+      "confirm": "Si, borralo",
+      "cancel": "Cancelar"
+    },
+    "statuses": {
+      "pending": "Abierta",
+      "failed": "Enviada",
+      "completed": "Terminada",
+      "void": "Nula"
+    },
+    "confirmsCancelation": {
+      "title": "¿Estás seguro que deseas cancelar?",
+      "description": "Esta acción no se puede deshacer. Eliminará permanentemente los cambios sin guardar del pago y los datos de nuestros servidores.",
+      "confirm": "Si, continuar",
+      "cancel": "Cancelar"
+    }
+  }
+}

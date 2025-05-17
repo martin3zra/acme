@@ -8,7 +8,7 @@ type Props = {
 
 export const HeaderCell: FC<Props> = ({ title, columnWidth, alignment }) => {
   return (
-    <div className={`p-1.5 font-semibold text-${alignment}`} style={{ width: columnWidth }}>
+    <div className={`p-1.5 font-semibold text-${alignment} uppercase`} style={{ width: columnWidth }}>
       {title}
     </div>
   );

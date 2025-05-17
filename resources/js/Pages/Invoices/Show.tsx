@@ -3,6 +3,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Separator } from '@/components/ui/separator';
 import { useNumber } from '@/composables/use-number';
+import { useTranslation } from '@/hooks/use-translation';
 import { cn, isNotEmpty } from '@/lib/utils';
 import { Auth, InvoiceWithLines, PaidStatuses } from '@/types';
 import { format } from 'date-fns';
@@ -15,6 +16,7 @@ type Props = {
 };
 
 export default function Show({ invoice, auth }: Props) {
+  const t = useTranslation().trans;
   const { currency } = useNumber();
 
   return (
@@ -24,7 +26,7 @@ export default function Show({ invoice, auth }: Props) {
         <div className="flex justify-between py-6 [&_[data-slot=label]]:text-base/2 [&_[data-slot=label]]:font-medium">
           <div className="col-span-6 flex items-center gap-x-6 [&>div]:flex [&>div]:gap-x-2">
             <div>
-              <Label>Invoice</Label>
+              <Label>{t('invoices.single.title')}</Label>
               <Label>#{invoice.header.number}</Label>
             </div>
             <div>
@@ -33,18 +35,18 @@ export default function Show({ invoice, auth }: Props) {
             </div>
           </div>
           <div className="col-span-6 flex items-center gap-x-2 [&_[data-slot=label]]:font-normal">
-            <Label>Date</Label>
-            <Label className="">{format(invoice.header.date, 'PPP')}</Label>
+            <Label>{t('global.date')}</Label>
+            <Label className="">{format(invoice.header.date, 'dd-MM-yyyy')}</Label>
           </div>
         </div>
         <Separator />
       </div>
-      <div className="col-span-9 grid h-full w-full grid-cols-12 grid-rows-[auto_1fr_auto] gap-y-4">
+      <div className="col-span-8 grid h-full w-full grid-cols-12 grid-rows-[auto_1fr_auto] gap-y-4">
         {/* header */}
         <div className="col-span-12 grid grid-cols-12">
           <div className="col-span-6">
             <div className="w-56">
-              <Label className="font-bold">Pay to:</Label>
+              <Label className="font-bold">{t('invoices.single.payTo')}:</Label>
               <div className="pt-2">
                 <span className="text-sm font-semibold">{auth.company.name}</span>
                 <address className="text-muted-foreground text-sm font-normal">{auth.company.address}</address>
@@ -54,7 +56,7 @@ export default function Show({ invoice, auth }: Props) {
           </div>
           <div className="col-span-6 place-items-end">
             <div className="w-56">
-              <Label className="font-bold">Invoice to:</Label>
+              <Label className="font-bold">{t('invoices.single.invoiceTo')}:</Label>
               <div className="pt-2">
                 <span className="text-sm font-semibold">{invoice.header.customer.name}</span>
                 <address className="text-muted-foreground text-sm font-normal">{invoice.header.customer.address}</address>
@@ -79,22 +81,22 @@ export default function Show({ invoice, auth }: Props) {
                   ID
                 </th>
                 <th scope="col" className="text-start">
-                  Name
+                  {t('global.name')}
                 </th>
-                <th scope="col" className="w-40 text-start">
-                  Unit
+                <th scope="col" className="w-20 text-start">
+                  {t('global.unit')}
                 </th>
                 <th scope="col" data-format="number" className="!w-20">
-                  Qty
+                  {t('global.qty')}
                 </th>
                 <th scope="col" data-format="number">
-                  Price
+                  {t('global.price')}
                 </th>
                 <th scope="col" data-format="number">
-                  Tax
+                  {t('global.tax')}
                 </th>
                 <th scope="col" data-format="number">
-                  Amount
+                  {t('global.amount')}
                 </th>
               </tr>
             </thead>
@@ -104,7 +106,7 @@ export default function Show({ invoice, auth }: Props) {
                   <td>{line.id}</td>
                   <td>{line.name}</td>
                   <td>{line.unit.name}</td>
-                  <td data-format="number" className="!w-20">
+                  <td data-format="number" className="!w-16">
                     {line.qty}
                   </td>
                   <td data-format="number">{currency(line.price)}</td>
@@ -117,14 +119,16 @@ export default function Show({ invoice, auth }: Props) {
         </div>
         {/* footer */}
         <div className="col-span-12 grid grid-cols-12">
-          <div className="col-span-8">
+          <div className="col-span-7">
             <div className="max-w-sm rounded-md border p-4">
-              <Label className="text-sm/6 font-medium">Notes:</Label>
-              <div className="text-muted-foreground text-sm">{isNotEmpty(invoice.header.notes) ? invoice.header.notes : 'No notes left'}</div>
+              <Label className="text-sm/6 font-medium">{t('global.notes')}:</Label>
+              <div className="text-muted-foreground text-sm">
+                {isNotEmpty(invoice.header.notes) ? invoice.header.notes : t('global.noNotesWasLeft')}
+              </div>
             </div>
           </div>
-          <div className="col-span-4 rounded-md border p-4">
-            <Label>Invoice total summary</Label>
+          <div className="col-span-5 rounded-md border p-4">
+            <Label>{t('invoices.single.totalSummary')}</Label>
             <div
               className={cn(
                 'flex flex-col gap-y-3 py-4',
@@ -133,11 +137,11 @@ export default function Show({ invoice, auth }: Props) {
               )}
             >
               <div className="flex items-center justify-between">
-                <Label>Sub-total</Label>
+                <Label>{t('global.subTotal')}</Label>
                 <Label data-slot="label-value">{currency(invoice.header.amount)}</Label>
               </div>
               <div className="flex items-center justify-between">
-                <Label>Discount</Label>
+                <Label>{t('global.discount')}</Label>
                 <Label data-slot="label-value">
                   {invoice.header.discount.type === 'percentage' && (
                     <span className="text-muted-foreground text-xs">{currency(invoice.header.amount * (invoice.header.discount.value / 100))}</span>
@@ -146,22 +150,22 @@ export default function Show({ invoice, auth }: Props) {
                 </Label>
               </div>
               <div className="flex items-center justify-between">
-                <Label>Tax</Label>
+                <Label>{t('global.tax')}</Label>
                 <Label data-slot="label-value">{currency(invoice.header.tax)}</Label>
               </div>
               <Separator />
               <div className="flex items-center justify-between">
-                <Label>Total</Label>
+                <Label>{t('global.total')}</Label>
                 <Label data-slot="label-value">{currency(invoice.header.total)}</Label>
               </div>
               {invoice.header.due_on && (
                 <>
                   <div className="flex items-center justify-between">
-                    <Label>Payment Applied</Label>
+                    <Label>{t('global.totalPaymentApplied')}</Label>
                     <Label data-slot="label-value">{currency(invoice.header.total - invoice.header.amount_due)}</Label>
                   </div>
                   <div className="flex items-center justify-between">
-                    <Label>Balance Due</Label>
+                    <Label>{t('global.balance')}</Label>
                     <Label data-slot="label-value">{currency(invoice.header.amount_due)}</Label>
                   </div>
                 </>
@@ -171,20 +175,20 @@ export default function Show({ invoice, auth }: Props) {
         </div>
       </div>
       {/* side panel with summary */}
-      <div className="col-span-3 flex flex-col gap-y-3 rounded-lg border p-3">
-        <StatusBadge type="paid" variant="alert" prefix="Paid status:" status={invoice.header.paid_status} />
-        <Label>Details:</Label>
+      <div className="col-span-4 flex flex-col gap-y-3 rounded-lg border p-3">
+        <StatusBadge type="paid" variant="alert" prefix={`${t('invoices.paidStatus')}:`} status={invoice.header.paid_status} />
+        <Label>{t('invoices.single.description')}</Label>
         <Separator />
         <div className="flex items-center justify-between">
           <Label className="text-lg">{currency(invoice.header.total)}</Label>
           <Select name="paid_status" defaultValue={'0'} value={invoice.header.paid_status} required disabled={invoice.header.status === 'void'}>
-            <SelectTrigger className="w-28">
+            <SelectTrigger className="w-46">
               <SelectValue placeholder="Paid status" />
             </SelectTrigger>
-            <SelectContent className="w-12">
+            <SelectContent className="w-46">
               {PaidStatuses.map((status) => (
                 <SelectItem key={status} value={status}>
-                  {status}
+                  {t(`global.paidStatuses.${status}`)}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -193,26 +197,26 @@ export default function Show({ invoice, auth }: Props) {
         <Separator />
         <div className="flex items-center gap-x-1 text-sm">
           <UserPen size={14} />
-          <span className="font-medium">Created by:</span>
+          <span className="font-medium">{t('global.createdBy')}:</span>
           <span className="text-muted-foreground">Jane Doe</span>
         </div>
         {invoice.header.due_on && (
           <div className="flex items-center gap-x-1 text-sm">
             <Calendar1 size={14} />
-            <span className="font-medium">Due date:</span>
+            <span className="font-medium">{t('global.dueDate')}:</span>
             <span className="text-muted-foreground">{format(invoice.header.due_on, 'PPP')}</span>
           </div>
         )}
         <div className="flex items-center gap-x-1 text-sm">
           <CircleDollarSignIcon size={14} />
-          <span className="font-medium">Currency:</span>
+          <span className="font-medium">{t('global.currency')}:</span>
           <span className="text-muted-foreground">Domincan Peso</span>
         </div>
         <div className="flex items-center gap-x-1 text-sm">
           <CreditCardIcon size={14} />
-          <span className="font-medium">Payment summary</span>
+          <span className="font-medium">{t('global.paymentSummary')}</span>
         </div>
-        {invoice.header.due_on !== null && <span className="text-muted-foreground -m-1.5 block px-1.5 text-sm">No available yet</span>}
+        {invoice.header.due_on !== null && <span className="text-muted-foreground -m-1.5 block px-1.5 text-sm">{t('global.noAvailable.yet')}</span>}
         <PaymentSummary paymentData={invoice.header.payment} />
         <Separator />
         <div className="px-1 py-4">

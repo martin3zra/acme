@@ -25,6 +25,7 @@ type Server struct {
 	session   *session.Session
 	assets    embed.FS
 	resources embed.FS
+	t         map[string]string
 }
 
 func NewServer(assets, resources embed.FS) *Server {
@@ -40,6 +41,7 @@ func NewServer(assets, resources embed.FS) *Server {
 		config:    LoadConfig(),
 		assets:    assets,
 		resources: resources,
+		t:         loadTranslations("global"),
 	}
 }
 

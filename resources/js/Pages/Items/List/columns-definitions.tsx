@@ -13,15 +13,16 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { Item, Verb } from '@/types';
+import { Item, Replacements, Verb } from '@/types';
 import { ColumnDef } from '@tanstack/react-table';
 import { ArrowUpDown, MoreHorizontal } from 'lucide-react';
 
 type Props = {
   onDidClick: (item: Item, action: Verb) => void;
+  t: (key: string, replacements?: Replacements) => string;
 };
 
-export const getColumns = ({ onDidClick }: Props): ColumnDef<Item>[] => {
+export const getColumns = ({ onDidClick, t }: Props): ColumnDef<Item>[] => {
   return [
     {
       id: 'select',
@@ -38,10 +39,11 @@ export const getColumns = ({ onDidClick }: Props): ColumnDef<Item>[] => {
     },
     {
       accessorKey: 'name',
+      meta: t('global.name'),
       header: ({ column }) => {
         return (
-          <Button variant="ghost" onClick={() => column.toggleSorting(column.getIsSorted() === 'asc')}>
-            Name <ArrowUpDown />
+          <Button className="uppercase" variant="ghost" onClick={() => column.toggleSorting(column.getIsSorted() === 'asc')}>
+            {t('global.name')} <ArrowUpDown />
           </Button>
         );
       },
@@ -51,9 +53,9 @@ export const getColumns = ({ onDidClick }: Props): ColumnDef<Item>[] => {
     },
     {
       accessorKey: 'description',
-      meta: 'Description',
+      meta: t('global.description'),
       header: (props) => {
-        return <HeaderCell title="Description" alignment="left" columnWidth={props.column.getSize()} />;
+        return <HeaderCell title={t('global.description')} alignment="left" columnWidth={props.column.getSize()} />;
       },
       cell: (props) => {
         return <TextCell columnWidth={props.column.getSize()} value={props.getValue() as string} />;
@@ -61,9 +63,9 @@ export const getColumns = ({ onDidClick }: Props): ColumnDef<Item>[] => {
     },
     {
       accessorKey: 'unit.name',
-      meta: 'Unit',
+      meta: t('global.unit'),
       header: (props) => {
-        return <HeaderCell title="Unit" alignment="left" columnWidth={props.column.getSize()} />;
+        return <HeaderCell title={t('global.unit')} alignment="left" columnWidth={props.column.getSize()} />;
       },
       cell: (props) => {
         return <TextCell columnWidth={props.column.getSize()} value={props.getValue() as string} />;
@@ -71,9 +73,9 @@ export const getColumns = ({ onDidClick }: Props): ColumnDef<Item>[] => {
     },
     {
       accessorKey: 'tax.name',
-      meta: 'Tax rate',
+      meta: t('global.taxRate'),
       header: (props) => {
-        return <HeaderCell title="Tax rate" alignment="left" columnWidth={props.column.getSize()} />;
+        return <HeaderCell title={t('global.taxRate')} alignment="left" columnWidth={props.column.getSize()} />;
       },
       cell: (props) => {
         return <TextCell columnWidth={props.column.getSize()} value={props.getValue() as string} />;
@@ -81,9 +83,10 @@ export const getColumns = ({ onDidClick }: Props): ColumnDef<Item>[] => {
     },
     {
       accessorKey: 'status',
+      meta: t('global.status'),
       size: 70,
       header: (props) => {
-        return <HeaderCell title="Status" alignment="center" columnWidth={props.column.getSize()} />;
+        return <HeaderCell title={t('global.status')} alignment="center" columnWidth={props.column.getSize()} />;
       },
       cell: (props) => {
         return <StatusBadge type="status" status={props.row.original.status} />;
@@ -91,10 +94,10 @@ export const getColumns = ({ onDidClick }: Props): ColumnDef<Item>[] => {
     },
     {
       accessorKey: 'price',
-      meta: 'Price',
+      meta: t('global.price'),
       // size: 880,
       header: (props) => {
-        return <HeaderCell title="Price" alignment="right" columnWidth={props.column.getSize()} />;
+        return <HeaderCell title={t('global.price')} alignment="right" columnWidth={props.column.getSize()} />;
       },
       cell: (props) => {
         return <CurrencyCell columnWidth={props.column.getSize()} value={props.getValue() as string} />;
@@ -102,10 +105,10 @@ export const getColumns = ({ onDidClick }: Props): ColumnDef<Item>[] => {
     },
     {
       accessorKey: 'created_at',
-      meta: 'Added On',
+      meta: t('global.addedAt'),
       // size: 880,
       header: (props) => {
-        return <HeaderCell title="Added On" alignment="left" columnWidth={props.column.getSize()} />;
+        return <HeaderCell title={t('global.addedAt')} alignment="left" columnWidth={props.column.getSize()} />;
       },
       cell: (props) => {
         return <DateCell columnWidth={props.column.getSize()} value={props.getValue() as string} />;
@@ -119,16 +122,16 @@ export const getColumns = ({ onDidClick }: Props): ColumnDef<Item>[] => {
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="ghost" className="size-8 p-0">
-                <span className="sr-only">Open menu</span>
+                <span className="sr-only">{t('global.openMenu')}</span>
                 <MoreHorizontal />
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-              <DropdownMenuLabel>Actions</DropdownMenuLabel>
+              <DropdownMenuLabel>{t('global.actions.title')}</DropdownMenuLabel>
               <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={() => onDidClick(props.row.original, 'view')}>View</DropdownMenuItem>
-              <DropdownMenuItem onClick={() => onDidClick(props.row.original, 'edit')}>Edit</DropdownMenuItem>
-              <DropdownMenuItem onClick={() => onDidClick(props.row.original, 'trash')}>Delete</DropdownMenuItem>
+              <DropdownMenuItem onClick={() => onDidClick(props.row.original, 'view')}>{t('items.viewItem.title')}</DropdownMenuItem>
+              <DropdownMenuItem onClick={() => onDidClick(props.row.original, 'edit')}>{t('items.editItem.title')}</DropdownMenuItem>
+              <DropdownMenuItem onClick={() => onDidClick(props.row.original, 'trash')}>{t('items.trashItem.title')}</DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
         );

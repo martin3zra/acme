@@ -13,15 +13,16 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { Customer, CustomerVerb } from '@/types';
+import { Customer, CustomerVerb, Replacements } from '@/types';
 import { ColumnDef } from '@tanstack/react-table';
 import { ArrowUpDown, MoreHorizontal } from 'lucide-react';
 
 type Props = {
   onDidClick: (customer: Customer, action: CustomerVerb) => void;
+  t: (key: string, replacements?: Replacements) => string;
 };
 
-export const getColumns = ({ onDidClick }: Props): ColumnDef<Customer>[] => {
+export const getColumns = ({ onDidClick, t }: Props): ColumnDef<Customer>[] => {
   return [
     {
       id: 'select',
@@ -38,10 +39,11 @@ export const getColumns = ({ onDidClick }: Props): ColumnDef<Customer>[] => {
     },
     {
       accessorKey: 'name',
+      meta: t('global.name'),
       header: ({ column }) => {
         return (
-          <Button variant="ghost" onClick={() => column.toggleSorting(column.getIsSorted() === 'asc')}>
-            Name <ArrowUpDown />
+          <Button className="uppercase" variant="ghost" onClick={() => column.toggleSorting(column.getIsSorted() === 'asc')}>
+            {t('global.name')} <ArrowUpDown />
           </Button>
         );
       },
@@ -51,9 +53,9 @@ export const getColumns = ({ onDidClick }: Props): ColumnDef<Customer>[] => {
     },
     {
       accessorKey: 'contact_name',
-      meta: 'Contact',
+      meta: t('global.contact'),
       header: (props) => {
-        return <HeaderCell title="Contact" alignment="left" columnWidth={props.column.getSize()} />;
+        return <HeaderCell title={t('global.contact')} alignment="left" columnWidth={props.column.getSize()} />;
       },
       cell: (props) => {
         return <TextCell columnWidth={props.column.getSize()} value={props.getValue() as string} />;
@@ -61,8 +63,9 @@ export const getColumns = ({ onDidClick }: Props): ColumnDef<Customer>[] => {
     },
     {
       accessorKey: 'phone',
+      meta: t('global.phone'),
       header: (props) => {
-        return <HeaderCell title="Phone" alignment="left" columnWidth={props.column.getSize()} />;
+        return <HeaderCell title={t('global.phone')} alignment="left" columnWidth={props.column.getSize()} />;
       },
       cell: (props) => {
         return <TextCell columnWidth={props.column.getSize()} value={props.getValue() as string} />;
@@ -70,10 +73,11 @@ export const getColumns = ({ onDidClick }: Props): ColumnDef<Customer>[] => {
     },
     {
       accessorKey: 'email',
+      meta: t('global.email'),
       header: ({ column }) => {
         return (
-          <Button variant="ghost" onClick={() => column.toggleSorting(column.getIsSorted() === 'asc')}>
-            Email <ArrowUpDown />
+          <Button className="uppercase" variant="ghost" onClick={() => column.toggleSorting(column.getIsSorted() === 'asc')}>
+            {t('global.email')} <ArrowUpDown />
           </Button>
         );
       },
@@ -83,9 +87,10 @@ export const getColumns = ({ onDidClick }: Props): ColumnDef<Customer>[] => {
     },
     {
       accessorKey: 'status',
+      meta: t('global.status'),
       size: 70,
       header: (props) => {
-        return <HeaderCell title="Status" alignment="center" columnWidth={props.column.getSize()} />;
+        return <HeaderCell title={t('global.status')} alignment="center" columnWidth={props.column.getSize()} />;
       },
       cell: (props) => {
         return <StatusBadge type="status" status={props.row.original.status} />;
@@ -93,10 +98,10 @@ export const getColumns = ({ onDidClick }: Props): ColumnDef<Customer>[] => {
     },
     {
       accessorKey: 'amount_due',
-      meta: 'Amount Due',
+      meta: t('global.balance'),
       // size: 880,
       header: (props) => {
-        return <HeaderCell title="Amount Due" alignment="right" columnWidth={props.column.getSize()} />;
+        return <HeaderCell title={t('global.balance')} alignment="right" columnWidth={props.column.getSize()} />;
       },
       cell: (props) => {
         return <CurrencyCell columnWidth={props.column.getSize()} value={props.getValue() as string} />;
@@ -104,10 +109,10 @@ export const getColumns = ({ onDidClick }: Props): ColumnDef<Customer>[] => {
     },
     {
       accessorKey: 'created_at',
-      meta: 'Added On',
+      meta: t('global.addedAt'),
       // size: 880,
       header: (props) => {
-        return <HeaderCell title="Added On" alignment="left" columnWidth={props.column.getSize()} />;
+        return <HeaderCell title={t('global.addedAt')} alignment="left" columnWidth={props.column.getSize()} />;
       },
       cell: (props) => {
         return <DateCell columnWidth={props.column.getSize()} value={props.getValue() as string} />;
@@ -121,21 +126,21 @@ export const getColumns = ({ onDidClick }: Props): ColumnDef<Customer>[] => {
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="ghost" className="size-8 p-0">
-                <span className="sr-only">Open menu</span>
+                <span className="sr-only">{t('global.openMenu')}</span>
                 <MoreHorizontal />
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-              <DropdownMenuLabel>Actions</DropdownMenuLabel>
+              <DropdownMenuLabel>{t('global.actions.title')}</DropdownMenuLabel>
               <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={() => onDidClick(props.row.original, 'view')}>View</DropdownMenuItem>
-              <DropdownMenuItem onClick={() => onDidClick(props.row.original, 'edit')}>Edit</DropdownMenuItem>
-              <DropdownMenuItem onClick={() => onDidClick(props.row.original, 'trash')}>Delete</DropdownMenuItem>
+              <DropdownMenuItem onClick={() => onDidClick(props.row.original, 'view')}>{t('customers.viewCustomer.title')}</DropdownMenuItem>
+              <DropdownMenuItem onClick={() => onDidClick(props.row.original, 'edit')}>{t('customers.editCustomer.title')}</DropdownMenuItem>
+              <DropdownMenuItem onClick={() => onDidClick(props.row.original, 'trash')}>{t('customers.trashCustomer.title')}</DropdownMenuItem>
               {props.row.original.amount_due > 0 && (
                 <>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem onClick={() => onDidClick(props.row.original, 'record-payment')} disabled={props.row.original.amount_due === 0}>
-                    Receive payment
+                    {t('global.actions.makePayment')}
                   </DropdownMenuItem>
                 </>
               )}

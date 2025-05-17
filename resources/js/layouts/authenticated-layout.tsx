@@ -36,7 +36,7 @@ export default class AuthenticatedLayout extends React.Component<Props> {
             <div className="min-w-md">{actions ? (actions as JSX.Element) : null}</div>
           </header>
           <div className="flex flex-1 flex-col gap-4 p-4">
-            <div className="min-h-[100vh] flex-1 rounded-xl md:min-h-min">{content}</div>
+            <div className="grid min-h-[100vh] grid-flow-col grid-cols-1 grid-rows-1 rounded-xl md:min-h-min">{content}</div>
           </div>
           <Toaster position="top-right" richColors />
         </SidebarInset>

@@ -7,6 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useHeader } from '@/composables/use-headers';
 import { useVerb } from '@/composables/use-verbs';
+import { useTranslation } from '@/hooks/use-translation';
 import { Item, PageProps, Tax, Unit, Verb } from '@/types';
 import { useForm, usePage } from '@inertiajs/react';
 import { FormEventHandler, useState } from 'react';
@@ -33,6 +34,7 @@ type ItemForm = {
 };
 
 export default function CreateForm({ onFinish, params }: CreateFormProps) {
+  const t = useTranslation().trans;
   const [dialogOpen, setDialogOpen] = useState(false);
   const { headers } = useHeader();
   const { errors: propsErrors } = usePage<PageProps>().props;
@@ -66,32 +68,13 @@ export default function CreateForm({ onFinish, params }: CreateFormProps) {
     if (params.action === 'edit') put(`/items/${params.item!.id}`, options);
   };
 
-  const dialogProps = {
-    enabled: {
-      title: `Are you sure you want to disable ${params.item?.name}?`,
-      description:
-        'Once this item is disabled, all of its resources and data will also be lock. Please enter your password ' +
-        'to confirm you would like to disabled this item.',
-      action: 'Disabled',
-      variant: 'destructive',
-    },
-    disabled: {
-      title: `Are you sure you want to enable ${params.item?.name}?`,
-      description:
-        'Once this item is enable, all of its resources and data will also be unlock. Please enter your password ' +
-        'to confirm you would like to enabled this item.',
-      action: 'Enabled',
-      variant: 'primary',
-    },
-  }[params.item?.status || 'enabled'];
-
   return (
     <div>
       {propsErrors.status && <div className="mb-4 text-center text-sm font-medium text-red-600">{propsErrors.status}</div>}
       <form onSubmit={submit} className="space-y-6">
         <div className="grid grid-cols-2 gap-2">
           <div className="grid gap-2">
-            <Label htmlFor="name">Name</Label>
+            <Label htmlFor="name">{t('global.name')}</Label>
             <Input
               id="name"
               className="mt-1 block w-full"
@@ -105,7 +88,7 @@ export default function CreateForm({ onFinish, params }: CreateFormProps) {
             <InputError className="mt-2" message={errors.name} />
           </div>
           <div className="grid gap-2">
-            <Label>Unit</Label>
+            <Label>{t('global.unit')}</Label>
             <Select
               onValueChange={(value) => setData('unit_id', Number(value))}
               disabled={viewMode}
@@ -130,7 +113,7 @@ export default function CreateForm({ onFinish, params }: CreateFormProps) {
         <div className="grid grid-cols-2 gap-2">
           <div className="flex items-center justify-between">
             <div className="flex flex-col gap-2">
-              <Label>Tax</Label>
+              <Label>{t('global.tax')}</Label>
               <Select
                 onValueChange={(value) => setData('tax_id', Number(value))}
                 disabled={viewMode}
@@ -153,7 +136,7 @@ export default function CreateForm({ onFinish, params }: CreateFormProps) {
             </div>
 
             <div className="flex flex-col gap-2">
-              <Label htmlFor="price">Price</Label>
+              <Label htmlFor="price">{t('global.price')}</Label>
               <Input
                 id="price"
                 type="number"
@@ -169,7 +152,7 @@ export default function CreateForm({ onFinish, params }: CreateFormProps) {
         </div>
         <div className="grid grid-cols-2 gap-2">
           <div className="grid gap-2">
-            <Label htmlFor="description">Description</Label>
+            <Label htmlFor="description">{t('global.description')}</Label>
             <textarea
               id="description"
               className="mt-1 block w-full rounded-lg border border-gray-300 bg-gray-50 p-2.5 text-sm text-gray-900 focus:border-blue-500 focus:ring-blue-500"
@@ -196,27 +179,32 @@ export default function CreateForm({ onFinish, params }: CreateFormProps) {
         </div>
         {!viewMode && (
           <div className="flex items-center gap-4">
-            <Button disabled={processing}>{verbName} Item</Button>
+            <Button disabled={processing}>
+              {t(`global.actions.${verbName}`)} {t('global.item')}
+            </Button>
           </div>
         )}
       </form>
 
       {viewMode && (
         <div className="space-y-6 pt-12">
-          <HeadingSmall title={`${dialogProps?.action} item`} description={`${isDisabled ? 'Unlock' : 'Lock'} item and all of its resources`} />
+          <HeadingSmall
+            title={t(`items.statuses.${params.item?.status || 'enabled'}.section.title`)}
+            description={t(`items.statuses.${params.item?.status || 'enabled'}.section.description`)}
+          />
           <div className={`space-y-4 rounded-lg border ${isDisabled ? 'border-primary-100 bg-primary-50' : 'border-red-100 bg-red-50'} p-4`}>
             <div className={`relative space-y-0.5 ${isDisabled ? 'text-primary' : 'text-red-600'}`}>
-              <p className="font-medium">Warning</p>
-              <p className="text-sm">Please proceed with caution, this is not permanent.</p>
+              <p className="font-medium">{t('global.warning.title')}</p>
+              <p className="text-sm">{t('global.warning.description')}</p>
             </div>
             <Button variant={isDisabled ? 'default' : 'destructive'} onClick={() => setDialogOpen(true)}>
-              {`${dialogProps?.action} item`}
+              {t(`items.statuses.${params.item?.status || 'enabled'}.section.title`)}
             </Button>
 
             <ConfirmsPassword
-              title={dialogProps?.title || ''}
-              description={dialogProps?.description || ''}
-              action={`${dialogProps?.action} it`}
+              title={t(`items.statuses.${params.item?.status || 'enabled'}.confirmsPassword.title`, { item: params.item?.name || '' })}
+              description={t(`items.statuses.${params.item?.status || 'enabled'}.confirmsPassword.description`)}
+              action={t(`items.statuses.${params.item?.status || 'enabled'}.confirmsPassword.confirm`)}
               verb={'update'}
               path={`/items/${params.item?.id}/change-status`}
               open={dialogOpen}

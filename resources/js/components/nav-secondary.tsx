@@ -2,6 +2,7 @@ import { type LucideIcon } from 'lucide-react';
 import * as React from 'react';
 
 import { SidebarGroup, SidebarGroupContent, SidebarMenu, SidebarMenuButton, SidebarMenuItem } from '@/components/ui/sidebar';
+import { useTranslation } from '@/hooks/use-translation';
 
 export function NavSecondary({
   items,
@@ -13,6 +14,7 @@ export function NavSecondary({
     icon: LucideIcon;
   }[];
 } & React.ComponentPropsWithoutRef<typeof SidebarGroup>) {
+  const t = useTranslation().trans;
   return (
     <SidebarGroup {...props}>
       <SidebarGroupContent>
@@ -22,7 +24,7 @@ export function NavSecondary({
               <SidebarMenuButton asChild size="sm">
                 <a href={item.url}>
                   <item.icon />
-                  <span>{item.title}</span>
+                  <span>{t(item.title)}</span>
                 </a>
               </SidebarMenuButton>
             </SidebarMenuItem>

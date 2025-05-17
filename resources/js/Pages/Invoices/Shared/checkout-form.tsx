@@ -4,7 +4,7 @@ import { Separator } from '@/components/ui/separator';
 import { Sheet, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { defaultPaymentMethods } from '@/constants';
 import { cn, subtractFloats } from '@/lib/utils';
-import { BTForm, CardForm, CardFormInput, CashForm, CheckForm, PaymentMethod, PaymentMethodsForm, PaymentMethodType } from '@/types';
+import { BTForm, CardForm, CardFormInput, CashForm, CheckForm, PaymentMethod, PaymentMethodsForm, PaymentMethodType, Replacements } from '@/types';
 import React from 'react';
 import { BankTransferFormView } from './bank-transfer';
 import { CardFormView } from './card-form';
@@ -27,6 +27,7 @@ type CheckoutFormProps = {
   processing: boolean;
   onCheckoutChange: (method: PaymentMethod, form: CashForm | CheckForm | CardForm | BTForm) => void;
   currency: (value: number | string, precision?: number, inCent?: boolean) => string;
+  t: (key: string, replacements?: Replacements) => string;
 };
 
 type CheckoutFormState = {
@@ -172,13 +173,15 @@ class CheckoutForm extends React.Component<CheckoutFormProps, CheckoutFormState>
 
   render() {
     const { receivedAmount, remainingBalance } = this.state;
-    const { action, openCheckout, setCheckout, errors, totalAmount, onCompleteCheckout, processing, setCancelConfirmation, currency } = this.props;
+    const { action, openCheckout, setCheckout, errors, totalAmount, onCompleteCheckout, processing, setCancelConfirmation, currency, t } = this.props;
     return (
       <Sheet open={openCheckout} onOpenChange={setCheckout}>
         <SheetContent side="right" className="m-4 flex h-[calc(~'(100%-var(--spacing)*4)/3')] w-full flex-col rounded-md sm:max-w-4xl">
           <SheetHeader>
-            <SheetTitle>Checkout: {this.state.activePaymentForm}</SheetTitle>
-            <SheetDescription className="text-[12px]">Checkout process</SheetDescription>
+            <SheetTitle>
+              {t('global.actions.checkout')}: {t(`global.paymentMethods.${this.state.activePaymentForm}.title`)}
+            </SheetTitle>
+            <SheetDescription className="text-[12px]">{t('global.checkoutProcess')}</SheetDescription>
           </SheetHeader>
           <div className="grid gap-4 px-4">
             {errors.status && <AlertDestructive description={errors.status} onDestroy={() => delete errors.status} />}
@@ -199,7 +202,7 @@ class CheckoutForm extends React.Component<CheckoutFormProps, CheckoutFormState>
                           'data-[slot=current]:bg-primary data-[slot=current]:text-primary-foreground data-[slot=current]:border-foreground',
                         )}
                       >
-                        {method.name}
+                        {t(`global.paymentMethods.${method.value}.title`)}
                       </th>
                     ))}
                   </tr>
@@ -224,16 +227,16 @@ class CheckoutForm extends React.Component<CheckoutFormProps, CheckoutFormState>
             <div className="pb-6">{this.renderPaymentMethodForm()}</div>
             <Separator className="" />
             <div>
-              <div className="flex w-60 items-center justify-between">
-                <span className="block text-2xl">To collect</span>
+              <div className="flex w-80 items-center justify-between">
+                <span className="block text-2xl">{t('global.totalToBeCollected')}</span>
                 <span className="block text-2xl">{currency(totalAmount)}</span>
               </div>
-              <div className="flex w-60 items-center justify-between">
-                <span className="block text-2xl">Received</span>
+              <div className="flex w-80 items-center justify-between">
+                <span className="block text-2xl">{t('global.totalReceived')}</span>
                 <span className="block text-2xl">{currency(receivedAmount)}</span>
               </div>
-              <div className="flex w-60 items-center justify-between">
-                <span className="block text-2xl">Remaining</span>
+              <div className="flex w-80 items-center justify-between">
+                <span className="block text-2xl">{t('global.balance')}</span>
                 <span className="block text-2xl font-medium text-red-600">{currency(remainingBalance)}</span>
               </div>
             </div>
@@ -241,7 +244,7 @@ class CheckoutForm extends React.Component<CheckoutFormProps, CheckoutFormState>
           <SheetFooter>
             <div className="flex justify-end gap-x-6">
               <Button variant={'secondary'} onClick={() => setCancelConfirmation(true)}>
-                Cancel
+                {t('global.actions.cancel')}
               </Button>
               <Button onClick={onCompleteCheckout} disabled={processing || remainingBalance !== 0}>
                 {action}

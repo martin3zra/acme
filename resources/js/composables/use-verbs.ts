@@ -6,9 +6,9 @@ export function useVerb() {
 
 function action(verb: Verb): string {
   return {
-    view: 'View',
-    edit: 'Update',
-    trash: 'Trash',
-    create: 'Create',
+    view: 'view',
+    edit: 'update',
+    trash: 'trash',
+    create: 'create',
   }[verb];
 }

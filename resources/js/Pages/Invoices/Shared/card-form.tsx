@@ -3,6 +3,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { defaultCardBrands } from '@/constants';
+import { useTranslation } from '@/hooks/use-translation';
 import { CardFormInput, PaymentFormType } from '@/types';
 
 type CardFormProps = PaymentFormType & {
@@ -12,6 +13,7 @@ type CardFormProps = PaymentFormType & {
 };
 
 export const CardFormView = ({ last4, brand, amount, reference, onChange }: CardFormProps) => {
+  const t = useTranslation().trans;
   const handleChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     if (event.currentTarget.name === 'last4') {
       event.currentTarget.value = event.currentTarget.value.replace(/\D/g, '');
@@ -32,12 +34,12 @@ export const CardFormView = ({ last4, brand, amount, reference, onChange }: Card
   return (
     <div>
       <FormSection onSubmit={() => {}}>
-        <FormSection.Title>Debit/Credit payment</FormSection.Title>
-        <FormSection.Description>Specify the amount of the Debit/Credit Card and the last 4 digits for future reference.</FormSection.Description>
+        <FormSection.Title>{t('global.paymentMethods.card.form.title')}</FormSection.Title>
+        <FormSection.Description>{t('global.paymentMethods.card.form.description')}</FormSection.Description>
         <FormSection.Form>
           <div className="col-span-6 space-y-2 sm:col-span-3">
             <Label htmlFor="last4" className="text-end">
-              Last 4 Digits
+              {t('global.paymentMethods.card.form.last4')}
             </Label>
             <Input
               type="number"
@@ -53,7 +55,7 @@ export const CardFormView = ({ last4, brand, amount, reference, onChange }: Card
           </div>
           <div className="col-span-6 space-y-2 sm:col-span-3">
             <Label htmlFor="brand" className="text-end">
-              Brand
+              {t('global.paymentMethods.card.form.brand')}
             </Label>
             <Select name="brand" onValueChange={(value) => onChange(value, 'brand')} value={brand} required>
               <SelectTrigger className="w-full" size={'lg'}>
@@ -70,12 +72,12 @@ export const CardFormView = ({ last4, brand, amount, reference, onChange }: Card
           </div>
 
           <div className="col-span-6 space-y-2 sm:col-span-3">
-            <Label htmlFor="reference">Authorization</Label>
+            <Label htmlFor="reference">{t('global.paymentMethods.card.form.authorization')}</Label>
             <Input type="text" name="reference" className="h-12 text-start md:text-xl" onChange={handleChange} value={reference} />
           </div>
           <div className="col-span-6 space-y-2 sm:col-span-3">
             <Label htmlFor="amount" className="text-end">
-              Amount
+              {t('global.amount')}
             </Label>
             <Input
               type="number"

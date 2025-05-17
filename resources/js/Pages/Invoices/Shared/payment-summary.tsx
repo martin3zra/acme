@@ -1,4 +1,5 @@
 import { useNumber } from '@/composables/use-number';
+import { useTranslation } from '@/hooks/use-translation';
 import { PaymentMethod } from '@/types';
 import React from 'react';
 
@@ -67,6 +68,7 @@ interface PaymentSummaryProps {
 }
 
 const PaymentSummary: React.FC<PaymentSummaryProps> = ({ paymentData }) => {
+  const t = useTranslation().trans;
   const { usedMethods, primaryMethod } = categorizePayments(paymentData);
   const { currency } = useNumber();
 
@@ -75,7 +77,7 @@ const PaymentSummary: React.FC<PaymentSummaryProps> = ({ paymentData }) => {
       <ul className="space-y-1">
         {usedMethods.map((method, index) => (
           <li key={index} className="rounded-md border border-gray-100 bg-gray-50 p-3 text-gray-700">
-            <div className="font-medium text-indigo-600 uppercase">{method.method}</div>
+            <div className="font-medium text-indigo-600 uppercase">{t(`global.paymentMethods.${method.method}.title`).toUpperCase()}</div>
             <div>
               <span className="font-semibold">${method.amount.toFixed(2)}</span>
               {method.reference && <span className="ml-2 text-sm text-gray-500">(Ref: {method.reference})</span>}
@@ -92,7 +94,7 @@ const PaymentSummary: React.FC<PaymentSummaryProps> = ({ paymentData }) => {
       {primaryMethod && (
         <div className="mt-2 rounded-md border border-indigo-200 bg-indigo-50 p-4">
           <p className="font-semibold text-indigo-700">
-            Primary Method: {primaryMethod.method.toUpperCase()}
+            {t('global.paymentMethods.primary')}: {t(`global.paymentMethods.${primaryMethod.method}.title`).toUpperCase()}
             <span className="block">{currency(primaryMethod.amount)}</span>
           </p>
         </div>

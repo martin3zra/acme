@@ -19,7 +19,8 @@ func (s *Server) customersHandler(i *inertia.Inertia) http.Handler {
 			return
 		}
 		props := inertia.Props{
-			"customers": customers,
+			"translations": mergeTranslations(r.Context(), loadTranslations("customers")),
+			"customers":    customers,
 		}
 		if ensureUUIDIsValid(uuid) {
 			customer, err := s.findCustomeByUUID(*user.CurrentCompanyId, uuid)
