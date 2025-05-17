@@ -89,6 +89,7 @@
       "create": "Crear"
     },
     "paymentMethods": {
+      "primary": "Método primario",
       "cash": {
         "title": "Efectivo"
       },
