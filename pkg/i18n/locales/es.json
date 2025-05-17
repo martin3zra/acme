@@ -377,7 +377,8 @@
       "payTo": "Pagar a",
       "paymentFrom": "Pago de",
       "totalSummary": "Resumen total del pago",
-      "invoice": "Factura"
+      "invoice": "Factura",
+      "viewInvoice": "Ver factura"
     },
     "viewPayment": {
       "title": "Ver pago",
@@ -400,8 +401,8 @@
       "description": "Una vez que registres tus pagos, aparecerán aquí."
     },
     "confirmsPassword": {
-      "title": "¿Estás seguro que deseas borrar a :item?",
-      "description": "Una vez que se elimine :item, todos sus recursos seguirán estando disponibles, pero no se podrá realizar ninguna operación nueva.",
+      "title": "¿Estás seguro que deseas anular el pago :payment?",
+      "description": "¿Estás seguro de que deseas anular este pago? Esta acción no se puede deshacer. Una vez que el pago quede nulo pasará de :total a $0.00.",
       "confirm": "Si, borralo",
       "cancel": "Cancelar"
     },
@@ -410,6 +411,12 @@
       "failed": "Enviada",
       "completed": "Terminada",
       "void": "Nula"
+    },
+    "confirmsCancelation": {
+      "title": "¿Estás seguro que deseas cancelar?",
+      "description": "Esta acción no se puede deshacer. Eliminará permanentemente los cambios sin guardar del pago y los datos de nuestros servidores.",
+      "confirm": "Si, continuar",
+      "cancel": "Cancelar"
     }
   }
 }

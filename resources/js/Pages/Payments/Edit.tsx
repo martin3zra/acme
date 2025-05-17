@@ -18,6 +18,7 @@ import { useHeader } from '@/composables/use-headers';
 import { useNumber } from '@/composables/use-number';
 import { useDebounced } from '@/hooks/use-debounced';
 import { usePersistedState } from '@/hooks/use-persisted-state';
+import { useTranslation } from '@/hooks/use-translation';
 import AuthenticatedLayout from '@/layouts/authenticated-layout';
 import { cn } from '@/lib/utils';
 import {
@@ -62,6 +63,7 @@ export default function Edit({
   receivables: Receivable[];
   invoice_uuid: string;
 }>) {
+  const t = useTranslation().trans;
   const { currency } = useNumber();
   const [openCancelConfirmation, setCancelConfirmation] = React.useState(false);
   const [openCheckout, setCheckout] = React.useState(false);
@@ -269,10 +271,10 @@ export default function Edit({
       <AuthenticatedLayout.Actions>
         <div className="flex justify-end gap-x-6">
           <Button variant={'secondary'} onClick={() => setCancelConfirmation(true)}>
-            Cancel
+            {t('global.actions.cancel')}
           </Button>
           <Button onClick={handleCheckout} disabled={totalPaid() === 0 || processing}>
-            Checkout
+            {t('global.actions.checkout')}
           </Button>
         </div>
       </AuthenticatedLayout.Actions>
@@ -296,7 +298,7 @@ export default function Edit({
           <div className="grid grid-cols-12">
             <div className="col-span-6 flex flex-col gap-y-6">
               <div className="flex flex-col gap-y-2">
-                <Label htmlFor="date">Date</Label>
+                <Label htmlFor="date">{t('global.date')}</Label>
                 <Popover>
                   <PopoverTrigger asChild>
                     <Button
@@ -321,7 +323,7 @@ export default function Edit({
               </div>
               <div className="flex flex-col">
                 <div className="flex flex-col gap-y-2">
-                  <Label className="text-sm/6 font-medium">Notes</Label>
+                  <Label className="text-sm/6 font-medium">{t('global.notes')}</Label>
                   <Textarea
                     name="notes"
                     rows={4}
@@ -338,7 +340,7 @@ export default function Edit({
             </div>
             <div className="col-span-6 grid place-items-end">
               <div className="flex flex-col gap-x-2">
-                <Label className="text-muted-foreground block text-end text-lg">Amount Received</Label>
+                <Label className="text-muted-foreground block text-end text-lg">{t('global.totalReceived')}</Label>
                 <Label className="block text-end text-4xl">{currency(totalPaid())}</Label>
               </div>
               {/* <div className="flex flex-col gap-y-2">
@@ -402,19 +404,17 @@ export default function Edit({
         <AlertDialog open={openCancelConfirmation} onOpenChange={setCancelConfirmation}>
           <AlertDialogContent>
             <AlertDialogHeader>
-              <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
-              <AlertDialogDescription>
-                This action cannot be undone. This will permanently delete this invoice and remove the data from our servers.
-              </AlertDialogDescription>
+              <AlertDialogTitle>{t('payments.confirmsCancelation.title')}</AlertDialogTitle>
+              <AlertDialogDescription>{t('payments.confirmsCancelation.description')}</AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
-              <AlertDialogCancel>Cancel</AlertDialogCancel>
-              <AlertDialogAction onClick={performPaymentCancelation}>Yes, Cancel</AlertDialogAction>
+              <AlertDialogCancel>{t('payments.confirmsCancelation.cancel')}</AlertDialogCancel>
+              <AlertDialogAction onClick={performPaymentCancelation}>{t('payments.confirmsCancelation.confirm')}</AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
         <CheckoutForm
-          action="Record Payment"
+          action={t('global.actions.update')}
           openCheckout={openCheckout}
           setCheckout={setCheckout}
           paymentForm={paymentForm.payment}
@@ -425,6 +425,7 @@ export default function Edit({
           errors={propsErrors}
           onCheckoutChange={handleCheckoutChange}
           currency={currency}
+          t={t}
         />
       </div>
     </AuthenticatedLayout>

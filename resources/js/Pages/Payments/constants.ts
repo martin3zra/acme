@@ -28,22 +28,15 @@ export const breadcrumbs: BreadcrumbItem[] = [
 export const createPaymentBreadcrumbs: BreadcrumbItem[] = [
   ...breadcrumbs,
   {
-    title: 'global.payments.newPayment',
+    title: 'payments.newPayment.title',
     href: '/payments/create',
   },
 ];
 
 export const editPaymentBreadcrumbs: BreadcrumbItem[] = [
+  ...breadcrumbs,
   {
-    title: 'Home',
-    href: '/home',
-  },
-  {
-    title: 'Payments',
-    href: '/payments',
-  },
-  {
-    title: 'Edit Payment',
+    title: 'payments.editPayment.title',
     href: '',
   },
 ];

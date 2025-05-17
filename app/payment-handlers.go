@@ -61,6 +61,7 @@ func (s *Server) createPaymentHandler(i *inertia.Inertia) http.Handler {
 		user := auth.User(r.Context())
 
 		props := inertia.Props{
+			"translations": mergeTranslations(r.Context(), loadTranslations("payments")),
 			"customers": inertia.Optional(func() (any, error) {
 				customers, err := s.findCustomersBySearchCriteria(*user.CurrentCompanyId, term)
 				if err != nil {
@@ -191,6 +192,7 @@ func (s *Server) editPaymentHandler(i *inertia.Inertia) http.Handler {
 		}
 
 		err = i.Render(w, r, "Payments/Edit", inertia.Props{
+			"translations": mergeTranslations(r.Context(), loadTranslations("payments")),
 			"payment": map[string]any{
 				"header": payment,
 				"lines":  lines,
