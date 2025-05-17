@@ -46,6 +46,8 @@
     "createdBy": "Creado por",
     "paymentSummary": "Resumen de pago",
     "limitReached": "Límite alcanzado",
+    "credentialsDoesNotMatch": "Estas credenciales no coinciden con nuestros registros.",
+    "platform": "Plataforma",
     "noAvailable": {
       "default": "No disponible",
       "yet": "No disponible aún"

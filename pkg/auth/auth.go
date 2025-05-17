@@ -37,11 +37,6 @@ func (a *Auth) Authenticate(username, password string) (foundation.Authenticatab
 		return nil, err
 	}
 
-	// if !a.Hashable.Check(password, user.GetAuthPassword()) {
-	// 	log.Printf("error invalid password")
-	// 	return nil, errors.New("error invalid password")
-	// }
-
 	if !a.EnsureIsCurrentPassword(user.GetAuthPassword(), password) {
 		log.Printf("error invalid password")
 		return nil, errors.New("error invalid password")
