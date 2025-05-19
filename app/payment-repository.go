@@ -4,7 +4,6 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	"log"
 	"time"
 
 	"github.com/martin3zra/acme/pkg/database"
@@ -197,46 +196,38 @@ func (s *Server) storePayment(companyId int, form StorePaymentForm) error {
 		return err
 	}
 
-	tx, err := s.db.Begin()
-	if err != nil {
-		return err
-	}
-	stmt, err := tx.Prepare("INSERT INTO receivables_income (company_id, customer_id, date, amount, notes, payment, status) " +
-		"VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id")
-	if err != nil {
-		defer stmt.Close()
-		if txErr := tx.Rollback(); txErr != nil {
-			log.Fatalf("Error inserting new item: %v", txErr)
-			return txErr
+	return database.WithTransaction(s.db, func(tx *sql.Tx) error {
+		stmt, err := tx.Prepare("INSERT INTO receivables_income (company_id, customer_id, date, amount, notes, payment, status) " +
+			"VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id")
+		if err != nil {
+			return err
 		}
 
-		return err
-	}
+		var paymentID int
+		err = stmt.QueryRow(
+			companyId,
+			customer.ID,
+			form.Date,
+			form.Amount,
+			form.Notes,
+			foundation.ToJSON(form.Payment),
+			PaymentStatuses.Completed,
+		).Scan(&paymentID)
 
-	var paymentID int
-	err = stmt.QueryRow(
-		companyId,
-		customer.ID,
-		form.Date,
-		form.Amount,
-		form.Notes,
-		foundation.ToJSON(form.Payment),
-		PaymentStatuses.Completed,
-	).Scan(&paymentID)
+		if err != nil {
+			return err
+		}
 
-	if err != nil {
-		return err
-	}
+		if err = s.attachPaymentLines(tx, companyId, paymentID, form); err != nil {
+			return err
+		}
 
-	if err = s.attachPaymentLines(tx, companyId, paymentID, form); err != nil {
-		return err
-	}
+		if err = s.updateCustomerAmountDue(tx, companyId, customer.ID, -form.Amount); err != nil {
+			return err
+		}
 
-	if err = s.updateCustomerAmountDue(tx, companyId, customer.ID, -form.Amount); err != nil {
-		return err
-	}
-
-	return tx.Commit()
+		return nil
+	})
 }
 
 func (s *Server) attachPaymentLines(tx *sql.Tx, companyId, paymentId int, form StorePaymentForm) error {
@@ -258,16 +249,8 @@ func (s *Server) attachPaymentLines(tx *sql.Tx, companyId, paymentId int, form S
 	stmt += database.PrepareBulkInsert(6, len(form.Lines))
 
 	_, err := tx.Exec(stmt, vals...)
-	if err != nil {
-		if txErr := tx.Rollback(); txErr != nil {
-			log.Fatalf("Error inserting new item: %v", txErr)
-			return txErr
-		}
 
-		return err
-	}
-
-	return nil
+	return err
 }
 
 func (s *Server) generatePrefixedPaymentNumber(value int) string {
@@ -288,41 +271,29 @@ func (s *Server) voidPayment(companyID int, uuid string) error {
 	if err != nil {
 		return err
 	}
-	tx, err := s.db.Begin()
-	if err != nil {
-		return err
-	}
-	for _, pl := range lines {
-		_, err = tx.Exec("UPDATE receivables_income_items SET payment_amount = 0, amount_due = 0 WHERE company_id = $1 AND receivable_income_id = $2 AND invoice_id = $3", companyID, payment.ID, pl.Invoice.ID)
-		if err != nil {
-			if txErr := tx.Rollback(); txErr != nil {
-				log.Fatalf("Error updating invoice payment amount: %v", txErr)
-				return txErr
+	return database.WithTransaction(s.db, func(tx *sql.Tx) error {
+		for _, pl := range lines {
+			_, err = tx.Exec("UPDATE receivables_income_items SET payment_amount = 0, amount_due = 0 WHERE company_id = $1 AND receivable_income_id = $2 AND invoice_id = $3", companyID, payment.ID, pl.Invoice.ID)
+			if err != nil {
+				return err
 			}
 
-			return err
+			if err = s.updateInvoiceBalance(tx, companyID, pl.Invoice.ID, pl.Payment); err != nil {
+				return err
+			}
 		}
-		if err = s.updateInvoiceBalance(tx, companyID, pl.Invoice.ID, pl.Payment); err != nil {
-			return err
-		}
-	}
 
-	// Adjust customer balance
-	if err = s.updateCustomerAmountDue(tx, companyID, payment.Customer.ID, payment.Amount); err != nil {
+		// Adjust customer balance
+		if err = s.updateCustomerAmountDue(tx, companyID, payment.Customer.ID, payment.Amount); err != nil {
+			return err
+		}
+
+		// Mark payment as voided
+		// Reset all amount on the receivable incomes items
+		_, err = tx.Exec("UPDATE receivables_income SET amount = 0, status = 'void'::payment_status, payment = NULL WHERE company_id = $1 AND id = $2", companyID, payment.ID)
+
 		return err
-	}
-
-	// Mark payment as voided
-	// Reset all amount on the receivable incomes items
-	_, err = tx.Exec("UPDATE receivables_income SET amount = 0, status = 'void'::payment_status, payment = NULL WHERE company_id = $1 AND id = $2", companyID, payment.ID)
-	if err != nil {
-		if txErr := tx.Rollback(); txErr != nil {
-			log.Fatalf("Error updating customer amount due: %v", txErr)
-			return txErr
-		}
-	}
-
-	return tx.Commit()
+	})
 }
 
 func (s *Server) updatePayment(companyId int, uuid string, form UpdatePaymentForm) error {
@@ -340,44 +311,29 @@ func (s *Server) updatePayment(companyId int, uuid string, form UpdatePaymentFor
 		return err
 	}
 
-	tx, err := s.db.Begin()
-	if err != nil {
-		return err
-	}
-	stmt, err := tx.Prepare("UPDATE receivables_income SET customer_id = $1, date = $2, amount = $3, notes = $4, payment = $5 WHERE company_id = $6 AND id = $7")
-	if err != nil {
-		defer stmt.Close()
-		if txErr := tx.Rollback(); txErr != nil {
-			log.Fatalf("Error updating item: %v", txErr)
-			return txErr
+	return database.WithTransaction(s.db, func(tx *sql.Tx) error {
+
+		stmt, err := tx.Prepare("UPDATE receivables_income SET customer_id = $1, date = $2, amount = $3, notes = $4, payment = $5 WHERE company_id = $6 AND id = $7")
+		if err != nil {
+			return err
 		}
 
-		return err
-	}
+		_, err = stmt.Exec(
+			customer.ID,
+			form.Date,
+			form.Amount,
+			form.Notes,
+			foundation.ToJSON(form.Payment),
+			companyId,
+			payment.ID,
+		)
 
-	_, err = stmt.Exec(
-		customer.ID,
-		form.Date,
-		form.Amount,
-		form.Notes,
-		foundation.ToJSON(form.Payment),
-		companyId,
-		payment.ID,
-	)
-
-	if err != nil {
-		return err
-	}
-
-	if err = s.processPaymentLines(tx, companyId, payment.ID, customer, form); err != nil {
-		if txErr := tx.Rollback(); txErr != nil {
-			log.Fatalf("Error processing payment lines: %v", txErr)
-			return txErr
+		if err != nil {
+			return err
 		}
-		return err
-	}
 
-	return tx.Commit()
+		return s.processPaymentLines(tx, companyId, payment.ID, customer, form)
+	})
 }
 
 func (s *Server) processPaymentLines(tx *sql.Tx, companyId, paymentId int, customer *customer, form UpdatePaymentForm) error {

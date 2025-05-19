@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/martin3zra/acme/pkg/i18n"
 	"github.com/martin3zra/acme/pkg/session"
 	"github.com/martin3zra/acme/pkg/store"
 )
@@ -22,10 +23,10 @@ type Server struct {
 	config         *Config
 	sessionManager *session.SessionManager
 	// Transient request data
-	session   *session.Session
-	assets    embed.FS
-	resources embed.FS
-	t         map[string]string
+	session    *session.Session
+	assets     embed.FS
+	resources  embed.FS
+	translator *i18n.Translator
 }
 
 func NewServer(assets, resources embed.FS) *Server {
@@ -34,14 +35,15 @@ func NewServer(assets, resources embed.FS) *Server {
 	if err != nil {
 		panic(err)
 	}
+	translator := i18n.NewTranslator(loadTranslations("global"))
 
 	return &Server{
-		mux:       http.NewServeMux(),
-		qs:        qs,
-		config:    LoadConfig(),
-		assets:    assets,
-		resources: resources,
-		t:         loadTranslations("global"),
+		mux:        http.NewServeMux(),
+		qs:         qs,
+		config:     LoadConfig(),
+		assets:     assets,
+		resources:  resources,
+		translator: translator,
 	}
 }
 
@@ -94,4 +96,8 @@ func (s *Server) put(pattern string, handler http.Handler) {
 
 func (s *Server) delete(pattern string, handler http.Handler) {
 	s.mux.Handle(fmt.Sprintf("DELETE %s", pattern), handler)
+}
+
+func (s *Server) trans(key string, replacements ...i18n.Replacements) string {
+	return s.translator.Trans(key, replacements...)
 }

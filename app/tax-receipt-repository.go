@@ -55,32 +55,18 @@ func (s *Server) grabTaxReceiptSequence(tx *sql.Tx, companyId, taxReceiptID int)
 	row := tx.QueryRow("SELECT current, sequence_end FROM tax_receipts WHERE company_id = $1 AND id = $2", companyId, taxReceiptID)
 	err := row.Scan(&sequence, &sequenceEnd)
 	if err != nil {
-		txErr := tx.Rollback()
-		if txErr != nil {
-			return 0, txErr
-		}
 		return 0, err
 	}
 
 	// abort the transaction when the current sequence is equals to the end sequence
 	if sequence == sequenceEnd {
-		txErr := tx.Rollback()
-		if txErr != nil {
-			return 0, txErr
-		}
-
 		return 0, errors.New("tax receipt reach end") //new(ErrTaxReceiptReachEnd)
 	}
 
 	_, err = tx.Exec("UPDATE tax_receipts SET current = $3 WHERE company_id = $1 AND id = $2", companyId, taxReceiptID, sequence+1)
 	if err != nil {
-		txErr := tx.Rollback()
-		if txErr != nil {
-			return 0, txErr
-		}
 		return 0, err
 	}
-	//commit
 
 	return sequence, nil
 }

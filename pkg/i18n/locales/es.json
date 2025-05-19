@@ -46,7 +46,23 @@
     "createdBy": "Creado por",
     "paymentSummary": "Resumen de pago",
     "limitReached": "Límite alcanzado",
-    "credentialsDoesNotMatch": "Estas credenciales no coinciden con nuestros registros.",
+    "credentialsDoesNotMatch": "Estás credenciales no coinciden con nuestros registros.",
+    "wasNotCreated": "No se creó :subject. Algo salió mal.",
+    "wasCreated": ":subject fue actualizad@action con éxito!",
+    "wasNotUpdated": "No se actualizó :subject. Algo salió mal.",
+    "wasUpdated": ":subject fue actualizad@action con éxito!",
+    "wasNotDeleted": "No se elimino :subject. Algo salió mal.",
+    "wasDeleted": ":subject fue eliminad@action con éxito!",
+    "wasNotVoided": "No se anulo :subject. Algo salió mal.",
+    "wasVoided": ":subject fue anulad@action con éxito!",
+    "nouns": {
+      "customer": {
+        "gender":"m"
+      },
+      "invoice": {
+        "gender":"f"
+      }
+    },
     "platform": "Plataforma",
     "noAvailable": {
       "default": "No disponible",

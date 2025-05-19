@@ -6,6 +6,7 @@ import (
 	"strconv"
 
 	"github.com/martin3zra/acme/pkg/auth"
+	"github.com/martin3zra/acme/pkg/i18n"
 	"github.com/martin3zra/acme/pkg/support"
 	inertia "github.com/romsar/gonertia/v2"
 )
@@ -61,12 +62,12 @@ func (s *Server) storeItemHandler(i *inertia.Inertia) http.Handler {
 		err = s.storeItem(*user.CurrentCompanyId, form)
 		if err != nil {
 			log.Printf("Error creating item: %v", err)
-			s.session.Errors("status", "Item wasn't created. Something went wrong.")
+			s.session.Errors("status", s.trans("global.wasNotCreated", i18n.Replacements{"subject": "@global.item"}))
 			i.Back(w, r)
 			return
 		}
 
-		s.session.Flash("success", "Item was created successfully!")
+		s.session.Flash("success", s.trans("global.wasCreated", i18n.Replacements{"subject": "@global.item"}))
 
 		i.Back(w, r)
 	}
@@ -93,13 +94,13 @@ func (s *Server) updateItemHandler(i *inertia.Inertia) http.Handler {
 		user := auth.User(r.Context())
 		err = s.updateItem(*user.CurrentCompanyId, id, form)
 		if err != nil {
-			s.session.Errors("status", "Item wasn't updated. Something went wrong.")
+			s.session.Errors("status", s.trans("global.wasNotUpdated", i18n.Replacements{"subject": "@global.item"}))
 			i.Back(w, r)
 			return
 
 		}
 
-		s.session.Flash("success", "Item was updated successfully!")
+		s.session.Flash("success", s.trans("global.wasUpdated", i18n.Replacements{"subject": "@global.item"}))
 
 		http.Redirect(w, r, "/items", http.StatusSeeOther)
 	}
@@ -126,12 +127,12 @@ func (s *Server) deleteItemHandler() http.Handler {
 		user := auth.User(r.Context())
 		err = s.deleteItem(*user.CurrentCompanyId, id)
 		if err != nil {
-			s.session.Errors("current_password", "Item wasn't deleted. Something went wrong.")
+			s.session.Errors("current_password", s.trans("global.wasNotDeleted", i18n.Replacements{"subject": "@global.item"}))
 			http.Redirect(w, r, "/items", http.StatusSeeOther)
 			return
 		}
 
-		s.session.Flash("success", "Item was deleted successfully!")
+		s.session.Flash("success", s.trans("global.wasDeleted", i18n.Replacements{"subject": "@global.item"}))
 
 		http.Redirect(w, r, "/items", http.StatusSeeOther)
 
@@ -159,7 +160,7 @@ func (s *Server) changeStatusItemHandler(i *inertia.Inertia) http.Handler {
 		user := form.User()
 		item, err := s.findItemByID(*user.CurrentCompanyId, id)
 		if err != nil {
-			s.session.Errors("status", "Item wasn't updated. Something went wrong.")
+			s.session.Errors("status", s.trans("global.wasNotUpdated", i18n.Replacements{"subject": "@global.item"}))
 			i.Back(w, r)
 			return
 
@@ -167,12 +168,12 @@ func (s *Server) changeStatusItemHandler(i *inertia.Inertia) http.Handler {
 
 		err = s.toggleItemStatus(*user.CurrentCompanyId, item)
 		if err != nil {
-			s.session.Errors("status", "Item wasn't updated. Something went wrong.")
+			s.session.Errors("status", s.trans("global.wasNotUpdated", i18n.Replacements{"subject": "@global.item"}))
 			i.Back(w, r)
 			return
 		}
 
-		s.session.Flash("success", "Item status was updated successfully!")
+		s.session.Flash("success", s.trans("global.wasUpdated", i18n.Replacements{"subject": "@global.item"}))
 
 		http.Redirect(w, r, "/items", http.StatusSeeOther)
 	}

@@ -42,7 +42,7 @@ func (s *Server) authHandler(i *inertia.Inertia) http.Handler {
 		auth := auth.NewAuth(r.Context())
 		user, err := auth.Authenticate(form.Email, form.Password)
 		if err != nil {
-			session.Errors("email", s.t["global.credentialsDoesNotMatch"])
+			session.Errors("email", s.trans("global.credentialsDoesNotMatch"))
 			i.Back(w, r, http.StatusSeeOther)
 			return
 		}
