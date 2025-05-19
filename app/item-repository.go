@@ -3,9 +3,9 @@ package app
 import (
 	"database/sql"
 	"errors"
-	"log"
 	"strings"
 
+	"github.com/martin3zra/acme/pkg/database"
 	"github.com/martin3zra/acme/pkg/foundation"
 )
 
@@ -102,7 +102,7 @@ func (s *Server) findItemsByCriteria(companyID int, term string) ([]*item, error
 		"FROM items i "+
 		"INNER JOIN taxes t ON(i.company_id = t.company_id AND i.tax_id = t.id) "+
 		"LEFT JOIN LATERAL (SELECT iu.unit_id, u.name FROM items_units iu INNER JOIN units u ON (iu.unit_id = u.id) WHERE iu.item_id = i.id limit 1) iu ON true "+
-		"WHERE i.company_id = $1 AND i.name LIKE $2 AND i.deleted_at IS NULL ORDER BY i.name", companyID, "%"+term+"%")
+		"WHERE i.company_id = $1 AND i.name ILIKE $2 AND i.deleted_at IS NULL ORDER BY i.name", companyID, "%"+term+"%")
 	if err != nil {
 		return nil, err
 	}
@@ -166,79 +166,58 @@ func (s *Server) findItemsByReference(companyID int, term string) (*item, error)
 }
 
 func (s *Server) storeItem(companyID int, form StoreItemForm) error {
-	tx, err := s.db.Begin()
-	if err != nil {
-		return err
-	}
-
-	stmt, err := tx.Prepare("INSERT INTO items (name, price, description, tax_id, company_id) " +
-		"VALUES ($1, $2, $3, $4, $5) RETURNING id")
-	if err != nil {
-		defer stmt.Close()
-		if txErr := tx.Rollback(); txErr != nil {
-			log.Fatalf("Error inserting new item: %v", txErr)
-			return txErr
+	return database.WithTransaction(s.db, func(tx *sql.Tx) error {
+		stmt, err := tx.Prepare("INSERT INTO items (name, price, description, tax_id, company_id) " +
+			"VALUES ($1, $2, $3, $4, $5) RETURNING id")
+		if err != nil {
+			return err
 		}
 
-		return err
-	}
+		var itemID int
+		err = stmt.QueryRow(
+			&form.Name,
+			form.Price,
+			form.Description,
+			form.TaxID,
+			companyID,
+		).Scan(&itemID)
 
-	var itemID int
-	err = stmt.QueryRow(
-		&form.Name,
-		form.Price,
-		form.Description,
-		form.TaxID,
-		companyID,
-	).Scan(&itemID)
+		if err != nil {
+			return err
+		}
 
-	if err != nil {
-		return err
-	}
+		if err = s.attachItemUnit(tx, companyID, itemID, form.UnitID); err != nil {
+			return err
+		}
 
-	if err = s.attachItemUnit(tx, companyID, itemID, form.UnitID); err != nil {
-		return err
-	}
-
-	return tx.Commit()
+		return nil
+	})
 }
 
 func (s *Server) attachItemUnit(tx *sql.Tx, companyID, itemID, unitID int) error {
 	_, err := tx.Exec("INSERT INTO items_units (company_id, item_id, unit_id) VALUES($1, $2, $3) "+
 		"ON CONFLICT (id) DO UPDATE SET updated_at = now()", companyID, itemID, unitID)
-
-	if err != nil {
-		if txErr := tx.Rollback(); txErr != nil {
-			log.Fatalf("Error attaching new item unit: %v", txErr)
-			return txErr
-		}
-	}
 	return err
 }
 
 func (s *Server) updateItem(companyID, itemID int, form UpdateItemForm) error {
-	tx, err := s.db.Begin()
-	if err != nil {
-		return err
-	}
+	return database.WithTransaction(s.db, func(tx *sql.Tx) error {
 
-	_, err = tx.Exec(
-		"UPDATE items SET name = $1, description = $2, price = $3, tax_id = $4 WHERE company_id = $5 AND id = $6",
-		form.Name, form.Description, form.Price, form.TaxID, companyID, itemID,
-	)
+		_, err := tx.Exec(
+			"UPDATE items SET name = $1, description = $2, price = $3, tax_id = $4 WHERE company_id = $5 AND id = $6",
+			form.Name, form.Description, form.Price, form.TaxID, companyID, itemID,
+		)
 
-	if err != nil {
-		if txErr := tx.Rollback(); txErr != nil {
-			log.Fatalf("Error attaching new item unit: %v", txErr)
-			return txErr
+		if err != nil {
+			return err
 		}
-	}
 
-	if err = s.attachItemUnit(tx, companyID, itemID, form.UnitID); err != nil {
-		return err
-	}
+		if err = s.attachItemUnit(tx, companyID, itemID, form.UnitID); err != nil {
+			return err
+		}
 
-	return tx.Commit()
+		return nil
+	})
 }
 
 func (s *Server) deleteItem(companyID, itemID int) error {

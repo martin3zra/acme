@@ -3,7 +3,6 @@ package app
 import (
 	"database/sql"
 	"errors"
-	"log"
 	"strings"
 	"time"
 
@@ -128,7 +127,7 @@ func (s *Server) findCustomersBySearchCriteria(companyID int, term string) ([]*c
 		"FROM customers c "+
 		"INNER JOIN companies ON (c.company_id = companies.id) "+
 		"WHERE c.company_id = $1 "+
-		"AND c.name LIKE $2 "+
+		"AND c.name ILIKE $2 "+
 		"AND c.deleted_at IS NULL AND c.status = 'enabled' ORDER BY c.name LIMIT 5 ", companyID, "%"+term+"%")
 	if err != nil {
 		return nil, err
@@ -205,23 +204,16 @@ func (s *Server) updateCustomerAmountDue(tx *sql.Tx, companyId, customerId int, 
 		companyId, customerId, amountDue,
 	)
 	if err != nil {
-		if txErr := tx.Rollback(); txErr != nil {
-			log.Fatalf("Error updating customer amount due: %v", txErr)
-			return txErr
-		}
+		return err
 	}
 
 	if affected, err := result.RowsAffected(); err == nil {
 		if affected != 1 {
-			txErr := tx.Rollback()
-			if txErr != nil {
-				return txErr
-			}
 			return errors.New("unable to update customer balance") //new(ErrUnprocessableEntity)
 		}
 	}
 
-	return nil
+	return err
 }
 
 func (s *Server) findCustomeReceivables(companyID int, customerID string) ([]*receivable, error) {

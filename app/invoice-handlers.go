@@ -6,6 +6,7 @@ import (
 	"net/http"
 
 	"github.com/martin3zra/acme/pkg/auth"
+	"github.com/martin3zra/acme/pkg/i18n"
 	"github.com/martin3zra/acme/pkg/support"
 	inertia "github.com/romsar/gonertia/v2"
 )
@@ -191,11 +192,11 @@ func (s *Server) storeInvoiceHandler(i *inertia.Inertia) http.Handler {
 		err = s.storeInvoice(*user.CurrentCompanyId, form)
 		if err != nil {
 			log.Printf("Error creating invoice: %v", err)
-			s.session.Errors("status", "Invoice wasn't created. Something went wrong.")
+			s.session.Errors("status", s.trans("global.wasNotCreated", i18n.Replacements{"subject": "@global.invoice"}))
 			i.Back(w, r)
 			return
 		}
-		s.session.Flash("success", "Invoice was created successfully!")
+		s.session.Flash("success", s.trans("global.wasCreated", i18n.Replacements{"subject": "@global.invoice"}))
 
 		i.Back(w, r)
 	}
@@ -227,11 +228,11 @@ func (s *Server) updateInvoiceHandler(i *inertia.Inertia) http.Handler {
 		err = s.updateInvoice(*user.CurrentCompanyId, uuid, form)
 		if err != nil {
 			log.Printf("Error updating invoice: %v", err)
-			s.session.Errors("status", "Invoice wasn't updated. Something went wrong.")
+			s.session.Errors("status", s.trans("global.wasNotUpdated", i18n.Replacements{"subject": "@global.invoice"}))
 			back()
 			return
 		}
-		s.session.Flash("success", "Invoice was created successfully!")
+		s.session.Flash("success", s.trans("global.wasUpdated", i18n.Replacements{"subject": "@global.invoice"}))
 
 		i.Redirect(w, r, "/invoices", http.StatusSeeOther)
 	}
@@ -257,11 +258,11 @@ func (s *Server) voidInvoiceHandler(i *inertia.Inertia) http.Handler {
 		err = s.voidInvoice(*user.CurrentCompanyId, uuid)
 		if err != nil {
 			log.Printf("Error voiding invoice: %v", err)
-			s.session.Errors("status", "Invoice wasn't voided. Something went wrong.")
+			s.session.Errors("status", s.trans("global.wasNotVoided", i18n.Replacements{"subject": "@global.invoice"}))
 			back()
 			return
 		}
-		s.session.Flash("success", "Invoice was voided successfully!")
+		s.session.Flash("success", s.trans("global.wasVoided", i18n.Replacements{"subject": "@global.invoice"}))
 
 		i.Redirect(w, r, "/invoices", http.StatusSeeOther)
 	}

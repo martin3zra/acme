@@ -5,6 +5,7 @@ import (
 	"net/http"
 
 	"github.com/martin3zra/acme/pkg/auth"
+	"github.com/martin3zra/acme/pkg/i18n"
 	"github.com/martin3zra/acme/pkg/support"
 	inertia "github.com/romsar/gonertia/v2"
 )
@@ -123,12 +124,12 @@ func (s *Server) storePaymentHandler(i *inertia.Inertia) http.Handler {
 		err = s.storePayment(*user.CurrentCompanyId, form)
 		if err != nil {
 			log.Printf("Error recording payment: %v", err)
-			s.session.Errors("status", "Payment wasn't recorded. Something went wrong.")
+			s.session.Errors("status", s.trans("global.wasNotCreated", i18n.Replacements{"subject": "@global.payment"}))
 			i.Back(w, r)
 			return
 		}
 
-		s.session.Flash("success", "Payment was recorded successfully!")
+		s.session.Flash("success", s.trans("global.wasCreated", i18n.Replacements{"subject": "@global.payment"}))
 
 		i.Back(w, r)
 	}
@@ -154,11 +155,11 @@ func (s *Server) voidPaymentHandler(i *inertia.Inertia) http.Handler {
 		err = s.voidPayment(*user.CurrentCompanyId, uuid)
 		if err != nil {
 			log.Printf("Error voiding payment: %v", err)
-			s.session.Errors("status", "Payment wasn't voided. Something went wrong.")
+			s.session.Errors("status", s.trans("global.wasNotVoided", i18n.Replacements{"subject": "@global.payment"}))
 			back()
 			return
 		}
-		s.session.Flash("success", "Payment was voided successfully!")
+		s.session.Flash("success", s.trans("global.wasVoided", i18n.Replacements{"subject": "@global.payment"}))
 
 		i.Redirect(w, r, "/payments", http.StatusSeeOther)
 	}
@@ -225,12 +226,12 @@ func (s *Server) updatePaymentHandler(i *inertia.Inertia) http.Handler {
 		err = s.updatePayment(*user.CurrentCompanyId, uuid, form)
 		if err != nil {
 			log.Printf("Error recording payment: %v", err)
-			s.session.Errors("status", "Payment wasn't recorded. Something went wrong.")
+			s.session.Errors("status", s.trans("global.wasNotUpdated", i18n.Replacements{"subject": "@global.payment"}))
 			back()
 			return
 		}
 
-		s.session.Flash("success", "Payment was recorded successfully!")
+		s.session.Flash("success", s.trans("global.wasUpdated", i18n.Replacements{"subject": "@global.payment"}))
 
 		i.Redirect(w, r, "/payments", http.StatusSeeOther)
 	}
