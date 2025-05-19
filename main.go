@@ -50,6 +50,8 @@ func run(args []string, stdout io.Writer) error {
 		log.Fatal(err)
 	}
 
+	// optional: log date-time, filename, and line number
+	log.SetFlags(log.Lshortfile | log.LstdFlags)
 	log.SetOutput(file)
 
 	server := app.NewServer(assets, resources)
@@ -57,10 +59,12 @@ func run(args []string, stdout io.Writer) error {
 
 	defer func() {
 		server.Shutdown()
+		log.Println("Stopping the server")
 	}()
 
 	go func() {
 		server.Start()
+		log.Println("Starting the server")
 	}()
 
 	// Wait for interrupt signal to gracefully shut down the server with a timeout of 10 seconds.
