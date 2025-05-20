@@ -1,8 +1,11 @@
 package app
 
 import (
+	"encoding/base64"
+	"log"
 	"os"
 	"strconv"
+	"strings"
 )
 
 type Config struct {
@@ -12,6 +15,7 @@ type Config struct {
 	port         string
 	db           Database
 	session      Session
+	secretKey    []byte
 }
 
 func (c *Config) ensureHasBeenSet() {
@@ -42,6 +46,10 @@ func (c *Config) ensureHasBeenSet() {
 		panic("Database port number should be set as environment variable")
 	}
 
+	if string(c.secretKey) == "" {
+		panic("APP_KEY should be set as environment variable")
+	}
+
 }
 
 func LoadConfig() *Config {
@@ -52,8 +60,25 @@ func LoadConfig() *Config {
 
 	lifetimeSession, _ := strconv.Atoi(os.Getenv("SESSION_LIFETIME"))
 
+	encoded := os.Getenv("APP_KEY")
+	if encoded == "" {
+		log.Fatal("APP_KEY environment variable is required")
+	}
+
+	encoded = strings.TrimPrefix(encoded, "base64:")
+
+	key, err := base64.StdEncoding.DecodeString(encoded)
+	if err != nil {
+		log.Fatalf("Failed to decode APP_KEY: %v", err)
+	}
+
+	if len(key) != 64 {
+		log.Fatalf("APP_KEY must be 64 bytes when decoded, got %d bytes", len(key))
+	}
+
 	return &Config{
 		appName:      os.Getenv("APP_NAME"),
+		secretKey:    key,
 		isProduction: isProduction,
 		host:         os.Getenv("APP_URL"),
 		port:         os.Getenv("APP_PORT"),
