@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/martin3zra/acme/pkg/i18n"
+	"github.com/martin3zra/acme/pkg/mailer"
 	"github.com/martin3zra/acme/pkg/session"
 	"github.com/martin3zra/acme/pkg/store"
 )
@@ -22,6 +23,7 @@ type Server struct {
 	db             *sql.DB
 	config         *Config
 	sessionManager *session.SessionManager
+	mail           mailer.Mailer
 	// Transient request data
 	session    *session.Session
 	assets     embed.FS
@@ -52,6 +54,7 @@ func (s *Server) Boot() {
 
 	s.openDatabaseConnection()
 	s.configureSessionManager()
+	s.configureMailClient()
 	s.bootRoutes()
 }
 
@@ -80,6 +83,10 @@ func (s *Server) configureSessionManager() {
 		s.config.session.secure,
 		s.config.session.httpOnly,
 	)
+}
+
+func (s *Server) configureMailClient() {
+	s.mail = mailer.New(s.config.mail.asMailConfig())
 }
 
 func (s *Server) get(pattern string, handler http.Handler) {

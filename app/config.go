@@ -6,6 +6,8 @@ import (
 	"os"
 	"strconv"
 	"strings"
+
+	"github.com/martin3zra/acme/pkg/mailer"
 )
 
 type Config struct {
@@ -16,6 +18,7 @@ type Config struct {
 	db           Database
 	session      Session
 	secretKey    []byte
+	mail         Mail
 }
 
 func (c *Config) ensureHasBeenSet() {
@@ -96,6 +99,15 @@ func LoadConfig() *Config {
 			secure:   isProduction,
 			httpOnly: true,
 		},
+		mail: Mail{
+			Driver:     MailDriver(os.Getenv("MAIL_DRIVER")),
+			Host:       os.Getenv("MAIL_HOST"),
+			Port:       os.Getenv("MAIL_PORT"),
+			From:       os.Getenv("MAIL_FROM"),
+			Username:   os.Getenv("MAIL_USERNAME"),
+			Password:   os.Getenv("MAIL_PASSWORD"),
+			Encryption: os.Getenv("MAIL_ENCRYPTION"),
+		},
 	}
 }
 
@@ -130,4 +142,33 @@ type Session struct {
 	// value of the cookie and the cookie will only be accessible through
 	// the HTTP protocol. It's unlikely you should disable this option.
 	httpOnly bool
+}
+
+type MailDriver string
+
+const (
+	STMP MailDriver = "smtp"
+	API  MailDriver = "api"
+)
+
+type Mail struct {
+	Driver     MailDriver
+	Host       string
+	Port       string
+	From       string
+	Username   string
+	Password   string
+	Encryption string
+}
+
+func (m Mail) asMailConfig() mailer.Config {
+	return mailer.Config{
+		Driver:     mailer.MailDriver(m.Driver),
+		Host:       m.Host,
+		Port:       m.Port,
+		From:       m.From,
+		Username:   m.Username,
+		Password:   m.Password,
+		Encryption: m.Encryption,
+	}
 }
