@@ -1,11 +1,13 @@
 package app
 
 import (
+	"database/sql"
 	"database/sql/driver"
 	"encoding/json"
 	"errors"
 	"time"
 
+	"github.com/martin3zra/acme/pkg/mailer"
 	"github.com/martin3zra/acme/pkg/support"
 	"github.com/martin3zra/acme/pkg/validator"
 )
@@ -506,4 +508,11 @@ func (form UpdatePaymentForm) Rules() map[string]any {
 		"lines.*.discount":   "sometimes",
 		"lines.*.action":     "required|in:added,updated,deleted,unchanged",
 	}
+}
+
+type MustVerifyAccount interface {
+	HasVerifiedAccount() bool
+	MarkAccountAsVerified(*sql.DB) bool
+	SendAccountVerificationNotification(mailer.Mailer, map[string]string)
+	GetEmailAddressForAccountVerification() string
 }

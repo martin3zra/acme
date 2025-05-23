@@ -54,7 +54,7 @@ func run(args []string, stdout io.Writer) error {
 	log.SetFlags(log.Lshortfile | log.LstdFlags)
 	log.SetOutput(file)
 
-	server := app.NewServer(assets, resources)
+	server := app.NewServer(&assets, &resources)
 	server.Boot()
 
 	defer func() {

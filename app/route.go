@@ -27,6 +27,8 @@ func (s *Server) registerRoutes(guest, auth alice.Chain, inertia *gonertia.Inert
 	s.get("/login", guest.Then(s.loginHandler(inertia)))
 	s.post("/login", guest.Then(s.authHandler(inertia)))
 
+	s.get("/verify-account/{uuid}/{hash}", guest.Then(s.verifyAccountHandler(inertia)))
+
 	s.post("/logout", auth.Then(s.logoutHandler(inertia)))
 
 	s.get("/home", auth.Then(s.homeHandler(inertia)))

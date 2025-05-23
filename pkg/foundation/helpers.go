@@ -7,6 +7,7 @@ import (
 	"log"
 	"net"
 	"net/http"
+	"reflect"
 	"strings"
 )
 
@@ -39,15 +40,18 @@ func GetIpAddress(r *http.Request) (string, error) {
 }
 
 func AsMap(obj any) map[string]any {
-	var result = make(map[string]any)
-	jsonBytes, err := json.Marshal(obj)
-	if err != nil {
-		log.Fatal(err)
+	result := make(map[string]any)
+	val := reflect.ValueOf(obj)
+	typ := reflect.TypeOf(obj)
+
+	if val.Kind() == reflect.Ptr {
+		val = val.Elem()
+		typ = typ.Elem()
 	}
 
-	err = json.Unmarshal(jsonBytes, &result)
-	if err != nil {
-		log.Fatal(err)
+	for i := range val.NumField() {
+		field := typ.Field(i)
+		result[field.Name] = val.Field(i).Interface()
 	}
 
 	return result

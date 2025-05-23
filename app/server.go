@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"os"
 	"time"
 
 	"github.com/martin3zra/acme/pkg/i18n"
@@ -23,7 +24,7 @@ type Server struct {
 	db             *sql.DB
 	config         *Config
 	sessionManager *session.SessionManager
-	mail           mailer.Mailer
+	mailer         mailer.Mailer
 	// Transient request data
 	session    *session.Session
 	assets     embed.FS
@@ -31,7 +32,7 @@ type Server struct {
 	translator *i18n.Translator
 }
 
-func NewServer(assets, resources embed.FS) *Server {
+func NewServer(assets, resources *embed.FS) *Server {
 
 	qs, err := store.NewQueryStore(sqlQueriesFS, "sql/")
 	if err != nil {
@@ -39,22 +40,33 @@ func NewServer(assets, resources embed.FS) *Server {
 	}
 	translator := i18n.NewTranslator(loadTranslations("global"))
 
-	return &Server{
+	server := &Server{
 		mux:        http.NewServeMux(),
 		qs:         qs,
 		config:     LoadConfig(),
-		assets:     assets,
-		resources:  resources,
 		translator: translator,
 	}
+
+	if assets != nil && resources != nil {
+		server.assets = *assets
+		server.resources = *resources
+	}
+
+	return server
 }
 
 func (s *Server) Boot() {
-	s.config.ensureHasBeenSet()
 
+	s.config.ensureHasBeenSet()
 	s.openDatabaseConnection()
-	s.configureSessionManager()
 	s.configureMailClient()
+
+	isRunningInCli := os.Getenv("RUNNING_IN_CLI")
+	if isRunningInCli == "YES" {
+		return
+	}
+
+	s.configureSessionManager()
 	s.bootRoutes()
 }
 
@@ -86,7 +98,7 @@ func (s *Server) configureSessionManager() {
 }
 
 func (s *Server) configureMailClient() {
-	s.mail = mailer.New(s.config.mail.asMailConfig())
+	s.mailer = mailer.New(s.config.mail.asMailConfig())
 }
 
 func (s *Server) get(pattern string, handler http.Handler) {

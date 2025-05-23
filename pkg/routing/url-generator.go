@@ -4,6 +4,7 @@ import (
 	"crypto/hmac"
 	"crypto/sha256"
 	"encoding/hex"
+	"log"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -50,6 +51,7 @@ func VerifyRequest(r *http.Request, secret string) bool {
 
 	expires, err := strconv.ParseInt(expiresStr, 10, 64)
 	if err != nil || time.Now().Unix() > expires {
+		log.Println("signature is expired", r)
 		return false
 	}
 
