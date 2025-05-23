@@ -516,3 +516,14 @@ type MustVerifyAccount interface {
 	SendAccountVerificationNotification(mailer.Mailer, map[string]string)
 	GetEmailAddressForAccountVerification() string
 }
+
+type EmailVerificationForm struct {
+	support.FormRequest
+	Email string `json:"email"`
+}
+
+func (EmailVerificationForm) Rules() map[string]any {
+	return map[string]any{
+		"email": "required|email|exists:users,email",
+	}
+}

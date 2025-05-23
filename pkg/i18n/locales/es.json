@@ -174,6 +174,17 @@
       "emptyText": "No se encontraron clientes"
     }
   },
+  "verify": {
+    "signatured-is-not-valid": "Intentamos procesar tu solicitud, pero parece que la firma que proporcionaste no es válida. Podría estar caducada, ser incorrecta o tener un formato incorrecto.\n\nNo te preocupes, ¡esto puede pasar! Para continuar, haz clic en el botón <b>Reenviar verificación</b>. Estaremos encantados de ayudarte.",
+    "uuid-is-not-valid": "No pudimos completar tu solicitud porque el ID de cuenta que proporcionaste no parece ser válido. Esto podría deberse a un pequeño error tipográfico o a que usaste un ID desactualizado o incorrecto.",
+    "not-found": "Gracias por contactarnos. Revisamos el ID de cuenta que nos proporcionaste, pero no encontramos ninguna cuenta asociada.",
+    "already-verified": "¡Buenas noticias! Tu cuenta ya ha sido verificada exitosamente, así que no necesitas pasar por el proceso nuevamente.",
+    "hash-do-not-match": "Verificamos el hash que enviaste, pero lamentablemente no coincide con ningún registro en nuestra plataforma.",
+    "account-verified": "¡Buenas noticias! ¡Hemos verificado tu cuenta! 🎉\n\nYa puedes iniciar sesión y empezar a usar todas las funciones disponibles. Si tienes alguna pregunta o necesitas ayuda para empezar, solo tienes que escribirnos.\n\n¡Bienvenido y gracias por verificar tu cuenta!",
+    "verification-link-sent": "Se ha enviado un nuevo enlace de verificación a la dirección de correo electrónico que se proporcionó durante el registro.",
+    "resend-verification-email": "Reenviar correo de verificación",
+    "login": "Inicia sesión en tu cuenta"
+  },
   "auth": {
     "login": {
       "action": {

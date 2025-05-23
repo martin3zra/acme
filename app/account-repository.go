@@ -40,7 +40,7 @@ func (a account) MarkAccountAsVerified(db *sql.DB) bool {
 		return nil
 	})
 
-	return err != nil
+	return err == nil
 }
 
 func (a account) SendAccountVerificationNotification(notify mailer.Mailer, attributes map[string]string) {
@@ -110,6 +110,24 @@ func (s *Server) findAccountByUUID(uuid string) (*account, error) {
     INNER JOIN users ON (accounts.owner_id = users.id)
     WHERE accounts.uuid = $1
   `, uuid).Scan(
+		&a.ID, &a.UUID, &a.Name, &a.VerifiedAt, &a.CreatedAt, &a.UpdatedAt, &a.DeletedAt, &a.Owner.ID, &a.Owner.Email,
+	); err != nil {
+		return nil, err
+	}
+
+	return &a, nil
+}
+
+func (s *Server) findAccountByOwnerEmailAddress(email string) (*account, error) {
+	var a account
+
+	if err := s.db.QueryRow(`
+    SELECT accounts.id, accounts.uuid, accounts.name, accounts.verified_at, accounts.created_at, accounts.updated_at, accounts.deleted_at,
+    users.id, users.email
+    FROM accounts
+    INNER JOIN users ON (accounts.owner_id = users.id)
+    WHERE users.email = $1
+  `, email).Scan(
 		&a.ID, &a.UUID, &a.Name, &a.VerifiedAt, &a.CreatedAt, &a.UpdatedAt, &a.DeletedAt, &a.Owner.ID, &a.Owner.Email,
 	); err != nil {
 		return nil, err
