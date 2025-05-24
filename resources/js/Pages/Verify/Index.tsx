@@ -13,7 +13,7 @@ interface EmailVerificationForm {
   email: string;
 }
 
-export default function Verify({ status }: PageProps<{ status: string }>) {
+export default function Verify({ status, csrf_token }: PageProps<{ status: string }>) {
   const { headers } = useHeader();
   const t = useTranslation().trans;
   const { data, setData, errors, post, processing } = useForm<Required<EmailVerificationForm>>({
@@ -38,11 +38,32 @@ export default function Verify({ status }: PageProps<{ status: string }>) {
         />
       )}
 
+      {status === 'already-verified' && (
+        <Link href="/home">
+          {t('global.visit', { to: 'tu' })}
+          {t('global.navMain.dashboard')}
+        </Link>
+      )}
+
       {status === 'verification-link-sent' && (
         <div className="mb-4 text-base font-medium text-green-600 dark:text-green-400">{t(`verify.${status}`)}</div>
       )}
 
-      {status === 'account-verified' && <Link href="/login">{t('verify.login')}</Link>}
+      {status === 'account-verified' && (
+        <>
+          <Link href="/login">{t('verify.login')}</Link>
+
+          <Link
+            href="/logout"
+            method="post"
+            headers={{ 'X-CSRF-Token': csrf_token }}
+            as="button"
+            className="rounded-md text-sm text-gray-600 underline hover:text-gray-900 focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 focus:outline-none"
+          >
+            Log Out
+          </Link>
+        </>
+      )}
 
       {showForm && (
         <form onSubmit={submit}>

@@ -3,16 +3,12 @@ package app
 import (
 	"context"
 	"net/http"
+	"net/url"
 	"regexp"
 
-	"github.com/martin3zra/acme/pkg/foundation"
 	"github.com/martin3zra/acme/pkg/i18n"
 	"github.com/romsar/gonertia/v2"
 )
-
-func flash(w http.ResponseWriter, name string, value any) {
-	foundation.SetFlash(w, name, value)
-}
 
 func ensureUUIDIsValid(str string) bool {
 	regex := `^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$`
@@ -58,4 +54,28 @@ func mergeTranslations(ctx context.Context, pageTranslations map[string]string) 
 	}
 
 	return merged
+}
+
+func back(w http.ResponseWriter, r *http.Request, attributes map[string]string) {
+	// Get the referer (previous page URL)
+	referer := r.Referer()
+	if referer == "" {
+		// Default fallback if referer is not present
+		referer = "/"
+	}
+
+	// Parse the referer URL
+	parsedURL, err := url.Parse(referer)
+	if err != nil {
+		http.Error(w, "Invalid referer", http.StatusBadRequest)
+		return
+	}
+
+	// Add or update query parameters
+	q := parsedURL.Query()
+	for k, v := range attributes {
+		q.Set(k, v)
+	}
+	parsedURL.RawQuery = q.Encode()
+	http.Redirect(w, r, parsedURL.String(), http.StatusFound)
 }

@@ -2,8 +2,8 @@ package app
 
 import (
 	"net/http"
-	"net/url"
 
+	"github.com/martin3zra/acme/pkg/auth"
 	"github.com/martin3zra/acme/pkg/foundation"
 	"github.com/martin3zra/acme/pkg/routing"
 	"github.com/martin3zra/acme/pkg/support"
@@ -13,9 +13,12 @@ import (
 func (s *Server) verifyAccountHandler(i *inertia.Inertia) http.Handler {
 	fn := func(w http.ResponseWriter, r *http.Request) {
 
-		renderWith := func(data map[string]any) {
-			data["translations"] = mergeTranslations(r.Context(), loadTranslations("verify"))
-			err := i.Render(w, r, "Verify/Index", data)
+		renderWithStatus := func(status string) {
+			props := map[string]any{
+				"translations": mergeTranslations(r.Context(), loadTranslations("verify")),
+				"status":       status,
+			}
+			err := i.Render(w, r, "Verify/Index", props)
 			if err != nil {
 				s.handleError(w, err)
 				return
@@ -23,12 +26,12 @@ func (s *Server) verifyAccountHandler(i *inertia.Inertia) http.Handler {
 		}
 
 		if r.URL.Query().Has("status") {
-			renderWith(map[string]any{"status": r.URL.Query().Get("status")})
+			renderWithStatus(r.URL.Query().Get("status"))
 			return
 		}
 
 		if !routing.VerifyRequest(r, string(s.config.secretKey)) {
-			renderWith(map[string]any{"status": "signatured-is-not-valid"})
+			renderWithStatus("signatured-is-not-valid")
 			return
 		}
 
@@ -36,25 +39,25 @@ func (s *Server) verifyAccountHandler(i *inertia.Inertia) http.Handler {
 		hash := r.PathValue("hash")
 
 		if !ensureUUIDIsValid(accountUUID) {
-			renderWith(map[string]any{"status": "uuid-is-not-valid"})
+			renderWithStatus("uuid-is-not-valid")
 			return
 		}
 
 		account, err := s.findAccountByUUID(accountUUID)
 		if err != nil {
-			renderWith(map[string]any{"status": "not-found"})
+			renderWithStatus("not-found")
 			return
 		}
 		// create a new user instance that belongs to the account extending the foundation one
 		// TODO: check the user is the owner by matching the owner ID with a user
 
 		if account.HasVerifiedAccount() {
-			renderWith(map[string]any{"status": "already-verified"})
+			renderWithStatus("already-verified")
 			return
 		}
 
 		if !foundation.NewHashable().Sha1Equals(account.GetEmailAddressForAccountVerification(), hash) {
-			renderWith(map[string]any{"status": "hash-do-not-match"})
+			renderWithStatus("hash-do-not-match")
 			return
 		}
 
@@ -65,7 +68,19 @@ func (s *Server) verifyAccountHandler(i *inertia.Inertia) http.Handler {
 		// trigger event
 		// create any default setting for this account.
 
-		renderWith(map[string]any{"status": "account-verified"})
+		user, err := auth.NewAuth(r.Context()).LoginUsingId(account.Owner.ID)
+		if err != nil {
+			s.handleError(w, err)
+			return
+		}
+
+		err = s.sessionManager.ReGenerate(r, user)
+		if err != nil {
+			s.handleError(w, err)
+			return
+		}
+
+		renderWithStatus("account-verified")
 	}
 
 	return http.HandlerFunc(fn)
@@ -91,28 +106,4 @@ func (s *Server) sendVerificationEmail(i *inertia.Inertia) http.Handler {
 		back(w, r, map[string]string{"status": "verification-link-sent"})
 	}
 	return http.HandlerFunc(fn)
-}
-
-func back(w http.ResponseWriter, r *http.Request, attributes map[string]string) {
-	// Get the referer (previous page URL)
-	referer := r.Referer()
-	if referer == "" {
-		// Default fallback if referer is not present
-		referer = "/"
-	}
-
-	// Parse the referer URL
-	parsedURL, err := url.Parse(referer)
-	if err != nil {
-		http.Error(w, "Invalid referer", http.StatusBadRequest)
-		return
-	}
-
-	// Add or update query parameters
-	q := parsedURL.Query()
-	for k, v := range attributes {
-		q.Set(k, v)
-	}
-	parsedURL.RawQuery = q.Encode()
-	http.Redirect(w, r, parsedURL.String(), http.StatusFound)
 }

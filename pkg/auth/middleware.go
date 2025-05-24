@@ -3,6 +3,7 @@ package auth
 import (
 	"context"
 	"net/http"
+	"strings"
 
 	"github.com/martin3zra/acme/pkg/session"
 )
@@ -27,6 +28,11 @@ func Middleware(next http.Handler) http.Handler {
 
 func RedirectIfAuthenticated(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+
+		if strings.HasPrefix(r.RequestURI, "/verify-account") {
+			next.ServeHTTP(w, r)
+			return
+		}
 		sess := session.GetSession(r)
 
 		userId := sess.Get("user_id")

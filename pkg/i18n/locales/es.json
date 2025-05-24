@@ -55,6 +55,7 @@
     "wasDeleted": ":subject fue eliminad@action con éxito!",
     "wasNotVoided": "No se anulo :subject. Algo salió mal.",
     "wasVoided": ":subject fue anulad@action con éxito!",
+    "visit": "Visita :to ",
     "nouns": {
       "customer": {
         "gender":"m"
@@ -180,7 +181,7 @@
     "not-found": "Gracias por contactarnos. Revisamos el ID de cuenta que nos proporcionaste, pero no encontramos ninguna cuenta asociada.",
     "already-verified": "¡Buenas noticias! Tu cuenta ya ha sido verificada exitosamente, así que no necesitas pasar por el proceso nuevamente.",
     "hash-do-not-match": "Verificamos el hash que enviaste, pero lamentablemente no coincide con ningún registro en nuestra plataforma.",
-    "account-verified": "¡Buenas noticias! ¡Hemos verificado tu cuenta! 🎉\n\nYa puedes iniciar sesión y empezar a usar todas las funciones disponibles. Si tienes alguna pregunta o necesitas ayuda para empezar, solo tienes que escribirnos.\n\n¡Bienvenido y gracias por verificar tu cuenta!",
+    "account-verified": "¡Buenas noticias! ¡Hemos verificado tu cuenta! 🎉\n\nYa puedes empezar a usar todas las funciones disponibles. Si tienes alguna pregunta o necesitas ayuda para empezar, solo tienes que escribirnos.\n\n¡Bienvenido y gracias por verificar tu cuenta!",
     "verification-link-sent": "Se ha enviado un nuevo enlace de verificación a la dirección de correo electrónico que se proporcionó durante el registro.",
     "resend-verification-email": "Reenviar correo de verificación",
     "login": "Inicia sesión en tu cuenta"

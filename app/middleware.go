@@ -45,15 +45,18 @@ func (s *Server) SharedProps(next http.Handler) http.Handler {
 		user := session.Get("user")
 		if user != nil {
 			if user, ok := user.(map[string]any); ok {
-				currentCompanyId := int(user["current_company_id"].(float64))
-				company, err := s.findCompanyById(currentCompanyId)
-				if err != nil {
-					log.Printf("error: %v", err)
-					http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
-					return
-				}
+				uCompany := user["current_company_id"]
+				if uCompany != nil {
+					currentCompanyId := int(uCompany.(float64))
+					company, err := s.findCompanyById(currentCompanyId)
+					if err != nil {
+						log.Printf("error: %v", err)
+						http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+						return
+					}
 
-				currentCompany = company
+					currentCompany = company
+				}
 			}
 		}
 
