@@ -8,6 +8,7 @@
     "save": "Guardar",
     "email": "Correo electrónico",
     "password": "Contraseña",
+    "password_confirmation": "Confirmar Contraseña",
     "processing": "Procesando...",
     "columns": "Columnas",
     "noResults": "No hay resultados.",
@@ -184,7 +185,9 @@
     "account-verified": "¡Buenas noticias! ¡Hemos verificado tu cuenta! 🎉\n\nYa puedes empezar a usar todas las funciones disponibles. Si tienes alguna pregunta o necesitas ayuda para empezar, solo tienes que escribirnos.\n\n¡Bienvenido y gracias por verificar tu cuenta!",
     "verification-link-sent": "Se ha enviado un nuevo enlace de verificación a la dirección de correo electrónico que se proporcionó durante el registro.",
     "resend-verification-email": "Reenviar correo de verificación",
-    "login": "Inicia sesión en tu cuenta"
+    "login": "Inicia sesión en tu cuenta",
+    "create-password": "Crear contraseña",
+    "create-password-description": "¡Buenas noticias! ¡Hemos verificado tu cuenta! 🎉\n\nPara completar el proceso de verificación, por favor crea una contraseña para tu cuenta. Esta contraseña te permitirá acceder a todas las funciones de nuestra plataforma."
   },
   "auth": {
     "login": {

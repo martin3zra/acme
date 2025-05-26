@@ -48,8 +48,6 @@ func (s *Server) verifyAccountHandler(i *inertia.Inertia) http.Handler {
 			renderWithStatus("not-found")
 			return
 		}
-		// create a new user instance that belongs to the account extending the foundation one
-		// TODO: check the user is the owner by matching the owner ID with a user
 
 		if account.HasVerifiedAccount() {
 			renderWithStatus("already-verified")
@@ -65,8 +63,6 @@ func (s *Server) verifyAccountHandler(i *inertia.Inertia) http.Handler {
 			s.handleError(w, err)
 			return
 		}
-		// trigger event
-		// create any default setting for this account.
 
 		user, err := auth.NewAuth(r.Context()).LoginUsingId(account.Owner.ID)
 		if err != nil {
@@ -77,6 +73,12 @@ func (s *Server) verifyAccountHandler(i *inertia.Inertia) http.Handler {
 		err = s.sessionManager.ReGenerate(r, user)
 		if err != nil {
 			s.handleError(w, err)
+			return
+		}
+
+		must, ok := user.(foundation.MustVerifyPassword)
+		if ok && must.HasNotChangedPassword() {
+			renderWithStatus("create-password")
 			return
 		}
 

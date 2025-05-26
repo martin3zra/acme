@@ -25,6 +25,18 @@ func (f LoginFormRequest) Rules() map[string]any {
 	}
 }
 
+type CreatePasswordForm struct {
+	support.FormRequest
+	Password             string `json:"password"`
+	PasswordConfirmation string `json:"password_confirmation"`
+}
+
+func (f CreatePasswordForm) Rules() map[string]any {
+	return map[string]any{
+		"password": "required|confirmed",
+	}
+}
+
 type StoreCustomerForm struct {
 	support.FormRequest
 	Name    string `json:"name"`
@@ -524,6 +536,6 @@ type EmailVerificationForm struct {
 
 func (EmailVerificationForm) Rules() map[string]any {
 	return map[string]any{
-		"email": "required|email|exists:users,email",
+		"email": "required|email",
 	}
 }

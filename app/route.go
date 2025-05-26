@@ -30,8 +30,10 @@ func (s *Server) registerRoutes(guest, auth alice.Chain, inertia *gonertia.Inert
 	s.get("/verify-account/{uuid}/{hash}", guest.Then(s.verifyAccountHandler(inertia)))
 	s.post("/email/verification-notification", guest.Then(s.sendVerificationEmail(inertia)))
 
+	s.post("/password", auth.Then(s.createPasswordHandler(inertia)))
 	s.post("/logout", auth.Then(s.logoutHandler(inertia)))
 
+	s.get("/onboarding", auth.Then(s.onboardingHandler(inertia)))
 	s.get("/home", auth.Then(s.homeHandler(inertia)))
 
 	s.get("/customers", auth.Then(s.customersHandler(inertia)))

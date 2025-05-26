@@ -8,6 +8,7 @@ import Guest from '@/layouts/guest-layout';
 import { PageProps } from '@/types';
 import { Head, Link, useForm } from '@inertiajs/react';
 import { FormEventHandler } from 'react';
+import CreatePassword from './Shared/create-password';
 
 interface EmailVerificationForm {
   email: string;
@@ -20,7 +21,8 @@ export default function Verify({ status, csrf_token }: PageProps<{ status: strin
     email: '',
   });
 
-  const showForm = status !== 'verification-link-sent' && status !== 'account-verified' && status !== 'already-verified';
+  const showReSendEmailForm =
+    status !== 'verification-link-sent' && status !== 'account-verified' && status !== 'already-verified' && status !== 'create-password';
 
   const submit: FormEventHandler = (e) => {
     e.preventDefault();
@@ -31,7 +33,7 @@ export default function Verify({ status, csrf_token }: PageProps<{ status: strin
     <Guest>
       <Head title="Email Verification" />
 
-      {status !== 'verification-link-sent' && (
+      {status !== 'verification-link-sent' && status !== 'create-password' && (
         <div
           className="mb-4 text-base text-gray-600 dark:text-gray-400"
           dangerouslySetInnerHTML={{ __html: t(`verify.${status}`).replace(/\n/g, '<br>') }}
@@ -65,7 +67,9 @@ export default function Verify({ status, csrf_token }: PageProps<{ status: strin
         </>
       )}
 
-      {showForm && (
+      {status === 'create-password' && <CreatePassword />}
+
+      {showReSendEmailForm && (
         <form onSubmit={submit}>
           <div className="grid gap-2">
             <Label htmlFor="email">{t(`global.email`)}</Label>
