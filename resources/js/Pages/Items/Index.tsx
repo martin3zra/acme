@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { useVerb } from '@/composables/use-verbs';
 import { useTranslation } from '@/hooks/use-translation';
-import AuthenticatedLayout from '@/layouts/authenticated-layout';
+import AppLayout from '@/layouts/app-layout';
 import { Item, PageProps, Tax, Unit, Verb } from '@/types';
 import { Plus } from 'lucide-react';
 import { useEffect, useState } from 'react';
@@ -56,7 +56,7 @@ export default function Index({ auth, items, taxes, units }: PageProps<{ items: 
   };
 
   return (
-    <AuthenticatedLayout user={auth.user} breadcrumbs={breadcrumbs}>
+    <AppLayout user={auth.user} breadcrumbs={breadcrumbs}>
       <div className="space-y-6">
         {hasItems && (
           <HeadingSmall
@@ -110,6 +110,6 @@ export default function Index({ auth, items, taxes, units }: PageProps<{ items: 
           />
         )}
       </div>
-    </AuthenticatedLayout>
+    </AppLayout>
   );
 }

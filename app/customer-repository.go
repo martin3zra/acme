@@ -1,6 +1,7 @@
 package app
 
 import (
+	"context"
 	"database/sql"
 	"errors"
 	"strings"
@@ -44,7 +45,7 @@ type receivable struct {
 	foundation.Timestamps
 }
 
-func (s *Server) findCustomeByID(companyID, customerID int) (*customer, error) {
+func (s *Server) findCustomeByID(ctx context.Context, customerID int) (*customer, error) {
 
 	var c customer
 	err := s.db.QueryRow("SELECT c.id, c.uuid, c.name, c.contact_name, c.phone, c.email, c.status, c.amount_due, "+
@@ -53,7 +54,7 @@ func (s *Server) findCustomeByID(companyID, customerID int) (*customer, error) {
 		"INNER JOIN companies ON (c.company_id = companies.id) "+
 		"WHERE c.company_id = $1 "+
 		"AND c.id = $2 "+
-		"AND c.deleted_at IS NULL", companyID, customerID).
+		"AND c.deleted_at IS NULL", CurrentCompany(ctx).ID, customerID).
 		Scan(&c.ID, &c.UUID, &c.Name, &c.ContactName, &c.Phone, &c.Email, &c.Status, &c.AmountDue, &c.CreatedAt, &c.UpdatedAt, &c.DeletedAt)
 	if err != nil {
 		return nil, err
@@ -63,7 +64,7 @@ func (s *Server) findCustomeByID(companyID, customerID int) (*customer, error) {
 	return &c, nil
 }
 
-func (s *Server) findCustomeByUUID(companyID int, customerID string) (*customer, error) {
+func (s *Server) findCustomeByUUID(ctx context.Context, customerID string) (*customer, error) {
 
 	var c customer
 	err := s.db.QueryRow("SELECT c.id, c.uuid, c.name, c.contact_name, c.phone, c.email, c.status, c.amount_due, "+
@@ -72,7 +73,7 @@ func (s *Server) findCustomeByUUID(companyID int, customerID string) (*customer,
 		"INNER JOIN companies ON (c.company_id = companies.id) "+
 		"WHERE c.company_id = $1 "+
 		"AND c.uuid = $2 "+
-		"AND c.deleted_at IS NULL", companyID, customerID).
+		"AND c.deleted_at IS NULL", CurrentCompany(ctx).ID, customerID).
 		Scan(&c.ID, &c.UUID, &c.Name, &c.ContactName, &c.Phone, &c.Email, &c.Status, &c.AmountDue, &c.CreatedAt, &c.UpdatedAt, &c.DeletedAt)
 	if err != nil {
 		return nil, err
@@ -82,14 +83,14 @@ func (s *Server) findCustomeByUUID(companyID int, customerID string) (*customer,
 	return &c, nil
 }
 
-func (s *Server) findCustomers(companyID int) ([]*customer, error) {
+func (s *Server) findCustomers(ctx context.Context) ([]*customer, error) {
 
 	rows, err := s.db.Query("SELECT c.id, c.uuid, c.name, c.contact_name, c.phone, c.email, c.status, c.amount_due, "+
 		"c.created_at, c.updated_at, c.deleted_at "+
 		"FROM customers c "+
 		"INNER JOIN companies ON (c.company_id = companies.id) "+
 		"WHERE c.company_id = $1 "+
-		"AND c.deleted_at IS NULL ORDER BY c.name", companyID)
+		"AND c.deleted_at IS NULL ORDER BY c.name", CurrentCompany(ctx).ID)
 	if err != nil {
 		return nil, err
 	}
@@ -119,7 +120,7 @@ func (s *Server) findCustomers(companyID int) ([]*customer, error) {
 	return data, nil
 }
 
-func (s *Server) findCustomersBySearchCriteria(companyID int, term string) ([]*customer, error) {
+func (s *Server) findCustomersBySearchCriteria(ctx context.Context, term string) ([]*customer, error) {
 	if len(strings.TrimSpace(term)) == 0 {
 		return nil, errors.New("need to specifiy the customer you're looking for")
 	}
@@ -128,7 +129,7 @@ func (s *Server) findCustomersBySearchCriteria(companyID int, term string) ([]*c
 		"INNER JOIN companies ON (c.company_id = companies.id) "+
 		"WHERE c.company_id = $1 "+
 		"AND c.name ILIKE $2 "+
-		"AND c.deleted_at IS NULL AND c.status = 'enabled' ORDER BY c.name LIMIT 5 ", companyID, "%"+term+"%")
+		"AND c.deleted_at IS NULL AND c.status = 'enabled' ORDER BY c.name LIMIT 5 ", CurrentCompany(ctx).ID, "%"+term+"%")
 	if err != nil {
 		return nil, err
 	}
@@ -154,37 +155,35 @@ func (s *Server) findCustomersBySearchCriteria(companyID int, term string) ([]*c
 	return data, nil
 }
 
-func (s *Server) storeCustomer(companyId int, form StoreCustomerForm) error {
-
+func (s *Server) storeCustomer(ctx context.Context, form StoreCustomerForm) error {
 	_, err := s.db.Exec("INSERT INTO customers (company_id, name, contact_name, email, phone) "+
 		"VALUES ($1, $2, $3, $4, $5)",
-		companyId, form.Name, form.Contact, form.Email, form.Phone,
+		CurrentCompany(ctx).ID, form.Name, form.Contact, form.Email, form.Phone,
 	)
 
 	return err
 }
 
-func (s *Server) updateCustomer(companyID, customerID int, form UpdateCustomerForm) error {
+func (s *Server) updateCustomer(ctx context.Context, customerID int, form UpdateCustomerForm) error {
 
 	_, err := s.db.Exec(
 		"UPDATE customers SET name = $1, contact_name = $2,  email = $3, phone = $4 WHERE company_id = $5 AND id = $6",
-		form.Name, form.Contact, form.Email, form.Phone, companyID, customerID,
+		form.Name, form.Contact, form.Email, form.Phone, CurrentCompany(ctx).ID, customerID,
 	)
 
 	return err
 }
 
-func (s *Server) deleteCustomer(companyID, customerID int) error {
-
+func (s *Server) deleteCustomer(ctx context.Context, customerID int) error {
 	_, err := s.db.Exec(
 		"UPDATE customers SET deleted_at = now(), updated_at = now() WHERE company_id = $1 AND id = $2",
-		companyID, customerID,
+		CurrentCompany(ctx).ID, customerID,
 	)
 
 	return err
 }
 
-func (s *Server) toggleCustomerStatus(companyID int, customer *customer) error {
+func (s *Server) toggleCustomerStatus(ctx context.Context, customer *customer) error {
 	status := customer.Status
 	if status == "enabled" {
 		status = "disabled"
@@ -193,7 +192,7 @@ func (s *Server) toggleCustomerStatus(companyID int, customer *customer) error {
 	}
 	_, err := s.db.Exec(
 		"UPDATE customers SET updated_at = now(), status = $3 WHERE company_id = $1 AND id = $2",
-		companyID, customer.ID, status,
+		CurrentCompany(ctx).ID, customer.ID, status,
 	)
 	return err
 }
@@ -216,7 +215,7 @@ func (s *Server) updateCustomerAmountDue(tx *sql.Tx, companyId, customerId int, 
 	return err
 }
 
-func (s *Server) findCustomeReceivables(companyID int, customerID string) ([]*receivable, error) {
+func (s *Server) findCustomeReceivables(ctx context.Context, customerID string) ([]*receivable, error) {
 	rows, err := s.db.Query(`
     SELECT receivables.id, receivables.uuid, invoices.uuid, invoices.id,
     invoices.date, invoices.due_on, invoices.total, invoices.amount_due, invoices.paid_status,
@@ -230,7 +229,7 @@ func (s *Server) findCustomeReceivables(companyID int, customerID string) ([]*re
     AND invoices.paid_status != 'paid'::paid_status
     AND customers.uuid = $2
 		AND receivables.deleted_at IS NULL
-  `, companyID, customerID)
+  `, CurrentCompany(ctx).ID, customerID)
 	if err != nil {
 		return nil, err
 	}

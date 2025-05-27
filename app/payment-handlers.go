@@ -4,7 +4,6 @@ import (
 	"log"
 	"net/http"
 
-	"github.com/martin3zra/acme/pkg/auth"
 	"github.com/martin3zra/acme/pkg/i18n"
 	"github.com/martin3zra/acme/pkg/support"
 	inertia "github.com/romsar/gonertia/v2"
@@ -13,8 +12,7 @@ import (
 func (s *Server) paymentsHandler(i *inertia.Inertia) http.Handler {
 	fn := func(w http.ResponseWriter, r *http.Request) {
 		uuid := r.URL.Query().Get("id")
-		user := auth.User(r.Context())
-		payments, err := s.findPayments(*user.CurrentCompanyId)
+		payments, err := s.findPayments(r.Context())
 		if err != nil {
 			s.handleError(w, err)
 			return
@@ -25,13 +23,13 @@ func (s *Server) paymentsHandler(i *inertia.Inertia) http.Handler {
 		}
 
 		if ensureUUIDIsValid(uuid) {
-			payment, err := s.findPaymentByUUID(*user.CurrentCompanyId, uuid)
+			payment, err := s.findPaymentByUUID(r.Context(), uuid)
 			if err != nil {
 				s.handleError(w, err)
 				return
 			}
 
-			lines, err := s.findPaymentLines(*user.CurrentCompanyId, payment.ID)
+			lines, err := s.findPaymentLines(r.Context(), payment.ID)
 			if err != nil {
 				s.handleError(w, err)
 				return
@@ -59,12 +57,11 @@ func (s *Server) createPaymentHandler(i *inertia.Inertia) http.Handler {
 		PaymentUuid := r.URL.Query().Get("Payment_id")
 		term := r.URL.Query().Get("search")
 		customerUuid := r.URL.Query().Get("customer_id")
-		user := auth.User(r.Context())
 
 		props := inertia.Props{
 			"translations": mergeTranslations(r.Context(), loadTranslations("payments")),
 			"customers": inertia.Optional(func() (any, error) {
-				customers, err := s.findCustomersBySearchCriteria(*user.CurrentCompanyId, term)
+				customers, err := s.findCustomersBySearchCriteria(r.Context(), term)
 				if err != nil {
 					return nil, err
 				}
@@ -72,7 +69,7 @@ func (s *Server) createPaymentHandler(i *inertia.Inertia) http.Handler {
 				return customers, err
 			}),
 			"receivables": inertia.Optional(func() (any, error) {
-				receivables, err := s.findCustomeReceivables(*user.CurrentCompanyId, customerUuid)
+				receivables, err := s.findCustomeReceivables(r.Context(), customerUuid)
 				if err != nil {
 					return nil, err
 				}
@@ -86,12 +83,12 @@ func (s *Server) createPaymentHandler(i *inertia.Inertia) http.Handler {
 		}
 
 		if ensureUUIDIsValid(customerUuid) {
-			customer, err := s.findCustomeByUUID(*user.CurrentCompanyId, customerUuid)
+			customer, err := s.findCustomeByUUID(r.Context(), customerUuid)
 			if err != nil {
 				s.handleError(w, err)
 				return
 			}
-			receivables, err := s.findCustomeReceivables(*user.CurrentCompanyId, customerUuid)
+			receivables, err := s.findCustomeReceivables(r.Context(), customerUuid)
 			if err != nil {
 				s.handleError(w, err)
 				return
@@ -120,8 +117,7 @@ func (s *Server) storePaymentHandler(i *inertia.Inertia) http.Handler {
 			return
 		}
 
-		user := auth.User(r.Context())
-		err = s.storePayment(*user.CurrentCompanyId, form)
+		err = s.storePayment(r.Context(), form)
 		if err != nil {
 			log.Printf("Error recording payment: %v", err)
 			s.session.Errors("status", s.trans("global.wasNotCreated", i18n.Replacements{"subject": "@global.payment"}))
@@ -151,8 +147,7 @@ func (s *Server) voidPaymentHandler(i *inertia.Inertia) http.Handler {
 			return
 		}
 
-		user := auth.User(r.Context())
-		err = s.voidPayment(*user.CurrentCompanyId, uuid)
+		err = s.voidPayment(r.Context(), uuid)
 		if err != nil {
 			log.Printf("Error voiding payment: %v", err)
 			s.session.Errors("status", s.trans("global.wasNotVoided", i18n.Replacements{"subject": "@global.payment"}))
@@ -173,20 +168,19 @@ func (s *Server) editPaymentHandler(i *inertia.Inertia) http.Handler {
 		back := func() {
 			i.Back(w, r, http.StatusSeeOther)
 		}
-		user := auth.User(r.Context())
 
 		if !ensureUUIDIsValid(uuid) {
 			back()
 			return
 		}
 
-		payment, err := s.findPaymentByUUID(*user.CurrentCompanyId, uuid)
+		payment, err := s.findPaymentByUUID(r.Context(), uuid)
 		if err != nil {
 			s.handleError(w, err)
 			return
 		}
 
-		lines, err := s.findPaymentLines(*user.CurrentCompanyId, payment.ID)
+		lines, err := s.findPaymentLines(r.Context(), payment.ID)
 		if err != nil {
 			s.handleError(w, err)
 			return
@@ -222,8 +216,7 @@ func (s *Server) updatePaymentHandler(i *inertia.Inertia) http.Handler {
 			return
 		}
 
-		user := auth.User(r.Context())
-		err = s.updatePayment(*user.CurrentCompanyId, uuid, form)
+		err = s.updatePayment(r.Context(), uuid, form)
 		if err != nil {
 			log.Printf("Error recording payment: %v", err)
 			s.session.Errors("status", s.trans("global.wasNotUpdated", i18n.Replacements{"subject": "@global.payment"}))

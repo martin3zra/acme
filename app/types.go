@@ -1,12 +1,16 @@
 package app
 
 import (
+	"context"
 	"database/sql"
 	"database/sql/driver"
 	"encoding/json"
 	"errors"
+	"log"
 	"time"
 
+	"github.com/martin3zra/acme/pkg/auth"
+	"github.com/martin3zra/acme/pkg/foundation"
 	"github.com/martin3zra/acme/pkg/mailer"
 	"github.com/martin3zra/acme/pkg/support"
 	"github.com/martin3zra/acme/pkg/validator"
@@ -538,4 +542,84 @@ func (EmailVerificationForm) Rules() map[string]any {
 	return map[string]any{
 		"email": "required|email",
 	}
+}
+
+type StoreCompanyForm struct {
+	support.FormRequest
+	Name    string `json:"name"`
+	RNC     string `json:"rnc"`
+	City    string `json:"city"`
+	Address string `json:"address"`
+}
+
+func (StoreCompanyForm) Rules() map[string]any {
+	return map[string]any{
+		"name": []any{
+			"required",
+			"min:3",
+			validator.Rule{}.Unique("companies", "name"),
+		},
+		"rnc":     "required|min:9|max:11:unique:companies,rnc",
+		"city":    "required",
+		"address": "required",
+	}
+}
+
+type User struct {
+	foundation.User
+}
+
+func UserFromContext(ctx context.Context) *User {
+	u := auth.User(ctx)
+	return &User{
+		User: *u,
+	}
+}
+
+func UserFromFoundationUser(u *foundation.User) *User {
+	return &User{
+		User: *u,
+	}
+}
+
+func (u *User) currentCompany(db *sql.DB) Company {
+	result := db.QueryRow(`
+    SELECT companies.id, companies.name, companies.identifier, companies.city,
+    companies.address, companies.created_at, companies.updated_at
+    FROM companies
+    JOIN companies_users ON companies.id = companies_users.company_id
+    WHERE companies_users.user_id = $1 AND companies_users.current = true
+  `, u.Id)
+	var company Company
+	err := result.Scan(
+		&company.ID,
+		&company.Name,
+		&company.Identifier,
+		&company.City,
+		&company.Address,
+		&company.CreatedAt,
+		&company.UpdatedAt,
+	)
+	if err != nil {
+		log.Fatalf("CurrentCompany: failed to scan company: %v", err)
+	}
+
+	return company
+}
+
+func CurrentCompany(ctx context.Context) Company {
+	cc := ctx.Value(auth.ContextCompanyID{}).(map[string]any)
+	company, err := mapTo[Company](cc)
+	if err != nil {
+		log.Fatalf("CurrentCompany: failed to map company: %v", err)
+	}
+
+	return company
+	// return Company{
+	// 	ID:         1,                 // Placeholder, replace with actual logic to get current company ID   }
+	// 	Name:       "Default Company", // Placeholder, replace with actual logic to get current company name
+	// 	Identifier: "default-company", // Placeholder, replace with actual logic to get current company identifier
+	// 	City:       "Default City",    // Placeholder, replace with actual logic to get current company city
+	// 	Address:    "123 Default St",  // Placeholder, replace with actual logic to get current company address
+	// }
 }

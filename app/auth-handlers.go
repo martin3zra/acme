@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/martin3zra/acme/pkg/auth"
+	"github.com/martin3zra/acme/pkg/foundation"
 	"github.com/martin3zra/acme/pkg/session"
 	"github.com/martin3zra/acme/pkg/support"
 
@@ -47,12 +48,17 @@ func (s *Server) authHandler(i *inertia.Inertia) http.Handler {
 			return
 		}
 
+		userCtx := UserFromFoundationUser(user.(*foundation.User))
+		company := userCtx.currentCompany(s.db)
+
 		// Preventing Timing Attacks
 		if time.Since(startTime) < duration {
 			time.Sleep(duration - time.Since(startTime))
 		}
 
-		err = s.sessionManager.ReGenerate(r, user)
+		err = s.sessionManager.ReGenerate(r, user, map[string]any{
+			"current_company": company,
+		})
 		if err != nil {
 			s.handleError(w, err)
 			return

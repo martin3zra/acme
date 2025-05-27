@@ -9,7 +9,6 @@ type User struct {
 	Id                 int        `json:"id"`
 	UUID               string     `json:"uuid"`
 	Status             string     `json:"status"`
-	CurrentCompanyId   *int       `json:"current_company_id"`
 	FirstName          string     `json:"first_name"`
 	LastName           string     `json:"last_name"`
 	Email              string     `json:"email"`

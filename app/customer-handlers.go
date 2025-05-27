@@ -4,7 +4,6 @@ import (
 	"net/http"
 	"strconv"
 
-	"github.com/martin3zra/acme/pkg/auth"
 	"github.com/martin3zra/acme/pkg/i18n"
 	"github.com/martin3zra/acme/pkg/support"
 	inertia "github.com/romsar/gonertia/v2"
@@ -13,8 +12,8 @@ import (
 func (s *Server) customersHandler(i *inertia.Inertia) http.Handler {
 	fn := func(w http.ResponseWriter, r *http.Request) {
 		uuid := r.URL.Query().Get("id")
-		user := auth.User(r.Context())
-		customers, err := s.findCustomers(*user.CurrentCompanyId)
+
+		customers, err := s.findCustomers(r.Context())
 		if err != nil {
 			s.handleError(w, err)
 			return
@@ -24,7 +23,7 @@ func (s *Server) customersHandler(i *inertia.Inertia) http.Handler {
 			"customers":    customers,
 		}
 		if ensureUUIDIsValid(uuid) {
-			customer, err := s.findCustomeByUUID(*user.CurrentCompanyId, uuid)
+			customer, err := s.findCustomeByUUID(r.Context(), uuid)
 			if err != nil {
 				s.handleError(w, err)
 				return
@@ -51,8 +50,7 @@ func (s *Server) storeCustomerHandler(i *inertia.Inertia) http.Handler {
 			return
 		}
 
-		user := auth.User(r.Context())
-		err = s.storeCustomer(*user.CurrentCompanyId, form)
+		err = s.storeCustomer(r.Context(), form)
 		if err != nil {
 			s.session.Errors("status", s.trans("global.wasNotCreated", i18n.Replacements{"subject": "@global.customer"}))
 			i.Back(w, r)
@@ -84,7 +82,7 @@ func (s *Server) updateCustomerHandler(i *inertia.Inertia) http.Handler {
 			return
 		}
 
-		err = s.updateCustomer(*form.User().CurrentCompanyId, id, form)
+		err = s.updateCustomer(r.Context(), id, form)
 		if err != nil {
 			s.session.Errors("status", s.trans("global.wasNotUpdated", i18n.Replacements{"subject": "@global.customer"}))
 			i.Back(w, r)
@@ -114,8 +112,7 @@ func (s *Server) deleteCustomerHandler() http.Handler {
 			return
 		}
 
-		user := form.User()
-		err = s.deleteCustomer(*user.CurrentCompanyId, id)
+		err = s.deleteCustomer(r.Context(), id)
 		if err != nil {
 			s.session.Errors("current_password", s.trans("global.wasNotDeleted", i18n.Replacements{"subject": "@global.customer"}))
 			http.Redirect(w, r, "/customers", http.StatusSeeOther)
@@ -147,15 +144,14 @@ func (s *Server) changeStatusCustomerHandler(i *inertia.Inertia) http.Handler {
 			return
 		}
 
-		user := form.User()
-		customer, err := s.findCustomeByID(*user.CurrentCompanyId, id)
+		customer, err := s.findCustomeByID(r.Context(), id)
 		if err != nil {
 			s.session.Errors("status", s.trans("global.wasNotUpdated", i18n.Replacements{"subject": "@global.customer"}))
 			i.Back(w, r)
 			return
 		}
 
-		err = s.toggleCustomerStatus(*user.CurrentCompanyId, customer)
+		err = s.toggleCustomerStatus(r.Context(), customer)
 		if err != nil {
 			s.session.Errors("status", s.trans("global.wasNotUpdated", i18n.Replacements{"subject": "@global.customer"}))
 			i.Back(w, r)

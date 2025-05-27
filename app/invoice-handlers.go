@@ -5,7 +5,6 @@ import (
 	"log"
 	"net/http"
 
-	"github.com/martin3zra/acme/pkg/auth"
 	"github.com/martin3zra/acme/pkg/i18n"
 	"github.com/martin3zra/acme/pkg/support"
 	inertia "github.com/romsar/gonertia/v2"
@@ -15,8 +14,7 @@ func (s *Server) invoicesHandler(i *inertia.Inertia) http.Handler {
 	fn := func(w http.ResponseWriter, r *http.Request) {
 
 		uuid := r.URL.Query().Get("id")
-		user := auth.User(r.Context())
-		invoices, err := s.findInvoices(*user.CurrentCompanyId)
+		invoices, err := s.findInvoices(r.Context())
 		if err != nil {
 			s.handleError(w, err)
 			return
@@ -28,13 +26,13 @@ func (s *Server) invoicesHandler(i *inertia.Inertia) http.Handler {
 		}
 
 		if ensureUUIDIsValid(uuid) {
-			invoice, err := s.findInvoicesByUUID(*user.CurrentCompanyId, uuid)
+			invoice, err := s.findInvoicesByUUID(r.Context(), uuid)
 			if err != nil {
 				s.handleError(w, err)
 				return
 			}
 
-			lines, err := s.findInvoiceLines(*user.CurrentCompanyId, invoice.ID)
+			lines, err := s.findInvoiceLines(r.Context(), invoice.ID)
 			if err != nil {
 				s.handleError(w, err)
 				return
@@ -61,8 +59,7 @@ func (s *Server) createInvoiceHandler(i *inertia.Inertia) http.Handler {
 	fn := func(w http.ResponseWriter, r *http.Request) {
 
 		term := r.URL.Query().Get("search")
-		user := auth.User(r.Context())
-		taxReceipts, err := s.findTaxesReceipts(*user.CurrentCompanyId)
+		taxReceipts, err := s.findTaxesReceipts(r.Context())
 		if err != nil {
 			s.handleError(w, err)
 			return
@@ -74,7 +71,7 @@ func (s *Server) createInvoiceHandler(i *inertia.Inertia) http.Handler {
 				return map[string]any{"id": receipt.ID, "name": fmt.Sprintf("%s-%s", receipt.Type, receipt.Name), "available": receipt.Current < receipt.SequenceEnd}
 			}),
 			"customers": inertia.Optional(func() (any, error) {
-				customers, err := s.findCustomersBySearchCriteria(*user.CurrentCompanyId, term)
+				customers, err := s.findCustomersBySearchCriteria(r.Context(), term)
 				if err != nil {
 					return nil, err
 				}
@@ -82,7 +79,7 @@ func (s *Server) createInvoiceHandler(i *inertia.Inertia) http.Handler {
 				return customers, err
 			}),
 			"item": inertia.Optional(func() (any, error) {
-				item, err := s.findItemsByReference(*user.CurrentCompanyId, term)
+				item, err := s.findItemsByReference(r.Context(), term)
 				if err != nil {
 					return nil, err
 				}
@@ -90,7 +87,7 @@ func (s *Server) createInvoiceHandler(i *inertia.Inertia) http.Handler {
 				return item, err
 			}),
 			"items": inertia.Optional(func() (any, error) {
-				item, err := s.findItemsByCriteria(*user.CurrentCompanyId, term)
+				item, err := s.findItemsByCriteria(r.Context(), term)
 				if err != nil {
 					return nil, err
 				}
@@ -111,20 +108,19 @@ func (s *Server) editInvoiceHandler(i *inertia.Inertia) http.Handler {
 	fn := func(w http.ResponseWriter, r *http.Request) {
 		invoiceUUID := r.PathValue("id")
 		term := r.URL.Query().Get("search")
-		user := auth.User(r.Context())
 
-		invoice, err := s.findInvoicesByUUID(*user.CurrentCompanyId, invoiceUUID)
+		invoice, err := s.findInvoicesByUUID(r.Context(), invoiceUUID)
 		if err != nil {
 			s.handleError(w, err)
 			return
 		}
 
-		lines, err := s.findInvoiceLines(*user.CurrentCompanyId, invoice.ID)
+		lines, err := s.findInvoiceLines(r.Context(), invoice.ID)
 		if err != nil {
 			s.handleError(w, err)
 		}
 
-		taxReceipts, err := s.findTaxesReceipts(*user.CurrentCompanyId)
+		taxReceipts, err := s.findTaxesReceipts(r.Context())
 		if err != nil {
 			s.handleError(w, err)
 			return
@@ -140,7 +136,7 @@ func (s *Server) editInvoiceHandler(i *inertia.Inertia) http.Handler {
 				return map[string]any{"id": receipt.ID, "name": fmt.Sprintf("%s-%s", receipt.Type, receipt.Name)}
 			}),
 			"customers": inertia.Optional(func() (any, error) {
-				customers, err := s.findCustomersBySearchCriteria(*user.CurrentCompanyId, term)
+				customers, err := s.findCustomersBySearchCriteria(r.Context(), term)
 				if err != nil {
 					return nil, err
 				}
@@ -148,7 +144,7 @@ func (s *Server) editInvoiceHandler(i *inertia.Inertia) http.Handler {
 				return customers, err
 			}),
 			"item": inertia.Optional(func() (any, error) {
-				item, err := s.findItemsByReference(*user.CurrentCompanyId, term)
+				item, err := s.findItemsByReference(r.Context(), term)
 				if err != nil {
 					return nil, err
 				}
@@ -156,7 +152,7 @@ func (s *Server) editInvoiceHandler(i *inertia.Inertia) http.Handler {
 				return item, err
 			}),
 			"items": inertia.Optional(func() (any, error) {
-				item, err := s.findItemsByCriteria(*user.CurrentCompanyId, term)
+				item, err := s.findItemsByCriteria(r.Context(), term)
 				if err != nil {
 					return nil, err
 				}
@@ -188,8 +184,7 @@ func (s *Server) storeInvoiceHandler(i *inertia.Inertia) http.Handler {
 			return
 		}
 
-		user := auth.User(r.Context())
-		err = s.storeInvoice(*user.CurrentCompanyId, form)
+		err = s.storeInvoice(r.Context(), form)
 		if err != nil {
 			log.Printf("Error creating invoice: %v", err)
 			s.session.Errors("status", s.trans("global.wasNotCreated", i18n.Replacements{"subject": "@global.invoice"}))
@@ -224,8 +219,7 @@ func (s *Server) updateInvoiceHandler(i *inertia.Inertia) http.Handler {
 			return
 		}
 
-		user := auth.User(r.Context())
-		err = s.updateInvoice(*user.CurrentCompanyId, uuid, form)
+		err = s.updateInvoice(r.Context(), uuid, form)
 		if err != nil {
 			log.Printf("Error updating invoice: %v", err)
 			s.session.Errors("status", s.trans("global.wasNotUpdated", i18n.Replacements{"subject": "@global.invoice"}))
@@ -254,8 +248,7 @@ func (s *Server) voidInvoiceHandler(i *inertia.Inertia) http.Handler {
 			return
 		}
 
-		user := auth.User(r.Context())
-		err = s.voidInvoice(*user.CurrentCompanyId, uuid)
+		err = s.voidInvoice(r.Context(), uuid)
 		if err != nil {
 			log.Printf("Error voiding invoice: %v", err)
 			s.session.Errors("status", s.trans("global.wasNotVoided", i18n.Replacements{"subject": "@global.invoice"}))

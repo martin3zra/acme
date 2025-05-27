@@ -70,7 +70,7 @@ func (s *Server) verifyAccountHandler(i *inertia.Inertia) http.Handler {
 			return
 		}
 
-		err = s.sessionManager.ReGenerate(r, user)
+		err = s.sessionManager.ReGenerate(r, user, map[string]any{})
 		if err != nil {
 			s.handleError(w, err)
 			return

@@ -5,7 +5,6 @@ import (
 	"net/http"
 	"strconv"
 
-	"github.com/martin3zra/acme/pkg/auth"
 	"github.com/martin3zra/acme/pkg/i18n"
 	"github.com/martin3zra/acme/pkg/support"
 	inertia "github.com/romsar/gonertia/v2"
@@ -13,8 +12,8 @@ import (
 
 func (s *Server) itemsHandler(i *inertia.Inertia) http.Handler {
 	fn := func(w http.ResponseWriter, r *http.Request) {
-		user := auth.User(r.Context())
-		items, err := s.findItems(*user.CurrentCompanyId)
+
+		items, err := s.findItems(r.Context())
 		if err != nil {
 			s.handleError(w, err)
 			return
@@ -24,7 +23,7 @@ func (s *Server) itemsHandler(i *inertia.Inertia) http.Handler {
 			"translations": mergeTranslations(r.Context(), loadTranslations("items")),
 			"items":        items,
 			"units": inertia.Defer(func() (any, error) {
-				units, err := s.findUnits(*user.CurrentCompanyId)
+				units, err := s.findUnits(r.Context())
 				if err != nil {
 					s.handleError(w, err)
 					return nil, nil
@@ -32,7 +31,7 @@ func (s *Server) itemsHandler(i *inertia.Inertia) http.Handler {
 				return units, err
 			}, "attributes"),
 			"taxes": inertia.Defer(func() (any, error) {
-				taxes, err := s.findTaxes(*user.CurrentCompanyId)
+				taxes, err := s.findTaxes(r.Context())
 				if err != nil {
 					s.handleError(w, err)
 					return nil, err
@@ -58,8 +57,7 @@ func (s *Server) storeItemHandler(i *inertia.Inertia) http.Handler {
 			return
 		}
 
-		user := auth.User(r.Context())
-		err = s.storeItem(*user.CurrentCompanyId, form)
+		err = s.storeItem(r.Context(), form)
 		if err != nil {
 			log.Printf("Error creating item: %v", err)
 			s.session.Errors("status", s.trans("global.wasNotCreated", i18n.Replacements{"subject": "@global.item"}))
@@ -91,8 +89,7 @@ func (s *Server) updateItemHandler(i *inertia.Inertia) http.Handler {
 			return
 		}
 
-		user := auth.User(r.Context())
-		err = s.updateItem(*user.CurrentCompanyId, id, form)
+		err = s.updateItem(r.Context(), id, form)
 		if err != nil {
 			s.session.Errors("status", s.trans("global.wasNotUpdated", i18n.Replacements{"subject": "@global.item"}))
 			i.Back(w, r)
@@ -124,8 +121,7 @@ func (s *Server) deleteItemHandler() http.Handler {
 			return
 		}
 
-		user := auth.User(r.Context())
-		err = s.deleteItem(*user.CurrentCompanyId, id)
+		err = s.deleteItem(r.Context(), id)
 		if err != nil {
 			s.session.Errors("current_password", s.trans("global.wasNotDeleted", i18n.Replacements{"subject": "@global.item"}))
 			http.Redirect(w, r, "/items", http.StatusSeeOther)
@@ -157,8 +153,7 @@ func (s *Server) changeStatusItemHandler(i *inertia.Inertia) http.Handler {
 			return
 		}
 
-		user := form.User()
-		item, err := s.findItemByID(*user.CurrentCompanyId, id)
+		item, err := s.findItemByID(r.Context(), id)
 		if err != nil {
 			s.session.Errors("status", s.trans("global.wasNotUpdated", i18n.Replacements{"subject": "@global.item"}))
 			i.Back(w, r)
@@ -166,7 +161,7 @@ func (s *Server) changeStatusItemHandler(i *inertia.Inertia) http.Handler {
 
 		}
 
-		err = s.toggleItemStatus(*user.CurrentCompanyId, item)
+		err = s.toggleItemStatus(r.Context(), item)
 		if err != nil {
 			s.session.Errors("status", s.trans("global.wasNotUpdated", i18n.Replacements{"subject": "@global.item"}))
 			i.Back(w, r)

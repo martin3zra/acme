@@ -20,7 +20,20 @@ func Middleware(next http.Handler) http.Handler {
 
 		user := sess.Get("user")
 		ctx := context.WithValue(r.Context(), ContextUserID{}, user)
+
 		req := r.WithContext(ctx)
+
+		attrs := sess.Get("attrs")
+		if attrs == nil {
+			next.ServeHTTP(w, req)
+			return
+		}
+
+		attrsMap := attrs.(map[string]any)
+		if cc, ok := attrsMap["current_company"]; ok {
+			ccCtx := context.WithValue(ctx, ContextCompanyID{}, cc)
+			req = r.WithContext(ccCtx)
+		}
 
 		next.ServeHTTP(w, req)
 	})

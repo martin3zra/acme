@@ -1,6 +1,10 @@
 package app
 
-import "github.com/martin3zra/acme/pkg/foundation"
+import (
+	"context"
+
+	"github.com/martin3zra/acme/pkg/foundation"
+)
 
 type unit struct {
 	ID   int64  `json:"id"`
@@ -9,8 +13,8 @@ type unit struct {
 	foundation.Timestamps
 }
 
-func (s *Server) findUnits(companyID int) ([]*unit, error) {
-	rows, err := s.db.Query("SELECT id, name, created_at, updated_at, deleted_at FROM units WHERE company_id = $1", companyID)
+func (s *Server) findUnits(ctx context.Context) ([]*unit, error) {
+	rows, err := s.db.Query("SELECT id, name, created_at, updated_at, deleted_at FROM units WHERE company_id = $1", CurrentCompany(ctx).ID)
 	if err != nil {
 		return nil, err
 	}

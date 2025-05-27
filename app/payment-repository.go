@@ -1,6 +1,7 @@
 package app
 
 import (
+	"context"
 	"database/sql"
 	"errors"
 	"fmt"
@@ -50,7 +51,7 @@ type paymentLine struct {
 	foundation.Timestamps
 }
 
-func (s *Server) findPayments(companyId int) ([]*payment, error) {
+func (s *Server) findPayments(ctx context.Context) ([]*payment, error) {
 	rows, err := s.db.Query(`
     SELECT
     receivables_income.id, receivables_income.uuid, receivables_income.date, receivables_income.amount,
@@ -65,7 +66,7 @@ func (s *Server) findPayments(companyId int) ([]*payment, error) {
     WHERE receivables_income.company_id = $1
     AND receivables_income.deleted_at IS NULL
     ORDER BY receivables_income.id
-  `, companyId)
+  `, CurrentCompany(ctx).ID)
 	if err != nil {
 		return nil, err
 	}
@@ -98,7 +99,7 @@ func (s *Server) findPayments(companyId int) ([]*payment, error) {
 	return data, nil
 }
 
-func (s *Server) findPaymentByUUID(companyId int, uuid string) (*payment, error) {
+func (s *Server) findPaymentByUUID(ctx context.Context, uuid string) (*payment, error) {
 
 	i := new(payment)
 	err := s.db.QueryRow(`
@@ -114,7 +115,7 @@ func (s *Server) findPaymentByUUID(companyId int, uuid string) (*payment, error)
     INNER JOIN customers ON (receivables_income.company_id = customers.company_id AND receivables_income.customer_id = customers.id)
     WHERE receivables_income.company_id = $1
     AND receivables_income.uuid = $2
-  `, companyId, uuid).Scan(
+  `, CurrentCompany(ctx).ID, uuid).Scan(
 		&i.ID,
 		&i.UUID,
 		&i.Date,
@@ -141,7 +142,7 @@ func (s *Server) findPaymentByUUID(companyId int, uuid string) (*payment, error)
 	return i, nil
 }
 
-func (s *Server) findPaymentLines(companyID int, paymentID int) ([]*paymentLine, error) {
+func (s *Server) findPaymentLines(ctx context.Context, paymentID int) ([]*paymentLine, error) {
 	rows, err := s.db.Query(`
     select receivables_income_items.id, receivables_income_items.payment_amount,
     receivables_income_items.created_at, receivables_income_items.updated_at,
@@ -156,7 +157,7 @@ func (s *Server) findPaymentLines(companyID int, paymentID int) ([]*paymentLine,
     where receivables_income_items.company_id = $1
     and receivables_income_items.receivable_income_id = $2
     ORDER BY receivables_income_items.id
-  `, companyID, paymentID)
+  `, CurrentCompany(ctx).ID, paymentID)
 	if err != nil {
 		return nil, err
 	}
@@ -189,9 +190,9 @@ func (s *Server) findPaymentLines(companyID int, paymentID int) ([]*paymentLine,
 	return data, nil
 }
 
-func (s *Server) storePayment(companyId int, form StorePaymentForm) error {
+func (s *Server) storePayment(ctx context.Context, form StorePaymentForm) error {
 
-	customer, err := s.findCustomeByUUID(companyId, form.CustomerID)
+	customer, err := s.findCustomeByUUID(ctx, form.CustomerID)
 	if err != nil {
 		return err
 	}
@@ -203,6 +204,7 @@ func (s *Server) storePayment(companyId int, form StorePaymentForm) error {
 			return err
 		}
 
+		companyId := CurrentCompany(ctx).ID
 		var paymentID int
 		err = stmt.QueryRow(
 			companyId,
@@ -218,7 +220,7 @@ func (s *Server) storePayment(companyId int, form StorePaymentForm) error {
 			return err
 		}
 
-		if err = s.attachPaymentLines(tx, companyId, paymentID, form); err != nil {
+		if err = s.attachPaymentLines(tx, ctx, paymentID, form); err != nil {
 			return err
 		}
 
@@ -230,10 +232,11 @@ func (s *Server) storePayment(companyId int, form StorePaymentForm) error {
 	})
 }
 
-func (s *Server) attachPaymentLines(tx *sql.Tx, companyId, paymentId int, form StorePaymentForm) error {
+func (s *Server) attachPaymentLines(tx *sql.Tx, ctx context.Context, paymentId int, form StorePaymentForm) error {
+	companyId := CurrentCompany(ctx).ID
 	vals := []any{}
 	for _, line := range form.Lines {
-		invoice, err := s.findInvoicesByUUID(companyId, line.Uuid)
+		invoice, err := s.findInvoicesByUUID(ctx, line.Uuid)
 		if err != nil {
 			return err
 		}
@@ -257,8 +260,8 @@ func (s *Server) generatePrefixedPaymentNumber(value int) string {
 	return foundation.GeneratePrefixedNumber("PAY-", 10, value)
 }
 
-func (s *Server) voidPayment(companyID int, uuid string) error {
-	payment, err := s.findPaymentByUUID(companyID, uuid)
+func (s *Server) voidPayment(ctx context.Context, uuid string) error {
+	payment, err := s.findPaymentByUUID(ctx, uuid)
 	if err != nil {
 		return err
 	}
@@ -267,10 +270,11 @@ func (s *Server) voidPayment(companyID int, uuid string) error {
 		return errors.New("payment already voided")
 	}
 
-	lines, err := s.findPaymentLines(companyID, payment.ID)
+	lines, err := s.findPaymentLines(ctx, payment.ID)
 	if err != nil {
 		return err
 	}
+	companyID := CurrentCompany(ctx).ID
 	return database.WithTransaction(s.db, func(tx *sql.Tx) error {
 		for _, pl := range lines {
 			_, err = tx.Exec("UPDATE receivables_income_items SET payment_amount = 0, amount_due = 0 WHERE company_id = $1 AND receivable_income_id = $2 AND invoice_id = $3", companyID, payment.ID, pl.Invoice.ID)
@@ -296,8 +300,8 @@ func (s *Server) voidPayment(companyID int, uuid string) error {
 	})
 }
 
-func (s *Server) updatePayment(companyId int, uuid string, form UpdatePaymentForm) error {
-	payment, err := s.findPaymentByUUID(companyId, uuid)
+func (s *Server) updatePayment(ctx context.Context, uuid string, form UpdatePaymentForm) error {
+	payment, err := s.findPaymentByUUID(ctx, uuid)
 	if err != nil {
 		return err
 	}
@@ -306,7 +310,7 @@ func (s *Server) updatePayment(companyId int, uuid string, form UpdatePaymentFor
 		return errors.New("payment already voided")
 	}
 
-	customer, err := s.findCustomeByUUID(companyId, form.CustomerID)
+	customer, err := s.findCustomeByUUID(ctx, form.CustomerID)
 	if err != nil {
 		return err
 	}
@@ -324,7 +328,7 @@ func (s *Server) updatePayment(companyId int, uuid string, form UpdatePaymentFor
 			form.Amount,
 			form.Notes,
 			foundation.ToJSON(form.Payment),
-			companyId,
+			CurrentCompany(ctx).ID,
 			payment.ID,
 		)
 
@@ -332,17 +336,18 @@ func (s *Server) updatePayment(companyId int, uuid string, form UpdatePaymentFor
 			return err
 		}
 
-		return s.processPaymentLines(tx, companyId, payment.ID, customer, form)
+		return s.processPaymentLines(tx, ctx, payment.ID, customer, form)
 	})
 }
 
-func (s *Server) processPaymentLines(tx *sql.Tx, companyId, paymentId int, customer *customer, form UpdatePaymentForm) error {
+func (s *Server) processPaymentLines(tx *sql.Tx, ctx context.Context, paymentId int, customer *customer, form UpdatePaymentForm) error {
 
-	paymentLines, err := s.findPaymentLines(companyId, paymentId)
+	paymentLines, err := s.findPaymentLines(ctx, paymentId)
 	if err != nil {
 		return err
 	}
 
+	companyId := CurrentCompany(ctx).ID
 	lines := s.filterPaymentLines(form.Lines, ADDED, UPDATED, DELETED)
 	for _, line := range lines {
 		pLines := filter(paymentLines, func(pl *paymentLine) bool { return pl.ID == line.ID })
@@ -351,7 +356,7 @@ func (s *Server) processPaymentLines(tx *sql.Tx, companyId, paymentId int, custo
 		}
 		switch line.Action {
 		case ADDED:
-			invoice, err := s.findInvoicesByUUID(companyId, line.Uuid)
+			invoice, err := s.findInvoicesByUUID(ctx, line.Uuid)
 			if err != nil {
 				return err
 			}
@@ -368,7 +373,7 @@ func (s *Server) processPaymentLines(tx *sql.Tx, companyId, paymentId int, custo
 				return err
 			}
 		case UPDATED:
-			invoice, err := s.findInvoicesByID(companyId, pLines[0].Invoice.ID)
+			invoice, err := s.findInvoicesByID(ctx, pLines[0].Invoice.ID)
 			if err != nil {
 				return err
 			}

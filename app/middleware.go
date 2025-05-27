@@ -2,7 +2,7 @@ package app
 
 import (
 	"context"
-	"log"
+	"fmt"
 	"net/http"
 
 	"github.com/justinas/alice"
@@ -42,27 +42,25 @@ func (s *Server) SharedProps(next http.Handler) http.Handler {
 
 		var currentCompany *Company
 		session := r.Context().Value(session.SessionContextKey{}).(*session.Session)
-		user := session.Get("user")
-		if user != nil {
-			if user, ok := user.(map[string]any); ok {
-				uCompany := user["current_company_id"]
-				if uCompany != nil {
-					currentCompanyId := int(uCompany.(float64))
-					company, err := s.findCompanyById(currentCompanyId)
+		sessionUser := session.Get("user")
+		attrs := session.Get("attrs")
+		if attrs != nil && len(attrs.(map[string]any)) > 0 {
+			attrsMap := attrs.(map[string]any)
+			if cc, ok := attrsMap["current_company"]; ok {
+				if company, ok := cc.(map[string]any); ok {
+					cct, err := mapTo[Company](company)
 					if err != nil {
-						log.Printf("error: %v", err)
-						http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
-						return
+						fmt.Printf("Error converting current company: %v\n", err)
+					} else {
+						currentCompany = &cct
 					}
-
-					currentCompany = company
 				}
 			}
 		}
 
 		ctx := gonertia.SetProps(r.Context(), map[string]any{
 			"auth": map[string]any{
-				"user":    user,
+				"user":    sessionUser,
 				"company": currentCompany,
 			},
 			"csrf_token":   session.Get("csrf_token"),

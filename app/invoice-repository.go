@@ -1,6 +1,7 @@
 package app
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
 	"time"
@@ -52,7 +53,7 @@ type line struct {
 	Action LineAction `json:"action"`
 }
 
-func (s *Server) findInvoices(companyId int) ([]*invoice, error) {
+func (s *Server) findInvoices(ctx context.Context) ([]*invoice, error) {
 	rows, err := s.db.Query("SELECT invoices.id, invoices.uuid, invoices.date, invoices.due_on, invoices.amount, invoices.discount, invoices.tax, "+
 		"invoices.total, invoices.amount_due, invoices.status, invoices.paid_status, invoices.payment, invoices.note, invoices.tax_receipt_id,"+
 		"tax_receipts.series || tax_receipts.type || LPAD(invoices.tax_receipt_sequence::varchar,8,'0') as NCF, "+
@@ -61,7 +62,7 @@ func (s *Server) findInvoices(companyId int) ([]*invoice, error) {
 		"INNER JOIN companies ON (invoices.company_id = companies.id) "+
 		"INNER JOIN customers ON (invoices.company_id = customers.company_id AND invoices.customer_id = customers.id) "+
 		"INNER JOIN tax_receipts ON (invoices.company_id = tax_receipts.company_id AND invoices.tax_receipt_id = tax_receipts.id) "+
-		"WHERE invoices.company_id = $1 ORDER BY invoices.id", companyId)
+		"WHERE invoices.company_id = $1 ORDER BY invoices.id", CurrentCompany(ctx).ID)
 	if err != nil {
 		return nil, err
 	}
@@ -101,7 +102,7 @@ func (s *Server) findInvoices(companyId int) ([]*invoice, error) {
 	return data, nil
 }
 
-func (s *Server) findInvoicesByUUID(companyId int, uuid string) (*invoice, error) {
+func (s *Server) findInvoicesByUUID(ctx context.Context, uuid string) (*invoice, error) {
 	i := new(invoice)
 	err := s.db.QueryRow("SELECT invoices.id, invoices.uuid, invoices.date, invoices.due_on, invoices.amount, invoices.amount_due, invoices.discount, invoices.tax, "+
 		"invoices.total, invoices.status, invoices.paid_status, invoices.payment, invoices.note, invoices.tax_receipt_id, "+
@@ -111,7 +112,7 @@ func (s *Server) findInvoicesByUUID(companyId int, uuid string) (*invoice, error
 		"INNER JOIN companies ON (invoices.company_id = companies.id) "+
 		"INNER JOIN customers ON (invoices.company_id = customers.company_id AND invoices.customer_id = customers.id) "+
 		"INNER JOIN tax_receipts ON (invoices.company_id = tax_receipts.company_id AND invoices.tax_receipt_id = tax_receipts.id) "+
-		"WHERE invoices.company_id = $1 AND invoices.uuid = $2", companyId, uuid).
+		"WHERE invoices.company_id = $1 AND invoices.uuid = $2", CurrentCompany(ctx).ID, uuid).
 		Scan(
 			&i.ID,
 			&i.UUID,
@@ -150,7 +151,7 @@ func (s *Server) findInvoicesByUUID(companyId int, uuid string) (*invoice, error
 	return i, nil
 }
 
-func (s *Server) findInvoicesByID(companyId, invoiceId int) (*invoice, error) {
+func (s *Server) findInvoicesByID(ctx context.Context, invoiceId int) (*invoice, error) {
 	i := new(invoice)
 	err := s.db.QueryRow("SELECT invoices.id, invoices.uuid, invoices.date, invoices.due_on, invoices.amount, invoices.amount_due, invoices.discount, invoices.tax, "+
 		"invoices.total, invoices.status, invoices.paid_status, invoices.payment, invoices.note, invoices.tax_receipt_id, "+
@@ -160,7 +161,7 @@ func (s *Server) findInvoicesByID(companyId, invoiceId int) (*invoice, error) {
 		"INNER JOIN companies ON (invoices.company_id = companies.id) "+
 		"INNER JOIN customers ON (invoices.company_id = customers.company_id AND invoices.customer_id = customers.id) "+
 		"INNER JOIN tax_receipts ON (invoices.company_id = tax_receipts.company_id AND invoices.tax_receipt_id = tax_receipts.id) "+
-		"WHERE invoices.company_id = $1 AND invoices.id = $2", companyId, invoiceId).
+		"WHERE invoices.company_id = $1 AND invoices.id = $2", CurrentCompany(ctx).ID, invoiceId).
 		Scan(
 			&i.ID,
 			&i.UUID,
@@ -203,7 +204,8 @@ func (s *Server) generatePrefixedInvoiceNumber(value int) string {
 	return foundation.GeneratePrefixedNumber("INV-", 10, value)
 }
 
-func (s *Server) storeInvoice(companyID int, form StoreInvoiceForm) error {
+func (s *Server) storeInvoice(ctx context.Context, form StoreInvoiceForm) error {
+	companyID := CurrentCompany(ctx).ID
 	return database.WithTransaction(s.db, func(tx *sql.Tx) error {
 		taxReceiptSequence, err := s.grabTaxReceiptSequence(tx, companyID, form.TaxReceipt)
 		if err != nil {
@@ -259,9 +261,9 @@ func (s *Server) storeInvoice(companyID int, form StoreInvoiceForm) error {
 	})
 }
 
-func (s *Server) updateInvoice(companyID int, uuid string, form UpdateInvoiceForm) error {
-
-	invoice, err := s.findInvoicesByUUID(companyID, uuid)
+func (s *Server) updateInvoice(ctx context.Context, uuid string, form UpdateInvoiceForm) error {
+	companyID := CurrentCompany(ctx).ID
+	invoice, err := s.findInvoicesByUUID(ctx, uuid)
 	if err != nil {
 		return err
 	}
@@ -329,9 +331,9 @@ func (s *Server) updateInvoice(companyID int, uuid string, form UpdateInvoiceFor
 	})
 }
 
-func (s *Server) voidInvoice(companyID int, uuid string) error {
-
-	invoice, err := s.findInvoicesByUUID(companyID, uuid)
+func (s *Server) voidInvoice(ctx context.Context, uuid string) error {
+	companyID := CurrentCompany(ctx).ID
+	invoice, err := s.findInvoicesByUUID(ctx, uuid)
 	if err != nil {
 		return err
 	}
@@ -409,7 +411,7 @@ func (s *Server) processInvoiceLines(tx *sql.Tx, companyId, invoiceId int, form 
 	return nil
 }
 
-func (s *Server) findInvoiceLines(companyId int, invoiceId int) ([]*line, error) {
+func (s *Server) findInvoiceLines(ctx context.Context, invoiceId int) ([]*line, error) {
 	rows, err := s.db.Query(`
     SELECT ii.item_id, ii.qty, ii.price, items_units.unit_id, it.name, it.description, items_units.name,
     ii.created_at, ii.updated_at, ii.deleted_at, 'unchanged' as action, ii.amount, ii.total,
@@ -426,7 +428,7 @@ func (s *Server) findInvoiceLines(companyId int, invoiceId int) ([]*line, error)
     ) items_units ON true
     INNER JOIN taxes ON (it.company_id = taxes.company_id AND it.tax_id = taxes.id)
     WHERE ii.company_id = $1
-    AND ii.invoice_id = $2`, companyId, invoiceId)
+    AND ii.invoice_id = $2`, CurrentCompany(ctx).ID, invoiceId)
 	if err != nil {
 		return nil, err
 	}

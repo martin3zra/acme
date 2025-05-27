@@ -5,7 +5,7 @@ import { Separator } from '@/components/ui/separator';
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import useCallbackState from '@/hooks/use-callback-state';
 import { useTranslation } from '@/hooks/use-translation';
-import AuthenticatedLayout from '@/layouts/authenticated-layout';
+import AppLayout from '@/layouts/app-layout';
 import { PageProps, Payment, PaymentVerb, PaymentWithLines } from '@/types';
 import { Link, router, usePage } from '@inertiajs/react';
 import { Ban, NotebookPen, Printer } from 'lucide-react';
@@ -73,7 +73,7 @@ export default function Index({
     setDeleteDialogOpen(open);
   };
   return (
-    <AuthenticatedLayout user={auth.user} breadcrumbs={breadcrumbs}>
+    <AppLayout user={auth.user} breadcrumbs={breadcrumbs}>
       <div className="space-y-6">
         {hasPayments && <HeadingSmall title={t('payments.title')} description={t('payments.description')} rightPanel={<AddNewPayment />} />}
 
@@ -143,6 +143,6 @@ export default function Index({
           />
         )}
       </div>
-    </AuthenticatedLayout>
+    </AppLayout>
   );
 }

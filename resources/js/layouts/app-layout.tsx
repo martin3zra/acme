@@ -16,7 +16,7 @@ interface Props extends React.ComponentProps<'div'> {
   children: React.ReactNode;
 }
 
-export default class AuthenticatedLayout extends React.Component<Props> {
+export default class AppLayout extends React.Component<Props> {
   static Actions = Actions;
   render() {
     const { user, breadcrumbs = [], children } = this.props;

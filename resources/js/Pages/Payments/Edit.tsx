@@ -19,7 +19,7 @@ import { useNumber } from '@/composables/use-number';
 import { useDebounced } from '@/hooks/use-debounced';
 import { usePersistedState } from '@/hooks/use-persisted-state';
 import { useTranslation } from '@/hooks/use-translation';
-import AuthenticatedLayout from '@/layouts/authenticated-layout';
+import AppLayout from '@/layouts/app-layout';
 import { cn } from '@/lib/utils';
 import {
   BTForm,
@@ -267,8 +267,8 @@ export default function Edit({
   };
 
   return (
-    <AuthenticatedLayout user={auth.user} breadcrumbs={editPaymentBreadcrumbs}>
-      <AuthenticatedLayout.Actions>
+    <AppLayout user={auth.user} breadcrumbs={editPaymentBreadcrumbs}>
+      <AppLayout.Actions>
         <div className="flex justify-end gap-x-6">
           <Button variant={'secondary'} onClick={() => setCancelConfirmation(true)}>
             {t('global.actions.cancel')}
@@ -277,7 +277,7 @@ export default function Edit({
             {t('global.actions.checkout')}
           </Button>
         </div>
-      </AuthenticatedLayout.Actions>
+      </AppLayout.Actions>
       <div className="grid h-full w-full grid-cols-12 grid-rows-[auto_1fr_auto] gap-y-4 bg-gray-50/10">
         {!openCheckout && propsErrors.status && (
           <div className="col-span-12">
@@ -428,6 +428,6 @@ export default function Edit({
           t={t}
         />
       </div>
-    </AuthenticatedLayout>
+    </AppLayout>
   );
 }

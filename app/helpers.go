@@ -2,6 +2,7 @@ package app
 
 import (
 	"context"
+	"encoding/json"
 	"net/http"
 	"net/url"
 	"regexp"
@@ -78,4 +79,17 @@ func back(w http.ResponseWriter, r *http.Request, attributes map[string]string) 
 	}
 	parsedURL.RawQuery = q.Encode()
 	http.Redirect(w, r, parsedURL.String(), http.StatusFound)
+}
+
+func mapTo[T any](m map[string]any) (T, error) {
+	var result T
+	data, err := json.Marshal(m)
+	if err != nil {
+		return result, err
+	}
+	err = json.Unmarshal(data, &result)
+	if err != nil {
+		return result, err
+	}
+	return result, nil
 }

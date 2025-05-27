@@ -189,6 +189,27 @@
     "create-password": "Crear contraseña",
     "create-password-description": "¡Buenas noticias! ¡Hemos verificado tu cuenta! 🎉\n\nPara completar el proceso de verificación, por favor crea una contraseña para tu cuenta. Esta contraseña te permitirá acceder a todas las funciones de nuestra plataforma."
   },
+  "onboarding": {
+    "title": "Registrar una nueva compañia ahora!",
+    "description": "Ahora ya tienes una cuenta Acme.",
+    "company": {
+      "title": "Crear una nueva compañia",
+      "description": "Proporcione los detalles necesarios para configurar su organización. Esta información le ayudará a identificar y gestionar a su equipo dentro del sistema.",
+      "name": "Nombre de la compañia",
+      "rnc": "Número de Razón Social (RNC)",
+      "city": "Ciudad",
+      "address": "Dirección",
+      "phone": "Teléfono de la compañia",
+      "email": "Correo electrónico de la compañia",
+      "website": "Sitio web de la c",
+      "action": "Guardar y continuar"
+    },
+    "congrats": {
+      "title": "¡Felicidades! Estás listo para empezar.",
+      "description": "Tu compañia ha sido creada exitosamente. Ahora puedes empezar a usar nuestra plataforma para gestionar tus facturas, clientes y pagos.",
+      "action": "Ir al panel de control"
+    }
+  },
   "auth": {
     "login": {
       "action": {

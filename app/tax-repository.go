@@ -1,6 +1,10 @@
 package app
 
-import "github.com/martin3zra/acme/pkg/foundation"
+import (
+	"context"
+
+	"github.com/martin3zra/acme/pkg/foundation"
+)
 
 type tax struct {
 	ID   int64   `json:"id"`
@@ -10,8 +14,8 @@ type tax struct {
 	foundation.Timestamps
 }
 
-func (s *Server) findTaxes(companyID int) ([]*tax, error) {
-	rows, err := s.db.Query("SELECT id, name, rate, created_at, updated_at, deleted_at FROM taxes WHERE company_id = $1", companyID)
+func (s *Server) findTaxes(ctx context.Context) ([]*tax, error) {
+	rows, err := s.db.Query("SELECT id, name, rate, created_at, updated_at, deleted_at FROM taxes WHERE company_id = $1", CurrentCompany(ctx).ID)
 	if err != nil {
 		return nil, err
 	}
