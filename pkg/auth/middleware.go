@@ -58,3 +58,17 @@ func RedirectIfAuthenticated(next http.Handler) http.Handler {
 		next.ServeHTTP(w, r)
 	})
 }
+
+func Verified(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+
+		user := User(r.Context())
+
+		if user == nil || user.EmailVerifiedAt == nil {
+			http.Redirect(w, r, "/verify-email", http.StatusSeeOther)
+			return
+		}
+
+		next.ServeHTTP(w, r)
+	})
+}

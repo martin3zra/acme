@@ -8,6 +8,8 @@ import (
 	"github.com/justinas/alice"
 	"github.com/martin3zra/acme/pkg/auth"
 	"github.com/martin3zra/acme/pkg/database"
+	"github.com/martin3zra/acme/pkg/foundation"
+	"github.com/martin3zra/acme/pkg/routing"
 	"github.com/martin3zra/acme/pkg/session"
 	"github.com/romsar/gonertia/v2"
 )
@@ -72,5 +74,30 @@ func (s *Server) SharedProps(next http.Handler) http.Handler {
 		s.sessionManager.AgeFlash(session)
 
 		next.ServeHTTP(w, r.WithContext(ctx))
+	})
+}
+
+func (s *Server) Signed(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if routing.VerifyRequest(r, string(s.config.secretKey)) {
+			next.ServeHTTP(w, r)
+			return
+		}
+
+		s.handleError(w, foundation.Unauthorized{})
+	})
+}
+
+func EnsurePasswordHasBeenChanged(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var user any = auth.User(r.Context())
+
+		u, ok := user.(foundation.MustVerifyPassword)
+		if ok && u.HasNotChangedPassword() {
+			http.Redirect(w, r, "/passwords/create", http.StatusFound)
+			return
+		}
+
+		next.ServeHTTP(w, r)
 	})
 }
