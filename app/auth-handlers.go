@@ -6,81 +6,64 @@ import (
 
 	"github.com/martin3zra/acme/pkg/auth"
 	"github.com/martin3zra/acme/pkg/foundation"
+	"github.com/martin3zra/acme/pkg/routing"
 	"github.com/martin3zra/acme/pkg/session"
 	"github.com/martin3zra/acme/pkg/support"
-
-	inertia "github.com/romsar/gonertia/v2"
 )
 
-func (s *Server) loginHandler(i *inertia.Inertia) http.Handler {
-	fn := func(w http.ResponseWriter, r *http.Request) {
+func (s *Server) login(ctx *routing.Context) {
 
-		err := i.Render(w, r, "Auth/Login", inertia.Props{
-			"translations": mergeTranslations(r.Context(), loadTranslations("auth")),
-		})
-		if err != nil {
-			s.handleError(w, err)
-			return
-		}
-	}
-
-	return http.HandlerFunc(fn)
+	ctx.Render("Auth/Login", map[string]any{
+		"translations": mergeTranslations(ctx.Request.Context(), loadTranslations("auth")),
+	})
 }
 
-func (s *Server) authHandler(i *inertia.Inertia) http.Handler {
-	fn := func(w http.ResponseWriter, r *http.Request) {
-		session := session.GetSession(r)
-		duration := 1 * time.Second
-		startTime := time.Now()
+func (s *Server) authHandler(ctx *routing.Context) {
 
-		var form LoginFormRequest
-		err := support.ParseRequest(r, &form)
-		if err != nil {
-			i.Back(w, r, http.StatusSeeOther)
-			return
-		}
+	session := session.GetSession(ctx.Request)
+	duration := 1 * time.Second
+	startTime := time.Now()
 
-		auth := auth.NewAuth(r.Context())
-		user, err := auth.Authenticate(form.Email, form.Password)
-		if err != nil {
-			session.Errors("email", s.trans("global.credentialsDoesNotMatch"))
-			i.Back(w, r, http.StatusSeeOther)
-			return
-		}
-
-		userCtx := UserFromFoundationUser(user.(*foundation.User))
-		company := userCtx.currentCompany(s.db)
-
-		// Preventing Timing Attacks
-		if time.Since(startTime) < duration {
-			time.Sleep(duration - time.Since(startTime))
-		}
-
-		err = s.sessionManager.ReGenerate(r, user, map[string]any{
-			"current_company": company,
-		})
-		if err != nil {
-			s.handleError(w, err)
-			return
-		}
-
-		i.Redirect(w, r, "/home")
+	var form LoginFormRequest
+	err := support.ParseRequest(ctx.Request, &form)
+	if err != nil {
+		ctx.Back(http.StatusSeeOther)
+		return
 	}
 
-	return http.HandlerFunc(fn)
+	auth := auth.NewAuth(ctx.Request.Context())
+	user, err := auth.Authenticate(form.Email, form.Password)
+	if err != nil {
+		session.Errors("email", s.trans("global.credentialsDoesNotMatch"))
+		ctx.Back(http.StatusSeeOther)
+		return
+	}
+
+	userCtx := UserFromFoundationUser(user.(*foundation.User))
+	company := userCtx.currentCompany(s.db)
+
+	// Preventing Timing Attacks
+	if time.Since(startTime) < duration {
+		time.Sleep(duration - time.Since(startTime))
+	}
+
+	err = s.sessionManager.ReGenerate(ctx.Request, user, map[string]any{
+		"current_company": company,
+	})
+	if err != nil {
+		ctx.Error(err)
+		return
+	}
+
+	ctx.Redirect("/home", http.StatusSeeOther)
 }
 
-func (s *Server) logoutHandler(i *inertia.Inertia) http.Handler {
-	fn := func(w http.ResponseWriter, r *http.Request) {
-
-		err := s.sessionManager.Invalidate(r)
-		if err != nil {
-			s.handleError(w, err)
-			return
-		}
-
-		i.Back(w, r)
+func (s *Server) logoutHandler(ctx *routing.Context) {
+	err := s.sessionManager.Invalidate(ctx.Request)
+	if err != nil {
+		ctx.Error(err)
+		return
 	}
 
-	return http.HandlerFunc(fn)
+	ctx.Redirect("/login", http.StatusSeeOther)
 }

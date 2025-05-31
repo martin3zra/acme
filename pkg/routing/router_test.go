@@ -17,7 +17,6 @@ import (
 // -----------------
 
 func TestMatchRoute(t *testing.T) {
-	// Table-driven tests for the MatchRoute function.
 	tests := []struct {
 		name    string
 		pattern string
@@ -142,66 +141,48 @@ func finalHandler(ctx *routing.Context) {
 	ctx.Response.Write([]byte("handler"))
 }
 
-// TestMiddlewareChain verifies that when multiple middleware are added,
-// they are executed in the proper order. The expected order is based
-// on the middleware wrapping logic.
+// TestMiddlewareChain verifies that middleware are applied in the proper order.
 func TestMiddlewareChain(t *testing.T) {
 	r := routing.New()
-	// Add two middleware functions: m1 and then m2.
 	r.WithMiddleware(m1, m2)
-	// Register a GET route that uses finalHandler.
 	r.GET("/test", finalHandler)
 
-	// Create a GET request for "/test".
 	req := httptest.NewRequest("GET", "/test", nil)
 	rr := httptest.NewRecorder()
-
 	r.ServeHTTP(rr, req)
 
-	resp := rr.Result()
-	bodyBytes, err := io.ReadAll(resp.Body)
+	bodyBytes, err := io.ReadAll(rr.Result().Body)
 	if err != nil {
-		t.Fatalf("Error reading response body: %v", err)
+		t.Fatalf("Error reading response: %v", err)
 	}
 	body := string(bodyBytes)
-
-	// With middleware wrapping in reverse order, the expected output is "m1-m2-handler".
 	expected := "m1-m2-handler"
 	if body != expected {
 		t.Errorf("Expected response %q, got %q", expected, body)
 	}
 }
 
-// TestWithoutNextMiddleware verifies that removing a specific middleware works as expected.
-// In this test, we remove m1 so that only m2 is applied before the final handler.
+// TestWithoutNextMiddleware verifies that a route can exclude a middleware.
 func TestWithoutNextMiddleware(t *testing.T) {
 	r := routing.New()
-	// Add both m1 and m2.
 	r.WithMiddleware(m1, m2)
-
-	// Create a new router instance that excludes m1.
 	r.GET("/test2", finalHandler).WithoutMiddleware(m1)
 
 	req := httptest.NewRequest("GET", "/test2", nil)
 	rr := httptest.NewRecorder()
-
 	r.ServeHTTP(rr, req)
 
-	resp := rr.Result()
-	bodyBytes, err := io.ReadAll(resp.Body)
+	bodyBytes, err := io.ReadAll(rr.Result().Body)
 	if err != nil {
-		t.Fatalf("Error reading response body: %v", err)
+		t.Fatalf("Error reading response: %v", err)
 	}
 	body := string(bodyBytes)
-
-	// With m1 removed, only m2 should wrap the handler, resulting in "m2-handler".
 	expected := "m2-handler"
 	if body != expected {
 		t.Errorf("Expected response %q, got %q", expected, body)
 	}
 }
 
-// testMiddleware sets the "X-Test-Middleware" header in the response.
 var testMiddleware routing.Middleware = func(next routing.HandlerFunc) routing.HandlerFunc {
 	return func(ctx *routing.Context) {
 		ctx.Response.Header().Set("X-Test-Middleware", "yes")
@@ -209,7 +190,6 @@ var testMiddleware routing.Middleware = func(next routing.HandlerFunc) routing.H
 	}
 }
 
-// skipMiddleware sets the "X-Skip-Middleware" header in the response.
 var skipMiddleware routing.Middleware = func(next routing.HandlerFunc) routing.HandlerFunc {
 	return func(ctx *routing.Context) {
 		ctx.Response.Header().Set("X-Skip-Middleware", "yes")
@@ -217,70 +197,53 @@ var skipMiddleware routing.Middleware = func(next routing.HandlerFunc) routing.H
 	}
 }
 
-// TestGroupMiddlewareAndSkipNext verifies that when grouping routes using
-// WithoutNextMiddleware the skipMiddleware is removed while testMiddleware remains.
-// We capture the router returned by WithoutNextMiddleware and use it for serving the request.
+// TestGroupMiddlewareAndSkipNext verifies that after removing a middleware from the chain,
+// only the remaining ones are applied in a group.
 func TestGroupMiddlewareAndSkipNext(t *testing.T) {
-	// Create the global router and add both middlewares.
 	r := routing.New()
 	r.WithMiddleware(testMiddleware, skipMiddleware)
-
-	// Remove skipMiddleware by creating a new router instance and work with it.
 	r2 := r.WithoutNextMiddleware(skipMiddleware)
 
-	// Group routes under "/api" on the new router.
-	r2.Group("/api", func(api *routing.Router) {
+	// Use Prefix to create an "/api" group.
+	r2.Prefix("/api").Group(func(api *routing.Router) {
 		api.GET("/grouped", func(ctx *routing.Context) {
-			// Return a basic text response.
 			ctx.Text(http.StatusOK, "grouped")
 		})
 	})
 
-	// Create a simulated HTTP GET request for "/api/grouped".
 	req := httptest.NewRequest("GET", "/api/grouped", nil)
 	w := httptest.NewRecorder()
-	// Serve the request using the router that has had skipMiddleware removed.
 	r2.ServeHTTP(w, req)
 
-	// Check that the header set by testMiddleware is present.
 	if w.Header().Get("X-Test-Middleware") != "yes" {
 		t.Errorf("expected X-Test-Middleware header to be set to 'yes'")
 	}
-	// Check that the header set by skipMiddleware is absent.
 	if w.Header().Get("X-Skip-Middleware") != "" {
-		t.Errorf("expected X-Skip-Middleware header to be skipped due to group configuration")
+		t.Errorf("expected X-Skip-Middleware header to be skipped")
 	}
 }
 
-// TestWithRequest_Success verifies that a valid JSON request
-// is correctly decoded by WithRequest and processed by the handler.
+// ---------------------
+// WithRequest Tests
+// ---------------------
+
 func TestWithRequest_Success(t *testing.T) {
-	// Define a sample payload structure.
 	type RequestPayload struct {
 		Message string `json:"message"`
 	}
 
-	// Create a new router instance.
 	r := routing.New()
-
-	// Register a POST route using WithRequest.
-	// The handler simply echoes back the payload message as JSON.
 	r.POST("/echo", routing.WithRequest(func(ctx *routing.Context, payload *RequestPayload) {
-		ctx.JSON(http.StatusOK, map[string]string{
-			"echo": payload.Message,
-		})
+		ctx.JSON(http.StatusOK, map[string]string{"echo": payload.Message})
 	}))
 
-	// Build a request with valid JSON.
 	validJSON := `{"message": "Hello, world!"}`
 	req := httptest.NewRequest("POST", "/echo", strings.NewReader(validJSON))
 	req.Header.Set("Content-Type", "application/json")
 	rr := httptest.NewRecorder()
 
-	// Serve the request.
 	r.ServeHTTP(rr, req)
 
-	// Validate the response.
 	if rr.Code != http.StatusOK {
 		t.Errorf("expected status code %d, got %d", http.StatusOK, rr.Code)
 	}
@@ -294,36 +257,149 @@ func TestWithRequest_Success(t *testing.T) {
 	}
 }
 
-// TestWithRequest_InvalidJSON verifies that an invalid JSON request
-// returns an appropriate error response.
 func TestWithRequest_InvalidJSON(t *testing.T) {
-	// Define a sample payload structure.
 	type RequestPayload struct {
 		Message string `json:"message"`
 	}
 
-	// Create a new router instance.
 	r := routing.New()
-	// Register a POST route using WithRequest.
 	r.POST("/echo", routing.WithRequest(func(ctx *routing.Context, payload *RequestPayload) {
 		ctx.JSON(http.StatusOK, map[string]string{"echo": payload.Message})
 	}))
 
-	// Create a request with invalid JSON.
 	invalidJSON := `{"message": "Hello, world!`
 	req := httptest.NewRequest("POST", "/echo", strings.NewReader(invalidJSON))
 	req.Header.Set("Content-Type", "application/json")
 	rr := httptest.NewRecorder()
 
-	// Serve the request.
 	r.ServeHTTP(rr, req)
 
-	// Expect a 400 Bad Request.
 	if rr.Code != http.StatusBadRequest {
 		t.Errorf("expected status code %d, got %d", http.StatusBadRequest, rr.Code)
 	}
-	// Verify the error message contains "invalid JSON".
 	if !strings.Contains(rr.Body.String(), "invalid JSON") {
 		t.Errorf("expected error message containing 'invalid JSON', got %q", rr.Body.String())
+	}
+}
+
+// ---------------------
+// New Group Enhancement Tests
+// ---------------------
+
+// containsRoute returns true if the target route string is present.
+func containsRoute(routes []string, target string) bool {
+	for _, r := range routes {
+		if r == target {
+			return true
+		}
+	}
+	return false
+}
+
+// TestPrefixGroupRoutes verifies that routes created from a prefixed group are registered correctly.
+func TestPrefixGroupRoutes(t *testing.T) {
+	r := routing.New()
+	r.Prefix("/admin").Group(func(rg *routing.Router) {
+		rg.GET("/users", func(ctx *routing.Context) {
+			ctx.Response.Write([]byte("admin users"))
+		})
+	})
+
+	routes := r.Routes()
+	if !containsRoute(routes, "GET /admin/users") {
+		t.Errorf("expected route GET /admin/users, got %v", routes)
+	}
+
+	req := httptest.NewRequest("GET", "/admin/users", nil)
+	rr := httptest.NewRecorder()
+	r.ServeHTTP(rr, req)
+	body, _ := io.ReadAll(rr.Result().Body)
+	if string(body) != "admin users" {
+		t.Errorf("expected response 'admin users', got %q", body)
+	}
+}
+
+// TestNestedPrefixGroupRoutes verifies that nested prefix groups correctly concatenate paths.
+func TestNestedPrefixGroupRoutes(t *testing.T) {
+	r := routing.New()
+	r.Prefix("/api").Group(func(api *routing.Router) {
+		api.Prefix("/v1").Group(func(v1 *routing.Router) {
+			v1.GET("/resource", func(ctx *routing.Context) {
+				ctx.Response.Write([]byte("api v1 resource"))
+			})
+		})
+		api.GET("/status", func(ctx *routing.Context) {
+			ctx.Response.Write([]byte("api status"))
+		})
+	})
+
+	routes := r.Routes()
+	if !containsRoute(routes, "GET /api/v1/resource") {
+		t.Errorf("expected route GET /api/v1/resource, got %v", routes)
+	}
+	if !containsRoute(routes, "GET /api/status") {
+		t.Errorf("expected route GET /api/status, got %v", routes)
+	}
+
+	req := httptest.NewRequest("GET", "/api/v1/resource", nil)
+	rr := httptest.NewRecorder()
+	r.ServeHTTP(rr, req)
+	body, _ := io.ReadAll(rr.Result().Body)
+	if string(body) != "api v1 resource" {
+		t.Errorf("expected response 'api v1 resource', got %q", body)
+	}
+
+	req2 := httptest.NewRequest("GET", "/api/status", nil)
+	rr2 := httptest.NewRecorder()
+	r.ServeHTTP(rr2, req2)
+	body2, _ := io.ReadAll(rr2.Result().Body)
+	if string(body2) != "api status" {
+		t.Errorf("expected response 'api status', got %q", body2)
+	}
+}
+
+// TestEmptyPrefixGroup verifies that an empty prefix does not alter route paths.
+func TestEmptyPrefixGroup(t *testing.T) {
+	r := routing.New()
+	r.Prefix("").Group(func(rg *routing.Router) {
+		rg.GET("/noprefix", func(ctx *routing.Context) {
+			ctx.Response.Write([]byte("noprefix"))
+		})
+	})
+	routes := r.Routes()
+	if !containsRoute(routes, "GET /noprefix") {
+		t.Errorf("expected route GET /noprefix, got %v", routes)
+	}
+
+	req := httptest.NewRequest("GET", "/noprefix", nil)
+	rr := httptest.NewRecorder()
+	r.ServeHTTP(rr, req)
+	body, _ := io.ReadAll(rr.Result().Body)
+	if string(body) != "noprefix" {
+		t.Errorf("expected response 'noprefix', got %q", body)
+	}
+}
+
+// TestPrefixGroupMiddlewareExclusion verifies that middleware exclusions work within a prefixed group.
+func TestPrefixGroupMiddlewareExclusion(t *testing.T) {
+	r := routing.New()
+	r.WithMiddleware(m1, m2)
+	r.Prefix("/blog").Group(func(rg *routing.Router) {
+		// Exclude m1 from this route.
+		rg.GET("/post", finalHandler).WithoutMiddleware(m1)
+	})
+
+	routes := r.Routes()
+	if !containsRoute(routes, "GET /blog/post") {
+		t.Errorf("expected route GET /blog/post, got %v", routes)
+	}
+
+	req := httptest.NewRequest("GET", "/blog/post", nil)
+	rr := httptest.NewRecorder()
+	r.ServeHTTP(rr, req)
+	body, _ := io.ReadAll(rr.Result().Body)
+	expected := "m2-handler" // Only m2 should wrap the handler
+	if string(body) != expected {
+		t.Errorf("expected response %q, got %q", expected, body)
 	}
 }

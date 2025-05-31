@@ -1,23 +1,12 @@
 package app
 
 import (
-	"net/http"
-
-	inertia "github.com/romsar/gonertia/v2"
+	"github.com/martin3zra/acme/pkg/routing"
 )
 
-func (s *Server) onboardingHandler(i *inertia.Inertia) http.Handler {
-	fn := func(w http.ResponseWriter, r *http.Request) {
-
-		err := i.Render(w, r, "Onboarding/Index", inertia.Props{
-			"translations": mergeTranslations(r.Context(), loadTranslations("onboarding")),
-			"status":       r.URL.Query().Get("status"),
-		})
-		if err != nil {
-			s.handleError(w, err)
-			return
-		}
-	}
-
-	return http.HandlerFunc(fn)
+func (s *Server) onboardingHandler(ctx *routing.Context) {
+	ctx.Render("Onboarding/Index", map[string]any{
+		"translations": mergeTranslations(ctx.Request.Context(), loadTranslations("onboarding")),
+		"status":       ctx.Query("status"),
+	})
 }

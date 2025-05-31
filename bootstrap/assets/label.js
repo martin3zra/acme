@@ -1,9 +1,6 @@
 import { jsx } from "react/jsx-runtime";
 import * as LabelPrimitive from "@radix-ui/react-label";
-import { c as cn } from "./button.js";
-function InputError({ message, className = "", ...props }) {
-  return message ? /* @__PURE__ */ jsx("p", { ...props, className: "text-sm text-red-600 dark:text-red-400" + className, children: message }) : null;
-}
+import { c as cn } from "./utils.js";
 function Label({
   className,
   ...props
@@ -21,6 +18,5 @@ function Label({
   );
 }
 export {
-  InputError as I,
   Label as L
 };

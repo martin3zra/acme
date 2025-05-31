@@ -1,9 +1,16 @@
 package routing
 
 import (
+	"context"
 	"encoding/json"
+	"log"
 	"net/http"
 	"net/url"
+	"strconv"
+	"text/template"
+
+	"github.com/martin3zra/acme/pkg/foundation"
+	"github.com/romsar/gonertia/v2"
 )
 
 // Context wraps request and response and provides helper methods.
@@ -11,6 +18,7 @@ type Context struct {
 	Response http.ResponseWriter
 	Request  *http.Request
 	Params   map[string]string
+	Inertia  *gonertia.Inertia
 }
 
 // Text writes plain text response with status code.
@@ -27,8 +35,99 @@ func (ctx *Context) JSON(status int, data any) {
 	_ = json.NewEncoder(ctx.Response).Encode(data)
 }
 
-// Query retrieves the query value for a key or returns the fallback value.
-func (ctx *Context) Query(key, fallback string) string {
+// Inertia sends the component and props to be use for inertiajs protocol
+func (ctx *Context) Render(component string, props map[string]any) {
+	err := ctx.Inertia.Render(ctx.Response, ctx.Request, component, props)
+	if err != nil {
+		log.Fatalf("Error rending the inertia component: %v", err)
+		ctx.Error(err)
+	}
+}
+
+// Error sends a parsed HTML to the client
+func (ctx *Context) Error(err error, status ...int) {
+	var titleHttpCode = map[int]string{
+		500: "Internal Error.",
+		403: "Forbidden.",
+		401: "Unauthorized.",
+	}
+	defaultStatus := 500
+	if len(status) > 0 {
+		defaultStatus = status[0]
+	}
+
+	title, ok := titleHttpCode[defaultStatus]
+	if !ok {
+		title = "Something went wrong."
+	}
+
+	errorViewFile := foundation.ResolvePath("resources/views/error/500.html")
+	// display errors when on dev mode. otherwise logged this error.
+	data := make(map[string]any)
+	data["title"] = title
+	data["message"] = err.Error()
+	data["status"] = defaultStatus
+	tmpl, _ := template.ParseFiles(errorViewFile)
+	tmplErr := tmpl.Execute(ctx.Response, data)
+
+	if tmplErr != nil {
+		log.Println(err.Error())
+		http.Error(ctx.Response, "Internal Server Error", http.StatusInternalServerError)
+	}
+}
+
+func (ctx *Context) WithContext(c context.Context) *Context {
+	ctx.Request = ctx.Request.WithContext(c)
+	return ctx
+}
+
+func (ctx *Context) Redirect(path string, status ...int) {
+	if len(status) > 0 {
+		http.Redirect(ctx.Response, ctx.Request, path, status[0])
+		return
+	}
+	http.Redirect(ctx.Response, ctx.Request, path, http.StatusSeeOther)
+}
+
+func (ctx *Context) Back(status ...int) {
+	if len(status) > 0 {
+		ctx.Inertia.Back(ctx.Response, ctx.Request, status[0])
+		return
+	}
+	ctx.Inertia.Back(ctx.Response, ctx.Request, http.StatusSeeOther)
+}
+
+func (ctx *Context) BackWith(attributes map[string]string) {
+	// Get the referer (previous page URL)
+	referer := ctx.Request.Referer()
+	if referer == "" {
+		// Default fallback if referer is not present
+		referer = "/"
+	}
+
+	// Parse the referer URL
+	parsedURL, err := url.Parse(referer)
+	if err != nil {
+		http.Error(ctx.Response, "Invalid referer", http.StatusBadRequest)
+		return
+	}
+
+	// Add or update query parameters
+	q := parsedURL.Query()
+	for k, v := range attributes {
+		q.Set(k, v)
+	}
+	parsedURL.RawQuery = q.Encode()
+	http.Redirect(ctx.Response, ctx.Request, parsedURL.String(), http.StatusFound)
+}
+
+// Query retrieves the query value for a key.
+func (ctx *Context) Query(key string) string {
+	return ctx.Request.URL.Query().Get(key)
+}
+
+// QueryWithDefault retrieves the query value for a key or returns the fallback value.
+func (ctx *Context) QueryWithDefault(key, fallback string) string {
 	val := ctx.Request.URL.Query().Get(key)
 	if val == "" {
 		return fallback
@@ -47,4 +146,12 @@ func (ctx *Context) Param(key string) string {
 		return ""
 	}
 	return ctx.Params[key]
+}
+
+func (ctx *Context) Int(key string) int {
+
+	if intValue, err := strconv.Atoi(ctx.Param(key)); err == nil {
+		return intValue
+	}
+	return 0
 }

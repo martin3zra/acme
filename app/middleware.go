@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/justinas/alice"
 	"github.com/martin3zra/acme/pkg/auth"
 	"github.com/martin3zra/acme/pkg/database"
 	"github.com/martin3zra/acme/pkg/foundation"
@@ -13,20 +12,6 @@ import (
 	"github.com/martin3zra/acme/pkg/session"
 	"github.com/romsar/gonertia/v2"
 )
-
-func (s *Server) registerGuestMiddlewares() alice.Chain {
-	return alice.New(
-		s.SharedProps,
-		auth.RedirectIfAuthenticated,
-	)
-}
-
-func (s *Server) registerAuthMiddlewares() alice.Chain {
-	return alice.New(
-		s.SharedProps,
-		auth.Middleware,
-	)
-}
 
 func (s *Server) BindMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -39,11 +24,10 @@ func (s *Server) BindMiddleware(next http.Handler) http.Handler {
 	})
 }
 
-func (s *Server) SharedProps(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-
+func (s *Server) SharedProps(next routing.HandlerFunc) routing.HandlerFunc {
+	return func(ctx *routing.Context) {
 		var currentCompany *Company
-		session := r.Context().Value(session.SessionContextKey{}).(*session.Session)
+		session := ctx.Request.Context().Value(session.SessionContextKey{}).(*session.Session)
 		sessionUser := session.Get("user")
 		attrs := session.Get("attrs")
 		if attrs != nil && len(attrs.(map[string]any)) > 0 {
@@ -60,7 +44,7 @@ func (s *Server) SharedProps(next http.Handler) http.Handler {
 			}
 		}
 
-		ctx := gonertia.SetProps(r.Context(), map[string]any{
+		ctxWithProps := gonertia.SetProps(ctx.Request.Context(), map[string]any{
 			"auth": map[string]any{
 				"user":    sessionUser,
 				"company": currentCompany,
@@ -73,8 +57,8 @@ func (s *Server) SharedProps(next http.Handler) http.Handler {
 
 		s.sessionManager.AgeFlash(session)
 
-		next.ServeHTTP(w, r.WithContext(ctx))
-	})
+		next(ctx.WithContext(ctxWithProps))
+	}
 }
 
 func (s *Server) Signed(next http.Handler) http.Handler {

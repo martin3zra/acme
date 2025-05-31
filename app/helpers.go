@@ -3,8 +3,6 @@ package app
 import (
 	"context"
 	"encoding/json"
-	"net/http"
-	"net/url"
 	"regexp"
 
 	"github.com/martin3zra/acme/pkg/i18n"
@@ -55,30 +53,6 @@ func mergeTranslations(ctx context.Context, pageTranslations map[string]string) 
 	}
 
 	return merged
-}
-
-func back(w http.ResponseWriter, r *http.Request, attributes map[string]string) {
-	// Get the referer (previous page URL)
-	referer := r.Referer()
-	if referer == "" {
-		// Default fallback if referer is not present
-		referer = "/"
-	}
-
-	// Parse the referer URL
-	parsedURL, err := url.Parse(referer)
-	if err != nil {
-		http.Error(w, "Invalid referer", http.StatusBadRequest)
-		return
-	}
-
-	// Add or update query parameters
-	q := parsedURL.Query()
-	for k, v := range attributes {
-		q.Set(k, v)
-	}
-	parsedURL.RawQuery = q.Encode()
-	http.Redirect(w, r, parsedURL.String(), http.StatusFound)
 }
 
 func mapTo[T any](m map[string]any) (T, error) {

@@ -1,111 +1,22 @@
 import { jsx, jsxs, Fragment } from "react/jsx-runtime";
-import { IconDotsVertical, IconUserCircle, IconCreditCard, IconNotification, IconLogout, IconInnerShadowTop, IconDashboard, IconUsers, IconSettings, IconHelp, IconSearch } from "@tabler/icons-react";
 import * as React from "react";
-import { Fragment as Fragment$1 } from "react";
+import React__default, { Fragment as Fragment$1 } from "react";
 import { Slot } from "@radix-ui/react-slot";
 import { cva } from "class-variance-authority";
-import { XIcon, PanelLeftIcon, ChevronRight } from "lucide-react";
-import { c as cn, B as Button } from "./button.js";
-import * as SheetPrimitive from "@radix-ui/react-dialog";
-import * as TooltipPrimitive from "@radix-ui/react-tooltip";
+import { PanelLeftIcon, ChevronsUpDown, Sparkles, BadgeCheck, CreditCard, Bell, LayoutDashboardIcon, ClipboardList, UsersIcon, LayoutListIcon, SettingsIcon, HelpCircleIcon, SearchIcon, ChevronRight } from "lucide-react";
+import { c as cn } from "./utils.js";
+import { B as Button } from "./button.js";
+import { S as Sheet, a as SheetContent, b as SheetHeader, c as SheetTitle, d as SheetDescription } from "./sheet.js";
+import { T as TooltipProvider, a as Tooltip, b as TooltipTrigger, c as TooltipContent } from "./tooltip.js";
+import { u as useTranslation } from "./use-translation.js";
 import { usePage, Link } from "@inertiajs/react";
 import * as AvatarPrimitive from "@radix-ui/react-avatar";
 import { D as DropdownMenu, a as DropdownMenuTrigger, b as DropdownMenuContent, d as DropdownMenuLabel, e as DropdownMenuSeparator, g as DropdownMenuGroup, f as DropdownMenuItem } from "./dropdown-menu.js";
-import * as SeparatorPrimitive from "@radix-ui/react-separator";
+import { IconLogout } from "@tabler/icons-react";
+import { A as AppLogoIcon } from "./app-logo-icon.js";
+import { S as Separator } from "./separator.js";
 import { useTheme } from "next-themes";
 import { Toaster as Toaster$1 } from "sonner";
-function Sheet({ ...props }) {
-  return /* @__PURE__ */ jsx(SheetPrimitive.Root, { "data-slot": "sheet", ...props });
-}
-function SheetPortal({
-  ...props
-}) {
-  return /* @__PURE__ */ jsx(SheetPrimitive.Portal, { "data-slot": "sheet-portal", ...props });
-}
-function SheetOverlay({
-  className,
-  ...props
-}) {
-  return /* @__PURE__ */ jsx(
-    SheetPrimitive.Overlay,
-    {
-      "data-slot": "sheet-overlay",
-      className: cn(
-        "data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 fixed inset-0 z-50 bg-black/50",
-        className
-      ),
-      ...props
-    }
-  );
-}
-function SheetContent({
-  className,
-  children,
-  side = "right",
-  ...props
-}) {
-  return /* @__PURE__ */ jsxs(SheetPortal, { children: [
-    /* @__PURE__ */ jsx(SheetOverlay, {}),
-    /* @__PURE__ */ jsxs(
-      SheetPrimitive.Content,
-      {
-        "data-slot": "sheet-content",
-        className: cn(
-          "bg-background data-[state=open]:animate-in data-[state=closed]:animate-out fixed z-50 flex flex-col gap-4 shadow-lg transition ease-in-out data-[state=closed]:duration-300 data-[state=open]:duration-500",
-          side === "right" && "data-[state=closed]:slide-out-to-right data-[state=open]:slide-in-from-right inset-y-0 right-0 h-full w-3/4 border-l sm:max-w-sm",
-          side === "left" && "data-[state=closed]:slide-out-to-left data-[state=open]:slide-in-from-left inset-y-0 left-0 h-full w-3/4 border-r sm:max-w-sm",
-          side === "top" && "data-[state=closed]:slide-out-to-top data-[state=open]:slide-in-from-top inset-x-0 top-0 h-auto border-b",
-          side === "bottom" && "data-[state=closed]:slide-out-to-bottom data-[state=open]:slide-in-from-bottom inset-x-0 bottom-0 h-auto border-t",
-          className
-        ),
-        ...props,
-        children: [
-          children,
-          /* @__PURE__ */ jsxs(SheetPrimitive.Close, { className: "ring-offset-background focus:ring-ring data-[state=open]:bg-secondary absolute top-4 right-4 rounded-xs opacity-70 transition-opacity hover:opacity-100 focus:ring-2 focus:ring-offset-2 focus:outline-hidden disabled:pointer-events-none", children: [
-            /* @__PURE__ */ jsx(XIcon, { className: "size-4" }),
-            /* @__PURE__ */ jsx("span", { className: "sr-only", children: "Close" })
-          ] })
-        ]
-      }
-    )
-  ] });
-}
-function SheetHeader({ className, ...props }) {
-  return /* @__PURE__ */ jsx(
-    "div",
-    {
-      "data-slot": "sheet-header",
-      className: cn("flex flex-col gap-1.5 p-4", className),
-      ...props
-    }
-  );
-}
-function SheetTitle({
-  className,
-  ...props
-}) {
-  return /* @__PURE__ */ jsx(
-    SheetPrimitive.Title,
-    {
-      "data-slot": "sheet-title",
-      className: cn("text-foreground font-semibold", className),
-      ...props
-    }
-  );
-}
-function SheetDescription({
-  className,
-  ...props
-}) {
-  return /* @__PURE__ */ jsx(
-    SheetPrimitive.Description,
-    {
-      "data-slot": "sheet-description",
-      className: cn("text-muted-foreground text-sm", className),
-      ...props
-    }
-  );
-}
 const MOBILE_BREAKPOINT = 768;
 function useIsMobile() {
   const [isMobile, setIsMobile] = React.useState(void 0);
@@ -119,72 +30,6 @@ function useIsMobile() {
     return () => mql.removeEventListener("change", onChange);
   }, []);
   return !!isMobile;
-}
-function Separator({
-  className,
-  orientation = "horizontal",
-  decorative = true,
-  ...props
-}) {
-  return /* @__PURE__ */ jsx(
-    SeparatorPrimitive.Root,
-    {
-      "data-slot": "separator-root",
-      decorative,
-      orientation,
-      className: cn(
-        "bg-border shrink-0 data-[orientation=horizontal]:h-px data-[orientation=horizontal]:w-full data-[orientation=vertical]:h-full data-[orientation=vertical]:w-px",
-        className
-      ),
-      ...props
-    }
-  );
-}
-function TooltipProvider({
-  delayDuration = 0,
-  ...props
-}) {
-  return /* @__PURE__ */ jsx(
-    TooltipPrimitive.Provider,
-    {
-      "data-slot": "tooltip-provider",
-      delayDuration,
-      ...props
-    }
-  );
-}
-function Tooltip({
-  ...props
-}) {
-  return /* @__PURE__ */ jsx(TooltipProvider, { children: /* @__PURE__ */ jsx(TooltipPrimitive.Root, { "data-slot": "tooltip", ...props }) });
-}
-function TooltipTrigger({
-  ...props
-}) {
-  return /* @__PURE__ */ jsx(TooltipPrimitive.Trigger, { "data-slot": "tooltip-trigger", ...props });
-}
-function TooltipContent({
-  className,
-  sideOffset = 0,
-  children,
-  ...props
-}) {
-  return /* @__PURE__ */ jsx(TooltipPrimitive.Portal, { children: /* @__PURE__ */ jsxs(
-    TooltipPrimitive.Content,
-    {
-      "data-slot": "tooltip-content",
-      sideOffset,
-      className: cn(
-        "bg-primary text-primary-foreground animate-in fade-in-0 zoom-in-95 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 z-50 w-fit origin-(--radix-tooltip-content-transform-origin) rounded-md px-3 py-1.5 text-xs text-balance",
-        className
-      ),
-      ...props,
-      children: [
-        children,
-        /* @__PURE__ */ jsx(TooltipPrimitive.Arrow, { className: "bg-primary fill-primary z-50 size-2.5 translate-y-[calc(-50%_-_2px)] rotate-45 rounded-[2px]" })
-      ]
-    }
-  ) });
 }
 const SIDEBAR_COOKIE_NAME = "sidebar_state";
 const SIDEBAR_COOKIE_MAX_AGE = 60 * 60 * 24 * 7;
@@ -450,6 +295,26 @@ function SidebarGroup({ className, ...props }) {
     }
   );
 }
+function SidebarGroupLabel({
+  className,
+  asChild = false,
+  ...props
+}) {
+  const Comp = asChild ? Slot : "div";
+  return /* @__PURE__ */ jsx(
+    Comp,
+    {
+      "data-slot": "sidebar-group-label",
+      "data-sidebar": "group-label",
+      className: cn(
+        "text-sidebar-foreground/70 ring-sidebar-ring flex h-8 shrink-0 items-center rounded-md px-2 text-xs font-medium outline-hidden transition-[margin,opacity] duration-200 ease-linear focus-visible:ring-2 [&>svg]:size-4 [&>svg]:shrink-0",
+        "group-data-[collapsible=icon]:-mt-8 group-data-[collapsible=icon]:opacity-0",
+        className
+      ),
+      ...props
+    }
+  );
+}
 function SidebarGroupContent({
   className,
   ...props
@@ -553,25 +418,31 @@ function NavMain({
   items
 }) {
   const { component } = usePage();
-  return /* @__PURE__ */ jsx(SidebarGroup, { children: /* @__PURE__ */ jsx(SidebarGroupContent, { className: "flex flex-col gap-2", children: /* @__PURE__ */ jsx(SidebarMenu, { children: items.map((item) => /* @__PURE__ */ jsx(SidebarMenuItem, { children: /* @__PURE__ */ jsx(Link, { href: item.url, children: /* @__PURE__ */ jsxs(
-    SidebarMenuButton,
-    {
-      tooltip: item.title,
-      className: `${component === item.component ? "bg-primary text-primary-foreground hover:bg-primary/90 hover:text-primary-foreground active:text-primary-foreground duration-200 ease-linear" : ""} cursor-pointer`,
-      children: [
-        item.icon && /* @__PURE__ */ jsx(item.icon, {}),
-        /* @__PURE__ */ jsx("span", { children: item.title })
-      ]
-    }
-  ) }) }, item.title)) }) }) });
+  const t = useTranslation().trans;
+  return /* @__PURE__ */ jsxs(SidebarGroup, { children: [
+    /* @__PURE__ */ jsx(SidebarGroupLabel, { children: t("global.platform") }),
+    /* @__PURE__ */ jsx(SidebarMenu, { children: items.map((item) => /* @__PURE__ */ jsx(SidebarMenuItem, { children: /* @__PURE__ */ jsx(Link, { href: item.url, children: /* @__PURE__ */ jsx(
+      SidebarMenuButton,
+      {
+        asChild: true,
+        tooltip: t(item.title),
+        className: `${item.components.includes(component) ? "bg-primary text-primary-foreground hover:bg-primary/90 hover:text-primary-foreground active:text-primary-foreground duration-200 ease-linear" : ""} cursor-pointer`,
+        children: /* @__PURE__ */ jsxs("div", { children: [
+          /* @__PURE__ */ jsx(item.icon, {}),
+          /* @__PURE__ */ jsx("span", { children: t(item.title) })
+        ] })
+      }
+    ) }) }, item.title)) })
+  ] });
 }
 function NavSecondary({
   items,
   ...props
 }) {
-  return /* @__PURE__ */ jsx(SidebarGroup, { ...props, children: /* @__PURE__ */ jsx(SidebarGroupContent, { children: /* @__PURE__ */ jsx(SidebarMenu, { children: items.map((item) => /* @__PURE__ */ jsx(SidebarMenuItem, { children: /* @__PURE__ */ jsx(SidebarMenuButton, { asChild: true, children: /* @__PURE__ */ jsxs("a", { href: item.url, children: [
+  const t = useTranslation().trans;
+  return /* @__PURE__ */ jsx(SidebarGroup, { ...props, children: /* @__PURE__ */ jsx(SidebarGroupContent, { children: /* @__PURE__ */ jsx(SidebarMenu, { children: items.map((item) => /* @__PURE__ */ jsx(SidebarMenuItem, { children: /* @__PURE__ */ jsx(SidebarMenuButton, { asChild: true, size: "sm", children: /* @__PURE__ */ jsxs("a", { href: item.url, children: [
     /* @__PURE__ */ jsx(item.icon, {}),
-    /* @__PURE__ */ jsx("span", { children: item.title })
+    /* @__PURE__ */ jsx("span", { children: t(item.title) })
   ] }) }) }, item.title)) }) }) });
 }
 function Avatar({
@@ -619,20 +490,31 @@ function AvatarFallback({
     }
   );
 }
+function useInitials() {
+  const getInitials = (fullName) => {
+    const names = fullName.trim().split(" ");
+    if (names.length === 0) return "";
+    if (names.length === 1) return names[0].charAt(0).toUpperCase();
+    return `${names[0].charAt(0)}${names[names.length - 1].charAt(0)}`.toUpperCase();
+  };
+  return getInitials;
+}
 function NavUser({ user }) {
-  const props = usePage().props;
   const { isMobile } = useSidebar();
+  const props = usePage().props;
+  const t = useTranslation().trans;
+  const getInitials = useInitials();
   return /* @__PURE__ */ jsx(SidebarMenu, { children: /* @__PURE__ */ jsx(SidebarMenuItem, { children: /* @__PURE__ */ jsxs(DropdownMenu, { children: [
     /* @__PURE__ */ jsx(DropdownMenuTrigger, { asChild: true, children: /* @__PURE__ */ jsxs(SidebarMenuButton, { size: "lg", className: "data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground", children: [
-      /* @__PURE__ */ jsxs(Avatar, { className: "h-8 w-8 rounded-lg grayscale", children: [
-        /* @__PURE__ */ jsx(AvatarImage, { src: user.avatar, alt: `${user.first_name} ${user.last_name}` }),
-        /* @__PURE__ */ jsx(AvatarFallback, { className: "rounded-lg", children: `${user.first_name.charAt(0)}${user.last_name.charAt(0)}` })
+      /* @__PURE__ */ jsxs(Avatar, { className: "h-8 w-8 rounded-lg", children: [
+        /* @__PURE__ */ jsx(AvatarImage, { src: user.avatar, alt: user.name }),
+        /* @__PURE__ */ jsx(AvatarFallback, { className: "rounded-lg", children: "CN" })
       ] }),
       /* @__PURE__ */ jsxs("div", { className: "grid flex-1 text-left text-sm leading-tight", children: [
-        /* @__PURE__ */ jsx("span", { className: "truncate font-medium", children: `${user.first_name} ${user.last_name}` }),
-        /* @__PURE__ */ jsx("span", { className: "text-muted-foreground truncate text-xs", children: user.email })
+        /* @__PURE__ */ jsx("span", { className: "truncate font-medium", children: user.name }),
+        /* @__PURE__ */ jsx("span", { className: "truncate text-xs", children: user.email })
       ] }),
-      /* @__PURE__ */ jsx(IconDotsVertical, { className: "ml-auto size-4" })
+      /* @__PURE__ */ jsx(ChevronsUpDown, { className: "ml-auto size-4" })
     ] }) }),
     /* @__PURE__ */ jsxs(
       DropdownMenuContent,
@@ -645,32 +527,37 @@ function NavUser({ user }) {
           /* @__PURE__ */ jsx(DropdownMenuLabel, { className: "p-0 font-normal", children: /* @__PURE__ */ jsxs("div", { className: "flex items-center gap-2 px-1 py-1.5 text-left text-sm", children: [
             /* @__PURE__ */ jsxs(Avatar, { className: "h-8 w-8 rounded-lg", children: [
               /* @__PURE__ */ jsx(AvatarImage, { src: user.avatar, alt: `${user.first_name} ${user.last_name}` }),
-              /* @__PURE__ */ jsx(AvatarFallback, { className: "rounded-lg", children: `${user.first_name.charAt(0)}${user.last_name.charAt(0)}` })
+              /* @__PURE__ */ jsx(AvatarFallback, { className: "rounded-lg", children: getInitials(`${user.first_name} ${user.last_name}`) })
             ] }),
             /* @__PURE__ */ jsxs("div", { className: "grid flex-1 text-left text-sm leading-tight", children: [
-              /* @__PURE__ */ jsx("span", { className: "truncate font-medium", children: `${user.first_name} ${user.last_name}` }),
-              /* @__PURE__ */ jsx("span", { className: "text-muted-foreground truncate text-xs", children: user.email })
+              /* @__PURE__ */ jsx("span", { className: "truncate font-medium", children: user.name }),
+              /* @__PURE__ */ jsx("span", { className: "truncate text-xs", children: user.email })
             ] })
+          ] }) }),
+          /* @__PURE__ */ jsx(DropdownMenuSeparator, {}),
+          /* @__PURE__ */ jsx(DropdownMenuGroup, { children: /* @__PURE__ */ jsxs(DropdownMenuItem, { children: [
+            /* @__PURE__ */ jsx(Sparkles, {}),
+            t("global.navUser.upgrade-to-pro")
           ] }) }),
           /* @__PURE__ */ jsx(DropdownMenuSeparator, {}),
           /* @__PURE__ */ jsxs(DropdownMenuGroup, { children: [
             /* @__PURE__ */ jsxs(DropdownMenuItem, { children: [
-              /* @__PURE__ */ jsx(IconUserCircle, {}),
-              "Account"
+              /* @__PURE__ */ jsx(BadgeCheck, {}),
+              t("global.navUser.account")
             ] }),
             /* @__PURE__ */ jsxs(DropdownMenuItem, { children: [
-              /* @__PURE__ */ jsx(IconCreditCard, {}),
-              "Billing"
+              /* @__PURE__ */ jsx(CreditCard, {}),
+              t("global.navUser.billing")
             ] }),
             /* @__PURE__ */ jsxs(DropdownMenuItem, { children: [
-              /* @__PURE__ */ jsx(IconNotification, {}),
-              "Notifications"
+              /* @__PURE__ */ jsx(Bell, {}),
+              t("global.navUser.notifications")
             ] })
           ] }),
           /* @__PURE__ */ jsx(DropdownMenuSeparator, {}),
           /* @__PURE__ */ jsxs(DropdownMenuItem, { children: [
             /* @__PURE__ */ jsx(IconLogout, {}),
-            /* @__PURE__ */ jsx(Link, { href: "/logout", method: "post", headers: { "X-CSRF-Token": props.csrf_token }, className: "cursor-pointer", as: "button", children: "Logout" })
+            /* @__PURE__ */ jsx(Link, { href: "/logout", method: "post", headers: { "X-CSRF-Token": props.csrf_token }, className: "cursor-pointer", as: "button", children: t("global.navUser.logout") })
           ] })
         ]
       }
@@ -680,63 +567,70 @@ function NavUser({ user }) {
 const data = {
   navMain: [
     {
-      title: "Dashboard",
+      title: "global.navMain.dashboard",
       url: "/home",
-      icon: IconDashboard,
-      component: "Home/Index"
+      icon: LayoutDashboardIcon,
+      components: ["Home/Index"]
     },
-    // {
-    //   title: "Lifecycle",
-    //   url: "#",
-    //   icon: IconListDetails,
-    // },
-    // {
-    //   title: "Analytics",
-    //   url: "#",
-    //   icon: IconChartBar,
-    // },
-    // {
-    //   title: "Projects",
-    //   url: "#",
-    //   icon: IconFolder,
-    // },
     {
-      title: "Customers",
+      title: "global.navMain.invoices",
+      url: "/invoices",
+      icon: ClipboardList,
+      components: ["Invoices/Index", "Invoices/Create"]
+    },
+    {
+      title: "global.navMain.customers",
       url: "/customers",
-      icon: IconUsers,
-      component: "Customers/Index"
+      icon: UsersIcon,
+      components: ["Customers/Index"]
+    },
+    {
+      title: "global.navMain.items",
+      url: "/items",
+      icon: LayoutListIcon,
+      components: ["Items/Index"]
+    },
+    {
+      title: "global.navMain.payments",
+      url: "/payments",
+      icon: CreditCard,
+      components: ["Payments/Index", "Payments/Create"]
     }
   ],
   navSecondary: [
     {
-      title: "Settings",
+      title: "global.navSecondary.settings",
       url: "#",
-      icon: IconSettings
+      icon: SettingsIcon
     },
     {
-      title: "Get Help",
+      title: "global.navSecondary.get-help",
       url: "#",
-      icon: IconHelp
+      icon: HelpCircleIcon
     },
     {
-      title: "Search",
+      title: "global.navSecondary.search",
       url: "#",
-      icon: IconSearch
+      icon: SearchIcon
     }
   ]
 };
 function AppSidebar({ ...props }) {
-  return /* @__PURE__ */ jsx(Sidebar, { collapsible: "offcanvas", ...props, variant: "inset", children: /* @__PURE__ */ jsxs(SidebarInset, { children: [
-    /* @__PURE__ */ jsx(SidebarHeader, { children: /* @__PURE__ */ jsx(SidebarMenu, { children: /* @__PURE__ */ jsx(SidebarMenuItem, { children: /* @__PURE__ */ jsx(SidebarMenuButton, { asChild: true, className: "data-[slot=sidebar-menu-button]:!p-1.5", children: /* @__PURE__ */ jsxs("a", { href: "#", children: [
-      /* @__PURE__ */ jsx(IconInnerShadowTop, { className: "!size-5" }),
-      /* @__PURE__ */ jsx("span", { className: "text-base font-semibold", children: "Acme Inc." })
+  const { auth } = usePage().props;
+  return /* @__PURE__ */ jsxs(Sidebar, { variant: "inset", ...props, children: [
+    /* @__PURE__ */ jsx(SidebarHeader, { children: /* @__PURE__ */ jsx(SidebarMenu, { children: /* @__PURE__ */ jsx(SidebarMenuItem, { children: /* @__PURE__ */ jsx(SidebarMenuButton, { size: "lg", asChild: true, children: /* @__PURE__ */ jsxs(Link, { href: "/home", children: [
+      /* @__PURE__ */ jsx("div", { className: "bg-sidebar-primary text-sidebar-primary-foreground flex aspect-square size-8 items-center justify-center rounded-lg", children: /* @__PURE__ */ jsx(AppLogoIcon, { className: "size-4" }) }),
+      /* @__PURE__ */ jsxs("div", { className: "grid flex-1 text-left text-sm leading-tight", children: [
+        /* @__PURE__ */ jsx("span", { className: "truncate font-medium", children: auth.company.name }),
+        /* @__PURE__ */ jsx("span", { className: "truncate text-xs", children: "Enterprise" })
+      ] })
     ] }) }) }) }) }),
     /* @__PURE__ */ jsxs(SidebarContent, { children: [
       /* @__PURE__ */ jsx(NavMain, { items: data.navMain }),
       /* @__PURE__ */ jsx(NavSecondary, { items: data.navSecondary, className: "mt-auto" })
     ] }),
     /* @__PURE__ */ jsx(SidebarFooter, { children: /* @__PURE__ */ jsx(NavUser, { user: props.user }) })
-  ] }) });
+  ] });
 }
 function Breadcrumb({ ...props }) {
   return /* @__PURE__ */ jsx("nav", { "aria-label": "breadcrumb", "data-slot": "breadcrumb", ...props });
@@ -810,10 +704,11 @@ function BreadcrumbSeparator({
   );
 }
 function Breadcrumbs({ breadcrumbs }) {
+  const t = useTranslation().trans;
   return /* @__PURE__ */ jsx(Fragment, { children: breadcrumbs && breadcrumbs.length > 0 && /* @__PURE__ */ jsx(Breadcrumb, { children: /* @__PURE__ */ jsx(BreadcrumbList, { children: breadcrumbs.map((item, index) => {
     const isLast = index === breadcrumbs.length - 1;
     return /* @__PURE__ */ jsxs(Fragment$1, { children: [
-      /* @__PURE__ */ jsx(BreadcrumbItem, { children: isLast ? /* @__PURE__ */ jsx(BreadcrumbPage, { children: item.title }) : /* @__PURE__ */ jsx(BreadcrumbLink, { asChild: true, children: /* @__PURE__ */ jsx(Link, { href: item.href, children: item.title }) }) }),
+      /* @__PURE__ */ jsx(BreadcrumbItem, { children: isLast ? /* @__PURE__ */ jsx(BreadcrumbPage, { children: t(item.title) }) : /* @__PURE__ */ jsx(BreadcrumbLink, { asChild: true, children: /* @__PURE__ */ jsx(Link, { href: item.href, children: t(item.title) }) }) }),
       !isLast && /* @__PURE__ */ jsx(BreadcrumbSeparator, {})
     ] }, index);
   }) }) }) });
@@ -834,29 +729,33 @@ const Toaster = ({ ...props }) => {
     }
   );
 };
-function AuthenticatedLayout({
-  user,
-  breadcrumbs,
-  children
-}) {
-  return /* @__PURE__ */ jsxs(SidebarProvider, { children: [
-    /* @__PURE__ */ jsx(AppSidebar, { user }),
-    /* @__PURE__ */ jsxs(SidebarInset, { children: [
-      /* @__PURE__ */ jsxs("header", { className: "flex h-16 shrink-0 items-center gap-2 border-b px-4", children: [
-        /* @__PURE__ */ jsx(SidebarTrigger, { className: "-ml-1" }),
-        /* @__PURE__ */ jsx(Separator, { orientation: "vertical", className: "mr-2 h-4" }),
-        /* @__PURE__ */ jsx(Breadcrumbs, { breadcrumbs })
-      ] }),
-      /* @__PURE__ */ jsx("div", { className: "flex flex-1 flex-col gap-4 p-4", children: /* @__PURE__ */ jsx("div", { className: "min-h-[100vh] flex-1 rounded-xl md:min-h-min", children }) }),
-      /* @__PURE__ */ jsx(Toaster, { position: "top-right", richColors: true })
-    ] })
-  ] });
+function Actions({ children }) {
+  return /* @__PURE__ */ jsx(Fragment, { children });
 }
+const _AppLayout = class _AppLayout extends React__default.Component {
+  render() {
+    const { user, breadcrumbs = [], children } = this.props;
+    const actions = React__default.Children.toArray(children).find((children2) => children2.type === Actions);
+    const content = React__default.Children.toArray(children).filter((children2) => children2.type !== Actions);
+    return /* @__PURE__ */ jsxs(SidebarProvider, { children: [
+      /* @__PURE__ */ jsx(AppSidebar, { user }),
+      /* @__PURE__ */ jsxs(SidebarInset, { children: [
+        /* @__PURE__ */ jsxs("header", { className: "flex h-16 shrink-0 items-center justify-between gap-2 border-b px-4", children: [
+          /* @__PURE__ */ jsxs("div", { className: "flex grow", children: [
+            /* @__PURE__ */ jsx(SidebarTrigger, { className: "-ml-1" }),
+            /* @__PURE__ */ jsx(Separator, { orientation: "vertical", className: "mr-2 h-4" }),
+            /* @__PURE__ */ jsx(Breadcrumbs, { breadcrumbs })
+          ] }),
+          /* @__PURE__ */ jsx("div", { className: "min-w-md", children: actions ? actions : null })
+        ] }),
+        /* @__PURE__ */ jsx("div", { className: "flex flex-1 flex-col gap-4 p-4", children: /* @__PURE__ */ jsx("div", { className: "grid min-h-[100vh] grid-flow-col grid-cols-1 grid-rows-1 rounded-xl md:min-h-min", children: content }) }),
+        /* @__PURE__ */ jsx(Toaster, { position: "top-right", richColors: true })
+      ] })
+    ] });
+  }
+};
+_AppLayout.Actions = Actions;
+let AppLayout = _AppLayout;
 export {
-  AuthenticatedLayout as A,
-  Sheet as S,
-  SheetContent as a,
-  SheetHeader as b,
-  SheetTitle as c,
-  SheetDescription as d
+  AppLayout as A
 };

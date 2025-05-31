@@ -85,3 +85,11 @@ func ResolvePath(relativePath string) string {
 	fullPath := filepath.Join(baseDir, "..", "..", relativePath)
 	return fullPath
 }
+
+func MapSlice[T, U any](s []T, f func(T) U) []U {
+	result := make([]U, len(s))
+	for i, v := range s {
+		result[i] = f(v)
+	}
+	return result
+}
