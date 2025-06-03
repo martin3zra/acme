@@ -1,7 +1,6 @@
 package routing
 
 import (
-	"log"
 	"net/http"
 	"reflect"
 	"strings"
@@ -105,17 +104,8 @@ func (r *Router) FileServer(prefix string, fileSystem http.FileSystem) {
 
 	fileRoutePattern := prefix + ":filepath..."
 	fileRoute := r.GET(fileRoutePattern, func(ctx *Context) {
-		// Log to confirm that this handler is hit and what the URL is
-		log.Println("[FileServer] Static asset handler triggered for:", ctx.Request.URL.Path)
-
-		// Optionally, log the request's URL after stripping for debugging
-		strippedPath := strings.TrimPrefix(ctx.Request.URL.Path, prefix)
-		log.Println("[FileServer] Stripped path:", strippedPath)
-
 		fileHandler.ServeHTTP(ctx.Response, ctx.Request)
 	})
-
-	log.Println("[FileServer] Registered static route:", fileRoutePattern)
 
 	// Exclude every global middleware for the file route.
 	for _, mw := range r.middlewares {
@@ -263,7 +253,7 @@ func (r *Router) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
 		return
 	}
-	// http.NotFound(w, req)
+	http.NotFound(w, req)
 }
 
 // Routes returns a slice of strings listing all registered routes.
@@ -332,9 +322,6 @@ func MatchRoute(pattern, urlPath string) (bool, map[string]string) {
 		return false, nil
 	}
 
-	// Log the segments for debugging.
-	log.Printf("[MatchRoute] Pattern Parts: %v, Path Parts: %v", patternParts, pathParts)
-
 	for i, part := range patternParts {
 		if strings.HasPrefix(part, ":") {
 			paramName := part[1:]
@@ -346,6 +333,6 @@ func MatchRoute(pattern, urlPath string) (bool, map[string]string) {
 	if catchAll {
 		params[catchAllParam] = strings.Join(pathParts[len(patternParts):], "/")
 	}
-	log.Printf("[MatchRoute] Matched with params: %v", params)
+
 	return true, params
 }

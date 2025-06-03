@@ -1,8 +1,6 @@
 package app
 
 import (
-	"html/template"
-	"log"
 	"net/http"
 
 	"github.com/martin3zra/acme/pkg/auth"
@@ -21,11 +19,14 @@ func (s *Server) bootRoutes() {
 			route.POST("/login", s.authHandler)
 
 			route.GET("/verify-account/:uuid/:hash", s.verifyAccountHandler)
-			route.POST("/email/verification-notification", s.sendVerificationEmail)
+			route.GET("/verify-email/:uuid/:hash", s.verifyEmailHandler).WithoutMiddleware(auth.RedirectIfAuthenticated)
+			route.GET("/verify-email", s.verifyEmailPromptHandler).WithoutMiddleware(auth.RedirectIfAuthenticated)
+			route.POST("/email/verification-notification", s.sendVerificationEmail).WithoutMiddleware(auth.RedirectIfAuthenticated)
 		})
 
+		//TODO: Set the session manager in the context to logout user
 	s.route.
-		WithMiddleware(auth.Middleware).
+		WithMiddleware(auth.Middleware, Verified).
 		WithoutGroupMiddleware(auth.RedirectIfAuthenticated).
 		Group(func(route *routing.Router) {
 			route.GET("/onboarding", s.onboardingHandler)
@@ -66,45 +67,4 @@ func (s *Server) bootRoutes() {
 
 	uiAssets := foundation.GetBuildAssets(s.assets, "public/build")
 	s.route.FileServer("/build/", http.FS(uiAssets))
-}
-
-func (s *Server) handleError(w http.ResponseWriter, err error, callbacks ...func()) {
-	var titleHttpCode = map[int]string{
-		500: "Internal Error.",
-		403: "Forbidden.",
-		401: "Unauthorized.",
-	}
-
-	var statusCode = http.StatusInternalServerError
-	formatterError, ok := err.(foundation.ErrorFormatter)
-	if ok {
-		statusCode = formatterError.Status()
-	} else {
-		if len(callbacks) > 0 {
-			callbacks[0]()
-			return
-		}
-	}
-
-	title, ok := titleHttpCode[statusCode]
-	if !ok {
-		title = "Something went wrong."
-	}
-	// display errors when on dev mode. otherwise logged this error.
-	data := make(map[string]any)
-	data["title"] = title
-	data["message"] = err.Error()
-	data["status"] = statusCode
-	if s.config.isProduction {
-		data["message"] = "Something happened, please contact the developer for support."
-	}
-	errorViewFile := "./resources/views/error/500.html"
-
-	tmpl, _ := template.ParseFiles(errorViewFile)
-	tmplErr := tmpl.Execute(w, data)
-
-	if tmplErr != nil {
-		log.Println(err.Error())
-		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
-	}
 }

@@ -14,7 +14,7 @@ interface EmailVerificationForm {
   email: string;
 }
 
-export default function Verify({ status, csrf_token }: PageProps<{ status: string }>) {
+export default function Verify({ status, email, csrf_token }: PageProps<{ status: string; email: boolean }>) {
   const { headers } = useHeader();
   const t = useTranslation().trans;
   const { data, setData, errors, post, processing } = useForm<Required<EmailVerificationForm>>({
@@ -27,7 +27,7 @@ export default function Verify({ status, csrf_token }: PageProps<{ status: strin
   const submit: FormEventHandler = (e) => {
     e.preventDefault();
 
-    post('/email/verification-notification', { ...headers });
+    post(`/email/verification-notification${email ? '?kind=email' : ''}`, { ...headers });
   };
   return (
     <Guest>

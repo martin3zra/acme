@@ -18,6 +18,7 @@ func (s *Server) BindMiddleware(next http.Handler) http.Handler {
 		s.session = session.GetSession(r)
 
 		ctx := context.WithValue(r.Context(), database.ConnectionKey{}, s.db)
+		ctx = context.WithValue(ctx, ConfigKey{}, s.config)
 		req := r.WithContext(ctx)
 
 		next.ServeHTTP(w, req)
@@ -61,27 +62,41 @@ func (s *Server) SharedProps(next routing.HandlerFunc) routing.HandlerFunc {
 	}
 }
 
-func (s *Server) Signed(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if routing.VerifyRequest(r, string(s.config.secretKey)) {
-			next.ServeHTTP(w, r)
+func Signed(next routing.HandlerFunc) routing.HandlerFunc {
+	return func(ctx *routing.Context) {
+		config := ctx.Request.Context().Value(ConfigKey{}).(*Config)
+		if routing.VerifyRequest(ctx.Request, string(config.secretKey)) {
+			next(ctx)
 			return
 		}
 
-		s.handleError(w, foundation.Unauthorized{})
-	})
+		ctx.Error(foundation.Unauthorized{})
+	}
 }
 
-func EnsurePasswordHasBeenChanged(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		var user any = auth.User(r.Context())
+func EnsurePasswordHasBeenChanged(next routing.HandlerFunc) routing.HandlerFunc {
+	return func(ctx *routing.Context) {
+		var user any = auth.User(ctx.Request.Context())
 
 		u, ok := user.(foundation.MustVerifyPassword)
 		if ok && u.HasNotChangedPassword() {
-			http.Redirect(w, r, "/passwords/create", http.StatusFound)
+			ctx.Redirect("/passwords/create", http.StatusFound)
 			return
 		}
 
-		next.ServeHTTP(w, r)
-	})
+		next(ctx)
+	}
+}
+
+func Verified(next routing.HandlerFunc) routing.HandlerFunc {
+	return func(ctx *routing.Context) {
+
+		user := auth.User(ctx.Request.Context())
+		if user == nil || user.EmailVerifiedAt == nil {
+			ctx.Redirect("/verify-email")
+			return
+		}
+
+		next(ctx)
+	}
 }

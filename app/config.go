@@ -10,6 +10,7 @@ import (
 	"github.com/martin3zra/acme/pkg/mailer"
 )
 
+type ConfigKey struct{}
 type Config struct {
 	appName      string
 	isProduction bool

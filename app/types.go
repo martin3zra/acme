@@ -6,12 +6,15 @@ import (
 	"database/sql/driver"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"log"
 	"time"
 
+	"github.com/martin3zra/acme/app/mail"
 	"github.com/martin3zra/acme/pkg/auth"
 	"github.com/martin3zra/acme/pkg/foundation"
 	"github.com/martin3zra/acme/pkg/mailer"
+	"github.com/martin3zra/acme/pkg/routing"
 	"github.com/martin3zra/acme/pkg/support"
 	"github.com/martin3zra/acme/pkg/validator"
 )
@@ -567,6 +570,27 @@ func (StoreCompanyForm) Rules() map[string]any {
 
 type User struct {
 	foundation.User
+}
+
+func (u *User) SendEmailVerification(notify mailer.Mailer, attributes map[string]string) {
+	url, err := routing.TemporarySignedURL(
+		attributes["url"],
+		map[string]string{},
+		attributes["secret"],
+		60*time.Minute,
+	)
+	if err != nil {
+		log.Fatal(err)
+		return
+	}
+
+	notify.
+		To(u.Email, fmt.Sprintf("%s %s", u.FirstName, u.LastName)).
+		Send(mail.NewVerification(foundation.AsMap(u), url))
+}
+
+func (u *User) HasVerifiedEmail() bool {
+  return u.EmailVerifiedAt == nil
 }
 
 func UserFromContext(ctx context.Context) *User {
