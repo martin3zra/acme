@@ -113,34 +113,38 @@ func (s *Server) verifyEmailHandler(ctx *routing.Context) {
 		return
 	}
 
-	// if account.HasVerifiedAccount() {
-	// 	renderWithStatus("already-verified")
-	// 	return
-	// }
+	// TODO : Check if the user isOrphan => abort(403, 'Sorry, but this user does not belongs to any account in our platform.');
+	// TODO : Add owner relationship to the user (select the account that owns that user.)
+  // TODO : Add new middle to ensure account is verified
 
-	if !foundation.NewHashable().Sha1Equals(account.GetEmailAddressForAccountVerification(), hash) {
+	if user.HasVerifiedEmail() {
+		renderWithStatus("already-verified")
+		return
+	}
+
+	if !foundation.NewHashable().Sha1Equals(user.Email, hash) {
 		renderWithStatus("hash-do-not-match")
 		return
 	}
 
-	if !account.MarkAccountAsVerified(s.db) {
+	if !user.MarkEmailAsVerified(s.db) {
 		ctx.Error(err)
 		return
 	}
 
-	user, err := auth.NewAuth(ctx.Request.Context()).LoginUsingId(account.Owner.ID)
+	loggedUser, err := auth.NewAuth(ctx.Request.Context()).LoginUsingId(user.Id)
 	if err != nil {
 		ctx.Error(err)
 		return
 	}
 
-	err = s.sessionManager.ReGenerate(ctx.Request, user, map[string]any{})
+	err = s.sessionManager.ReGenerate(ctx.Request, loggedUser, map[string]any{})
 	if err != nil {
 		ctx.Error(err)
 		return
 	}
 
-	must, ok := user.(foundation.MustVerifyPassword)
+	must, ok := loggedUser.(foundation.MustVerifyPassword)
 	if ok && must.HasNotChangedPassword() {
 		renderWithStatus("create-password")
 		return

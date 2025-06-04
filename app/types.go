@@ -590,7 +590,12 @@ func (u *User) SendEmailVerification(notify mailer.Mailer, attributes map[string
 }
 
 func (u *User) HasVerifiedEmail() bool {
-  return u.EmailVerifiedAt == nil
+	return u.EmailVerifiedAt != nil
+}
+
+func (u *User) MarkEmailAsVerified(db *sql.DB) bool {
+	_, err := db.Exec("UPDATE users SET email_verified_at = now(), updated_at = now() WHERE id = $1", u.Id)
+	return err == nil
 }
 
 func UserFromContext(ctx context.Context) *User {

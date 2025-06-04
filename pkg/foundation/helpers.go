@@ -82,8 +82,7 @@ func ResolvePath(relativePath string) string {
 	baseDir := filepath.Dir(execPath)
 
 	// Join with the relative path to the static file
-	fullPath := filepath.Join(baseDir, "..", "..", relativePath)
-	return fullPath
+	return filepath.Join(baseDir, relativePath)
 }
 
 func MapSlice[T, U any](s []T, f func(T) U) []U {
