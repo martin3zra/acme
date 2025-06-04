@@ -1,20 +1,12 @@
 package app
 
 import (
-	"net/http"
+	"log"
 
-	inertia "github.com/romsar/gonertia/v2"
+	"github.com/martin3zra/acme/pkg/routing"
 )
 
-func (s *Server) homeHandler(i *inertia.Inertia) http.Handler {
-	fn := func(w http.ResponseWriter, r *http.Request) {
-
-		err := i.Render(w, r, "Home/Index", inertia.Props{})
-		if err != nil {
-			s.handleError(w, err)
-			return
-		}
-	}
-
-	return http.HandlerFunc(fn)
+func (s *Server) homeHandler(ctx *routing.Context) {
+	log.Println("Home route accessed")
+	ctx.Render("Home/Index", map[string]any{})
 }

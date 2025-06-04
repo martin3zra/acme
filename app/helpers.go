@@ -2,17 +2,12 @@ package app
 
 import (
 	"context"
-	"net/http"
+	"encoding/json"
 	"regexp"
 
-	"github.com/martin3zra/acme/pkg/foundation"
 	"github.com/martin3zra/acme/pkg/i18n"
 	"github.com/romsar/gonertia/v2"
 )
-
-func flash(w http.ResponseWriter, name string, value any) {
-	foundation.SetFlash(w, name, value)
-}
 
 func ensureUUIDIsValid(str string) bool {
 	regex := `^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$`
@@ -58,4 +53,17 @@ func mergeTranslations(ctx context.Context, pageTranslations map[string]string) 
 	}
 
 	return merged
+}
+
+func mapTo[T any](m map[string]any) (T, error) {
+	var result T
+	data, err := json.Marshal(m)
+	if err != nil {
+		return result, err
+	}
+	err = json.Unmarshal(data, &result)
+	if err != nil {
+		return result, err
+	}
+	return result, nil
 }

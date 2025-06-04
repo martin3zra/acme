@@ -1,6 +1,6 @@
-import AuthenticatedLayout from '@/layouts/authenticated-layout';
+import AppLayout from '@/layouts/app-layout';
 import { PageProps } from '@/types';
 
 export default function Index({ auth }: PageProps) {
-  return <AuthenticatedLayout user={auth.user}>Error Page</AuthenticatedLayout>;
+  return <AppLayout user={auth.user}>Error Page</AppLayout>;
 }

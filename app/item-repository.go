@@ -1,6 +1,7 @@
 package app
 
 import (
+	"context"
 	"database/sql"
 	"errors"
 	"strings"
@@ -26,14 +27,14 @@ type item struct {
 	foundation.Timestamps
 }
 
-func (s *Server) findItemByID(companyID, itemID int) (*item, error) {
+func (s *Server) findItemByID(ctx context.Context, itemID int) (*item, error) {
 	var i item
 	err := s.db.QueryRow("SELECT i.id, i.uuid, i.name, i.price, i.description, i.tax_id, t.name, t.rate, i.status, "+
 		"i.created_at, i.updated_at, i.deleted_at, iu.unit_id, iu.name as unit_name  "+
 		"FROM items i "+
 		"INNER JOIN taxes t ON(i.company_id = t.company_id AND i.tax_id = t.id)"+
 		"LEFT JOIN LATERAL (SELECT iu.unit_id, u.name FROM items_units iu INNER JOIN units u ON (iu.unit_id = u.id) WHERE iu.item_id = i.id limit 1) iu ON true "+
-		"WHERE i.company_id = $1 AND i.id = $2 AND i.deleted_at IS NULL", companyID, itemID).Scan(
+		"WHERE i.company_id = $1 AND i.id = $2 AND i.deleted_at IS NULL", CurrentCompany(ctx).ID, itemID).Scan(
 		&i.ID,
 		&i.UUID,
 		&i.Name,
@@ -56,14 +57,14 @@ func (s *Server) findItemByID(companyID, itemID int) (*item, error) {
 	return &i, nil
 }
 
-func (s *Server) findItems(companyID int) ([]*item, error) {
+func (s *Server) findItems(ctx context.Context) ([]*item, error) {
 
 	is, err := s.db.Query("SELECT i.id, i.uuid, i.name, i.price, i.description, i.tax_id, t.name, t.rate, i.status, "+
 		"i.created_at, i.updated_at, i.deleted_at, iu.unit_id, iu.name as unit_name "+
 		"FROM items i "+
 		"INNER JOIN taxes t ON(i.company_id = t.company_id AND i.tax_id = t.id) "+
 		"LEFT JOIN LATERAL (SELECT iu.unit_id, u.name FROM items_units iu INNER JOIN units u ON (iu.unit_id = u.id) WHERE iu.item_id = i.id limit 1) iu ON true "+
-		"WHERE i.company_id = $1 AND i.deleted_at IS NULL ORDER BY i.name", companyID)
+		"WHERE i.company_id = $1 AND i.deleted_at IS NULL ORDER BY i.name", CurrentCompany(ctx).ID)
 	if err != nil {
 		return nil, err
 	}
@@ -93,7 +94,7 @@ func (s *Server) findItems(companyID int) ([]*item, error) {
 	return data, nil
 }
 
-func (s *Server) findItemsByCriteria(companyID int, term string) ([]*item, error) {
+func (s *Server) findItemsByCriteria(ctx context.Context, term string) ([]*item, error) {
 	if len(strings.TrimSpace(term)) == 0 {
 		return nil, errors.New("need to specifiy the item you're looking for")
 	}
@@ -102,7 +103,7 @@ func (s *Server) findItemsByCriteria(companyID int, term string) ([]*item, error
 		"FROM items i "+
 		"INNER JOIN taxes t ON(i.company_id = t.company_id AND i.tax_id = t.id) "+
 		"LEFT JOIN LATERAL (SELECT iu.unit_id, u.name FROM items_units iu INNER JOIN units u ON (iu.unit_id = u.id) WHERE iu.item_id = i.id limit 1) iu ON true "+
-		"WHERE i.company_id = $1 AND i.name ILIKE $2 AND i.deleted_at IS NULL ORDER BY i.name", companyID, "%"+term+"%")
+		"WHERE i.company_id = $1 AND i.name ILIKE $2 AND i.deleted_at IS NULL ORDER BY i.name", CurrentCompany(ctx).ID, "%"+term+"%")
 	if err != nil {
 		return nil, err
 	}
@@ -132,7 +133,7 @@ func (s *Server) findItemsByCriteria(companyID int, term string) ([]*item, error
 	return data, nil
 }
 
-func (s *Server) findItemsByReference(companyID int, term string) (*item, error) {
+func (s *Server) findItemsByReference(ctx context.Context, term string) (*item, error) {
 	if len(strings.TrimSpace(term)) == 0 {
 		return nil, errors.New("need to specifiy the item you're looking for")
 	}
@@ -142,7 +143,7 @@ func (s *Server) findItemsByReference(companyID int, term string) (*item, error)
 		"FROM items i "+
 		"INNER JOIN taxes t ON(i.company_id = t.company_id AND i.tax_id = t.id) "+
 		"LEFT JOIN LATERAL (SELECT iu.unit_id, u.name FROM items_units iu INNER JOIN units u ON (iu.unit_id = u.id) WHERE iu.item_id = i.id limit 1) iu ON true "+
-		"WHERE i.company_id = $1 AND i.name = $2 AND i.deleted_at IS NULL", companyID, term)
+		"WHERE i.company_id = $1 AND i.name = $2 AND i.deleted_at IS NULL", CurrentCompany(ctx).ID, term)
 	if result.Err() != nil {
 		return nil, result.Err()
 	}
@@ -165,7 +166,8 @@ func (s *Server) findItemsByReference(companyID int, term string) (*item, error)
 	return i, nil
 }
 
-func (s *Server) storeItem(companyID int, form StoreItemForm) error {
+func (s *Server) storeItem(ctx context.Context, form StoreItemForm) error {
+	companyID := CurrentCompany(ctx).ID
 	return database.WithTransaction(s.db, func(tx *sql.Tx) error {
 		stmt, err := tx.Prepare("INSERT INTO items (name, price, description, tax_id, company_id) " +
 			"VALUES ($1, $2, $3, $4, $5) RETURNING id")
@@ -200,7 +202,8 @@ func (s *Server) attachItemUnit(tx *sql.Tx, companyID, itemID, unitID int) error
 	return err
 }
 
-func (s *Server) updateItem(companyID, itemID int, form UpdateItemForm) error {
+func (s *Server) updateItem(ctx context.Context, itemID int, form UpdateItemForm) error {
+	companyID := CurrentCompany(ctx).ID
 	return database.WithTransaction(s.db, func(tx *sql.Tx) error {
 
 		_, err := tx.Exec(
@@ -220,17 +223,17 @@ func (s *Server) updateItem(companyID, itemID int, form UpdateItemForm) error {
 	})
 }
 
-func (s *Server) deleteItem(companyID, itemID int) error {
+func (s *Server) deleteItem(ctx context.Context, itemID int) error {
 
 	_, err := s.db.Exec(
 		"UPDATE items SET deleted_at = now(), updated_at = now() WHERE company_id = $1 AND id = $2",
-		companyID, itemID,
+		CurrentCompany(ctx).ID, itemID,
 	)
 
 	return err
 }
 
-func (s *Server) toggleItemStatus(companyID int, item *item) error {
+func (s *Server) toggleItemStatus(ctx context.Context, item *item) error {
 	status := item.Status
 	if status == "enabled" {
 		status = "disabled"
@@ -239,7 +242,7 @@ func (s *Server) toggleItemStatus(companyID int, item *item) error {
 	}
 	_, err := s.db.Exec(
 		"UPDATE items SET updated_at = now(), status = $3 WHERE company_id = $1 AND id = $2",
-		companyID, item.ID, status,
+		CurrentCompany(ctx).ID, item.ID, status,
 	)
 	return err
 }

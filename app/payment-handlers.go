@@ -2,239 +2,185 @@ package app
 
 import (
 	"log"
-	"net/http"
 
-	"github.com/martin3zra/acme/pkg/auth"
 	"github.com/martin3zra/acme/pkg/i18n"
+	"github.com/martin3zra/acme/pkg/routing"
 	"github.com/martin3zra/acme/pkg/support"
 	inertia "github.com/romsar/gonertia/v2"
 )
 
-func (s *Server) paymentsHandler(i *inertia.Inertia) http.Handler {
-	fn := func(w http.ResponseWriter, r *http.Request) {
-		uuid := r.URL.Query().Get("id")
-		user := auth.User(r.Context())
-		payments, err := s.findPayments(*user.CurrentCompanyId)
+func (s *Server) paymentsHandler(ctx *routing.Context) {
+	payments, err := s.findPayments(ctx.Request.Context())
+	if err != nil {
+		ctx.Error(err)
+		return
+	}
+	props := map[string]any{
+		"translations": mergeTranslations(ctx.Request.Context(), loadTranslations("payments")),
+		"payments":     payments,
+	}
+
+	uuid := ctx.Query("id")
+	if ensureUUIDIsValid(uuid) {
+		payment, err := s.findPaymentByUUID(ctx.Request.Context(), uuid)
 		if err != nil {
-			s.handleError(w, err)
+			ctx.Error(err)
 			return
 		}
-		props := inertia.Props{
-			"translations": mergeTranslations(r.Context(), loadTranslations("payments")),
-			"payments":     payments,
-		}
 
-		if ensureUUIDIsValid(uuid) {
-			payment, err := s.findPaymentByUUID(*user.CurrentCompanyId, uuid)
+		lines, err := s.findPaymentLines(ctx.Request.Context(), payment.ID)
+		if err != nil {
+			ctx.Error(err)
+			return
+		}
+		props["payment"] = map[string]any{
+			"header": payment,
+			"lines":  lines,
+		}
+		props["showPayment"] = true
+	}
+
+	ctx.Render("Payments/Index", props)
+}
+
+func (s *Server) createPaymentHandler(ctx *routing.Context) {
+
+	// what we do when the Payment id is given? only return that Payments?
+	paymentUuid := ctx.Query("payment_id")
+	term := ctx.Query("search")
+	customerUuid := ctx.Query("customer_id")
+
+	props := map[string]any{
+		"translations": mergeTranslations(ctx.Request.Context(), loadTranslations("payments")),
+		"customers": inertia.Optional(func() (any, error) {
+			customers, err := s.findCustomersBySearchCriteria(ctx.Request.Context(), term)
 			if err != nil {
-				s.handleError(w, err)
-				return
+				return nil, err
 			}
 
-			lines, err := s.findPaymentLines(*user.CurrentCompanyId, payment.ID)
+			return customers, err
+		}),
+		"receivables": inertia.Optional(func() (any, error) {
+			receivables, err := s.findCustomeReceivables(ctx.Request.Context(), customerUuid)
 			if err != nil {
-				s.handleError(w, err)
-				return
-			}
-			props["payment"] = map[string]any{
-				"header": payment,
-				"lines":  lines,
-			}
-			props["showPayment"] = true
-		}
-
-		err = i.Render(w, r, "Payments/Index", props)
-		if err != nil {
-			s.handleError(w, err)
-			return
-		}
-	}
-
-	return http.HandlerFunc(fn)
-}
-
-func (s *Server) createPaymentHandler(i *inertia.Inertia) http.Handler {
-	fn := func(w http.ResponseWriter, r *http.Request) {
-		// what we do when the Payment id is given? only return that Payments?
-		PaymentUuid := r.URL.Query().Get("Payment_id")
-		term := r.URL.Query().Get("search")
-		customerUuid := r.URL.Query().Get("customer_id")
-		user := auth.User(r.Context())
-
-		props := inertia.Props{
-			"translations": mergeTranslations(r.Context(), loadTranslations("payments")),
-			"customers": inertia.Optional(func() (any, error) {
-				customers, err := s.findCustomersBySearchCriteria(*user.CurrentCompanyId, term)
-				if err != nil {
-					return nil, err
-				}
-
-				return customers, err
-			}),
-			"receivables": inertia.Optional(func() (any, error) {
-				receivables, err := s.findCustomeReceivables(*user.CurrentCompanyId, customerUuid)
-				if err != nil {
-					return nil, err
-				}
-
-				return receivables, err
-			}),
-		}
-
-		if ensureUUIDIsValid(PaymentUuid) {
-			props["Payment_uuid"] = PaymentUuid
-		}
-
-		if ensureUUIDIsValid(customerUuid) {
-			customer, err := s.findCustomeByUUID(*user.CurrentCompanyId, customerUuid)
-			if err != nil {
-				s.handleError(w, err)
-				return
-			}
-			receivables, err := s.findCustomeReceivables(*user.CurrentCompanyId, customerUuid)
-			if err != nil {
-				s.handleError(w, err)
-				return
+				return nil, err
 			}
 
-			props["customer"] = customer
-			props["receivables"] = receivables
-			props["forceInitial"] = true
-		}
-		err := i.Render(w, r, "Payments/Create", props)
-		if err != nil {
-			s.handleError(w, err)
-			return
-		}
+			return receivables, err
+		}),
 	}
 
-	return http.HandlerFunc(fn)
+	if ensureUUIDIsValid(paymentUuid) {
+		props["payment_uuid"] = paymentUuid
+	}
+
+	if ensureUUIDIsValid(customerUuid) {
+		customer, err := s.findCustomeByUUID(ctx.Request.Context(), customerUuid)
+		if err != nil {
+			ctx.Error(err)
+			return
+		}
+		receivables, err := s.findCustomeReceivables(ctx.Request.Context(), customerUuid)
+		if err != nil {
+			ctx.Error(err)
+			return
+		}
+
+		props["customer"] = customer
+		props["receivables"] = receivables
+		props["forceInitial"] = true
+	}
+	ctx.Render("Payments/Create", props)
 }
 
-func (s *Server) storePaymentHandler(i *inertia.Inertia) http.Handler {
-	fn := func(w http.ResponseWriter, r *http.Request) {
-		var form StorePaymentForm
-		err := support.ParseRequest(r, &form)
-		if err != nil {
-			i.Back(w, r)
-			return
-		}
-
-		user := auth.User(r.Context())
-		err = s.storePayment(*user.CurrentCompanyId, form)
-		if err != nil {
-			log.Printf("Error recording payment: %v", err)
-			s.session.Errors("status", s.trans("global.wasNotCreated", i18n.Replacements{"subject": "@global.payment"}))
-			i.Back(w, r)
-			return
-		}
-
-		s.session.Flash("success", s.trans("global.wasCreated", i18n.Replacements{"subject": "@global.payment"}))
-
-		i.Back(w, r)
+func (s *Server) storePaymentHandler(ctx *routing.Context) {
+	var form StorePaymentForm
+	err := support.ParseRequest(ctx.Request, &form)
+	if err != nil {
+		ctx.Back()
+		return
 	}
 
-	return http.HandlerFunc(fn)
+	err = s.storePayment(ctx.Request.Context(), form)
+	if err != nil {
+		log.Printf("Error recording payment: %v", err)
+		s.session.Errors("status", s.trans("global.wasNotCreated", i18n.Replacements{"subject": "@global.payment"}))
+		ctx.Back()
+		return
+	}
+
+	s.session.Flash("success", s.trans("global.wasCreated", i18n.Replacements{"subject": "@global.payment"}))
+
+	ctx.Redirect("/payments")
 }
 
-func (s *Server) voidPaymentHandler(i *inertia.Inertia) http.Handler {
-
-	fn := func(w http.ResponseWriter, r *http.Request) {
-		uuid := r.PathValue("id")
-		back := func() {
-			i.Back(w, r, http.StatusSeeOther)
-		}
-		var form ConfirmsPasswords
-		err := support.ParseRequest(r, &form)
-		if err != nil {
-			back()
-			return
-		}
-
-		user := auth.User(r.Context())
-		err = s.voidPayment(*user.CurrentCompanyId, uuid)
-		if err != nil {
-			log.Printf("Error voiding payment: %v", err)
-			s.session.Errors("status", s.trans("global.wasNotVoided", i18n.Replacements{"subject": "@global.payment"}))
-			back()
-			return
-		}
-		s.session.Flash("success", s.trans("global.wasVoided", i18n.Replacements{"subject": "@global.payment"}))
-
-		i.Redirect(w, r, "/payments", http.StatusSeeOther)
+func (s *Server) voidPaymentHandler(ctx *routing.Context) {
+	var form ConfirmsPasswords
+	err := support.ParseRequest(ctx.Request, &form)
+	if err != nil {
+		ctx.Back()
+		return
 	}
 
-	return http.HandlerFunc(fn)
+	err = s.voidPayment(ctx.Request.Context(), ctx.Param("id"))
+	if err != nil {
+		log.Printf("Error voiding payment: %v", err)
+		s.session.Errors("status", s.trans("global.wasNotVoided", i18n.Replacements{"subject": "@global.payment"}))
+		ctx.Back()
+		return
+	}
+	s.session.Flash("success", s.trans("global.wasVoided", i18n.Replacements{"subject": "@global.payment"}))
+
+	ctx.Redirect("/payments")
 }
 
-func (s *Server) editPaymentHandler(i *inertia.Inertia) http.Handler {
-	fn := func(w http.ResponseWriter, r *http.Request) {
-		uuid := r.PathValue("id")
-		back := func() {
-			i.Back(w, r, http.StatusSeeOther)
-		}
-		user := auth.User(r.Context())
+func (s *Server) editPaymentHandler(ctx *routing.Context) {
 
-		if !ensureUUIDIsValid(uuid) {
-			back()
-			return
-		}
-
-		payment, err := s.findPaymentByUUID(*user.CurrentCompanyId, uuid)
-		if err != nil {
-			s.handleError(w, err)
-			return
-		}
-
-		lines, err := s.findPaymentLines(*user.CurrentCompanyId, payment.ID)
-		if err != nil {
-			s.handleError(w, err)
-			return
-		}
-
-		err = i.Render(w, r, "Payments/Edit", inertia.Props{
-			"translations": mergeTranslations(r.Context(), loadTranslations("payments")),
-			"payment": map[string]any{
-				"header": payment,
-				"lines":  lines,
-			},
-			"showPayment": true,
-		})
-		if err != nil {
-			s.handleError(w, err)
-			return
-		}
+	uuid := ctx.Param("id")
+	if !ensureUUIDIsValid(uuid) {
+		ctx.Back()
+		return
 	}
 
-	return http.HandlerFunc(fn)
+	payment, err := s.findPaymentByUUID(ctx.Request.Context(), uuid)
+	if err != nil {
+		ctx.Error(err)
+		return
+	}
+
+	lines, err := s.findPaymentLines(ctx.Request.Context(), payment.ID)
+	if err != nil {
+		ctx.Error(err)
+		return
+	}
+
+	ctx.Render("Payments/Edit", map[string]any{
+		"translations": mergeTranslations(ctx.Request.Context(), loadTranslations("payments")),
+		"payment": map[string]any{
+			"header": payment,
+			"lines":  lines,
+		},
+		"showPayment": true,
+	})
 }
 
-func (s *Server) updatePaymentHandler(i *inertia.Inertia) http.Handler {
-	fn := func(w http.ResponseWriter, r *http.Request) {
-		uuid := r.PathValue("id")
-		back := func() {
-			i.Back(w, r, http.StatusSeeOther)
-		}
-		var form UpdatePaymentForm
-		err := support.ParseRequest(r, &form)
-		if err != nil {
-			back()
-			return
-		}
-
-		user := auth.User(r.Context())
-		err = s.updatePayment(*user.CurrentCompanyId, uuid, form)
-		if err != nil {
-			log.Printf("Error recording payment: %v", err)
-			s.session.Errors("status", s.trans("global.wasNotUpdated", i18n.Replacements{"subject": "@global.payment"}))
-			back()
-			return
-		}
-
-		s.session.Flash("success", s.trans("global.wasUpdated", i18n.Replacements{"subject": "@global.payment"}))
-
-		i.Redirect(w, r, "/payments", http.StatusSeeOther)
+func (s *Server) updatePaymentHandler(ctx *routing.Context) {
+	var form UpdatePaymentForm
+	err := support.ParseRequest(ctx.Request, &form)
+	if err != nil {
+		ctx.Back()
+		return
 	}
 
-	return http.HandlerFunc(fn)
+	err = s.updatePayment(ctx.Request.Context(), ctx.Param("id"), form)
+	if err != nil {
+		log.Printf("Error recording payment: %v", err)
+		s.session.Errors("status", s.trans("global.wasNotUpdated", i18n.Replacements{"subject": "@global.payment"}))
+		ctx.Back()
+		return
+	}
+
+	s.session.Flash("success", s.trans("global.wasUpdated", i18n.Replacements{"subject": "@global.payment"}))
+
+	ctx.Redirect("/payments")
 }

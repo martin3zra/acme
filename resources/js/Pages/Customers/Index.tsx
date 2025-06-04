@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { useVerb } from '@/composables/use-verbs';
 import { useTranslation } from '@/hooks/use-translation';
-import AuthenticatedLayout from '@/layouts/authenticated-layout';
+import AppLayout from '@/layouts/app-layout';
 import { Customer, CustomerVerb, PageProps } from '@/types';
 import { router } from '@inertiajs/react';
 import { Plus } from 'lucide-react';
@@ -59,7 +59,7 @@ export default function Index({ auth, customers, customer }: PageProps<{ custome
   };
 
   return (
-    <AuthenticatedLayout user={auth.user} breadcrumbs={breadcrumbs}>
+    <AppLayout user={auth.user} breadcrumbs={breadcrumbs}>
       <div className="space-y-6">
         {hasCustomers && (
           <HeadingSmall
@@ -113,6 +113,6 @@ export default function Index({ auth, customers, customer }: PageProps<{ custome
           />
         )}
       </div>
-    </AuthenticatedLayout>
+    </AppLayout>
   );
 }

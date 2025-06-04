@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"log"
 
 	"github.com/martin3zra/acme/pkg/database"
@@ -12,6 +13,8 @@ import (
 )
 
 type ContextUserID struct{}
+
+type ContextCompanyID struct{}
 
 type Auth struct {
 	db       *sql.DB
@@ -31,7 +34,7 @@ func NewAuth(ctx context.Context) *Auth {
 }
 
 func (a *Auth) Authenticate(username, password string) (foundation.Authenticatable, error) {
-	user, err := a.attempt(username)
+	user, err := a.attempt("email", username)
 	if err != nil {
 		log.Printf("error authenticating user: %s\n", err)
 		return nil, err
@@ -45,15 +48,26 @@ func (a *Auth) Authenticate(username, password string) (foundation.Authenticatab
 	return user, nil
 }
 
+func (a *Auth) LoginUsingId(id int) (foundation.Authenticatable, error) {
+	user, err := a.attempt("id", id)
+	if err != nil {
+		log.Printf("error authenticating user: %s\n", err)
+		return nil, err
+	}
+
+	return user, nil
+}
+
 func (a *Auth) EnsureIsCurrentPassword(hashed, password string) bool {
 	return a.Hashable.Check(password, hashed)
 }
 
-func (a *Auth) attempt(username string) (foundation.Authenticatable, error) {
+func (a *Auth) attempt(column, value any) (foundation.Authenticatable, error) {
 	user := new(foundation.User)
-	err := a.db.QueryRow("SELECT * FROM users WHERE email = $1", username).
-		Scan(&user.Id, &user.CurrentCompanyId, &user.FirstName, &user.LastName, &user.Email,
-			&user.Password, &user.EmailVerifiedAt, &user.LastPasswordReset, &user.CreatedAt, &user.UpdatedAt, &user.DeletedAt)
+	err := a.db.QueryRow(fmt.Sprintf("SELECT * FROM users WHERE %s = $1", column), value).
+		Scan(&user.Id, &user.FirstName, &user.LastName, &user.Email,
+			&user.Password, &user.EmailVerifiedAt, &user.LastPasswordReset, &user.CreatedAt,
+			&user.UpdatedAt, &user.DeletedAt, &user.UUID, &user.Status, &user.MustChangePassword)
 	if err != nil {
 		return nil, err
 	}

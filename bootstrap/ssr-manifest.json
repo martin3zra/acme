@@ -15,8 +15,8 @@
   "resources/js/Pages/Customers/Shared/CreateForm.tsx": [
     "/bootstrap/assets/CreateForm.js"
   ],
-  "resources/js/Pages/Customers/Shared/delete-customer.tsx": [
-    "/bootstrap/assets/delete-customer.js"
+  "resources/js/Pages/Customers/constants.ts": [
+    "/bootstrap/assets/Index.js"
   ],
   "resources/js/Pages/Error/Index.tsx": [
     "/bootstrap/assets/Index3.js"
@@ -24,62 +24,215 @@
   "resources/js/Pages/Home/Index.tsx": [
     "/bootstrap/assets/Index4.js"
   ],
+  "resources/js/Pages/Invoices/Create.tsx": [
+    "/bootstrap/assets/Create.js"
+  ],
+  "resources/js/Pages/Invoices/Edit.tsx": [
+    "/bootstrap/assets/Edit.js"
+  ],
+  "resources/js/Pages/Invoices/Index.tsx": [
+    "/bootstrap/assets/Index5.js"
+  ],
+  "resources/js/Pages/Invoices/List/Index.tsx": [
+    "/bootstrap/assets/Index6.js"
+  ],
+  "resources/js/Pages/Invoices/List/columns-definitions.tsx": [
+    "/bootstrap/assets/columns-definitions2.js"
+  ],
+  "resources/js/Pages/Invoices/Shared/AddNewInvoice.tsx": [
+    "/bootstrap/assets/AddNewInvoice.js"
+  ],
+  "resources/js/Pages/Invoices/Shared/bank-transfer.tsx": [
+    "/bootstrap/assets/bank-transfer.js"
+  ],
+  "resources/js/Pages/Invoices/Shared/card-form.tsx": [
+    "/bootstrap/assets/card-form.js"
+  ],
+  "resources/js/Pages/Invoices/Shared/check-form.tsx": [
+    "/bootstrap/assets/check-form.js"
+  ],
+  "resources/js/Pages/Invoices/Shared/checkout-form.tsx": [
+    "/bootstrap/assets/checkout-form.js"
+  ],
+  "resources/js/Pages/Invoices/Shared/customer-section.tsx": [
+    "/bootstrap/assets/customer-section.js"
+  ],
+  "resources/js/Pages/Invoices/Shared/input-view.tsx": [
+    "/bootstrap/assets/input-view.js"
+  ],
+  "resources/js/Pages/Invoices/Shared/lines-column-headers.tsx": [
+    "/bootstrap/assets/lines-column-headers.js"
+  ],
+  "resources/js/Pages/Invoices/Shared/lines-form.tsx": [
+    "/bootstrap/assets/lines-form.js"
+  ],
+  "resources/js/Pages/Invoices/Shared/lines-line.tsx": [
+    "/bootstrap/assets/lines-line.js"
+  ],
+  "resources/js/Pages/Invoices/Shared/lines.tsx": [
+    "/bootstrap/assets/lines.js"
+  ],
+  "resources/js/Pages/Invoices/Shared/payment-summary.tsx": [
+    "/bootstrap/assets/payment-summary.js"
+  ],
+  "resources/js/Pages/Invoices/Show.tsx": [
+    "/bootstrap/assets/Show.js"
+  ],
+  "resources/js/Pages/Invoices/constants.ts": [
+    "/bootstrap/assets/constants.js"
+  ],
+  "resources/js/Pages/Items/Index.tsx": [
+    "/bootstrap/assets/Index7.js"
+  ],
+  "resources/js/Pages/Items/List/Index.tsx": [
+    "/bootstrap/assets/Index8.js"
+  ],
+  "resources/js/Pages/Items/List/columns-definitions.tsx": [
+    "/bootstrap/assets/columns-definitions3.js"
+  ],
+  "resources/js/Pages/Items/Shared/CreateForm.tsx": [
+    "/bootstrap/assets/CreateForm2.js"
+  ],
+  "resources/js/Pages/Items/constants.ts": [
+    "/bootstrap/assets/Index7.js"
+  ],
+  "resources/js/Pages/Onboarding/Index.tsx": [
+    "/bootstrap/assets/Index9.js"
+  ],
+  "resources/js/Pages/Onboarding/Shared/confetti-ball.tsx": [
+    "/bootstrap/assets/confetti-ball.js"
+  ],
+  "resources/js/Pages/Onboarding/Shared/congrats.tsx": [
+    "/bootstrap/assets/congrats.js"
+  ],
+  "resources/js/Pages/Payments/Create.tsx": [
+    "/bootstrap/assets/Create2.js"
+  ],
+  "resources/js/Pages/Payments/Edit.tsx": [
+    "/bootstrap/assets/Edit2.js"
+  ],
+  "resources/js/Pages/Payments/Index.tsx": [
+    "/bootstrap/assets/Index10.js"
+  ],
+  "resources/js/Pages/Payments/List/Index.tsx": [
+    "/bootstrap/assets/Index11.js"
+  ],
+  "resources/js/Pages/Payments/List/columns-definitions.tsx": [
+    "/bootstrap/assets/columns-definitions4.js"
+  ],
+  "resources/js/Pages/Payments/Shared/add-new-payment.tsx": [
+    "/bootstrap/assets/add-new-payment.js"
+  ],
+  "resources/js/Pages/Payments/Shared/columns-definitions.tsx": [
+    "/bootstrap/assets/columns-definitions5.js"
+  ],
+  "resources/js/Pages/Payments/Shared/lines-payment.tsx": [
+    "/bootstrap/assets/lines-payment.js"
+  ],
+  "resources/js/Pages/Payments/Show.tsx": [
+    "/bootstrap/assets/Show2.js"
+  ],
+  "resources/js/Pages/Payments/constants.ts": [
+    "/bootstrap/assets/constants3.js"
+  ],
+  "resources/js/Pages/Verify/Index.tsx": [
+    "/bootstrap/assets/Index12.js"
+  ],
+  "resources/js/Pages/Verify/Shared/create-password.tsx": [
+    "/bootstrap/assets/create-password.js"
+  ],
+  "resources/js/components/alert-destructive.tsx": [
+    "/bootstrap/assets/alert-destructive.js"
+  ],
   "resources/js/components/app-logo-icon.tsx": [
-    "/bootstrap/assets/Login.js"
+    "/bootstrap/assets/app-logo-icon.js"
   ],
   "resources/js/components/app-sidebar.tsx": [
-    "/bootstrap/assets/authenticated-layout.js"
+    "/bootstrap/assets/app-layout.js"
   ],
   "resources/js/components/breadcrumbs.tsx": [
-    "/bootstrap/assets/authenticated-layout.js"
+    "/bootstrap/assets/app-layout.js"
+  ],
+  "resources/js/components/confirms-password.tsx": [
+    "/bootstrap/assets/heading-small.js"
+  ],
+  "resources/js/components/create-company-form.tsx": [
+    "/bootstrap/assets/Index9.js"
   ],
   "resources/js/components/data-table/currency-cell.tsx": [
-    "/bootstrap/assets/columns-definitions.js"
+    "/bootstrap/assets/checkbox.js"
   ],
   "resources/js/components/data-table/date-cell.tsx": [
-    "/bootstrap/assets/columns-definitions.js"
+    "/bootstrap/assets/checkbox.js"
+  ],
+  "resources/js/components/data-table/editable-cell.tsx": [
+    "/bootstrap/assets/columns-definitions5.js"
   ],
   "resources/js/components/data-table/header-cell.tsx": [
-    "/bootstrap/assets/columns-definitions.js"
+    "/bootstrap/assets/checkbox.js"
+  ],
+  "resources/js/components/data-table/link-cell.tsx": [
+    "/bootstrap/assets/link-cell.js"
+  ],
+  "resources/js/components/data-table/numeric-cell.tsx": [
+    "/bootstrap/assets/columns-definitions4.js"
   ],
   "resources/js/components/data-table/text-cell.tsx": [
-    "/bootstrap/assets/columns-definitions.js"
+    "/bootstrap/assets/checkbox.js"
+  ],
+  "resources/js/components/form-section.tsx": [
+    "/bootstrap/assets/form-section.js"
   ],
   "resources/js/components/heading-small.tsx": [
-    "/bootstrap/assets/CreateForm.js"
+    "/bootstrap/assets/heading-small.js"
   ],
   "resources/js/components/input-error.tsx": [
-    "/bootstrap/assets/label.js"
+    "/bootstrap/assets/input-error.js"
+  ],
+  "resources/js/components/input-searchable.tsx": [
+    "/bootstrap/assets/customer-section.js"
   ],
   "resources/js/components/nav-main.tsx": [
-    "/bootstrap/assets/authenticated-layout.js"
+    "/bootstrap/assets/app-layout.js"
   ],
   "resources/js/components/nav-secondary.tsx": [
-    "/bootstrap/assets/authenticated-layout.js"
+    "/bootstrap/assets/app-layout.js"
   ],
   "resources/js/components/nav-user.tsx": [
-    "/bootstrap/assets/authenticated-layout.js"
+    "/bootstrap/assets/app-layout.js"
   ],
-  "resources/js/components/secure-action-dialog.tsx": [
-    "/bootstrap/assets/CreateForm.js"
+  "resources/js/components/section-title.tsx": [
+    "/bootstrap/assets/form-section.js"
+  ],
+  "resources/js/components/status-badge.tsx": [
+    "/bootstrap/assets/status-badge.js"
+  ],
+  "resources/js/components/ui/alert-dialog.tsx": [
+    "/bootstrap/assets/use-persisted-state.js"
+  ],
+  "resources/js/components/ui/alert.tsx": [
+    "/bootstrap/assets/alert-destructive.js"
   ],
   "resources/js/components/ui/avatar.tsx": [
-    "/bootstrap/assets/authenticated-layout.js"
-  ],
-  "resources/js/components/ui/badge.tsx": [
-    "/bootstrap/assets/columns-definitions.js"
+    "/bootstrap/assets/app-layout.js"
   ],
   "resources/js/components/ui/breadcrumb.tsx": [
-    "/bootstrap/assets/authenticated-layout.js"
+    "/bootstrap/assets/app-layout.js"
   ],
   "resources/js/components/ui/button.tsx": [
     "/bootstrap/assets/button.js"
   ],
+  "resources/js/components/ui/calendar.tsx": [
+    "/bootstrap/assets/use-persisted-state.js"
+  ],
   "resources/js/components/ui/checkbox.tsx": [
-    "/bootstrap/assets/columns-definitions.js"
+    "/bootstrap/assets/checkbox.js"
+  ],
+  "resources/js/components/ui/command.tsx": [
+    "/bootstrap/assets/command.js"
   ],
   "resources/js/components/ui/dialog.tsx": [
-    "/bootstrap/assets/use-headers.js"
+    "/bootstrap/assets/dialog.js"
   ],
   "resources/js/components/ui/dropdown-menu.tsx": [
     "/bootstrap/assets/dropdown-menu.js"
@@ -90,38 +243,71 @@
   "resources/js/components/ui/label.tsx": [
     "/bootstrap/assets/label.js"
   ],
+  "resources/js/components/ui/popover.tsx": [
+    "/bootstrap/assets/customer-section.js"
+  ],
+  "resources/js/components/ui/select.tsx": [
+    "/bootstrap/assets/select.js"
+  ],
   "resources/js/components/ui/separator.tsx": [
-    "/bootstrap/assets/authenticated-layout.js"
+    "/bootstrap/assets/separator.js"
   ],
   "resources/js/components/ui/sheet.tsx": [
-    "/bootstrap/assets/authenticated-layout.js"
+    "/bootstrap/assets/sheet.js"
   ],
   "resources/js/components/ui/sidebar.tsx": [
-    "/bootstrap/assets/authenticated-layout.js"
+    "/bootstrap/assets/app-layout.js"
   ],
   "resources/js/components/ui/sonner.tsx": [
-    "/bootstrap/assets/authenticated-layout.js"
+    "/bootstrap/assets/app-layout.js"
   ],
   "resources/js/components/ui/table.tsx": [
-    "/bootstrap/assets/Index2.js"
+    "/bootstrap/assets/table.js"
   ],
   "resources/js/components/ui/tooltip.tsx": [
-    "/bootstrap/assets/authenticated-layout.js"
+    "/bootstrap/assets/tooltip.js"
   ],
   "resources/js/composables/use-document.ts": [
-    "/bootstrap/assets/use-headers.js"
+    "/bootstrap/assets/heading-small.js"
   ],
   "resources/js/composables/use-headers.ts": [
     "/bootstrap/assets/use-headers.js"
   ],
   "resources/js/composables/use-number.ts": [
-    "/bootstrap/assets/columns-definitions.js"
+    "/bootstrap/assets/use-number.js"
   ],
   "resources/js/composables/use-verbs.ts": [
-    "/bootstrap/assets/CreateForm.js"
+    "/bootstrap/assets/use-verbs.js"
+  ],
+  "resources/js/constants.ts": [
+    "/bootstrap/assets/constants2.js"
+  ],
+  "resources/js/hooks/use-callback-state.ts": [
+    "/bootstrap/assets/use-callback-state.js"
+  ],
+  "resources/js/hooks/use-debounced.ts": [
+    "/bootstrap/assets/use-debounced.js"
+  ],
+  "resources/js/hooks/use-initials.ts": [
+    "/bootstrap/assets/app-layout.js"
+  ],
+  "resources/js/hooks/use-local-storage.ts": [
+    "/bootstrap/assets/use-persisted-state.js"
   ],
   "resources/js/hooks/use-mobile.ts": [
-    "/bootstrap/assets/authenticated-layout.js"
+    "/bootstrap/assets/app-layout.js"
+  ],
+  "resources/js/hooks/use-persisted-state.ts": [
+    "/bootstrap/assets/use-persisted-state.js"
+  ],
+  "resources/js/hooks/use-translation.ts": [
+    "/bootstrap/assets/use-translation.js"
+  ],
+  "resources/js/layouts/app-layout.tsx": [
+    "/bootstrap/assets/app-layout.js"
+  ],
+  "resources/js/layouts/app-simple-layout.tsx": [
+    "/bootstrap/assets/Index9.js"
   ],
   "resources/js/layouts/auth-layout.tsx": [
     "/bootstrap/assets/Login.js"
@@ -129,11 +315,17 @@
   "resources/js/layouts/auth/auth-simple-layout.tsx": [
     "/bootstrap/assets/Login.js"
   ],
-  "resources/js/layouts/authenticated-layout.tsx": [
-    "/bootstrap/assets/authenticated-layout.js"
+  "resources/js/layouts/guest-layout.tsx": [
+    "/bootstrap/assets/Index12.js"
   ],
   "resources/js/lib/utils.ts": [
-    "/bootstrap/assets/button.js"
+    "/bootstrap/assets/utils.js"
   ],
-  "resources/js/ssr.jsx": []
+  "resources/js/ssr.jsx": [],
+  "resources/js/types/index.ts": [
+    "/bootstrap/assets/index13.js"
+  ],
+  "resources/js/types/status-config-map.ts": [
+    "/bootstrap/assets/status-badge.js"
+  ]
 }

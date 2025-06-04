@@ -3,39 +3,58 @@ package auth
 import (
 	"context"
 	"net/http"
+	"strings"
 
+	"github.com/martin3zra/acme/pkg/routing"
 	"github.com/martin3zra/acme/pkg/session"
 )
 
-func Middleware(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		sess := session.GetSession(r)
+func Middleware(next routing.HandlerFunc) routing.HandlerFunc {
+	return func(ctx *routing.Context) {
+		sess := session.GetSession(ctx.Request)
 
 		userId := sess.Get("user_id")
 		if userId == nil || userId.(float64) == 0 {
-			http.Redirect(w, r, "/login", http.StatusSeeOther)
+			ctx.Redirect("/login", http.StatusSeeOther)
 			return
 		}
 
 		user := sess.Get("user")
-		ctx := context.WithValue(r.Context(), ContextUserID{}, user)
-		req := r.WithContext(ctx)
+		userCtx := context.WithValue(ctx.Request.Context(), ContextUserID{}, user)
 
-		next.ServeHTTP(w, req)
-	})
+		attrs := sess.Get("attrs")
+		if attrs == nil {
+			next(ctx.WithContext(userCtx))
+			return
+		}
+
+		attrsMap := attrs.(map[string]any)
+		if cc, ok := attrsMap["current_company"]; ok {
+			ccCtx := context.WithValue(userCtx, ContextCompanyID{}, cc)
+			next(ctx.WithContext(ccCtx))
+			return
+		}
+
+		next(ctx.WithContext(userCtx))
+	}
 }
 
-func RedirectIfAuthenticated(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		sess := session.GetSession(r)
+func RedirectIfAuthenticated(next routing.HandlerFunc) routing.HandlerFunc {
+	return func(ctx *routing.Context) {
+
+		if strings.HasPrefix(ctx.Request.RequestURI, "/verify-account") {
+			next(ctx)
+			return
+		}
+		sess := session.GetSession(ctx.Request)
 
 		userId := sess.Get("user_id")
 
 		if userId != nil && userId.(float64) != 0 {
-			http.Redirect(w, r, "/home", http.StatusSeeOther)
+			ctx.Redirect("/home", http.StatusSeeOther)
 			return
 		}
 
-		next.ServeHTTP(w, r)
-	})
+		next(ctx)
+	}
 }

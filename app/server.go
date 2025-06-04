@@ -6,9 +6,13 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"os"
 	"time"
 
 	"github.com/martin3zra/acme/pkg/i18n"
+	"github.com/martin3zra/acme/pkg/inertia"
+	"github.com/martin3zra/acme/pkg/mailer"
+	"github.com/martin3zra/acme/pkg/routing"
 	"github.com/martin3zra/acme/pkg/session"
 	"github.com/martin3zra/acme/pkg/store"
 )
@@ -17,19 +21,20 @@ import (
 var sqlQueriesFS embed.FS
 
 type Server struct {
-	mux            *http.ServeMux
 	qs             store.Query
 	db             *sql.DB
 	config         *Config
 	sessionManager *session.SessionManager
+	mailer         mailer.Mailer
 	// Transient request data
 	session    *session.Session
 	assets     embed.FS
 	resources  embed.FS
 	translator *i18n.Translator
+	route      *routing.Router
 }
 
-func NewServer(assets, resources embed.FS) *Server {
+func NewServer(assets, resources *embed.FS) *Server {
 
 	qs, err := store.NewQueryStore(sqlQueriesFS, "sql/")
 	if err != nil {
@@ -37,21 +42,44 @@ func NewServer(assets, resources embed.FS) *Server {
 	}
 	translator := i18n.NewTranslator(loadTranslations("global"))
 
-	return &Server{
-		mux:        http.NewServeMux(),
+	server := &Server{
 		qs:         qs,
 		config:     LoadConfig(),
-		assets:     assets,
-		resources:  resources,
 		translator: translator,
 	}
+
+	if assets != nil && resources != nil {
+		server.assets = *assets
+		server.resources = *resources
+	}
+
+	return server
 }
 
 func (s *Server) Boot() {
-	s.config.ensureHasBeenSet()
 
+	s.config.ensureHasBeenSet()
 	s.openDatabaseConnection()
+	s.configureMailClient()
+
+	isRunningInCli := os.Getenv("RUNNING_IN_CLI")
+	if isRunningInCli == "YES" {
+		return
+	}
+
 	s.configureSessionManager()
+	s.configureRouting()
+}
+
+func (s *Server) configureRouting() {
+	s.route = routing.New()
+	s.route.RegisterInertia(
+		inertia.InitInertia(
+			s.assets,
+			s.resources,
+			s.config.port,
+		),
+	)
 	s.bootRoutes()
 }
 
@@ -59,7 +87,7 @@ func (s *Server) Start() {
 
 	server := &http.Server{
 		Addr:    fmt.Sprintf(":%s", s.config.port),
-		Handler: s.sessionManager.Handle(s.BindMiddleware(s.mux)),
+		Handler: s.sessionManager.Handle(s.BindMiddleware(s.route)),
 	}
 
 	server.ListenAndServe()
@@ -82,20 +110,8 @@ func (s *Server) configureSessionManager() {
 	)
 }
 
-func (s *Server) get(pattern string, handler http.Handler) {
-	s.mux.Handle(fmt.Sprintf("GET %s", pattern), handler)
-}
-
-func (s *Server) post(pattern string, handler http.Handler) {
-	s.mux.Handle(fmt.Sprintf("POST %s", pattern), handler)
-}
-
-func (s *Server) put(pattern string, handler http.Handler) {
-	s.mux.Handle(fmt.Sprintf("PUT %s", pattern), handler)
-}
-
-func (s *Server) delete(pattern string, handler http.Handler) {
-	s.mux.Handle(fmt.Sprintf("DELETE %s", pattern), handler)
+func (s *Server) configureMailClient() {
+	s.mailer = mailer.New(s.config.mail.asMailConfig(), s.resources)
 }
 
 func (s *Server) trans(key string, replacements ...i18n.Replacements) string {

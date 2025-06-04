@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/martin3zra/acme/pkg/foundation"
+	"github.com/romsar/gonertia/v2"
 )
 
 func NewSessionManager(
@@ -110,7 +111,7 @@ func (m *SessionManager) Migrate(session *Session) error {
 	return nil
 }
 
-func (m *SessionManager) ReGenerate(r *http.Request, user foundation.Authenticatable) error {
+func (m *SessionManager) ReGenerate(r *http.Request, user foundation.Authenticatable, attrs map[string]any) error {
 	sess := GetSession(r)
 	err := m.Migrate(sess)
 	if err != nil {
@@ -120,7 +121,10 @@ func (m *SessionManager) ReGenerate(r *http.Request, user foundation.Authenticat
 
 	sess.Put("user_id", user.GetAuthIdentifier())
 	sess.Put("user", user)
+	sess.Put("attrs", attrs)
 	sess.ClearErrors()
+
+	gonertia.SetProp(r.Context(), "csrf_token", sess.Get("csrf_token"))
 
 	return nil
 }

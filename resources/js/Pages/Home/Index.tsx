@@ -1,9 +1,9 @@
-import AuthenticatedLayout from '@/layouts/authenticated-layout';
+import AppLayout from '@/layouts/app-layout';
 import { PageProps } from '@/types';
 
 export default function Home({ auth, flash }: PageProps) {
   return (
-    <AuthenticatedLayout user={auth.user}>
+    <AppLayout user={auth.user}>
       <div>
         <div className="grid auto-rows-min gap-4 md:grid-cols-3">
           <div className="bg-muted/50 aspect-video rounded-xl" />
@@ -13,6 +13,6 @@ export default function Home({ auth, flash }: PageProps) {
         {flash && <span>{flash.success}</span>}
         <h1>Home Page</h1>
       </div>
-    </AuthenticatedLayout>
+    </AppLayout>
   );
 }

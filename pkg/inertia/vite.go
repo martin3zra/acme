@@ -53,7 +53,7 @@ func InitInertia(assets, resources embed.FS, port string) *inertia.Inertia {
 	manifestPath := "public/build/manifest.json"
 	i, err := inertia.NewFromFileFS(
 		resources,
-		"resources/views/root.html",
+		rootViewFile,
 		inertia.WithVersionFromFileFS(assets, manifestPath),
 		inertia.WithSSR(),
 	)
