@@ -1,7 +1,6 @@
 package mail
 
 import (
-	"github.com/martin3zra/acme/pkg/foundation"
 	"github.com/martin3zra/acme/pkg/mailer"
 )
 
@@ -24,7 +23,7 @@ func (w Verify) To() []mailer.Individual {
 	return []mailer.Individual{}
 }
 
-func (w Verify) Content() string { return foundation.ResolvePath("resources/views/mail/verify.html") }
+func (w Verify) Content() string { return "resources/views/mail/verify.html" }
 
 func (w Verify) Data() map[string]any {
 

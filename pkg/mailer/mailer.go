@@ -2,6 +2,7 @@ package mailer
 
 import (
 	"bytes"
+	"embed"
 	"encoding/json"
 	"fmt"
 	"html/template"
@@ -43,12 +44,13 @@ type Mailable interface {
 }
 
 type Mailer struct {
-	to  Individual
-	cfg Config
+	to        Individual
+	cfg       Config
+	templates embed.FS
 }
 
-func New(cfg Config) Mailer {
-	return Mailer{cfg: cfg}
+func New(cfg Config, templates embed.FS) Mailer {
+	return Mailer{cfg: cfg, templates: templates}
 }
 
 func (m Mailer) To(email, name string) Mailer {
@@ -135,7 +137,7 @@ func (m Mailer) sendViaSMTP(mailable Mailable) {
 
 func (m Mailer) composeHTML(view string, data map[string]any) string {
 
-	tmpl, err := template.ParseFiles(view)
+	tmpl, err := template.ParseFS(m.templates, view)
 	if err != nil {
 		log.Fatal(err.Error())
 		return ""

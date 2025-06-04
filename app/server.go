@@ -111,7 +111,7 @@ func (s *Server) configureSessionManager() {
 }
 
 func (s *Server) configureMailClient() {
-	s.mailer = mailer.New(s.config.mail.asMailConfig())
+	s.mailer = mailer.New(s.config.mail.asMailConfig(), s.resources)
 }
 
 func (s *Server) trans(key string, replacements ...i18n.Replacements) string {
