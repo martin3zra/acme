@@ -68,6 +68,27 @@ func (s *Server) bootRoutes() {
 			route.PUT("/payments/:id", s.updatePaymentHandler)
 
 			route.POST("/password", s.createPasswordHandler)
+
+			route.Group(func(route *routing.Router) {
+				route.GET("/settings/:account/profile", func(ctx *routing.Context) {
+					ctx.Render("Settings/Account", map[string]any{})
+				})
+				route.GET("/settings/:account/companies", func(ctx *routing.Context) {
+					ctx.Render("Settings/Companies/Index", map[string]any{})
+				})
+				route.GET("/settings/:account/users", func(ctx *routing.Context) {
+					ctx.Render("Settings/Users/Index", map[string]any{})
+				})
+				route.GET("/settings/:account/preferences", func(ctx *routing.Context) {
+					ctx.Render("Settings/Preferences", map[string]any{})
+				})
+				route.GET("/settings/:account/taxes", func(ctx *routing.Context) {
+					ctx.Render("Settings/Taxes/Index", map[string]any{})
+				})
+				route.GET("/settings/profile", func(ctx *routing.Context) {
+					ctx.Render("Settings/Profile", map[string]any{})
+				})
+			})
 		})
 
 	uiAssets := foundation.GetBuildAssets(s.assets, "public/build")

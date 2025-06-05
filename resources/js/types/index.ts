@@ -1,5 +1,8 @@
+import { LucideIcon } from 'lucide-react';
+
 export interface User {
   id: number;
+  uuid: string;
   first_name: string;
   last_name: string;
   email: string;
@@ -13,6 +16,12 @@ export interface User {
 export interface Auth {
   user: User;
   company: Company;
+  account: AuthAccount;
+}
+
+export interface AuthAccount {
+  uuid: string;
+  owner: boolean;
 }
 
 export interface Company {
@@ -340,3 +349,10 @@ export const defaultBreadcrumbs: BreadcrumbItem[] = [
     href: '/home',
   },
 ];
+
+export interface NavItem {
+  title: string;
+  url: string;
+  icon?: LucideIcon | null;
+  isActive?: boolean;
+}

@@ -619,7 +619,7 @@ func (u *User) OwnedBy(db *sql.DB) *account {
 
 	var a = new(account)
 	if err := db.QueryRow(`
-    SELECT id, uuid, name, owner_id, status, verified_at, created_at, updated_at, deleted_at
+    SELECT accounts.id, accounts.uuid, accounts.name, accounts.owner_id, accounts.status, accounts.verified_at, accounts.created_at, accounts.updated_at, accounts.deleted_at
     FROM accounts
     INNER JOIN accounts_users on accounts.id = accounts_users.account_id
     WHERE accounts_users.user_id = $1

@@ -44,7 +44,7 @@ const data = {
   navSecondary: [
     {
       title: 'global.navSecondary.settings',
-      url: '#',
+      url: '/settings/:account/profile',
       icon: SettingsIcon,
     },
     {

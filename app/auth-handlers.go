@@ -40,6 +40,7 @@ func (s *Server) authHandler(ctx *routing.Context) {
 	}
 
 	userCtx := UserFromFoundationUser(user.(*foundation.User))
+	account := userCtx.OwnedBy(s.db)
 	company := userCtx.currentCompany(s.db)
 
 	// Preventing Timing Attacks
@@ -49,6 +50,10 @@ func (s *Server) authHandler(ctx *routing.Context) {
 
 	err = s.sessionManager.ReGenerate(ctx.Request, user, map[string]any{
 		"current_company": company,
+		"account": map[string]any{
+			"uuid":  account.UUID,
+			"owner": userCtx.Account(s.db) != nil,
+		},
 	})
 	if err != nil {
 		ctx.Error(err)

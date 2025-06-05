@@ -28,6 +28,7 @@ func (s *Server) BindMiddleware(next http.Handler) http.Handler {
 
 func (s *Server) SharedProps(next routing.HandlerFunc) routing.HandlerFunc {
 	return func(ctx *routing.Context) {
+		var ownedBy map[string]any
 		var currentCompany *Company
 		session := ctx.Request.Context().Value(session.SessionContextKey{}).(*session.Session)
 		sessionUser := session.Get("user")
@@ -44,12 +45,18 @@ func (s *Server) SharedProps(next routing.HandlerFunc) routing.HandlerFunc {
 					}
 				}
 			}
+			if ac, ok := attrsMap["account"]; ok {
+				if oa, ok := ac.(map[string]any); ok {
+					ownedBy = oa
+				}
+			}
 		}
 
 		ctxWithProps := gonertia.SetProps(ctx.Request.Context(), map[string]any{
 			"auth": map[string]any{
 				"user":    sessionUser,
 				"company": currentCompany,
+				"account": ownedBy,
 			},
 			"csrf_token":   session.Get("csrf_token"),
 			"errors":       session.Get("errors"),
