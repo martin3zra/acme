@@ -570,6 +570,7 @@ func (StoreCompanyForm) Rules() map[string]any {
 
 type User struct {
 	foundation.User
+	account *account
 }
 
 func (u *User) SendEmailVerification(notify mailer.Mailer, attributes map[string]string) {
@@ -596,6 +597,61 @@ func (u *User) HasVerifiedEmail() bool {
 func (u *User) MarkEmailAsVerified(db *sql.DB) bool {
 	_, err := db.Exec("UPDATE users SET email_verified_at = now(), updated_at = now() WHERE id = $1", u.Id)
 	return err == nil
+}
+
+func (u *User) Account(db *sql.DB) *account {
+	var a = new(account)
+	if err := db.QueryRow("SELECT id, uuid, name, owner_id, status, verified_at, created_at, updated_at, deleted_at FROM accounts WHERE owner_id = $1", u.Id).
+		Scan(&a.ID, &a.UUID, &a.Name, &a.Owner.ID, &a.Status, &a.VerifiedAt, &a.CreatedAt, &a.UpdatedAt, &a.DeletedAt); err != nil {
+		log.Println("An error occurred fetching the account using the ownerID:", err)
+		return nil
+	}
+
+	u.account = a
+
+	return a
+}
+
+func (u *User) OwnedBy(db *sql.DB) *account {
+	if u.account != nil {
+		return u.account
+	}
+
+	var a = new(account)
+	if err := db.QueryRow(`
+    SELECT id, uuid, name, owner_id, status, verified_at, created_at, updated_at, deleted_at
+    FROM accounts
+    INNER JOIN accounts_users on accounts.id = accounts_users.account_id
+    WHERE accounts_users.user_id = $1
+  `, u.Id).
+		Scan(&a.ID, &a.UUID, &a.Name, &a.Owner.ID, &a.Status, &a.VerifiedAt, &a.CreatedAt, &a.UpdatedAt, &a.DeletedAt); err != nil {
+		log.Println("An error occurred fetching the owned account using the userId:", err)
+		return nil
+	}
+
+	u.account = a
+
+	return a
+}
+
+func (u *User) IsOwner(db *sql.DB) bool {
+	return u.Account(db) != nil
+}
+
+func (u *User) IsNotOwner(db *sql.DB) bool {
+	return !u.IsOwner(db)
+}
+
+func (u *User) IsOwned(db *sql.DB) bool {
+	return u.OwnedBy(db) != nil
+}
+
+func (u *User) IsNotOwned(db *sql.DB) bool {
+	return !u.IsOwned(db)
+}
+
+func (u *User) IsOrphan(db *sql.DB) bool {
+	return u.IsNotOwned(db) && u.IsNotOwner(db)
 }
 
 func UserFromContext(ctx context.Context) *User {
@@ -644,11 +700,4 @@ func CurrentCompany(ctx context.Context) Company {
 	}
 
 	return company
-	// return Company{
-	// 	ID:         1,                 // Placeholder, replace with actual logic to get current company ID   }
-	// 	Name:       "Default Company", // Placeholder, replace with actual logic to get current company name
-	// 	Identifier: "default-company", // Placeholder, replace with actual logic to get current company identifier
-	// 	City:       "Default City",    // Placeholder, replace with actual logic to get current company city
-	// 	Address:    "123 Default St",  // Placeholder, replace with actual logic to get current company address
-	// }
 }

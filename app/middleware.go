@@ -2,6 +2,7 @@ package app
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 	"net/http"
 
@@ -94,6 +95,25 @@ func Verified(next routing.HandlerFunc) routing.HandlerFunc {
 		user := auth.User(ctx.Request.Context())
 		if user == nil || user.EmailVerifiedAt == nil {
 			ctx.Redirect("/verify-email")
+			return
+		}
+
+		next(ctx)
+	}
+}
+
+func EnforceVerifiedUserAccess(next routing.HandlerFunc) routing.HandlerFunc {
+	return func(ctx *routing.Context) {
+		db := ctx.Request.Context().Value(database.ConnectionKey{}).(*sql.DB)
+		user := UserFromFoundationUser(auth.User(ctx.Request.Context()))
+
+		if user.IsOrphan(db) {
+			ctx.Redirect("/verify-account", http.StatusForbidden)
+			return
+		}
+
+		if user.IsOwned(db) && !user.account.HasVerifiedAccount() {
+			ctx.Redirect("/verify-account", http.StatusForbidden)
 			return
 		}
 

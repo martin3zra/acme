@@ -13,10 +13,11 @@ import (
 )
 
 type account struct {
-	ID    int    `json:"id"`
-	UUID  string `json:"uuid"`
-	Name  string `json:"name"`
-	Owner struct {
+	ID     int    `json:"id"`
+	UUID   string `json:"uuid"`
+	Name   string `json:"name"`
+	Status string `json:"status"`
+	Owner  struct {
 		ID    int    `json:"id"`
 		Email string `json:"email"`
 	} `json:"owner"`
@@ -68,13 +69,13 @@ func (s *Server) findAccountByID(accountID int) (*account, error) {
 	var a account
 
 	if err := s.db.QueryRow(`
-    SELECT accounts.id, accounts.uuid, accounts.name, accounts.verified_at, accounts.created_at, accounts.updated_at, accounts.deleted_at,
+    SELECT accounts.id, accounts.uuid, accounts.name, accounts.verified_at, accounts.status, accounts.created_at, accounts.updated_at, accounts.deleted_at,
     users.id, users.email
     FROM accounts
     INNER JOIN users ON (accounts.owner_id = users.id)
     WHERE accounts.id = $1
   `, accountID).Scan(
-		a.ID, a.UUID, a.Name, a.VerifiedAt, a.CreatedAt, a.UpdatedAt, a.DeletedAt, a.Owner.ID, a.Owner.Email,
+		a.ID, a.UUID, a.Name, a.VerifiedAt, &a.Status, a.CreatedAt, a.UpdatedAt, a.DeletedAt, a.Owner.ID, a.Owner.Email,
 	); err != nil {
 		return nil, err
 	}
@@ -86,13 +87,13 @@ func (s *Server) findAccountByIDUsingTx(tx *sql.Tx, accountID int) (*account, er
 	var a account
 
 	if err := tx.QueryRow(`
-    SELECT accounts.id, accounts.uuid, accounts.name, accounts.verified_at, accounts.created_at, accounts.updated_at, accounts.deleted_at,
+    SELECT accounts.id, accounts.uuid, accounts.name, accounts.verified_at, accounts.status, accounts.created_at, accounts.updated_at, accounts.deleted_at,
     users.id, users.email
     FROM accounts
     INNER JOIN users ON (accounts.owner_id = users.id)
     WHERE accounts.id = $1
   `, accountID).Scan(
-		&a.ID, &a.UUID, &a.Name, &a.VerifiedAt, &a.CreatedAt, &a.UpdatedAt, &a.DeletedAt, &a.Owner.ID, &a.Owner.Email,
+		&a.ID, &a.UUID, &a.Name, &a.VerifiedAt, &a.Status, &a.CreatedAt, &a.UpdatedAt, &a.DeletedAt, &a.Owner.ID, &a.Owner.Email,
 	); err != nil {
 		return nil, err
 	}
@@ -104,13 +105,13 @@ func (s *Server) findAccountByUUID(uuid string) (*account, error) {
 	var a account
 
 	if err := s.db.QueryRow(`
-    SELECT accounts.id, accounts.uuid, accounts.name, accounts.verified_at, accounts.created_at, accounts.updated_at, accounts.deleted_at,
+    SELECT accounts.id, accounts.uuid, accounts.name, accounts.verified_at, accounts.status, accounts.created_at, accounts.updated_at, accounts.deleted_at,
     users.id, users.email
     FROM accounts
     INNER JOIN users ON (accounts.owner_id = users.id)
     WHERE accounts.uuid = $1
   `, uuid).Scan(
-		&a.ID, &a.UUID, &a.Name, &a.VerifiedAt, &a.CreatedAt, &a.UpdatedAt, &a.DeletedAt, &a.Owner.ID, &a.Owner.Email,
+		&a.ID, &a.UUID, &a.Name, &a.VerifiedAt, &a.Status, &a.CreatedAt, &a.UpdatedAt, &a.DeletedAt, &a.Owner.ID, &a.Owner.Email,
 	); err != nil {
 		return nil, err
 	}
@@ -122,13 +123,13 @@ func (s *Server) findAccountByOwnerEmailAddress(email string) (*account, error) 
 	var a account
 
 	if err := s.db.QueryRow(`
-    SELECT accounts.id, accounts.uuid, accounts.name, accounts.verified_at, accounts.created_at, accounts.updated_at, accounts.deleted_at,
+    SELECT accounts.id, accounts.uuid, accounts.name, accounts.verified_at, accounts.status, accounts.created_at, accounts.updated_at, accounts.deleted_at,
     users.id, users.email
     FROM accounts
     INNER JOIN users ON (accounts.owner_id = users.id)
     WHERE users.email = $1
   `, email).Scan(
-		&a.ID, &a.UUID, &a.Name, &a.VerifiedAt, &a.CreatedAt, &a.UpdatedAt, &a.DeletedAt, &a.Owner.ID, &a.Owner.Email,
+		&a.ID, &a.UUID, &a.Name, &a.VerifiedAt, &a.Status, &a.CreatedAt, &a.UpdatedAt, &a.DeletedAt, &a.Owner.ID, &a.Owner.Email,
 	); err != nil {
 		return nil, err
 	}

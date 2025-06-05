@@ -24,9 +24,11 @@ func (s *Server) createPasswordHandler(ctx *routing.Context) {
 		return
 	}
 
-	// TODO Is ther user isOrphan or have any company then redirect to the homepage,
-	// TODO : otherwise if owner redirect to the onboarding
+	u := UserFromFoundationUser(user)
+	if u.IsOwner(s.db) {
+		ctx.Redirect("/onboarding")
+		return
+	}
 
-	// redirect to home || onboarding
-	ctx.Redirect("/onboarding")
+	ctx.Redirect("/home")
 }

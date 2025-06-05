@@ -18,15 +18,20 @@ func (s *Server) bootRoutes() {
 			route.GET("/login", s.login)
 			route.POST("/login", s.authHandler)
 
+			route.GET("/verify-account", func(ctx *routing.Context) {
+				props := map[string]any{
+					"translations": mergeTranslations(ctx.Request.Context(), loadTranslations("verify")),
+				}
+				ctx.Render("Verify/Index", props)
+			})
 			route.GET("/verify-account/:uuid/:hash", s.verifyAccountHandler)
 			route.GET("/verify-email/:uuid/:hash", s.verifyEmailHandler).WithoutMiddleware(auth.RedirectIfAuthenticated)
 			route.GET("/verify-email", s.verifyEmailPromptHandler).WithoutMiddleware(auth.RedirectIfAuthenticated)
 			route.POST("/email/verification-notification", s.sendVerificationEmail).WithoutMiddleware(auth.RedirectIfAuthenticated)
 		})
 
-		//TODO: Set the session manager in the context to logout user
 	s.route.
-		WithMiddleware(auth.Middleware, Verified).
+		WithMiddleware(auth.Middleware, Verified, EnforceVerifiedUserAccess).
 		WithoutGroupMiddleware(auth.RedirectIfAuthenticated).
 		Group(func(route *routing.Router) {
 			route.GET("/onboarding", s.onboardingHandler)
