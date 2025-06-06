@@ -185,7 +185,7 @@ func (s *Server) updateInvoiceHandler(ctx *routing.Context) {
 		return
 	}
 
-	err = s.updateInvoice(ctx.Request.Context(), ctx.Param("uuid"), form)
+	err = s.updateInvoice(ctx.Request.Context(), ctx.Param("id"), form)
 	if err != nil {
 		log.Printf("Error updating invoice: %v", err)
 		s.session.Errors("status", s.trans("global.wasNotUpdated", i18n.Replacements{"subject": "@global.invoice"}))

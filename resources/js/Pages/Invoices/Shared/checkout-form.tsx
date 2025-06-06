@@ -47,7 +47,7 @@ class CheckoutForm extends React.Component<CheckoutFormProps, CheckoutFormState>
 
     const paymentMethods = this.hydratePaymentMethods();
     const receivedAmount = paymentMethods.reduce((accumulator, method) => accumulator + method.amount, 0);
-    const remainingBalance = props.totalAmount - receivedAmount;
+    const remainingBalance = Math.abs(props.totalAmount - receivedAmount);
 
     this.state = {
       activePaymentForm: 'cash',

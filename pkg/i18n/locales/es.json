@@ -32,6 +32,7 @@
     "totalReceived": "Total recibido",
     "currency": "Moneda",
     "customer": "Cliente",
+    "invoice": "Factura",
     "item": "Producto",
     "contact": "Contacto",
     "profile": "Perfil",

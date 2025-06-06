@@ -433,10 +433,10 @@ func (form *StoreInvoiceForm) computeTax() {
 		}
 		// We can store the line discoun on the database
 		// We can add a discount value amount to the invoice.
-		line.amount = (line.Price * float64(line.Qty))
-		line.discount = line.amount * (discountPercentage / 100)
-		line.tax = (line.amount - line.discount) * (line.Rate / 100)
-		line.total = line.amount - line.discount + line.tax
+		line.amount = round(line.Price*float64(line.Qty), 2)
+		line.discount = round(line.amount*(discountPercentage/100), 2)
+		line.tax = round((line.amount-line.discount)*(line.Rate/100), 2)
+		line.total = round(line.amount-line.discount+line.tax, 2)
 
 		form.tax += line.tax
 		form.amount += line.amount

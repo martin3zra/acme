@@ -3,6 +3,7 @@ package app
 import (
 	"context"
 	"encoding/json"
+	"math"
 	"regexp"
 
 	"github.com/martin3zra/acme/pkg/i18n"
@@ -66,4 +67,9 @@ func mapTo[T any](m map[string]any) (T, error) {
 		return result, err
 	}
 	return result, nil
+}
+
+func round(value float64, precision int) float64 {
+	ratio := math.Pow(10, float64(precision))
+	return math.Round(value*ratio) / ratio
 }
