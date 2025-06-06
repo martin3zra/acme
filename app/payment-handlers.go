@@ -49,6 +49,7 @@ func (s *Server) createPaymentHandler(ctx *routing.Context) {
 	paymentUuid := ctx.Query("payment_id")
 	term := ctx.Query("search")
 	customerUuid := ctx.Query("customer_id")
+	invoiceUuid := ctx.Query("invoice_id")
 
 	props := map[string]any{
 		"translations": mergeTranslations(ctx.Request.Context(), loadTranslations("payments")),
@@ -88,6 +89,7 @@ func (s *Server) createPaymentHandler(ctx *routing.Context) {
 
 		props["customer"] = customer
 		props["receivables"] = receivables
+		props["invoice_uuid"] = invoiceUuid
 		props["forceInitial"] = true
 	}
 	ctx.Render("Payments/Create", props)

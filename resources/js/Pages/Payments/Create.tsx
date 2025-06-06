@@ -84,13 +84,15 @@ export default function Create({
 
     const lines: ReceivableInvoiceForm[] = [];
     let selectedRowId = -1;
-    receivables.map((receivable) => {
+    receivables.map((receivable: Receivable) => {
       selectedRowId = invoice_uuid === receivable.invoice.uuid ? receivable.invoice.id : -1;
       const line: ReceivableInvoiceForm = {
         ...receivable.invoice,
         payment: invoice_uuid === receivable.invoice.uuid ? receivable.invoice.amount_due : 0,
         discount: 0,
         balance: 0,
+        original_payment: 0,
+        action: 'unchanged',
       };
       lines.push(line);
     });
