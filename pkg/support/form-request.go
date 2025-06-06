@@ -3,8 +3,6 @@ package support
 import (
 	"context"
 
-	"github.com/martin3zra/acme/pkg/auth"
-	"github.com/martin3zra/acme/pkg/foundation"
 	"github.com/martin3zra/acme/pkg/validator"
 )
 
@@ -15,7 +13,6 @@ type FormRequestContract interface {
 	Validate(object any, rules map[string]any, prepareForValidation func()) validator.Validator
 	Rules() map[string]any
 	Errors() validator.Errors
-	User() *foundation.User
 	SetContext(ctx context.Context)
 	Messages() map[string]string
 }
@@ -28,10 +25,6 @@ type FormRequest struct {
 func (f *FormRequest) SetContext(ctx context.Context) {
 	f.ctx = ctx
 	f.getValidatorInstance()
-}
-
-func (f *FormRequest) User() *foundation.User {
-	return auth.User(f.ctx)
 }
 
 func (f *FormRequest) setValidatorInstance(validator *validator.Validator) {

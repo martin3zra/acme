@@ -9,8 +9,7 @@ type User struct {
 	Id                 int        `json:"id"`
 	UUID               string     `json:"uuid"`
 	Status             string     `json:"status"`
-	FirstName          string     `json:"first_name"`
-	LastName           string     `json:"last_name"`
+	Name               string     `json:"name"`
 	Email              string     `json:"email"`
 	Password           string     `json:"-"`
 	EmailVerifiedAt    *time.Time `json:"email_verified_at"`

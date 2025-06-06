@@ -205,7 +205,7 @@ func TestGroupMiddlewareAndSkipNext(t *testing.T) {
 	r2 := r.WithoutNextMiddleware(skipMiddleware)
 
 	// Use Prefix to create an "/api" group.
-	r2.Prefix("/api").Group(func(api *routing.Router) {
+	r2.GroupPrefix("/api", func(api *routing.Router) {
 		api.GET("/grouped", func(ctx *routing.Context) {
 			ctx.Text(http.StatusOK, "grouped")
 		})
@@ -299,7 +299,8 @@ func containsRoute(routes []string, target string) bool {
 // TestPrefixGroupRoutes verifies that routes created from a prefixed group are registered correctly.
 func TestPrefixGroupRoutes(t *testing.T) {
 	r := routing.New()
-	r.Prefix("/admin").Group(func(rg *routing.Router) {
+	r.GroupPrefix("/admin", func(rg *routing.Router) {
+		// Use "users" without a leading slash so the full route becomes "/admin/users"
 		rg.GET("/users", func(ctx *routing.Context) {
 			ctx.Response.Write([]byte("admin users"))
 		})
@@ -319,11 +320,57 @@ func TestPrefixGroupRoutes(t *testing.T) {
 	}
 }
 
+// TestPrefixGroupMiddlewareExclusion verifies that middleware exclusions work within a prefixed group.
+func TestPrefixGroupMiddlewareExclusion(t *testing.T) {
+	r := routing.New()
+	r.WithMiddleware(m1, m2)
+	r.GroupPrefix("/blog", func(rg *routing.Router) {
+		// Exclude m1 from this route.
+		rg.GET("/post", finalHandler).WithoutMiddleware(m1)
+	})
+
+	routes := r.Routes()
+	if !containsRoute(routes, "GET /blog/post") {
+		t.Errorf("expected route GET /blog/post, got %v", routes)
+	}
+
+	req := httptest.NewRequest("GET", "/blog/post", nil)
+	rr := httptest.NewRecorder()
+	r.ServeHTTP(rr, req)
+	body, _ := io.ReadAll(rr.Result().Body)
+	expected := "m2-handler" // Only m2 should wrap the handler
+	if string(body) != expected {
+		t.Errorf("expected response %q, got %q", expected, body)
+	}
+}
+
+// TestEmptyPrefixGroup verifies that an empty prefix does not alter route paths.
+func TestEmptyPrefixGroup(t *testing.T) {
+	r := routing.New()
+	r.GroupPrefix("", func(rg *routing.Router) {
+		rg.GET("noprefix", func(ctx *routing.Context) {
+			ctx.Response.Write([]byte("noprefix"))
+		})
+	})
+	routes := r.Routes()
+	if !containsRoute(routes, "GET /noprefix") {
+		t.Errorf("expected route GET /noprefix, got %v", routes)
+	}
+
+	req := httptest.NewRequest("GET", "/noprefix", nil)
+	rr := httptest.NewRecorder()
+	r.ServeHTTP(rr, req)
+	body, _ := io.ReadAll(rr.Result().Body)
+	if string(body) != "noprefix" {
+		t.Errorf("expected response 'noprefix', got %q", body)
+	}
+}
+
 // TestNestedPrefixGroupRoutes verifies that nested prefix groups correctly concatenate paths.
 func TestNestedPrefixGroupRoutes(t *testing.T) {
 	r := routing.New()
-	r.Prefix("/api").Group(func(api *routing.Router) {
-		api.Prefix("/v1").Group(func(v1 *routing.Router) {
+	r.GroupPrefix("/api", func(api *routing.Router) {
+		api.GroupPrefix("/v1", func(v1 *routing.Router) {
 			v1.GET("/resource", func(ctx *routing.Context) {
 				ctx.Response.Write([]byte("api v1 resource"))
 			})
@@ -355,51 +402,5 @@ func TestNestedPrefixGroupRoutes(t *testing.T) {
 	body2, _ := io.ReadAll(rr2.Result().Body)
 	if string(body2) != "api status" {
 		t.Errorf("expected response 'api status', got %q", body2)
-	}
-}
-
-// TestEmptyPrefixGroup verifies that an empty prefix does not alter route paths.
-func TestEmptyPrefixGroup(t *testing.T) {
-	r := routing.New()
-	r.Prefix("").Group(func(rg *routing.Router) {
-		rg.GET("/noprefix", func(ctx *routing.Context) {
-			ctx.Response.Write([]byte("noprefix"))
-		})
-	})
-	routes := r.Routes()
-	if !containsRoute(routes, "GET /noprefix") {
-		t.Errorf("expected route GET /noprefix, got %v", routes)
-	}
-
-	req := httptest.NewRequest("GET", "/noprefix", nil)
-	rr := httptest.NewRecorder()
-	r.ServeHTTP(rr, req)
-	body, _ := io.ReadAll(rr.Result().Body)
-	if string(body) != "noprefix" {
-		t.Errorf("expected response 'noprefix', got %q", body)
-	}
-}
-
-// TestPrefixGroupMiddlewareExclusion verifies that middleware exclusions work within a prefixed group.
-func TestPrefixGroupMiddlewareExclusion(t *testing.T) {
-	r := routing.New()
-	r.WithMiddleware(m1, m2)
-	r.Prefix("/blog").Group(func(rg *routing.Router) {
-		// Exclude m1 from this route.
-		rg.GET("/post", finalHandler).WithoutMiddleware(m1)
-	})
-
-	routes := r.Routes()
-	if !containsRoute(routes, "GET /blog/post") {
-		t.Errorf("expected route GET /blog/post, got %v", routes)
-	}
-
-	req := httptest.NewRequest("GET", "/blog/post", nil)
-	rr := httptest.NewRecorder()
-	r.ServeHTTP(rr, req)
-	body, _ := io.ReadAll(rr.Result().Body)
-	expected := "m2-handler" // Only m2 should wrap the handler
-	if string(body) != expected {
-		t.Errorf("expected response %q, got %q", expected, body)
 	}
 }

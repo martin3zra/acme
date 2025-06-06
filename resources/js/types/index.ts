@@ -3,8 +3,7 @@ import { LucideIcon } from 'lucide-react';
 export interface User {
   id: number;
   uuid: string;
-  first_name: string;
-  last_name: string;
+  name: string;
   email: string;
   avatar?: string;
   email_verified_at: string | null;

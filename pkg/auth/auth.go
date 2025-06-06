@@ -65,7 +65,7 @@ func (a *Auth) EnsureIsCurrentPassword(hashed, password string) bool {
 func (a *Auth) attempt(column, value any) (foundation.Authenticatable, error) {
 	user := new(foundation.User)
 	err := a.db.QueryRow(fmt.Sprintf("SELECT * FROM users WHERE %s = $1", column), value).
-		Scan(&user.Id, &user.FirstName, &user.LastName, &user.Email,
+		Scan(&user.Id, &user.Name, &user.Email,
 			&user.Password, &user.EmailVerifiedAt, &user.LastPasswordReset, &user.CreatedAt,
 			&user.UpdatedAt, &user.DeletedAt, &user.UUID, &user.Status, &user.MustChangePassword)
 	if err != nil {

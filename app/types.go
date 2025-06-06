@@ -568,6 +568,19 @@ func (StoreCompanyForm) Rules() map[string]any {
 	}
 }
 
+type StoreProfileForm struct {
+	support.FormRequest
+	Name  string `json:"name"`
+	Email string `json:"email"`
+}
+
+func (StoreProfileForm) Rules() map[string]any {
+	return map[string]any{
+		"name":  "required|min:3",
+		"email": "required|email",
+	}
+}
+
 type User struct {
 	foundation.User
 	account *account
@@ -586,7 +599,7 @@ func (u *User) SendEmailVerification(notify mailer.Mailer, attributes map[string
 	}
 
 	notify.
-		To(u.Email, fmt.Sprintf("%s %s", u.FirstName, u.LastName)).
+		To(u.Email, fmt.Sprintf("%s", u.Name)).
 		Send(mail.NewVerification(foundation.AsMap(u), url))
 }
 
@@ -601,8 +614,8 @@ func (u *User) MarkEmailAsVerified(db *sql.DB) bool {
 
 func (u *User) Account(db *sql.DB) *account {
 	var a = new(account)
-	if err := db.QueryRow("SELECT id, uuid, name, owner_id, status, verified_at, created_at, updated_at, deleted_at FROM accounts WHERE owner_id = $1", u.Id).
-		Scan(&a.ID, &a.UUID, &a.Name, &a.Owner.ID, &a.Status, &a.VerifiedAt, &a.CreatedAt, &a.UpdatedAt, &a.DeletedAt); err != nil {
+	if err := db.QueryRow("SELECT id, uuid, owner_id, status, verified_at, created_at, updated_at, deleted_at FROM accounts WHERE owner_id = $1", u.Id).
+		Scan(&a.ID, &a.UUID, &a.Owner.ID, &a.Status, &a.VerifiedAt, &a.CreatedAt, &a.UpdatedAt, &a.DeletedAt); err != nil {
 		log.Println("An error occurred fetching the account using the ownerID:", err)
 		return nil
 	}
@@ -619,12 +632,12 @@ func (u *User) OwnedBy(db *sql.DB) *account {
 
 	var a = new(account)
 	if err := db.QueryRow(`
-    SELECT accounts.id, accounts.uuid, accounts.name, accounts.owner_id, accounts.status, accounts.verified_at, accounts.created_at, accounts.updated_at, accounts.deleted_at
+    SELECT accounts.id, accounts.uuid, accounts.owner_id, accounts.status, accounts.verified_at, accounts.created_at, accounts.updated_at, accounts.deleted_at
     FROM accounts
     INNER JOIN accounts_users on accounts.id = accounts_users.account_id
     WHERE accounts_users.user_id = $1
   `, u.Id).
-		Scan(&a.ID, &a.UUID, &a.Name, &a.Owner.ID, &a.Status, &a.VerifiedAt, &a.CreatedAt, &a.UpdatedAt, &a.DeletedAt); err != nil {
+		Scan(&a.ID, &a.UUID, &a.Owner.ID, &a.Status, &a.VerifiedAt, &a.CreatedAt, &a.UpdatedAt, &a.DeletedAt); err != nil {
 		log.Println("An error occurred fetching the owned account using the userId:", err)
 		return nil
 	}

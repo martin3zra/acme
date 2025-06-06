@@ -3,7 +3,6 @@ package app
 import (
 	"net/http"
 
-	"github.com/martin3zra/acme/pkg/auth"
 	"github.com/martin3zra/acme/pkg/foundation"
 	"github.com/martin3zra/acme/pkg/routing"
 )
@@ -13,7 +12,7 @@ func (s *Server) bootRoutes() {
 	s.route.WithMiddleware(s.SharedProps)
 
 	s.route.
-		WithMiddleware(auth.RedirectIfAuthenticated).
+		WithMiddleware(RedirectIfAuthenticated).
 		Group(func(route *routing.Router) {
 			route.GET("/login", s.login)
 			route.POST("/login", s.authHandler)
@@ -25,14 +24,14 @@ func (s *Server) bootRoutes() {
 				ctx.Render("Verify/Index", props)
 			})
 			route.GET("/verify-account/:uuid/:hash", s.verifyAccountHandler)
-			route.GET("/verify-email/:uuid/:hash", s.verifyEmailHandler).WithoutMiddleware(auth.RedirectIfAuthenticated)
-			route.GET("/verify-email", s.verifyEmailPromptHandler).WithoutMiddleware(auth.RedirectIfAuthenticated)
-			route.POST("/email/verification-notification", s.sendVerificationEmail).WithoutMiddleware(auth.RedirectIfAuthenticated)
+			route.GET("/verify-email/:uuid/:hash", s.verifyEmailHandler).WithoutMiddleware(RedirectIfAuthenticated)
+			route.GET("/verify-email", s.verifyEmailPromptHandler).WithoutMiddleware(RedirectIfAuthenticated)
+			route.POST("/email/verification-notification", s.sendVerificationEmail).WithoutMiddleware(RedirectIfAuthenticated)
 		})
 
 	s.route.
-		WithMiddleware(auth.Middleware, Verified, EnforceVerifiedUserAccess).
-		WithoutGroupMiddleware(auth.RedirectIfAuthenticated).
+		WithMiddleware(AuthenticatedMiddleware, Verified, EnforceVerifiedUserAccess).
+		WithoutGroupMiddleware(RedirectIfAuthenticated).
 		Group(func(route *routing.Router) {
 			route.GET("/onboarding", s.onboardingHandler)
 
@@ -69,22 +68,25 @@ func (s *Server) bootRoutes() {
 
 			route.POST("/password", s.createPasswordHandler)
 
-			route.Group(func(route *routing.Router) {
-				route.GET("/settings/:account/profile", func(ctx *routing.Context) {
+			route.GroupPrefix("/settings/:account", func(route *routing.Router) {
+				route.GET("/profile", func(ctx *routing.Context) {
 					ctx.Render("Settings/Account", map[string]any{})
 				})
-				route.GET("/settings/:account/companies", func(ctx *routing.Context) {
+
+				route.PUT("/profile", s.updateAccountProfileHandler())
+
+				route.GET("/companies", func(ctx *routing.Context) {
 					ctx.Render("Settings/Companies/Index", map[string]any{})
 				})
-				route.GET("/settings/:account/users", func(ctx *routing.Context) {
+				route.GET("/users", func(ctx *routing.Context) {
 					ctx.Render("Settings/Users/Index", map[string]any{})
 				})
-				route.GET("/settings/:account/preferences", func(ctx *routing.Context) {
-					ctx.Render("Settings/Preferences", map[string]any{})
-				})
-				route.GET("/settings/:account/taxes", func(ctx *routing.Context) {
-					ctx.Render("Settings/Taxes/Index", map[string]any{})
-				})
+				// route.GET("/preferences", func(ctx *routing.Context) {
+				// 	ctx.Render("Settings/Preferences", map[string]any{})
+				// })
+				// route.GET("/taxes", func(ctx *routing.Context) {
+				// 	ctx.Render("Settings/Taxes/Index", map[string]any{})
+				// })
 				route.GET("/settings/profile", func(ctx *routing.Context) {
 					ctx.Render("Settings/Profile", map[string]any{})
 				})

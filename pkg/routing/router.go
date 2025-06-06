@@ -19,11 +19,12 @@ type Middleware func(HandlerFunc) HandlerFunc
 // Route represents an HTTP route by associating an HTTP method, a URL pattern,
 // a final handler, and any middleware to be explicitly excluded.
 type Route struct {
-	Method   string
-	Pattern  string
-	Handler  HandlerFunc
-	Excluded []Middleware
-	Wrapped  bool // Indicates that the handler has been pre-wrapped.
+	Method    string
+	Pattern   string
+	Handler   HandlerFunc
+	Excluded  []Middleware
+	Wrapped   bool // Indicates that the handler has been pre-wrapped.
+	IsGrouped bool // Flag to indicate this route was registered in a group.
 }
 
 // WithoutMiddleware excludes the specified middleware from being applied
@@ -40,17 +41,18 @@ type Router struct {
 	prefix      string
 	middlewares []Middleware
 	// groupExcluded holds middleware to _exclude_ from this router’s group.
-	groupExcluded []Middleware
-	inertia       *gonertia.Inertia
-	parent        *Router // pointer to parent router (nil if root)
+	groupExcluded   []Middleware
+	inertia         *gonertia.Inertia
+	isGroupedRouter bool // CHANGE: true if this router was created via Group()
 }
 
 // New creates a new Router instance with an empty route list and middleware chain.
 func New() *Router {
 	return &Router{
-		routes:      []Route{},
-		prefix:      "",
-		middlewares: []Middleware{},
+		routes:          []Route{},
+		prefix:          "",
+		middlewares:     []Middleware{},
+		isGroupedRouter: false,
 	}
 }
 
@@ -142,23 +144,27 @@ func (r *Router) handle(method, pattern string, handler HandlerFunc) *Route {
 		Pattern: fullPattern,
 		Handler: handler,
 		// Each route copies the current group exclusion list.
-		Excluded: append([]Middleware{}, r.groupExcluded...),
+		Excluded:  append([]Middleware{}, r.groupExcluded...),
+		Wrapped:   false, // CHANGE: Global route; not pre-wrapped
+		IsGrouped: false, // CHANGE: Mark as a global (non-group) route.
 	}
 	r.routes = append(r.routes, route)
 	return &r.routes[len(r.routes)-1]
 }
 
-// Prefix returns a new router instance with the given prefix appended to the current prefix,
-// and inherits the middleware and group exclusion settings.
-func (r *Router) Prefix(prefix string) *Router {
-	return &Router{
-		routes:        []Route{},
-		prefix:        r.prefix + prefix,
-		middlewares:   append([]Middleware{}, r.middlewares...),
-		groupExcluded: append([]Middleware{}, r.groupExcluded...),
-		inertia:       r.inertia,
-		parent:        r,
+// GroupPrefix behaves like Prefix but applies the prefix only for the duration of the group.
+// It temporarily updates the current router’s prefix, calls the callback, then restores the previous prefix.
+// This way, your API remains clean and all routes are registered on the same underlying router.
+func (r *Router) GroupPrefix(prefix string, fn func(rg *Router)) {
+	savedPrefix := r.prefix
+	// Compute new prefix by concatenating the current prefix and the given prefix.
+	newPrefix := strings.TrimRight(r.prefix, "/") + "/" + strings.Trim(prefix, "/")
+	if !strings.HasPrefix(newPrefix, "/") {
+		newPrefix = "/" + newPrefix
 	}
+	r.prefix = newPrefix
+	fn(r)
+	r.prefix = savedPrefix
 }
 
 // Group creates a temporary child router for grouping routes. It first saves the parent's
@@ -172,13 +178,22 @@ func (r *Router) Group(fn func(rg *Router)) {
 	savedExcluded := append([]Middleware{}, r.groupExcluded...)
 
 	// Create a temporary child router.
+	// If the parent is already a grouped router, don't inherit parent's middlewares,
+	// so as to avoid re-wrapping them.
+	var childMiddlewares []Middleware
+	if r.isGroupedRouter {
+		childMiddlewares = []Middleware{}
+	} else {
+		childMiddlewares = append([]Middleware{}, r.middlewares...)
+	}
+	// Create a temporary child router.
 	child := &Router{
-		routes:        []Route{},
-		prefix:        r.prefix,
-		middlewares:   append([]Middleware{}, r.middlewares...),
-		groupExcluded: append([]Middleware{}, r.groupExcluded...),
-		inertia:       r.inertia,
-		parent:        r,
+		routes:          []Route{},
+		prefix:          r.prefix,
+		middlewares:     childMiddlewares, //append([]Middleware{}, r.middlewares...),
+		groupExcluded:   append([]Middleware{}, r.groupExcluded...),
+		inertia:         r.inertia,
+		isGroupedRouter: true, // CHANGE: This is a grouped router.
 	}
 
 	// Execute the group's callback on the child router.
@@ -187,17 +202,17 @@ func (r *Router) Group(fn func(rg *Router)) {
 	// Pre-wrap each route in the child router.
 	for i, route := range child.routes {
 		effective := route.Handler
-		// Apply the child's middleware chain in reverse order.
+		// Apply only the middleware added at this group level.
 		for j := len(child.middlewares) - 1; j >= 0; j-- {
 			mw := child.middlewares[j]
-			// Skip middleware that are excluded for this route.
 			if middlewareExcluded(mw, route.Excluded) {
 				continue
 			}
 			effective = mw(effective)
 		}
 		child.routes[i].Handler = effective
-		child.routes[i].Wrapped = true
+		child.routes[i].Wrapped = true   // Mark as pre-wrapped.
+		child.routes[i].IsGrouped = true // Mark that this route comes from a group.
 	}
 
 	// Merge the child's routes back into the parent's route table.
@@ -233,8 +248,8 @@ func (r *Router) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 			}
 			finalHandler := route.Handler
 
-			// If the route wasn't pre-wrapped (i.e. is a global route), wrap it now.
-			if !route.Wrapped {
+			// Only wrap global middleware if the route was not registered in a group.
+			if !route.IsGrouped {
 				for i := len(r.middlewares) - 1; i >= 0; i-- {
 					mw := r.middlewares[i]
 					if middlewareExcluded(mw, route.Excluded) {
@@ -253,6 +268,7 @@ func (r *Router) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
 		return
 	}
+
 	http.NotFound(w, req)
 }
 

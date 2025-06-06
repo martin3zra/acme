@@ -52,7 +52,7 @@ class FormSection extends React.Component<Props> {
               <div className="grid grid-cols-6 gap-6">{form}</div>
             </div>
             {actions && (
-              <div className="flex items-center justify-end bg-gray-50 px-4 py-3 text-end shadow sm:rounded-br-md sm:rounded-bl-md sm:px-6 dark:bg-gray-800">
+              <div className="flex items-center justify-end gap-6 bg-gray-50 px-4 py-3 text-end shadow sm:rounded-br-md sm:rounded-bl-md sm:px-6 dark:bg-gray-800">
                 {actions}
               </div>
             )}

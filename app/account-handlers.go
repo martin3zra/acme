@@ -2,9 +2,11 @@ package app
 
 import (
 	"fmt"
+	"log"
 
 	"github.com/martin3zra/acme/pkg/auth"
 	"github.com/martin3zra/acme/pkg/foundation"
+	"github.com/martin3zra/acme/pkg/i18n"
 	"github.com/martin3zra/acme/pkg/routing"
 	"github.com/martin3zra/acme/pkg/support"
 )
@@ -115,7 +117,7 @@ func (s *Server) verifyEmailHandler(ctx *routing.Context) {
 
 	// TODO : Check if the user isOrphan => abort(403, 'Sorry, but this user does not belongs to any account in our platform.');
 	// TODO : Add owner relationship to the user (select the account that owns that user.)
-  // TODO : Add new middle to ensure account is verified
+	// TODO : Add new middle to ensure account is verified
 
 	if user.HasVerifiedEmail() {
 		renderWithStatus("already-verified")
@@ -205,4 +207,44 @@ func (s *Server) sendVerificationEmail(ctx *routing.Context) {
 	s.sendAccountVerificationNotification(*account)
 
 	ctx.BackWith(map[string]string{"status": "verification-link-sent"})
+}
+
+func (s *Server) updateAccountProfileHandler() routing.HandlerFunc {
+	return routing.WithRequest(func(ctx *routing.Context, form *StoreProfileForm) {
+
+		uuid := ctx.Param("account")
+		if err := s.updateProfile(uuid, form); err != nil {
+			s.session.Errors("name", "Something wrong happened")
+			log.Println("errors", err.Error())
+			ctx.Back()
+			return
+		}
+
+		user, err := s.findUserByAccountUUID(uuid)
+		if err != nil {
+			s.session.Errors("name", "Something wrong happened")
+			log.Println("errors", err.Error())
+			ctx.Back()
+			return
+		}
+
+		account := user.OwnedBy(s.db)
+		company := user.currentCompany(s.db)
+		// re-generate session
+		err = s.sessionManager.ReGenerate(ctx.Request, user, map[string]any{
+			"current_company": company,
+			"account": map[string]any{
+				"uuid":  account.UUID,
+				"owner": user.Account(s.db) != nil,
+			},
+		})
+		if err != nil {
+			ctx.Error(err)
+			return
+		}
+
+		s.session.Flash("success", s.trans("global.wasUpdated", i18n.Replacements{"subject": "@global.profile"}))
+
+		ctx.Back()
+	})
 }

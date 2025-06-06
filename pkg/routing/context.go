@@ -9,6 +9,7 @@ import (
 	"strconv"
 	"text/template"
 
+	"github.com/martin3zra/acme/pkg/auth"
 	"github.com/martin3zra/acme/pkg/foundation"
 	"github.com/romsar/gonertia/v2"
 )
@@ -19,6 +20,11 @@ type Context struct {
 	Request  *http.Request
 	Params   map[string]string
 	Inertia  *gonertia.Inertia
+}
+
+// User fetch user from Request Context
+func (c *Context) User() *foundation.User {
+	return auth.User(c.Request.Context())
 }
 
 // Text writes plain text response with status code.

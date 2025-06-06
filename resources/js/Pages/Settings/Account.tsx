@@ -3,6 +3,7 @@ import InputError from '@/components/input-error';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { useHeader } from '@/composables/use-headers';
 import AppLayout from '@/layouts/app-layout';
 import SettingsLayout from '@/layouts/settings/layout';
 import { BreadcrumbItem, PageProps } from '@/types';
@@ -22,13 +23,14 @@ interface AccountForm {
 
 export default function Account() {
   const { auth } = usePage<PageProps>().props;
+  const { headers } = useHeader();
 
   const { data, setData, put, errors, processing, recentlySuccessful } = useForm<Required<AccountForm>>({
-    name: auth.user.first_name,
+    name: auth.user.name,
     email: auth.user.email,
   });
   const submit = () => {
-    put('');
+    put(`/settings/${auth.account.uuid}/profile`, { ...headers });
   };
   return (
     <AppLayout breadcrumbs={breadcrumbs} user={auth.user}>
@@ -56,14 +58,7 @@ export default function Account() {
               <Label htmlFor="email" className="text-end">
                 Email
               </Label>
-              <Input
-                type="email"
-                name="email"
-                className="h-12 md:text-xl"
-                value={data.email}
-                onChange={(e) => setData('email', e.target.value)}
-                autoFocus
-              />
+              <Input type="email" name="email" className="h-12 md:text-xl" value={data.email} onChange={(e) => setData('email', e.target.value)} />
               <InputError message={errors.email} />
             </div>
           </FormSection.Form>

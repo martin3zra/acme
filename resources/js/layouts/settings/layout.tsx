@@ -21,16 +21,6 @@ const sidebarNavItems: NavItem[] = [
     url: '/settings/:account/users',
     icon: null,
   },
-  {
-    title: 'Preferences',
-    url: '/settings/:account/preferences',
-    icon: null,
-  },
-  {
-    title: 'Sales Taxes',
-    url: '/settings/:account/taxes',
-    icon: null,
-  },
 ];
 export default function SettingsLayout({ children }: { children: React.ReactNode }) {
   const { auth } = usePage<PageProps>().props;
