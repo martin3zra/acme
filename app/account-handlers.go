@@ -3,6 +3,7 @@ package app
 import (
 	"fmt"
 	"log"
+	"strings"
 
 	"github.com/martin3zra/acme/pkg/auth"
 	"github.com/martin3zra/acme/pkg/foundation"
@@ -119,19 +120,39 @@ func (s *Server) verifyEmailHandler(ctx *routing.Context) {
 	// TODO : Add owner relationship to the user (select the account that owns that user.)
 	// TODO : Add new middle to ensure account is verified
 
-	if user.HasVerifiedEmail() {
-		renderWithStatus("already-verified")
-		return
-	}
+	if ctx.Query("action") == "change" {
+		if !foundation.NewHashable().Sha1Equals(fmt.Sprintf("%schange", *user.PendingEmail), hash) {
+			renderWithStatus("hash-do-not-match")
+			return
+		}
 
-	if !foundation.NewHashable().Sha1Equals(user.Email, hash) {
-		renderWithStatus("hash-do-not-match")
-		return
-	}
+		if err := s.updatePendingEmail(user); err != nil {
+			log.Println("Something wrong happened updating the pending email: ", err)
+			ctx.Error(err)
+			return
+		}
 
-	if !user.MarkEmailAsVerified(s.db) {
-		ctx.Error(err)
-		return
+		user, err = s.findUserByUUID(userUUID)
+		if err != nil {
+			renderWithStatus("not-found")
+			return
+		}
+	} else {
+
+		if user.HasVerifiedEmail() {
+			renderWithStatus("already-verified")
+			return
+		}
+
+		if !foundation.NewHashable().Sha1Equals(user.Email, hash) {
+			renderWithStatus("hash-do-not-match")
+			return
+		}
+
+		if !user.MarkEmailAsVerified(s.db) {
+			ctx.Error(err)
+			return
+		}
 	}
 
 	loggedUser, err := auth.NewAuth(ctx.Request.Context()).LoginUsingId(user.Id)
@@ -140,7 +161,15 @@ func (s *Server) verifyEmailHandler(ctx *routing.Context) {
 		return
 	}
 
-	err = s.sessionManager.ReGenerate(ctx.Request, loggedUser, map[string]any{})
+	account := user.OwnedBy(s.db)
+	company := user.currentCompany(s.db)
+	err = s.sessionManager.ReGenerate(ctx.Request, loggedUser, map[string]any{
+		"current_company": company,
+		"account": map[string]any{
+			"uuid":  account.UUID,
+			"owner": user.Account(s.db) != nil,
+		},
+	})
 	if err != nil {
 		ctx.Error(err)
 		return
@@ -213,6 +242,14 @@ func (s *Server) updateAccountProfileHandler() routing.HandlerFunc {
 	return routing.WithRequest(func(ctx *routing.Context, form *StoreProfileForm) {
 
 		uuid := ctx.Param("account")
+		user, err := s.findUserByAccountUUID(uuid)
+		if err != nil {
+			s.session.Errors("name", "Something wrong happened")
+			log.Println("errors", err.Error())
+			ctx.Back()
+			return
+		}
+
 		if err := s.updateProfile(uuid, form); err != nil {
 			s.session.Errors("name", "Something wrong happened")
 			log.Println("errors", err.Error())
@@ -220,12 +257,24 @@ func (s *Server) updateAccountProfileHandler() routing.HandlerFunc {
 			return
 		}
 
-		user, err := s.findUserByAccountUUID(uuid)
-		if err != nil {
-			s.session.Errors("name", "Something wrong happened")
-			log.Println("errors", err.Error())
-			ctx.Back()
-			return
+		if !strings.EqualFold(user.Email, form.Email) {
+			if user.PendingEmail != nil {
+				s.session.Errors("email", fmt.Sprintf("You already have a pending email change to %s. Please verify it before requesting a new one.", *user.PendingEmail))
+				ctx.Back()
+				return
+			}
+
+			user.PendingEmail = &form.Email
+
+			user.SendEmailVerificationChange(s.mailer, map[string]string{
+				"url": fmt.Sprintf(
+					"%s/verify-email/%s/%s?action=change",
+					s.config.host,
+					user.UUID,
+					foundation.NewHashable().Sha1(fmt.Sprintf("%s%s", form.Email, "change")),
+				),
+				"secret": string(s.config.secretKey),
+			})
 		}
 
 		account := user.OwnedBy(s.db)

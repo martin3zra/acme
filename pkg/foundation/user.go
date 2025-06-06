@@ -11,6 +11,7 @@ type User struct {
 	Status             string     `json:"status"`
 	Name               string     `json:"name"`
 	Email              string     `json:"email"`
+	PendingEmail       *string    `json:"pending_email"`
 	Password           string     `json:"-"`
 	EmailVerifiedAt    *time.Time `json:"email_verified_at"`
 	LastPasswordReset  *time.Time `json:"last_password_reset"`

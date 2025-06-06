@@ -6,7 +6,6 @@ import (
 	"database/sql/driver"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"log"
 	"time"
 
@@ -570,14 +569,22 @@ func (StoreCompanyForm) Rules() map[string]any {
 
 type StoreProfileForm struct {
 	support.FormRequest
+	ID    string `json:"id"`
 	Name  string `json:"name"`
 	Email string `json:"email"`
 }
 
-func (StoreProfileForm) Rules() map[string]any {
+func (form StoreProfileForm) Rules() map[string]any {
 	return map[string]any{
-		"name":  "required|min:3",
-		"email": "required|email",
+		"name": "required|min:3",
+		"email": []any{
+			"required",
+			"email",
+			"min:8",
+			"max:120",
+			"lowercase",
+			validator.Rule{}.Unique("users", "email").Ignore(form.ID, "uuid"),
+		},
 	}
 }
 
@@ -599,7 +606,24 @@ func (u *User) SendEmailVerification(notify mailer.Mailer, attributes map[string
 	}
 
 	notify.
-		To(u.Email, fmt.Sprintf("%s", u.Name)).
+		To(u.Email, u.Name).
+		Send(mail.NewVerification(foundation.AsMap(u), url))
+}
+
+func (u *User) SendEmailVerificationChange(notify mailer.Mailer, attributes map[string]string) {
+	url, err := routing.TemporarySignedURL(
+		attributes["url"],
+		map[string]string{},
+		attributes["secret"],
+		60*time.Minute,
+	)
+	if err != nil {
+		log.Fatal(err)
+		return
+	}
+
+	notify.
+		To(*u.PendingEmail, u.Name).
 		Send(mail.NewVerification(foundation.AsMap(u), url))
 }
 

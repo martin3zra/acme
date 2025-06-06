@@ -53,7 +53,9 @@ func AsMap(obj any) map[string]any {
 
 	for i := range val.NumField() {
 		field := typ.Field(i)
-		result[field.Name] = val.Field(i).Interface()
+		if field.IsExported() {
+			result[field.Name] = val.Field(i).Interface()
+		}
 	}
 
 	return result

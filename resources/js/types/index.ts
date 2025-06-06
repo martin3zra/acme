@@ -5,6 +5,7 @@ export interface User {
   uuid: string;
   name: string;
   email: string;
+  pending_email: string;
   avatar?: string;
   email_verified_at: string | null;
   created_at: string;
