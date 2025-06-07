@@ -56,7 +56,7 @@ export default function SettingsLayout({ children }: { children: React.ReactNode
 
         <Separator className="my-6 md:hidden" />
 
-        <div className="flex-1 md:max-w-4xl">
+        <div className="flex-1 md:max-w-7xl">
           <section className="w-full space-y-12">{children}</section>
         </div>
       </div>

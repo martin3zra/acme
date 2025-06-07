@@ -36,3 +36,17 @@ func (s *Server) storeCompanyHandler(ctx *routing.Context) {
 
 	ctx.BackWith(map[string]string{"status": "success"})
 }
+
+func (s *Server) companyHandler(ctx *routing.Context) {
+
+	companies, err := s.findCompanies()
+	if err != nil {
+		log.Println("something wrong occurred fetching companies:", err)
+		ctx.Error(err)
+		return
+	}
+	ctx.Render("Settings/Companies/Index", map[string]any{
+		"translations": mergeTranslations(ctx.Request.Context(), loadTranslations("companies")),
+		"companies":    companies,
+	})
+}

@@ -16,6 +16,32 @@ type Company struct {
 	foundation.Timestamps
 }
 
+// TODO add the account column to the table and as filter here.
+func (s *Server) findCompanies() ([]*Company, error) {
+	rows, err := s.db.Query("SELECT id, name, identifier, city, address, created_at, updated_at, deleted_at FROM companies")
+	if err != nil {
+		return nil, err
+	}
+	data := make([]*Company, 0)
+	for rows.Next() {
+		c := new(Company)
+		if err = rows.Scan(
+			&c.ID,
+			&c.Name,
+			&c.Identifier,
+			&c.City,
+			&c.Address,
+			&c.CreatedAt,
+			&c.UpdatedAt,
+			&c.DeletedAt,
+		); err != nil {
+			return nil, err
+		}
+		data = append(data, c)
+	}
+	return data, nil
+}
+
 func (s *Server) findCompanyById(id int) (*Company, error) {
 	result := s.db.QueryRow(s.qs.Q("companies_find_by_id"), id)
 	var company Company

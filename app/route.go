@@ -75,9 +75,7 @@ func (s *Server) bootRoutes() {
 
 				route.PUT("/profile", s.updateAccountProfileHandler())
 
-				route.GET("/companies", func(ctx *routing.Context) {
-					ctx.Render("Settings/Companies/Index", map[string]any{})
-				})
+				route.GET("/companies", s.companyHandler)
 				route.GET("/users", func(ctx *routing.Context) {
 					ctx.Render("Settings/Users/Index", map[string]any{})
 				})

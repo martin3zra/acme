@@ -32,6 +32,7 @@
     "totalReceived": "Total recibido",
     "currency": "Moneda",
     "customer": "Cliente",
+    "company": "Compañia",
     "invoice": "Factura",
     "item": "Producto",
     "contact": "Contacto",
@@ -59,6 +60,7 @@
     "wasNotVoided": "No se anulo :subject. Algo salió mal.",
     "wasVoided": ":subject fue anulad@action con éxito!",
     "visit": "Visita :to ",
+    "city": "Ciudad",
     "nouns": {
       "customer": {
         "gender":"m"
@@ -210,6 +212,37 @@
       "title": "¡Felicidades! Estás listo para empezar.",
       "description": "Tu compañia ha sido creada exitosamente. Ahora puedes empezar a usar nuestra plataforma para gestionar tus facturas, clientes y pagos.",
       "action": "Ir al panel de control"
+    }
+  },
+  "companies": {
+    "single": {
+      "title": "Crear una nueva compañia",
+      "description": "Proporcione los detalles necesarios para configurar su organización. Esta información le ayudará a identificar y gestionar a su equipo dentro del sistema.",
+      "name": "Nombre de la compañia",
+      "rnc": "Número de Razón Social (RNC)",
+      "rnc_short": "RNC",
+      "city": "Ciudad",
+      "address": "Dirección",
+      "phone": "Teléfono de la compañia",
+      "email": "Correo electrónico de la compañia",
+      "website": "Sitio web de la c",
+      "action": "Guardar y continuar"
+    },
+    "viewCompany": {
+      "title": "Ver compañia",
+      "description": "Detalles de la compañia seleccionada."
+    },
+    "newCompany": {
+      "title": "Nueva compañia",
+      "description": "Crea una nueva compañia para facturarle."
+    },
+    "editCompany": {
+      "title": "Editar compañia",
+      "description": "Edita los detalles de la compañia seleccionada"
+    },
+    "trashCompany": {
+      "title": "Borrar compañia",
+      "description": "Borra los detalles de la compañia seleccionada."
     }
   },
   "auth": {
