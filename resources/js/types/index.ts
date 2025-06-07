@@ -8,6 +8,7 @@ export interface User {
   pending_email: string;
   avatar?: string;
   email_verified_at: string | null;
+  status: string;
   created_at: string;
   updated_at: string;
   [key: string]: unknown; // This allows for additional properties
@@ -156,6 +157,8 @@ export type InvoiceVerb = Exclude<Verb, 'trash'> | 'void' | 'record-payment';
 export type PaymentVerb = Verb | 'void';
 
 export type CustomerVerb = Verb | 'record-payment';
+
+export type UserVerb = Verb | 'permission';
 
 export interface PaymentFormType {
   amount: number;

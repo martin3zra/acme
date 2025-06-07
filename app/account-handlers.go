@@ -238,6 +238,26 @@ func (s *Server) sendVerificationEmail(ctx *routing.Context) {
 	ctx.BackWith(map[string]string{"status": "verification-link-sent"})
 }
 
+func (s *Server) accountProfileHandler(ctx *routing.Context) {
+	companies, err := s.findCompanies()
+	if err != nil {
+		log.Println("something wrong occurred fetching companies:", err)
+		ctx.Error(err)
+		return
+	}
+	users, err := s.findUsers()
+	if err != nil {
+		log.Println("something wrong occurred fetching users:", err)
+		ctx.Error(err)
+		return
+	}
+	ctx.Render("Settings/Account", map[string]any{
+		"translations": mergeTranslations(ctx.Request.Context(), loadTranslations("companies", "users")),
+		"companies":    companies,
+		"users":        users,
+	})
+}
+
 func (s *Server) updateAccountProfileHandler() routing.HandlerFunc {
 	return routing.WithRequest(func(ctx *routing.Context, form *StoreProfileForm) {
 

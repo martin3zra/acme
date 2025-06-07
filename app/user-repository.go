@@ -1,5 +1,21 @@
 package app
 
+func (s *Server) findUsers() ([]*User, error) {
+	rows, err := s.db.Query("SELECT id, uuid, name, email, email_verified_at, status, created_at, updated_at FROM users")
+	if err != nil {
+		return nil, err
+	}
+	data := make([]*User, 0)
+	for rows.Next() {
+		u := new(User)
+		if err = rows.Scan(&u.Id, &u.UUID, &u.Name, &u.Email, &u.EmailVerifiedAt, &u.Status, &u.CreatedAt, &u.UpdatedAt); err != nil {
+			return nil, err
+		}
+		data = append(data, u)
+	}
+	return data, nil
+}
+
 func (s *Server) findUserByEmail(email string) (*User, error) {
 	user := new(User)
 

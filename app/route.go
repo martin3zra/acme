@@ -69,10 +69,7 @@ func (s *Server) bootRoutes() {
 			route.POST("/password", s.createPasswordHandler)
 
 			route.GroupPrefix("/settings/:account", func(route *routing.Router) {
-				route.GET("/profile", func(ctx *routing.Context) {
-					ctx.Render("Settings/Account", map[string]any{})
-				})
-
+				route.GET("/profile", s.accountProfileHandler)
 				route.PUT("/profile", s.updateAccountProfileHandler())
 
 				route.GET("/companies", s.companyHandler)

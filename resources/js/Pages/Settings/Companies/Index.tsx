@@ -7,7 +7,7 @@ import SettingsLayout from '@/layouts/settings/layout';
 import { BreadcrumbItem, Company, PageProps, Verb } from '@/types';
 import { Head, usePage } from '@inertiajs/react';
 import { useEffect, useState } from 'react';
-import { List } from './List/Index';
+import { CompanyList } from './List/Index';
 import Show from './Show';
 const breadcrumbs: BreadcrumbItem[] = [
   {
@@ -59,7 +59,7 @@ export default function Index({ companies, company }: PageProps<{ companies: Com
     <AppLayout breadcrumbs={breadcrumbs} user={auth.user}>
       <Head title="Companies Settings" />
       <SettingsLayout>
-        {hasCompanies && <List data={companies} onSelectCompany={onSelectCompany} />}
+        {hasCompanies && <CompanyList data={companies} onSelectCompany={onSelectCompany} />}
 
         <Sheet open={open} onOpenChange={onOpenChange}>
           <SheetContent side="right" className="m-4 flex h-[calc(~'(100%-var(--spacing)*4)/3')] w-full flex-col rounded-md sm:max-w-[1380px]">

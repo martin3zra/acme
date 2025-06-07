@@ -1,7 +1,7 @@
 import HeadingSmall from '@/components/heading-small';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useTranslation } from '@/hooks/use-translation';
-import { Company, Verb } from '@/types';
+import { User, UserVerb } from '@/types';
 import {
   ColumnFiltersState,
   flexRender,
@@ -17,18 +17,18 @@ import { FC, useState } from 'react';
 import { getColumns } from './columns-definitions';
 
 type Props = {
-  data: Company[];
-  onSelectCompany: (company: Company, action: Verb) => void;
+  data: User[];
+  onSelectUser: (user: User, action: UserVerb) => void;
 };
 
-export const CompanyList: FC<Props> = ({ data, onSelectCompany }) => {
+export const UserList: FC<Props> = ({ data, onSelectUser }) => {
   const t = useTranslation().trans;
   const [sorting, setSorting] = useState<SortingState>([]);
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
   const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({});
   const [rowSelection, setRowSelection] = useState({});
 
-  const columns = getColumns({ onDidClick: onSelectCompany, t });
+  const columns = getColumns({ onDidClick: onSelectUser, t });
 
   const table = useReactTable({
     data,
@@ -51,39 +51,7 @@ export const CompanyList: FC<Props> = ({ data, onSelectCompany }) => {
 
   return (
     <div>
-      {/* <div className="flex items-center py-4">
-        <Input
-          placeholder="Filter names..."
-          value={(table.getColumn('name')?.getFilterValue() as string) ?? ''}
-          onChange={(event) => table.getColumn('name')?.setFilterValue(event.target.value)}
-          className="max-w-sm"
-        />
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="outline" className="ml-auto">
-              {t('global.columns')} <ChevronDown />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            {table
-              .getAllColumns()
-              .filter((column) => column.getCanHide())
-              .map((column) => {
-                return (
-                  <DropdownMenuCheckboxItem
-                    key={column.id}
-                    className="capitalize"
-                    checked={column.getIsVisible()}
-                    onCheckedChange={(value) => column.toggleVisibility(!!value)}
-                  >
-                    {(column.columnDef.meta as string) || column.id}
-                  </DropdownMenuCheckboxItem>
-                );
-              })}
-          </DropdownMenuContent>
-        </DropdownMenu>
-      </div> */}
-      <HeadingSmall title="Companies" description="Manage your subscription and billing details"></HeadingSmall>
+      <HeadingSmall title="Users" description="Manage your users and permissions details"></HeadingSmall>
       <div className="mt-2 rounded-md border">
         <Table>
           <TableHeader>
@@ -118,22 +86,6 @@ export const CompanyList: FC<Props> = ({ data, onSelectCompany }) => {
           </TableBody>
         </Table>
       </div>
-      {/* <div className="flex items-center justify-end space-x-2 py-4">
-        <div className="text-muted-foreground flex-1 text-sm">
-          {t('global.pagination.selectedOf', {
-            rows: table.getFilteredSelectedRowModel().rows.length,
-            total: table.getFilteredRowModel().rows.length,
-          })}
-        </div>
-        <div className="space-x-2">
-          <Button value="outline" size="sm" onClick={() => table.previousPage()} disabled={!table.getCanPreviousPage()}>
-            {t('global.pagination.previous')}
-          </Button>
-          <Button value="outline" size="sm" onClick={() => table.nextPage()} disabled={!table.getCanNextPage()}>
-            {t('global.pagination.next')}
-          </Button>
-        </div>
-      </div> */}
     </div>
   );
 };

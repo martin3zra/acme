@@ -6,6 +6,7 @@
     "delete": "Eliminar",
     "edit": "Editar",
     "save": "Guardar",
+    "verified": "Verificado",
     "email": "Correo electrónico",
     "password": "Contraseña",
     "password_confirmation": "Confirmar Contraseña",
@@ -243,6 +244,32 @@
     "trashCompany": {
       "title": "Borrar compañia",
       "description": "Borra los detalles de la compañia seleccionada."
+    }
+  },
+  "users": {
+    "single": {
+      "title": "Crear un nuevo usuario",
+      "description": "Proporcione los detalles necesarios para configurar el usuario. Esta información le ayudará a identificar y gestionar dentro de su equipo el sistema."
+    },
+    "viewUser": {
+      "title": "Ver usuario",
+      "description": "Detalles del usuario seleccionado."
+    },
+    "newUser": {
+      "title": "Nueva usuario",
+      "description": "Crea una nueva usuario."
+    },
+    "editUser": {
+      "title": "Editar usuario",
+      "description": "Edita los detalles del usuario seleccionado"
+    },
+    "trashUser": {
+      "title": "Borrar usuario",
+      "description": "Borra los detalles del usuario seleccionado."
+    },
+    "permissionUser": {
+      "title": "Permisos",
+      "description": "Maneja los permisos del usuario seleccionado."
     }
   },
   "auth": {
