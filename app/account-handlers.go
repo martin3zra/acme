@@ -160,16 +160,20 @@ func (s *Server) verifyEmailHandler(ctx *routing.Context) {
 		ctx.Error(err)
 		return
 	}
-
-	account := user.OwnedBy(s.db)
-	company := user.currentCompany(s.db)
-	err = s.sessionManager.ReGenerate(ctx.Request, loggedUser, map[string]any{
-		"current_company": company,
-		"account": map[string]any{
+	attrs := map[string]any{"current_company": nil, "account": nil}
+	account, err := user.OwnedBy(s.db)
+	if err == nil {
+		attrs["account"] = map[string]any{
 			"uuid":  account.UUID,
 			"owner": user.Account(s.db) != nil,
-		},
-	})
+		}
+	}
+	company, err := user.currentCompany(s.db)
+	if err == nil {
+		attrs["current_company"] = company
+	}
+
+	err = s.sessionManager.ReGenerate(ctx.Request, loggedUser, attrs)
 	if err != nil {
 		ctx.Error(err)
 		return
@@ -308,16 +312,20 @@ func (s *Server) updateAccountProfileHandler() routing.HandlerFunc {
 			})
 		}
 
-		account := user.OwnedBy(s.db)
-		company := user.currentCompany(s.db)
-		// re-generate session
-		err = s.sessionManager.ReGenerate(ctx.Request, user, map[string]any{
-			"current_company": company,
-			"account": map[string]any{
+		attrs := map[string]any{"current_company": nil, "account": nil}
+		account, err := user.OwnedBy(s.db)
+		if err == nil {
+			attrs["account"] = map[string]any{
 				"uuid":  account.UUID,
 				"owner": user.Account(s.db) != nil,
-			},
-		})
+			}
+		}
+		company, err := user.currentCompany(s.db)
+		if err == nil {
+			attrs["current_company"] = company
+		}
+		// re-generate session
+		err = s.sessionManager.ReGenerate(ctx.Request, user, attrs)
 		if err != nil {
 			ctx.Error(err)
 			return

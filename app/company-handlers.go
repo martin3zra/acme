@@ -25,10 +25,12 @@ func (s *Server) storeCompanyHandler(ctx *routing.Context) {
 		return
 	}
 
-	company := user.currentCompany(s.db)
-	err = s.sessionManager.ReGenerate(ctx.Request, user, map[string]any{
-		"current_company": company,
-	})
+	attrs := map[string]any{"current_company": nil}
+	company, err := user.currentCompany(s.db)
+	if err == nil {
+		attrs["current_company"] = company
+	}
+	err = s.sessionManager.ReGenerate(ctx.Request, user, attrs)
 	if err != nil {
 		ctx.Error(err)
 		return

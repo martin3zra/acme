@@ -150,9 +150,11 @@ func AuthenticatedMiddleware(next routing.HandlerFunc) routing.HandlerFunc {
 		// TODO add account information here
 		attrsMap := attrs.(map[string]any)
 		if cc, ok := attrsMap["current_company"]; ok {
-			ccCtx := context.WithValue(userCtx, auth.ContextCompanyID{}, cc)
-			next(ctx.WithContext(ccCtx))
-			return
+			if cc != nil {
+				ccCtx := context.WithValue(userCtx, auth.ContextCompanyID{}, cc)
+				next(ctx.WithContext(ccCtx))
+				return
+			}
 		}
 
 		next(ctx.WithContext(userCtx))
@@ -175,6 +177,14 @@ func RedirectIfAuthenticated(next routing.HandlerFunc) routing.HandlerFunc {
 			return
 		}
 
+		next(ctx)
+	}
+}
+
+func RestrictedAccess(next routing.HandlerFunc) routing.HandlerFunc {
+	return func(ctx *routing.Context) {
+		// user := UserFromFoundationUser(ctx.User())
+		// TODO: Send the user to a restricted page, they need to have a company assigned.
 		next(ctx)
 	}
 }

@@ -35,55 +35,59 @@ func (s *Server) bootRoutes() {
 		Group(func(route *routing.Router) {
 			route.GET("/onboarding", s.onboardingHandler)
 
-			route.GET("/home", s.homeHandler)
-			route.POST("/logout", s.logoutHandler)
+			route.
+				WithMiddleware(RestrictedAccess).
+				Group(func(route *routing.Router) {
+					route.GET("/home", s.homeHandler)
+					route.POST("/logout", s.logoutHandler)
 
-			route.POST("/companies", s.storeCompanyHandler)
+					route.POST("/companies", s.storeCompanyHandler)
 
-			route.GET("/customers", s.customersHandler)
-			route.POST("/customers", s.storeCustomerHandler)
-			route.PUT("/customers/:id", s.updateCustomerHandler)
-			route.PUT("/customers/:id/change-status", s.changeStatusCustomerHandler)
-			route.DELETE("/customers/:id", s.deleteCustomerHandler)
+					route.GET("/customers", s.customersHandler)
+					route.POST("/customers", s.storeCustomerHandler)
+					route.PUT("/customers/:id", s.updateCustomerHandler)
+					route.PUT("/customers/:id/change-status", s.changeStatusCustomerHandler)
+					route.DELETE("/customers/:id", s.deleteCustomerHandler)
 
-			route.GET("/items", s.itemsHandler)
-			route.POST("/items", s.storeItemHandler)
-			route.PUT("/items/:id", s.updateItemHandler)
-			route.PUT("/items/:id/change-status", s.changeStatusItemHandler)
-			route.DELETE("/items/:id", s.deleteItemHandler)
+					route.GET("/items", s.itemsHandler)
+					route.POST("/items", s.storeItemHandler)
+					route.PUT("/items/:id", s.updateItemHandler)
+					route.PUT("/items/:id/change-status", s.changeStatusItemHandler)
+					route.DELETE("/items/:id", s.deleteItemHandler)
 
-			route.GET("/invoices", s.invoicesHandler)
-			route.POST("/invoices", s.storeInvoiceHandler)
-			route.GET("/invoices/create", s.createInvoiceHandler)
-			route.GET("/invoices/:id/edit", s.editInvoiceHandler)
-			route.PUT("/invoices/:id/void", s.voidInvoiceHandler)
-			route.PUT("/invoices/:id", s.updateInvoiceHandler)
+					route.GET("/invoices", s.invoicesHandler)
+					route.POST("/invoices", s.storeInvoiceHandler)
+					route.GET("/invoices/create", s.createInvoiceHandler)
+					route.GET("/invoices/:id/edit", s.editInvoiceHandler)
+					route.PUT("/invoices/:id/void", s.voidInvoiceHandler)
+					route.PUT("/invoices/:id", s.updateInvoiceHandler)
 
-			route.GET("/payments", s.paymentsHandler)
-			route.POST("/payments", s.storePaymentHandler)
-			route.GET("/payments/create", s.createPaymentHandler)
-			route.GET("/payments/:id/edit", s.editPaymentHandler)
-			route.PUT("/payments/:id/void", s.voidPaymentHandler)
-			route.PUT("/payments/:id", s.updatePaymentHandler)
+					route.GET("/payments", s.paymentsHandler)
+					route.POST("/payments", s.storePaymentHandler)
+					route.GET("/payments/create", s.createPaymentHandler)
+					route.GET("/payments/:id/edit", s.editPaymentHandler)
+					route.PUT("/payments/:id/void", s.voidPaymentHandler)
+					route.PUT("/payments/:id", s.updatePaymentHandler)
 
-			route.POST("/password", s.createPasswordHandler)
+					route.POST("/password", s.createPasswordHandler)
 
-			route.GroupPrefix("/settings/:account", func(route *routing.Router) {
-				route.GET("/profile", s.accountProfileHandler)
-				route.PUT("/profile", s.updateAccountProfileHandler())
+					route.GroupPrefix("/settings/:account", func(route *routing.Router) {
+						route.GET("/profile", s.accountProfileHandler)
+						route.PUT("/profile", s.updateAccountProfileHandler())
 
-				route.GET("/companies", s.companyHandler)
-				route.POST("/users", s.storeUserHandler())
-				// route.GET("/preferences", func(ctx *routing.Context) {
-				// 	ctx.Render("Settings/Preferences", map[string]any{})
-				// })
-				// route.GET("/taxes", func(ctx *routing.Context) {
-				// 	ctx.Render("Settings/Taxes/Index", map[string]any{})
-				// })
-				route.GET("/settings/profile", func(ctx *routing.Context) {
-					ctx.Render("Settings/Profile", map[string]any{})
+						route.GET("/companies", s.companyHandler)
+						route.POST("/users", s.storeUserHandler())
+						// route.GET("/preferences", func(ctx *routing.Context) {
+						// 	ctx.Render("Settings/Preferences", map[string]any{})
+						// })
+						// route.GET("/taxes", func(ctx *routing.Context) {
+						// 	ctx.Render("Settings/Taxes/Index", map[string]any{})
+						// })
+						route.GET("/settings/profile", func(ctx *routing.Context) {
+							ctx.Render("Settings/Profile", map[string]any{})
+						})
+					})
 				})
-			})
 		})
 
 	uiAssets := foundation.GetBuildAssets(s.assets, "public/build")

@@ -40,21 +40,25 @@ func (s *Server) authHandler(ctx *routing.Context) {
 	}
 
 	userCtx := UserFromFoundationUser(user.(*foundation.User))
-	account := userCtx.OwnedBy(s.db)
-	company := userCtx.currentCompany(s.db)
+	attrs := map[string]any{"current_company": nil, "account": nil}
+	account, err := userCtx.OwnedBy(s.db)
+	if err == nil {
+		attrs["account"] = map[string]any{
+			"uuid":  account.UUID,
+			"owner": userCtx.Account(s.db) != nil,
+		}
+	}
+	company, err := userCtx.currentCompany(s.db)
+	if err == nil {
+		attrs["current_company"] = company
+	}
 
 	// Preventing Timing Attacks
 	if time.Since(startTime) < duration {
 		time.Sleep(duration - time.Since(startTime))
 	}
 
-	err = s.sessionManager.ReGenerate(ctx.Request, user, map[string]any{
-		"current_company": company,
-		"account": map[string]any{
-			"uuid":  account.UUID,
-			"owner": userCtx.Account(s.db) != nil,
-		},
-	})
+	err = s.sessionManager.ReGenerate(ctx.Request, user, attrs)
 	if err != nil {
 		ctx.Error(err)
 		return

@@ -649,9 +649,9 @@ func (u *User) Account(db *sql.DB) *account {
 	return a
 }
 
-func (u *User) OwnedBy(db *sql.DB) *account {
+func (u *User) OwnedBy(db *sql.DB) (*account, error) {
 	if u.account != nil {
-		return u.account
+		return u.account, nil
 	}
 
 	var a = new(account)
@@ -663,12 +663,12 @@ func (u *User) OwnedBy(db *sql.DB) *account {
   `, u.Id).
 		Scan(&a.ID, &a.UUID, &a.Owner.ID, &a.Status, &a.VerifiedAt, &a.CreatedAt, &a.UpdatedAt, &a.DeletedAt); err != nil {
 		log.Println("An error occurred fetching the owned account using the userId:", err)
-		return nil
+		return nil, err
 	}
 
 	u.account = a
 
-	return a
+	return a, nil
 }
 
 func (u *User) IsOwner(db *sql.DB) bool {
@@ -680,7 +680,8 @@ func (u *User) IsNotOwner(db *sql.DB) bool {
 }
 
 func (u *User) IsOwned(db *sql.DB) bool {
-	return u.OwnedBy(db) != nil
+	_, err := u.OwnedBy(db)
+	return err == nil
 }
 
 func (u *User) IsNotOwned(db *sql.DB) bool {
@@ -704,7 +705,7 @@ func UserFromFoundationUser(u *foundation.User) *User {
 	}
 }
 
-func (u *User) currentCompany(db *sql.DB) *Company {
+func (u *User) currentCompany(db *sql.DB) (*Company, error) {
 	result := db.QueryRow(`
     SELECT companies.id, companies.name, companies.identifier, companies.city,
     companies.address, companies.created_at, companies.updated_at
@@ -723,10 +724,10 @@ func (u *User) currentCompany(db *sql.DB) *Company {
 		&company.UpdatedAt,
 	)
 	if err != nil {
-		log.Println("CurrentCompany: failed to scan company:", err)
+		return nil, err
 	}
 
-	return &company
+	return &company, err
 }
 
 func CurrentCompany(ctx context.Context) Company {

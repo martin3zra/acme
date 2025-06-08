@@ -11,9 +11,13 @@ import (
 func (s *Server) storeUserHandler() routing.HandlerFunc {
 	return routing.WithRequest(func(ctx *routing.Context, form *StoreProfileForm) {
 
-		// log.Println("Createing new users:", form, UserFromFoundationUser(ctx.User()).Account(s.db))
-		accountID := UserFromFoundationUser(ctx.User()).OwnedBy(s.db)
-		user, err := s.storeUser(accountID.ID, form)
+		account, err := UserFromFoundationUser(ctx.User()).OwnedBy(s.db)
+		if err != nil {
+			ctx.Back()
+			return
+		}
+
+		user, err := s.storeUser(account.ID, form)
 		if err != nil {
 			s.session.Errors("error", s.trans("global.wasNotCreated", i18n.Replacements{"subject": "@global.user"}))
 			ctx.BackWith(map[string]any{
