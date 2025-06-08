@@ -34,7 +34,7 @@ func (s *Server) storeCompanyHandler(ctx *routing.Context) {
 		return
 	}
 
-	ctx.BackWith(map[string]string{"status": "success"})
+	ctx.BackWith(map[string]any{"status": "success"})
 }
 
 func (s *Server) companyHandler(ctx *routing.Context) {

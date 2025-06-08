@@ -3,10 +3,12 @@ package routing
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"log"
 	"net/http"
 	"net/url"
 	"strconv"
+	"strings"
 	"text/template"
 
 	"github.com/martin3zra/acme/pkg/auth"
@@ -103,7 +105,7 @@ func (ctx *Context) Back(status ...int) {
 	ctx.Inertia.Back(ctx.Response, ctx.Request, http.StatusSeeOther)
 }
 
-func (ctx *Context) BackWith(attributes map[string]string) {
+func (ctx *Context) BackWith(attributes map[string]any) {
 	// Get the referer (previous page URL)
 	referer := ctx.Request.Referer()
 	if referer == "" {
@@ -121,7 +123,7 @@ func (ctx *Context) BackWith(attributes map[string]string) {
 	// Add or update query parameters
 	q := parsedURL.Query()
 	for k, v := range attributes {
-		q.Set(k, v)
+		q.Set(k, fmt.Sprintf("%v", v))
 	}
 	parsedURL.RawQuery = q.Encode()
 	http.Redirect(ctx.Response, ctx.Request, parsedURL.String(), http.StatusFound)
@@ -130,6 +132,10 @@ func (ctx *Context) BackWith(attributes map[string]string) {
 // Query retrieves the query value for a key.
 func (ctx *Context) Query(key string) string {
 	return ctx.Request.URL.Query().Get(key)
+}
+
+func (ctx *Context) QueryHas(key string) bool {
+	return strings.TrimSpace(ctx.Request.URL.Query().Get(key)) != ""
 }
 
 // QueryWithDefault retrieves the query value for a key or returns the fallback value.

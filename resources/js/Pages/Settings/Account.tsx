@@ -38,10 +38,12 @@ export default function Account({
   company,
   users,
   user,
-}: PageProps<{ companies: Company[]; company: Company; users: User[]; user: User }>) {
+  initialState = false,
+  subject = 'profile',
+}: PageProps<{ companies: Company[]; company: Company; users: User[]; user: User; initialState: boolean; subject: SheetContentType }>) {
   const t = useTranslation().trans;
   const getInitials = useInitials();
-  const [state, setState] = useState<State>({ sheetState: false, sheetContent: 'profile' });
+  const [state, setState] = useState<State>({ sheetState: initialState, sheetContent: subject });
   const [selectedCompany, setSelectedCompany] = useState<CreateFormParams>({
     company: company,
     action: company !== undefined ? 'view' : 'create',
@@ -78,6 +80,7 @@ export default function Account({
   };
 
   const onOpenChange = (open: boolean) => {
+    setSelectedUser({ user: undefined, action: 'create' });
     setState({ sheetState: open, sheetContent: 'profile' });
   };
 
@@ -85,10 +88,15 @@ export default function Account({
     onOpenChange(open);
     // setDeleteDialogOpen(open);
   };
+
+  const onAddNewUser = () => {
+    setState({ sheetState: true, sheetContent: 'user:form' });
+  };
   return (
     <AppLayout breadcrumbs={breadcrumbs} user={auth.user}>
       <div className="flex">
         <div className="flex basis-[30vw] flex-col gap-y-6 py-6">
+          {JSON.stringify(state)}
           <div className="flex items-end gap-6">
             <div className="relative flex size-22 items-center">
               <Avatar className="bg-muted flex h-22 w-22 items-center justify-center rounded-full">
@@ -109,7 +117,8 @@ export default function Account({
             <h4>Member since</h4>
             {format(auth.user.created_at, 'PPP')}
           </div>
-          <div>
+          <div className="space-y-6">
+            <Separator />
             <Button onClick={onEditProfile}>Edit Profile</Button>
           </div>
         </div>
@@ -117,7 +126,7 @@ export default function Account({
           {hasCompanies && <CompanyList data={companies} onSelectCompany={onSelectCompany} />}
           {hasUsers && (
             <>
-              <Separator /> <UserList data={users} onSelectUser={onSelectUser} />
+              <Separator /> <UserList data={users} onSelectUser={onSelectUser} onAddNewUser={onAddNewUser} />
             </>
           )}
         </div>
@@ -135,7 +144,7 @@ export default function Account({
               <CreateCompanyForm params={selectedCompany} onFinish={modalHandler} />
             )}
             {state.sheetContent === 'user:view' && selectedUser.user !== undefined && <ShowUser user={selectedUser.user} />}
-            {state.sheetContent === 'user:form' && selectedUser.user !== undefined && <UserForm params={selectedUser} onFinish={modalHandler} />}
+            {state.sheetContent === 'user:form' && <UserForm params={selectedUser} onFinish={modalHandler} />}
             {state.sheetContent === 'profile' && <AccountForm />}
           </div>
         </SheetContent>

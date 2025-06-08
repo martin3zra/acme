@@ -223,7 +223,7 @@ func (s *Server) sendVerificationEmail(ctx *routing.Context) {
 			"secret": string(s.config.secretKey),
 		})
 
-		ctx.BackWith(map[string]string{"status": "verification-link-sent"})
+		ctx.BackWith(map[string]any{"status": "verification-link-sent"})
 		return
 	}
 
@@ -235,7 +235,7 @@ func (s *Server) sendVerificationEmail(ctx *routing.Context) {
 
 	s.sendAccountVerificationNotification(*account)
 
-	ctx.BackWith(map[string]string{"status": "verification-link-sent"})
+	ctx.BackWith(map[string]any{"status": "verification-link-sent"})
 }
 
 func (s *Server) accountProfileHandler(ctx *routing.Context) {
@@ -251,11 +251,22 @@ func (s *Server) accountProfileHandler(ctx *routing.Context) {
 		ctx.Error(err)
 		return
 	}
-	ctx.Render("Settings/Account", map[string]any{
+
+	props := map[string]any{
 		"translations": mergeTranslations(ctx.Request.Context(), loadTranslations("companies", "users")),
 		"companies":    companies,
 		"users":        users,
-	})
+	}
+
+	if ctx.QueryHas("open") {
+		props["initialState"] = ctx.Query("open")
+	}
+
+	if ctx.QueryHas("subject") {
+		props["subject"] = ctx.Query("subject")
+	}
+
+	ctx.Render("Settings/Account", props)
 }
 
 func (s *Server) updateAccountProfileHandler() routing.HandlerFunc {

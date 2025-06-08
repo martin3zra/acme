@@ -583,7 +583,7 @@ func (form StoreProfileForm) Rules() map[string]any {
 			"min:8",
 			"max:120",
 			"lowercase",
-			validator.Rule{}.Unique("users", "email").Ignore(form.ID, "uuid"),
+			validator.Rule{}.Unique("users", "email"),
 		},
 	}
 }
@@ -704,7 +704,7 @@ func UserFromFoundationUser(u *foundation.User) *User {
 	}
 }
 
-func (u *User) currentCompany(db *sql.DB) Company {
+func (u *User) currentCompany(db *sql.DB) *Company {
 	result := db.QueryRow(`
     SELECT companies.id, companies.name, companies.identifier, companies.city,
     companies.address, companies.created_at, companies.updated_at
@@ -723,10 +723,10 @@ func (u *User) currentCompany(db *sql.DB) Company {
 		&company.UpdatedAt,
 	)
 	if err != nil {
-		log.Fatalf("CurrentCompany: failed to scan company: %v", err)
+		log.Println("CurrentCompany: failed to scan company:", err)
 	}
 
-	return company
+	return &company
 }
 
 func CurrentCompany(ctx context.Context) Company {
