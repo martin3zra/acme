@@ -27,6 +27,7 @@ export interface AuthAccount {
 
 export interface Company {
   id: number;
+  uuid: string;
   name: string;
   address: string;
   identifier: string;
@@ -359,3 +360,9 @@ export interface NavItem {
   icon?: LucideIcon | null;
   isActive?: boolean;
 }
+
+export type Role = {
+  id: string;
+  label: string;
+  description: string;
+};

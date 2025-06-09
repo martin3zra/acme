@@ -7,7 +7,7 @@ import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '
 import { useInitials } from '@/hooks/use-initials';
 import { useTranslation } from '@/hooks/use-translation';
 import AppLayout from '@/layouts/app-layout';
-import { BreadcrumbItem, Company, PageProps, User, UserVerb, Verb } from '@/types';
+import { BreadcrumbItem, Company, PageProps, Role, User, UserVerb, Verb } from '@/types';
 import { format } from 'date-fns';
 import { BadgeCheck } from 'lucide-react';
 import { useState } from 'react';
@@ -37,9 +37,18 @@ export default function Account({
   company,
   users,
   user,
+  roles,
   initialState = false,
   subject = 'profile',
-}: PageProps<{ companies: Company[]; company: Company; users: User[]; user: User; initialState: boolean; subject: SheetContentType }>) {
+}: PageProps<{
+  companies: Company[];
+  company: Company;
+  users: User[];
+  user: User;
+  roles: Role[];
+  initialState: boolean;
+  subject: SheetContentType;
+}>) {
   const t = useTranslation().trans;
   const getInitials = useInitials();
   const [state, setState] = useState<State>({ sheetState: initialState, sheetContent: subject });
@@ -140,7 +149,9 @@ export default function Account({
             {state.sheetContent === 'company:form' && selectedCompany.company !== undefined && (
               <CreateCompanyForm params={selectedCompany} onFinish={modalHandler} />
             )}
-            {['user:view', 'user:form'].includes(state.sheetContent) && <UserForm params={selectedUser} onFinish={modalHandler} />}
+            {['user:view', 'user:form'].includes(state.sheetContent) && (
+              <UserForm params={selectedUser} companies={companies} roles={roles} onFinish={modalHandler} />
+            )}
             {state.sheetContent === 'profile' && <AccountForm />}
           </div>
         </SheetContent>

@@ -162,6 +162,38 @@ var InvoiceTermType = struct {
 	Credit: _CREDIT,
 }
 
+type Role string
+
+const (
+	_DEVELOPER  Role = "developer"  //  Access to APIs, integrations, and developer tools
+	_OWNER      Role = "owner"      // Full control of billing, settings, and organization
+	_ADMIN      Role = "admin"      //  Manages users, roles, and global settings
+	_SUPERVISOR Role = "supervisor" // Manages team data, limited settings access
+	_STANDARD   Role = "standard"   // Regular user with core feature access
+)
+
+var Roles = struct {
+	Developer  Role
+	Owner      Role
+	Admin      Role
+	Supervisor Role
+	Standard   Role
+}{
+	Developer:  _DEVELOPER,
+	Owner:      _OWNER,
+	Admin:      _ADMIN,
+	Supervisor: _SUPERVISOR,
+	Standard:   _STANDARD,
+}
+
+var RoleMap = []map[string]any{
+	// {"id": string(Roles.Developer), "label": Roles.Developer},
+	// {"id": string(Roles.Owner), "label": Roles.Owner},
+	{"id": string(Roles.Admin), "label": Roles.Admin, "description": "Manages users, roles, and global settings"},
+	{"id": string(Roles.Supervisor), "label": Roles.Supervisor, "description": "Manages team data, limited settings access"},
+	{"id": string(Roles.Standard), "label": Roles.Standard, "description": "Regular user with core feature access"},
+}
+
 type PaidStatus string
 
 const (

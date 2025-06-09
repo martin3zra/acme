@@ -58,6 +58,7 @@ func NewServer(assets, resources *embed.FS) *Server {
 
 func (s *Server) Boot() {
 
+	s.registerPermissions()
 	s.config.ensureHasBeenSet()
 	s.openDatabaseConnection()
 	s.configureMailClient()
@@ -116,4 +117,23 @@ func (s *Server) configureMailClient() {
 
 func (s *Server) trans(key string, replacements ...i18n.Replacements) string {
 	return s.translator.Trans(key, replacements...)
+}
+
+func (s *Server) registerPermissions() {
+	modules := []string{
+		"company", "user", "customer", "invoice", "payment",
+	}
+
+	actions := []string{"delete", "update", "view", "create", "store", "viewAny"}
+
+	// Grouped by action
+	var permissions []string
+
+	for _, action := range actions {
+		for _, module := range modules {
+			permissions = append(permissions, fmt.Sprintf("%s:%s", action, module))
+		}
+	}
+
+	fmt.Println("✅ permissions.", permissions)
 }

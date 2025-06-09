@@ -5,9 +5,10 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Separator } from '@/components/ui/separator';
 import { useHeader } from '@/composables/use-headers';
-import { PageProps, User, UserVerb } from '@/types';
+import { Company, PageProps, Role, User, UserVerb } from '@/types';
 import { Transition } from '@headlessui/react';
 import { useForm, usePage } from '@inertiajs/react';
 
@@ -24,9 +25,11 @@ export type UserFormParams = {
 export type UserFormProps = {
   onFinish: () => void;
   params: UserFormParams;
+  companies: Company[];
+  roles: Role[];
 };
 
-export default function UserForm({ onFinish, params }: UserFormProps) {
+export default function UserForm({ onFinish, params, companies, roles }: UserFormProps) {
   const { auth } = usePage<PageProps>().props;
   const { headers } = useHeader();
   const { data, setData, post, put, errors, processing, recentlySuccessful } = useForm<Required<UserForm>>({
@@ -72,6 +75,7 @@ export default function UserForm({ onFinish, params }: UserFormProps) {
             />
             <InputError message={errors.name} />
           </div>
+
           <div className="col-span-6 space-y-2">
             <Label htmlFor="email" className="text-end">
               Email
@@ -84,6 +88,48 @@ export default function UserForm({ onFinish, params }: UserFormProps) {
               onChange={(e) => setData('email', e.target.value)}
               disabled={params.action !== 'create'}
             />
+            <InputError message={errors.email} />
+          </div>
+
+          <Separator className="col-span-6" />
+          <div className="col-span-6 space-y-2">
+            <Label htmlFor="email" className="text-end">
+              Company
+            </Label>
+            {/* onValueChange={handlePaymentTermsChange}
+            value={String(invoiceForm.header.terms)} */}
+            <Select required name="paymentTerms" defaultValue={'0'}>
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder="Select terms" />
+              </SelectTrigger>
+              <SelectContent className="">
+                {companies.map((company) => (
+                  <SelectItem key={company.id.toString()} value={company.id.toString()}>
+                    {company.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <InputError message={errors.email} />
+          </div>
+          <div className="col-span-6 space-y-2">
+            <Label htmlFor="email" className="text-end">
+              Role
+            </Label>
+            {/* onValueChange={handlePaymentTermsChange}
+            value={String(invoiceForm.header.terms)} */}
+            <Select required name="paymentTerms" defaultValue={'0'}>
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder="Select terms" />
+              </SelectTrigger>
+              <SelectContent className="">
+                {roles.map((role) => (
+                  <SelectItem key={role.id} value={role.id}>
+                    {role.label.toUpperCase()} <span className="text-muted-foreground">{role.description}</span>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
             <InputError message={errors.email} />
           </div>
         </FormSection.Form>

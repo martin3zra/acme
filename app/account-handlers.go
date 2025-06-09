@@ -260,6 +260,7 @@ func (s *Server) accountProfileHandler(ctx *routing.Context) {
 		"translations": mergeTranslations(ctx.Request.Context(), loadTranslations("companies", "users")),
 		"companies":    companies,
 		"users":        users,
+		"roles":        RoleMap,
 	}
 
 	if ctx.QueryHas("open") {
