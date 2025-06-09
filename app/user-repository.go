@@ -2,6 +2,7 @@ package app
 
 import (
 	"database/sql"
+	"fmt"
 
 	"github.com/martin3zra/acme/pkg/database"
 	"github.com/martin3zra/acme/pkg/foundation"
@@ -98,6 +99,35 @@ func (s *Server) storeUser(accountID int, form *StoreProfileForm) (*User, error)
 		}
 
 		_, err = stmt.Exec(accountID, user.Id)
+		if err != nil {
+			return err
+		}
+
+		stmt, err = tx.Prepare("INSERT INTO companies_users (company_id, user_id, role, current) SELECT id, $1, $2, $3 FROM companies WHERE uuid = $4")
+		if err != nil {
+			return err
+		}
+
+		current := false
+		for i, cr := range form.Companies {
+			if i == 0 {
+				current = true
+			}
+			res, err := stmt.Exec(user.Id, cr.Role, current, cr.Company)
+			if err != nil {
+				return err
+			}
+			current = false
+
+			affected, err := res.RowsAffected()
+			if err != nil {
+				return err
+			}
+			if affected == 0 {
+				return fmt.Errorf("company with UUID %s not found", cr.Company)
+			}
+		}
+
 		return err
 	})
 

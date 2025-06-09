@@ -14,6 +14,7 @@ type FormRequestContract interface {
 	Rules() map[string]any
 	Errors() validator.Errors
 	SetContext(ctx context.Context)
+	Context() context.Context
 	Messages() map[string]string
 }
 
@@ -25,6 +26,10 @@ type FormRequest struct {
 func (f *FormRequest) SetContext(ctx context.Context) {
 	f.ctx = ctx
 	f.getValidatorInstance()
+}
+
+func (f *FormRequest) Context() context.Context {
+	return f.ctx
 }
 
 func (f *FormRequest) setValidatorInstance(validator *validator.Validator) {

@@ -16,8 +16,20 @@ func (s *Server) storeCompanyHandler(ctx *routing.Context) {
 		ctx.Back()
 		return
 	}
+
+	// TODO: An owner and admin can create companies.
 	user := UserFromFoundationUser(auth.User(ctx.Request.Context()))
-	err = s.storeCompany(user.Id, form)
+	account := user.Account(s.db)
+	if account == nil {
+		account, err = user.OwnedBy(s.db)
+		if err != nil {
+			log.Println("Unable to create company, we can't find an account to associated it.")
+			ctx.Back()
+			return
+		}
+	}
+
+	err = s.storeCompany(account.ID, user.Id, form)
 	if err != nil {
 		log.Printf("Error creating company: %v", err)
 		s.session.Errors("status", s.trans("global.wasNotCreated", i18n.Replacements{"subject": "@global.company"}))

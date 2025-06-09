@@ -5,16 +5,23 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Separator } from '@/components/ui/separator';
 import { useHeader } from '@/composables/use-headers';
 import { Company, PageProps, Role, User, UserVerb } from '@/types';
-import { Transition } from '@headlessui/react';
+import { Field, Radio, RadioGroup, Transition } from '@headlessui/react';
 import { useForm, usePage } from '@inertiajs/react';
+import { CheckCircleIcon } from 'lucide-react';
+import { useState } from 'react';
+
+type CompanyRole = {
+  company: string;
+  role: string;
+};
 
 export interface UserForm {
   name: string;
   email: string;
+  companies: CompanyRole[];
 }
 
 export type UserFormParams = {
@@ -29,16 +36,36 @@ export type UserFormProps = {
   roles: Role[];
 };
 
+type UserCompany = {
+  company: Company;
+  role: Role;
+};
+
 export default function UserForm({ onFinish, params, companies, roles }: UserFormProps) {
   const { auth } = usePage<PageProps>().props;
+  const [userCompanies, setUserCompanies] = useState<UserCompany[]>([]);
   const { headers } = useHeader();
-  const { data, setData, post, put, errors, processing, recentlySuccessful } = useForm<Required<UserForm>>({
-    name: params.user?.name || '',
-    email: params.user?.email || '',
+  const { data, setData, transform, post, put, errors, processing, recentlySuccessful } = useForm<Required<UserForm>>({
+    name: params.user?.name || 'Nathalia',
+    email: params.user?.email || 'thalia@example.com',
+    companies: [],
   });
+
+  // Add or update business-role selection
+  const updateUserCompanies = (company: Company, role: Role) => {
+    setUserCompanies((prev) => {
+      const exists = prev.find((b: UserCompany) => b.company.id === company.id);
+      return exists ? prev.map((b) => (b.company.id === company.id ? { company, role } : b)) : [...prev, { company, role }];
+    });
+  };
 
   const options = { ...headers }; //, onSuccess: () => onFinish() };
   const submit = () => {
+    transform((data) => ({
+      ...data,
+      companies: userCompanies.map(({ company, role }) => ({ company: company.uuid, role: role.id })),
+    }));
+
     if (params.action === 'create') {
       post(`/settings/${auth.account.uuid}/users`, { ...options, preserveState: 'errors' });
       return;
@@ -46,6 +73,7 @@ export default function UserForm({ onFinish, params, companies, roles }: UserFor
 
     put(`/settings/${auth.account.uuid}/users/${params.user?.uuid}`, { ...options, preserveState: 'errors' });
   };
+
   return (
     <div className="flex flex-col space-y-6">
       <FormSection onSubmit={submit}>
@@ -92,46 +120,33 @@ export default function UserForm({ onFinish, params, companies, roles }: UserFor
           </div>
 
           <Separator className="col-span-6" />
-          <div className="col-span-6 space-y-2">
-            <Label htmlFor="email" className="text-end">
-              Company
-            </Label>
-            {/* onValueChange={handlePaymentTermsChange}
-            value={String(invoiceForm.header.terms)} */}
-            <Select required name="paymentTerms" defaultValue={'0'}>
-              <SelectTrigger className="w-full">
-                <SelectValue placeholder="Select terms" />
-              </SelectTrigger>
-              <SelectContent className="">
-                {companies.map((company) => (
-                  <SelectItem key={company.id.toString()} value={company.id.toString()}>
-                    {company.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <InputError message={errors.email} />
-          </div>
-          <div className="col-span-6 space-y-2">
-            <Label htmlFor="email" className="text-end">
-              Role
-            </Label>
-            {/* onValueChange={handlePaymentTermsChange}
-            value={String(invoiceForm.header.terms)} */}
-            <Select required name="paymentTerms" defaultValue={'0'}>
-              <SelectTrigger className="w-full">
-                <SelectValue placeholder="Select terms" />
-              </SelectTrigger>
-              <SelectContent className="">
+          {companies.map((company) => (
+            <div className="col-span-6" key={`company-${company.uuid}`}>
+              <h3 className="mb-5 text-lg font-medium text-gray-900 dark:text-white">{company.name}</h3>
+              <RadioGroup
+                by="label"
+                aria-label="Companies Roles"
+                className="grid grid-cols-3 gap-6"
+                onChange={(role: Role) => updateUserCompanies(company, role)}
+                value={userCompanies.find((b: UserCompany) => b.company.id === company.id)?.role}
+              >
                 {roles.map((role) => (
-                  <SelectItem key={role.id} value={role.id}>
-                    {role.label.toUpperCase()} <span className="text-muted-foreground">{role.description}</span>
-                  </SelectItem>
+                  <Field key={role.id}>
+                    <Radio
+                      value={role}
+                      className="group data-checked:bg-primary data-checked:text-primary-foreground bg-primary/5 data-focus:outline-primary relative flex cursor-pointer grid-cols-1 rounded-lg px-5 py-4 shadow-md transition focus:not-data-focus:outline-none data-focus:outline"
+                    >
+                      <div className="flex w-full flex-col items-start justify-start">
+                        <div className="text-lg font-semibold">{role.label}</div>
+                        <div className="text-xs">{role.description}</div>
+                      </div>
+                      <CheckCircleIcon className="size-6 opacity-0 transition group-data-checked:opacity-100" />
+                    </Radio>
+                  </Field>
                 ))}
-              </SelectContent>
-            </Select>
-            <InputError message={errors.email} />
-          </div>
+              </RadioGroup>
+            </div>
+          ))}
         </FormSection.Form>
         <FormSection.Actions>
           <Transition

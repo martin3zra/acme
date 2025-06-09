@@ -366,3 +366,5 @@ export type Role = {
   label: string;
   description: string;
 };
+
+export type RoleType = 'developer' | 'owner' | 'admin' | 'supervisor' | 'standard';

@@ -599,11 +599,17 @@ func (StoreCompanyForm) Rules() map[string]any {
 	}
 }
 
+type CompanyRole struct {
+	Company string `json:"company"`
+	Role    string `json:"role"`
+}
+
 type StoreProfileForm struct {
 	support.FormRequest
-	ID    string `json:"id"`
-	Name  string `json:"name"`
-	Email string `json:"email"`
+	ID        string        `json:"id"`
+	Name      string        `json:"name"`
+	Email     string        `json:"email"`
+	Companies []CompanyRole `json:"companies"`
 }
 
 func (form StoreProfileForm) Rules() map[string]any {
@@ -617,6 +623,9 @@ func (form StoreProfileForm) Rules() map[string]any {
 			"lowercase",
 			validator.Rule{}.Unique("users", "email"),
 		},
+		"companies":           "required|min:1",
+		"companies.*.company": "required|exists:companies,uuid",
+		"companies.*.role":    "required|in:admin,supervisor,standard",
 	}
 }
 
