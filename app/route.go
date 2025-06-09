@@ -39,7 +39,6 @@ func (s *Server) bootRoutes() {
 				WithMiddleware(RestrictedAccess).
 				Group(func(route *routing.Router) {
 					route.GET("/home", s.homeHandler)
-					route.POST("/logout", s.logoutHandler)
 
 					route.POST("/companies", s.storeCompanyHandler)
 
@@ -86,6 +85,16 @@ func (s *Server) bootRoutes() {
 						route.GET("/settings/profile", func(ctx *routing.Context) {
 							ctx.Render("Settings/Profile", map[string]any{})
 						})
+					})
+				})
+
+			route.
+				WithoutGroupMiddleware(RestrictedAccess).
+				Group(func(route *routing.Router) {
+					route.POST("/logout", s.logoutHandler)
+
+					route.GET("/awaiting-association", func(ctx *routing.Context) {
+						ctx.Render("Restricted/AwaitingAssociation/Index", map[string]any{})
 					})
 				})
 		})

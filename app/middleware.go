@@ -183,8 +183,11 @@ func RedirectIfAuthenticated(next routing.HandlerFunc) routing.HandlerFunc {
 
 func RestrictedAccess(next routing.HandlerFunc) routing.HandlerFunc {
 	return func(ctx *routing.Context) {
-		// user := UserFromFoundationUser(ctx.User())
-		// TODO: Send the user to a restricted page, they need to have a company assigned.
+		if CurrentCompany(ctx.Request.Context()) == nil {
+			ctx.Redirect("/awaiting-association")
+			return
+		}
+
 		next(ctx)
 	}
 }
@@ -192,6 +195,10 @@ func RestrictedAccess(next routing.HandlerFunc) routing.HandlerFunc {
 func getCurrentCompany(attrs map[string]any) (*Company, error) {
 	raw, ok := attrs["current_company"]
 	if !ok {
+		return nil, nil
+	}
+
+	if raw == nil {
 		return nil, nil
 	}
 

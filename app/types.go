@@ -730,12 +730,17 @@ func (u *User) currentCompany(db *sql.DB) (*Company, error) {
 	return &company, err
 }
 
-func CurrentCompany(ctx context.Context) Company {
-	cc := ctx.Value(auth.ContextCompanyID{}).(map[string]any)
-	company, err := mapTo[Company](cc)
-	if err != nil {
-		log.Fatalf("CurrentCompany: failed to map company: %v", err)
+func CurrentCompany(ctx context.Context) *Company {
+	cc := ctx.Value(auth.ContextCompanyID{})
+	if cc == nil {
+		return nil
 	}
 
-	return company
+	company, err := mapTo[Company](cc.(map[string]any))
+	if err != nil {
+		log.Fatalf("CurrentCompany: failed to map company: %v", err)
+		return nil
+	}
+
+	return &company
 }

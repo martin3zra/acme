@@ -180,6 +180,10 @@
       "search": "Buscar cliente...",
       "addNew": "Registrar nuevo cliente",
       "emptyText": "No se encontraron clientes"
+    },
+    "restricted": {
+      "title": "Acceso restringido",
+      "description": "Aún no estás asociado a una cuenta comercial, por lo que no puedes acceder a la aplicación."
     }
   },
   "verify": {
