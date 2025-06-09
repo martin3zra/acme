@@ -15,7 +15,6 @@ import { CompanyList } from './Companies/List/Index';
 import Show from './Companies/Show';
 import AccountForm from './Shared/account-form';
 import { UserList } from './Users/List/Index';
-import ShowUser from './Users/Show';
 import UserForm, { UserFormParams } from './Users/UserForm';
 
 export const breadcrumbs: BreadcrumbItem[] = [
@@ -96,7 +95,6 @@ export default function Account({
     <AppLayout breadcrumbs={breadcrumbs} user={auth.user}>
       <div className="flex">
         <div className="flex basis-[30vw] flex-col gap-y-6 py-6">
-          {JSON.stringify(state)}
           <div className="flex items-end gap-6">
             <div className="relative flex size-22 items-center">
               <Avatar className="bg-muted flex h-22 w-22 items-center justify-center rounded-full">
@@ -118,7 +116,6 @@ export default function Account({
             {format(auth.user.created_at, 'PPP')}
           </div>
           <div className="space-y-6">
-            <Separator />
             <Button onClick={onEditProfile}>Edit Profile</Button>
           </div>
         </div>
@@ -143,8 +140,7 @@ export default function Account({
             {state.sheetContent === 'company:form' && selectedCompany.company !== undefined && (
               <CreateCompanyForm params={selectedCompany} onFinish={modalHandler} />
             )}
-            {state.sheetContent === 'user:view' && selectedUser.user !== undefined && <ShowUser user={selectedUser.user} />}
-            {state.sheetContent === 'user:form' && <UserForm params={selectedUser} onFinish={modalHandler} />}
+            {['user:view', 'user:form'].includes(state.sheetContent) && <UserForm params={selectedUser} onFinish={modalHandler} />}
             {state.sheetContent === 'profile' && <AccountForm />}
           </div>
         </SheetContent>

@@ -1,9 +1,11 @@
+import ActionSection from '@/components/action-section';
 import FormSection from '@/components/form-section';
 import InputError from '@/components/input-error';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Separator } from '@/components/ui/separator';
 import { useHeader } from '@/composables/use-headers';
 import { PageProps, User, UserVerb } from '@/types';
 import { Transition } from '@headlessui/react';
@@ -42,13 +44,13 @@ export default function UserForm({ onFinish, params }: UserFormProps) {
     put(`/settings/${auth.account.uuid}/users/${params.user?.uuid}`, { ...options, preserveState: 'errors' });
   };
   return (
-    <div>
+    <div className="flex flex-col space-y-6">
       <FormSection onSubmit={submit}>
         <FormSection.Title>Account</FormSection.Title>
         <FormSection.Description>Manage your account settings and set e-mail preferences.</FormSection.Description>
         <FormSection.Form>
           <div className="col-span-6 space-y-2">
-            {params.user !== undefined && params.user?.email_verified_at !== null && (
+            {params.user !== undefined && params.user?.email_verified_at === null && (
               <Alert variant="destructive" className="border-red-400 bg-red-100/50">
                 <AlertDescription className="inline">
                   <span className="font-bold">{params.user?.name}</span> has not verified his account yet.
@@ -95,11 +97,36 @@ export default function UserForm({ onFinish, params }: UserFormProps) {
           >
             <p className="text-sm text-gray-600">Saved.</p>
           </Transition>
-          <Button type="submit" disabled={processing} className="h-12 md:text-xl">
-            {params.action}
+          <Button type="submit" disabled={processing} className="h-12 uppercase md:text-xl">
+            save
           </Button>
         </FormSection.Actions>
       </FormSection>
+
+      {params.user !== undefined && (
+        <>
+          <Separator className="space-y-6" />
+          <ActionSection>
+            <ActionSection.Title>Danger Zone: Disable User Account</ActionSection.Title>
+            <ActionSection.Description>
+              Disabling this user account will immediately revoke their access to the system. The user will be logged out, and they will no longer be
+              able to perform any actions or access any resources. This action does not delete the user's data or history but will effectively
+              deactivate the account until re-enabled by an administrator.
+            </ActionSection.Description>
+            <ActionSection.Content>
+              <p>
+                <span className="font-bold">Security Notice</span> Disabling a user account is a sensitive action. Only do this if the user should no
+                longer access the system. For temporary suspensions, consider using role restrictions instead. Need to undo this later? You can
+                re-enable a disabled user at any time from the Admin {'>'} Users section. No data will be lost when disabling.
+              </p>
+
+              <Button className="mt-6 uppercase" variant={'destructive'}>
+                Confirm and Disable
+              </Button>
+            </ActionSection.Content>
+          </ActionSection>
+        </>
+      )}
     </div>
   );
 }

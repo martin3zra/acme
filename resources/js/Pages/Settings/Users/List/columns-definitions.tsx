@@ -118,7 +118,6 @@ export const getColumns = ({ onDidClick, t }: Props): ColumnDef<User>[] => {
               <DropdownMenuLabel>{t('global.actions.title')}</DropdownMenuLabel>
               <DropdownMenuSeparator />
               <DropdownMenuItem onClick={() => onDidClick(props.row.original, 'view')}>{t('users.viewUser.title')}</DropdownMenuItem>
-              <DropdownMenuItem onClick={() => onDidClick(props.row.original, 'edit')}>{t('users.editUser.title')}</DropdownMenuItem>
               <DropdownMenuItem onClick={() => onDidClick(props.row.original, 'trash')}>{t('users.trashUser.title')}</DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem onClick={() => onDidClick(props.row.original, 'permission')}>{t('users.permissionUser.title')}</DropdownMenuItem>
