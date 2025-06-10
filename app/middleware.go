@@ -12,6 +12,7 @@ import (
 	"github.com/martin3zra/acme/pkg/foundation"
 	"github.com/martin3zra/acme/pkg/routing"
 	"github.com/martin3zra/acme/pkg/session"
+	"github.com/martin3zra/acme/pkg/support"
 	"github.com/romsar/gonertia/v2"
 )
 
@@ -147,17 +148,14 @@ func AuthenticatedMiddleware(next routing.HandlerFunc) routing.HandlerFunc {
 			return
 		}
 
-		// TODO add account information here
 		attrsMap := attrs.(map[string]any)
-		if cc, ok := attrsMap["current_company"]; ok {
-			if cc != nil {
-				ccCtx := context.WithValue(userCtx, auth.ContextCompanyID{}, cc)
-				next(ctx.WithContext(ccCtx))
-				return
-			}
-		}
+		ac := getAccount(attrsMap)
+		cc, _ := getCurrentCompany(attrsMap)
 
-		next(ctx.WithContext(userCtx))
+		acCtx := context.WithValue(userCtx, support.AccountKey{}, ac)
+		ccCtx := context.WithValue(acCtx, support.CompanyKey{}, cc)
+
+		next(ctx.WithContext(ccCtx))
 	}
 }
 

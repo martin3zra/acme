@@ -1,6 +1,7 @@
 package app
 
 import (
+	"context"
 	"database/sql"
 
 	"github.com/martin3zra/acme/pkg/database"
@@ -17,9 +18,8 @@ type Company struct {
 	foundation.Timestamps
 }
 
-// TODO add the account column to the table and as filter here.
-func (s *Server) findCompanies() ([]*Company, error) {
-	rows, err := s.db.Query("SELECT id, uuid, name, identifier, city, address, created_at, updated_at, deleted_at FROM companies")
+func (s *Server) findCompanies(ctx context.Context) ([]*Company, error) {
+	rows, err := s.db.Query("SELECT id, uuid, name, identifier, city, address, created_at, updated_at, deleted_at FROM companies WHERE account_id = $1", CurrentAccount(ctx))
 	if err != nil {
 		return nil, err
 	}

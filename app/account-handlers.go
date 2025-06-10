@@ -164,6 +164,7 @@ func (s *Server) verifyEmailHandler(ctx *routing.Context) {
 	account, err := user.OwnedBy(s.db)
 	if err == nil {
 		attrs["account"] = map[string]any{
+			"id":    account.ID,
 			"uuid":  account.UUID,
 			"owner": user.Account(s.db) != nil,
 		}
@@ -243,13 +244,13 @@ func (s *Server) sendVerificationEmail(ctx *routing.Context) {
 }
 
 func (s *Server) accountProfileHandler(ctx *routing.Context) {
-	companies, err := s.findCompanies()
+	companies, err := s.findCompanies(ctx.Request.Context())
 	if err != nil {
 		log.Println("something wrong occurred fetching companies:", err)
 		ctx.Error(err)
 		return
 	}
-	users, err := s.findUsers()
+	users, err := s.findUsers(ctx.Request.Context())
 	if err != nil {
 		log.Println("something wrong occurred fetching users:", err)
 		ctx.Error(err)
@@ -317,6 +318,7 @@ func (s *Server) updateAccountProfileHandler() routing.HandlerFunc {
 		account, err := user.OwnedBy(s.db)
 		if err == nil {
 			attrs["account"] = map[string]any{
+				"id":    account.ID,
 				"uuid":  account.UUID,
 				"owner": user.Account(s.db) != nil,
 			}

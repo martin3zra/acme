@@ -748,7 +748,7 @@ func UserFromFoundationUser(u *foundation.User) *User {
 
 func (u *User) currentCompany(db *sql.DB) (*Company, error) {
 	result := db.QueryRow(`
-    SELECT companies.id, companies.name, companies.identifier, companies.city,
+    SELECT companies.id, companies.uuid, companies.name, companies.identifier, companies.city,
     companies.address, companies.created_at, companies.updated_at
     FROM companies
     JOIN companies_users ON companies.id = companies_users.company_id
@@ -757,6 +757,7 @@ func (u *User) currentCompany(db *sql.DB) (*Company, error) {
 	var company Company
 	err := result.Scan(
 		&company.ID,
+		&company.UUID,
 		&company.Name,
 		&company.Identifier,
 		&company.City,
@@ -772,16 +773,28 @@ func (u *User) currentCompany(db *sql.DB) (*Company, error) {
 }
 
 func CurrentCompany(ctx context.Context) *Company {
-	cc := ctx.Value(auth.ContextCompanyID{})
+	cc := ctx.Value(support.CompanyKey{})
 	if cc == nil {
 		return nil
 	}
 
-	company, err := mapTo[Company](cc.(map[string]any))
-	if err != nil {
-		log.Fatalf("CurrentCompany: failed to map company: %v", err)
-		return nil
+	return cc.(*Company)
+}
+
+func CurrentAccount(ctx context.Context) int {
+	ac := ctx.Value(support.AccountKey{})
+	if ac == nil {
+		return 0
 	}
 
-	return &company
+	data, ok := ac.(map[string]any)
+	if !ok {
+		return 0
+	}
+	if val, ok := data["id"]; ok {
+		if intVal, err := toInt(val); err == nil {
+			return intVal
+		}
+	}
+	return 0
 }

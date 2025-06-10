@@ -44,6 +44,7 @@ func (s *Server) authHandler(ctx *routing.Context) {
 	account, err := userCtx.OwnedBy(s.db)
 	if err == nil {
 		attrs["account"] = map[string]any{
+			"id":    account.ID,
 			"uuid":  account.UUID,
 			"owner": userCtx.Account(s.db) != nil,
 		}

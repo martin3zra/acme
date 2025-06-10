@@ -53,7 +53,7 @@ func (s *Server) storeCompanyHandler(ctx *routing.Context) {
 
 func (s *Server) companyHandler(ctx *routing.Context) {
 
-	companies, err := s.findCompanies()
+	companies, err := s.findCompanies(ctx.Request.Context())
 	if err != nil {
 		log.Println("something wrong occurred fetching companies:", err)
 		ctx.Error(err)

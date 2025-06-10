@@ -6,6 +6,10 @@ import (
 	"github.com/martin3zra/acme/pkg/validator"
 )
 
+type AccountKey struct{}
+
+type CompanyKey struct{}
+
 type FormRequestContract interface {
 	PrepareForValidation()
 	PassedValidation()

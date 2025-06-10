@@ -1,6 +1,7 @@
 package app
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
 
@@ -8,8 +9,14 @@ import (
 	"github.com/martin3zra/acme/pkg/foundation"
 )
 
-func (s *Server) findUsers() ([]*User, error) {
-	rows, err := s.db.Query("SELECT id, uuid, name, email, email_verified_at, status, created_at, updated_at FROM users")
+func (s *Server) findUsers(ctx context.Context) ([]*User, error) {
+	rows, err := s.db.Query(`
+    SELECT id, uuid, name, email, email_verified_at, status, created_at, updated_at
+    FROM users
+    WHERE EXISTS (
+      SELECT 1 FROM accounts_users WHERE accounts_users.user_id = users.id AND accounts_users.account_id = $1
+    )
+  `, CurrentAccount(ctx))
 	if err != nil {
 		return nil, err
 	}
@@ -77,7 +84,8 @@ func (s *Server) updatePendingEmail(user *User) error {
 	return err
 }
 
-func (s *Server) storeUser(accountID int, form *StoreProfileForm) (*User, error) {
+func (s *Server) storeUser(ctx context.Context, form *StoreProfileForm) (*User, error) {
+	accountID := CurrentAccount(ctx)
 	var user User
 
 	err := database.WithTransaction(s.db, func(tx *sql.Tx) error {
@@ -103,7 +111,7 @@ func (s *Server) storeUser(accountID int, form *StoreProfileForm) (*User, error)
 			return err
 		}
 
-		stmt, err = tx.Prepare("INSERT INTO companies_users (company_id, user_id, role, current) SELECT id, $1, $2, $3 FROM companies WHERE uuid = $4")
+		stmt, err = tx.Prepare("INSERT INTO companies_users (company_id, user_id, role, current) SELECT id, $1, $2, $3 FROM companies WHERE account_id = $4 AND uuid = $5")
 		if err != nil {
 			return err
 		}
@@ -113,7 +121,7 @@ func (s *Server) storeUser(accountID int, form *StoreProfileForm) (*User, error)
 			if i == 0 {
 				current = true
 			}
-			res, err := stmt.Exec(user.Id, cr.Role, current, cr.Company)
+			res, err := stmt.Exec(user.Id, cr.Role, current, accountID, cr.Company)
 			if err != nil {
 				return err
 			}

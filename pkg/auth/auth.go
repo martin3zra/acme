@@ -14,8 +14,6 @@ import (
 
 type ContextUserID struct{}
 
-type ContextCompanyID struct{}
-
 type Auth struct {
 	db       *sql.DB
 	Hashable foundation.Hash

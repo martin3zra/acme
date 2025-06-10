@@ -3,8 +3,10 @@ package app
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"math"
 	"regexp"
+	"strconv"
 
 	"github.com/martin3zra/acme/pkg/i18n"
 	"github.com/romsar/gonertia/v2"
@@ -72,4 +74,20 @@ func mapTo[T any](m map[string]any) (T, error) {
 func round(value float64, precision int) float64 {
 	ratio := math.Pow(10, float64(precision))
 	return math.Round(value*ratio) / ratio
+}
+
+// Helper to convert various types to int
+func toInt(value any) (int, error) {
+	switch v := value.(type) {
+	case int:
+		return v, nil
+	case int64:
+		return int(v), nil
+	case float64:
+		return int(v), nil
+	case string:
+		return strconv.Atoi(v)
+	default:
+		return 0, fmt.Errorf("unsupported type: %T", value)
+	}
 }
