@@ -629,6 +629,10 @@ func (form StoreProfileForm) Rules() map[string]any {
 	}
 }
 
+func (form *StoreProfileForm) Authorize() bool {
+	return Can(form.User(), "create:users")
+}
+
 type User struct {
 	foundation.User
 	account *account
@@ -741,6 +745,7 @@ func UserFromContext(ctx context.Context) *User {
 }
 
 func UserFromFoundationUser(u *foundation.User) *User {
+	// TODO set the role here.
 	return &User{
 		User: *u,
 	}
@@ -749,7 +754,7 @@ func UserFromFoundationUser(u *foundation.User) *User {
 func (u *User) currentCompany(db *sql.DB) (*Company, error) {
 	result := db.QueryRow(`
     SELECT companies.id, companies.uuid, companies.name, companies.identifier, companies.city,
-    companies.address, companies.created_at, companies.updated_at
+    companies.address, companies.created_at, companies.updated_at, companies_users.role
     FROM companies
     JOIN companies_users ON companies.id = companies_users.company_id
     WHERE companies_users.user_id = $1 AND companies_users.current = true
@@ -764,6 +769,7 @@ func (u *User) currentCompany(db *sql.DB) (*Company, error) {
 		&company.Address,
 		&company.CreatedAt,
 		&company.UpdatedAt,
+		&company.UserRole,
 	)
 	if err != nil {
 		return nil, err

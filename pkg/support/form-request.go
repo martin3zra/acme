@@ -3,6 +3,8 @@ package support
 import (
 	"context"
 
+	"github.com/martin3zra/acme/pkg/auth"
+	"github.com/martin3zra/acme/pkg/foundation"
 	"github.com/martin3zra/acme/pkg/validator"
 )
 
@@ -19,16 +21,19 @@ type FormRequestContract interface {
 	Errors() validator.Errors
 	SetContext(ctx context.Context)
 	Context() context.Context
+	User() *foundation.User
 	Messages() map[string]string
 }
 
 type FormRequest struct {
 	validator *validator.Validator
 	ctx       context.Context
+	user      *foundation.User
 }
 
 func (f *FormRequest) SetContext(ctx context.Context) {
 	f.ctx = ctx
+	f.user = auth.User(ctx)
 	f.getValidatorInstance()
 }
 
@@ -79,6 +84,10 @@ func (f *FormRequest) PassesAuthorization() bool { return true }
 
 func (f *FormRequest) FailedAuthorization() {
 	// return here everything for a 403 status code
+}
+
+func (f *FormRequest) User() *foundation.User {
+	return f.user
 }
 
 func (f *FormRequest) Messages() map[string]string {

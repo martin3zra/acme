@@ -7,8 +7,10 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"strings"
 	"time"
 
+	"github.com/martin3zra/acme/pkg/foundation"
 	"github.com/martin3zra/acme/pkg/i18n"
 	"github.com/martin3zra/acme/pkg/inertia"
 	"github.com/martin3zra/acme/pkg/mailer"
@@ -120,20 +122,99 @@ func (s *Server) trans(key string, replacements ...i18n.Replacements) string {
 }
 
 func (s *Server) registerPermissions() {
-	modules := []string{
-		"company", "user", "customer", "invoice", "payment",
+	// modules := []string{
+	// 	"company", "user", "customer", "invoice", "payment",
+	// }
+
+	// actions := []string{"delete", "update", "view", "create", "store", "viewAny"}
+
+	// // Grouped by action
+	// var permissions []string
+
+	// for _, action := range actions {
+	// 	for _, module := range modules {
+	// 		permissions = append(permissions, fmt.Sprintf("%s:%s", action, module))
+	// 	}
+	// }
+}
+
+var rolePermissionsCache = map[string]map[string]bool{}
+
+var groupedPermissions = map[string]map[string][]string{
+	"owner": {"*": {"*"}},
+	"admin": {
+		"view":    {"invoice", "customer", "items"},
+		"viewAny": {"reports", "customers", "dashboard"},
+		"store":   {"invoices", "customer", "payments"},
+	},
+	"supervisor": {
+		"view":   {"invoice", "customer"},
+		"create": {"invoices", "payments"},
+	},
+	"standard": {
+		"view": {"invoice"},
+	},
+}
+
+func permissions(role string) map[string]bool {
+	if cached, exists := rolePermissionsCache[role]; exists {
+		return cached
 	}
 
-	actions := []string{"delete", "update", "view", "create", "store", "viewAny"}
+	flatPermissions := make(map[string]bool)
 
-	// Grouped by action
-	var permissions []string
+	if rolePermissions, exists := groupedPermissions[role]; exists {
+		for action, modules := range rolePermissions {
+			for _, module := range modules {
+				flatPermissions[action+":"+module] = true
 
-	for _, action := range actions {
-		for _, module := range modules {
-			permissions = append(permissions, fmt.Sprintf("%s:%s", action, module))
+				// If role has full module access ("view:*"), store general key
+				if module == "*" {
+					flatPermissions[action+":*"] = true
+				}
+
+				// If role has full action access ("*:invoice"), store wildcard key
+				if action == "*" {
+					flatPermissions["*:"+module] = true
+				}
+			}
+		}
+
+		// If role has full access ("*:*"), store a general wildcard key
+		if _, exists := rolePermissions["*"]; exists {
+			flatPermissions["*"] = true
 		}
 	}
 
-	fmt.Println("✅ permissions.", permissions)
+	rolePermissionsCache[role] = flatPermissions
+	return flatPermissions
+}
+
+func Can(user *foundation.User, actionModule string) bool {
+	permissions := permissions(user.Role)
+
+	// If the user requests "*" (full access check), return true if full access exists
+	if actionModule == "*" {
+		return permissions["*"]
+	}
+
+	// Standard permission checks
+	if permissions[actionModule] {
+		return true
+	}
+
+	// Action-wide wildcard (e.g., "view:*")
+	action := actionModule[:strings.Index(actionModule, ":")]
+	if permissions[action+":*"] {
+		return true
+	}
+
+	// Module-wide wildcard (e.g., "*:invoice")
+	module := actionModule[strings.Index(actionModule, ":")+1:]
+	if permissions["*:"+module] {
+		return true
+	}
+
+	// Check for complete wildcard "*:*"
+	return permissions["*"]
 }

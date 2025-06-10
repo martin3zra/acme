@@ -17,6 +17,7 @@ type User struct {
 	LastPasswordReset  *time.Time `json:"last_password_reset"`
 	MustChangePassword bool       `json:"must_change_password"`
 	Timestamps
+	Role string `json:"role"`
 }
 
 func (u *User) GetAuthIdentifier() int {
@@ -25,6 +26,10 @@ func (u *User) GetAuthIdentifier() int {
 
 func (u *User) GetAuthIdentifierName() string {
 	return "email"
+}
+
+func (u *User) SetRole(role string) {
+	u.Role = role
 }
 
 func (u *User) GetAuthPassword() string {
@@ -46,6 +51,7 @@ type Authenticatable interface {
 	GetAuthIdentifier() int
 	GetAuthIdentifierName() string
 	GetAuthPassword() string
+	SetRole(role string)
 }
 
 type MustVerifyPassword interface {

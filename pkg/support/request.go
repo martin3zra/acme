@@ -23,6 +23,7 @@ func ParseRequest(r *http.Request, params any) error {
 		formRequest.SetContext(r.Context())
 
 		if !formRequest.Authorize() {
+			session.GetSession(r).Errors("status", "Unauthorized")
 			return foundation.Unauthorized{}
 		}
 

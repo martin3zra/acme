@@ -15,6 +15,7 @@ type Company struct {
 	Identifier string `json:"identifier"`
 	City       string `json:"city"`
 	Address    string `json:"address"`
+	UserRole   string `json:"_"`
 	foundation.Timestamps
 }
 

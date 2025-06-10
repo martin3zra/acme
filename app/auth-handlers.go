@@ -51,6 +51,7 @@ func (s *Server) authHandler(ctx *routing.Context) {
 	}
 	company, err := userCtx.currentCompany(s.db)
 	if err == nil {
+		user.SetRole(company.UserRole)
 		attrs["current_company"] = company
 	}
 
