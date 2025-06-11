@@ -21,5 +21,8 @@
 <body class="font-sans antialiased">
     {{ .inertia }}
     <script type="module" src="{{ vite "resources/js/app.jsx" }}"></script>
+    <script>
+      window._abilities = {{ .abilities }}
+    </script>
 </body>
 </html>

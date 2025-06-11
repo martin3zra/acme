@@ -47,6 +47,9 @@ func InitInertia(assets, resources embed.FS, port string) *inertia.Inertia {
 
 		i.ShareTemplateData("hmr", true)
 
+		// set empty variable name, later to be inject from the middleware.
+		i.ShareTemplateData("abilities", map[string]bool{})
+
 		return i
 	}
 

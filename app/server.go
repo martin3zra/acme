@@ -60,7 +60,6 @@ func NewServer(assets, resources *embed.FS) *Server {
 
 func (s *Server) Boot() {
 
-	s.registerPermissions()
 	s.config.ensureHasBeenSet()
 	s.openDatabaseConnection()
 	s.configureMailClient()
@@ -121,38 +120,30 @@ func (s *Server) trans(key string, replacements ...i18n.Replacements) string {
 	return s.translator.Trans(key, replacements...)
 }
 
-func (s *Server) registerPermissions() {
-	// modules := []string{
-	// 	"company", "user", "customer", "invoice", "payment",
-	// }
-
-	// actions := []string{"delete", "update", "view", "create", "store", "viewAny"}
-
-	// // Grouped by action
-	// var permissions []string
-
-	// for _, action := range actions {
-	// 	for _, module := range modules {
-	// 		permissions = append(permissions, fmt.Sprintf("%s:%s", action, module))
-	// 	}
-	// }
-}
-
 var rolePermissionsCache = map[string]map[string]bool{}
 
 var groupedPermissions = map[string]map[string][]string{
 	"owner": {"*": {"*"}},
 	"admin": {
-		"view":    {"invoice", "customer", "items"},
-		"viewAny": {"reports", "customers", "dashboard"},
-		"store":   {"invoices", "customer", "payments"},
+		"view":    {"dashboard", "invoice", "customer", "items", "payments", "settings"},
+		"viewAny": {"dashboard", "invoice", "customer", "items", "payments", "settings"},
+		"create":  {"dashboard", "invoice", "customer", "items", "payments", "settings"},
+		"delete":  {"dashboard", "invoice", "customer", "items", "payments", "settings"},
+		"edit":    {"dashboard", "invoice", "customer", "items", "payments", "settings"},
 	},
 	"supervisor": {
-		"view":   {"invoice", "customer"},
-		"create": {"invoices", "payments"},
+		"view":    {"dashboard", "customer", "items", "payments"},
+		"viewAny": {"dashboard", "invoice", "customer", "items", "payments"},
+		"create":  {"dashboard", "customer", "items", "payments"},
+		"delete":  {"dashboard", "invoice", "customer", "items", "payments"},
+		"edit":    {"dashboard", "invoice", "customer", "items", "payments"},
 	},
 	"standard": {
-		"view": {"invoice"},
+		"view":    {"dashboard", "invoice", "customer", "items", "payments"},
+		"viewAny": {"dashboard", "invoice", "customer", "items", "payments"},
+		"create":  {"dashboard", "invoice", "customer", "items", "payments"},
+		"delete":  {"dashboard", "invoice", "customer", "items", "payments"},
+		"edit":    {"dashboard", "invoice", "customer", "items", "payments"},
 	},
 }
 
@@ -168,19 +159,19 @@ func permissions(role string) map[string]bool {
 			for _, module := range modules {
 				flatPermissions[action+":"+module] = true
 
-				// If role has full module access ("view:*"), store general key
+				// If role has full module access ("view:*"), create general key
 				if module == "*" {
 					flatPermissions[action+":*"] = true
 				}
 
-				// If role has full action access ("*:invoice"), store wildcard key
+				// If role has full action access ("*:invoice"), create wildcard key
 				if action == "*" {
 					flatPermissions["*:"+module] = true
 				}
 			}
 		}
 
-		// If role has full access ("*:*"), store a general wildcard key
+		// If role has full access ("*:*"), create a general wildcard key
 		if _, exists := rolePermissions["*"]; exists {
 			flatPermissions["*"] = true
 		}

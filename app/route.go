@@ -54,7 +54,7 @@ func (s *Server) bootRoutes() {
 					route.PUT("/items/:id/change-status", s.changeStatusItemHandler)
 					route.DELETE("/items/:id", s.deleteItemHandler)
 
-					route.GET("/invoices", s.invoicesHandler)
+					route.GET("/invoices", s.invoicesHandler).Can("view:invoices")
 					route.POST("/invoices", s.storeInvoiceHandler)
 					route.GET("/invoices/create", s.createInvoiceHandler)
 					route.GET("/invoices/:id/edit", s.editInvoiceHandler)

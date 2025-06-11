@@ -10,6 +10,8 @@ import (
 	"github.com/romsar/gonertia/v2"
 )
 
+type PermissionKey struct{}
+
 // HandlerFunc defines the function signature for a route handler.
 type HandlerFunc func(*Context)
 
@@ -19,18 +21,44 @@ type Middleware func(HandlerFunc) HandlerFunc
 // Route represents an HTTP route by associating an HTTP method, a URL pattern,
 // a final handler, and any middleware to be explicitly excluded.
 type Route struct {
-	Method    string
-	Pattern   string
-	Handler   HandlerFunc
-	Excluded  []Middleware
-	Wrapped   bool // Indicates that the handler has been pre-wrapped.
-	IsGrouped bool // Flag to indicate this route was registered in a group.
+	Method     string
+	Pattern    string
+	Handler    HandlerFunc
+	Excluded   []Middleware
+	Wrapped    bool   // Indicates that the handler has been pre-wrapped.
+	IsGrouped  bool   // Flag to indicate this route was registered in a group.
+	Permission string // Stores the required permission for this route.
 }
 
 // WithoutMiddleware excludes the specified middleware from being applied
 // on this route.
 func (rt *Route) WithoutMiddleware(mw Middleware) *Route {
 	rt.Excluded = append(rt.Excluded, mw)
+	return rt
+}
+
+func hasPermission(next HandlerFunc, permission string) HandlerFunc {
+	return func(ctx *Context) {
+		userPerms := ctx.Request.Context().Value(PermissionKey{}).(map[string]bool)
+
+		if !userPerms[permission] {
+			ctx.Inertia.Render(ctx.Response, ctx.Request, "Error/Index", map[string]any{
+				"status":  http.StatusForbidden,
+				"message": "Forbidden: Missing permission " + permission,
+			})
+			return
+		}
+
+		next(ctx)
+	}
+}
+
+func (rt *Route) Can(permission string) *Route {
+	rt.Permission = permission
+
+	// Inject a middleware that checks for this permission
+	rt.Handler = hasPermission(rt.Handler, permission)
+
 	return rt
 }
 
