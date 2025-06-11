@@ -14,7 +14,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Replacements, User, UserVerb } from '@/types';
 import { ColumnDef } from '@tanstack/react-table';
-import { ArrowUpDown, BadgeCheck, MoreHorizontal } from 'lucide-react';
+import { ArrowUpDown, BadgeCheck, Link, MoreHorizontal } from 'lucide-react';
 
 type Props = {
   onDidClick: (user: User, action: UserVerb) => void;
@@ -89,6 +89,25 @@ export const getColumns = ({ onDidClick, t }: Props): ColumnDef<User>[] => {
         }
 
         return null;
+      },
+    },
+    {
+      accessorKey: 'linked',
+      meta: t('global.link'),
+      size: 70,
+      header: (props) => {
+        return <HeaderCell title={t('global.link')} alignment="center" columnWidth={props.column.getSize()} />;
+      },
+      cell: (props) => {
+        if (props.row.original.linked === 0) {
+          return null;
+        }
+
+        return (
+          <div className="flex justify-center">
+            <Link size={22} />
+          </div>
+        );
       },
     },
     {

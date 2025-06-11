@@ -1,5 +1,9 @@
 import { LucideIcon } from 'lucide-react';
 
+export interface LinkedCompany {
+  uuid: string;
+  role: string;
+}
 export interface User {
   id: number;
   uuid: string;
@@ -9,6 +13,8 @@ export interface User {
   avatar?: string;
   email_verified_at: string | null;
   status: string;
+  linked: number;
+  linkedCompanies: LinkedCompany[];
   created_at: string;
   updated_at: string;
   [key: string]: unknown; // This allows for additional properties

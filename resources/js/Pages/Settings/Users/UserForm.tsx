@@ -43,7 +43,16 @@ type UserCompany = {
 
 export default function UserForm({ onFinish, params, companies, roles }: UserFormProps) {
   const { auth } = usePage<PageProps>().props;
-  const [userCompanies, setUserCompanies] = useState<UserCompany[]>([]);
+  const [userCompanies, setUserCompanies] = useState<UserCompany[]>((): UserCompany[] => {
+    if (params.user === undefined) return [];
+    return params.user.linkedCompanies
+      .map((linked) => {
+        const company = companies.find((c: Company) => c.uuid === linked.uuid);
+        const role = roles.find((c: Role) => c.id === linked.role);
+        return { company, role } as UserCompany;
+      })
+      .filter((l): l is UserCompany => l !== null); // ✨ TS type-guard
+  });
   const { headers } = useHeader();
   const { data, setData, transform, post, put, errors, processing, recentlySuccessful } = useForm<Required<UserForm>>({
     name: params.user?.name || 'Nathalia',

@@ -9,9 +9,21 @@ import (
 	"github.com/martin3zra/acme/pkg/foundation"
 )
 
+type UserLinkedCompany struct {
+	ID   int    `json:"id"`
+	UUID string `json:"uuid"`
+	Role string `json:"role"`
+}
+
 func (s *Server) findUsers(ctx context.Context) ([]*User, error) {
 	rows, err := s.db.Query(`
-    SELECT id, uuid, name, email, email_verified_at, status, created_at, updated_at
+    SELECT id, uuid, name, email, email_verified_at, status, created_at, updated_at,
+    (
+      SELECT COUNT(*)
+	    FROM companies_users
+	    INNER JOIN companies ON companies_users.company_id = companies.id AND companies.account_id = $1
+	    WHERE users.id = companies_users.user_id
+    ) as linked
     FROM users
     WHERE EXISTS (
       SELECT 1 FROM accounts_users WHERE accounts_users.user_id = users.id AND accounts_users.account_id = $1
@@ -23,7 +35,7 @@ func (s *Server) findUsers(ctx context.Context) ([]*User, error) {
 	data := make([]*User, 0)
 	for rows.Next() {
 		u := new(User)
-		if err = rows.Scan(&u.Id, &u.UUID, &u.Name, &u.Email, &u.EmailVerifiedAt, &u.Status, &u.CreatedAt, &u.UpdatedAt); err != nil {
+		if err = rows.Scan(&u.Id, &u.UUID, &u.Name, &u.Email, &u.EmailVerifiedAt, &u.Status, &u.CreatedAt, &u.UpdatedAt, &u.Linked); err != nil {
 			return nil, err
 		}
 		data = append(data, u)
@@ -57,6 +69,37 @@ func (s *Server) findUserByUUID(uuid string) (*User, error) {
 	return user, nil
 }
 
+func (s *Server) findUserLinkedCompanies(ctx context.Context, id int) ([]*UserLinkedCompany, error) {
+	rows, err := s.db.Query(`
+    SELECT companies.id, companies.uuid, companies_users.role
+    FROM companies
+    INNER JOIN companies_users ON companies.id = companies_users.company_id
+    INNER JOIN users ON companies_users.user_id = users.id
+    WHERE companies.account_id = $1 AND users.id = $2
+  `, CurrentAccount(ctx), id)
+
+	if err != nil {
+		return nil, err
+	}
+
+	data := make([]*UserLinkedCompany, 0)
+	for rows.Next() {
+		l := new(UserLinkedCompany)
+		if err = rows.Scan(
+			&l.ID,
+			&l.UUID,
+			&l.Role,
+		); err != nil {
+			return nil, err
+		}
+
+		data = append(data, l)
+
+	}
+
+	return data, err
+}
+
 func (s *Server) updateProfile(uuid string, form *StoreProfileForm) error {
 	_, err := s.db.Exec(`
     UPDATE users
@@ -84,7 +127,7 @@ func (s *Server) updatePendingEmail(user *User) error {
 	return err
 }
 
-func (s *Server) storeUser(ctx context.Context, form *StoreProfileForm) (*User, error) {
+func (s *Server) storeUser(ctx context.Context, form *StoreUserForm) (*User, error) {
 	accountID := CurrentAccount(ctx)
 	var user User
 
@@ -140,4 +183,54 @@ func (s *Server) storeUser(ctx context.Context, form *StoreProfileForm) (*User, 
 	})
 
 	return &user, err
+}
+
+func (s *Server) updateUser(ctx context.Context, form *StoreUserForm) error {
+	accountID := CurrentAccount(ctx)
+	var userId = 0
+
+	err := database.WithTransaction(s.db, func(tx *sql.Tx) error {
+		stmt, err := tx.Prepare("UPDATE users SET name = $2 WHERE uuid = $1 RETURNING id")
+		if err != nil {
+			return err
+		}
+		err = stmt.QueryRow(form.Param("id"), form.Name).Scan(&userId)
+		if err != nil {
+			return err
+		}
+
+		_, err = tx.Exec("DELETE FROM companies_users WHERE user_id = $1", userId)
+		if err != nil {
+			return err
+		}
+
+		stmt, err = tx.Prepare("INSERT INTO companies_users (company_id, user_id, role, current) SELECT id, $1, $2, $3 FROM companies WHERE account_id = $4 AND uuid = $5")
+		if err != nil {
+			return err
+		}
+
+		current := false
+		for i, cr := range form.Companies {
+			if i == 0 {
+				current = true
+			}
+			res, err := stmt.Exec(userId, cr.Role, current, accountID, cr.Company)
+			if err != nil {
+				return err
+			}
+			current = false
+
+			affected, err := res.RowsAffected()
+			if err != nil {
+				return err
+			}
+			if affected == 0 {
+				return fmt.Errorf("company with UUID %s not found", cr.Company)
+			}
+		}
+
+		return err
+	})
+
+	return err
 }

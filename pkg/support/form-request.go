@@ -22,6 +22,8 @@ type FormRequestContract interface {
 	SetContext(ctx context.Context)
 	Context() context.Context
 	User() *foundation.User
+	SetPathParams(params map[string]string)
+	Param(key string) string
 	Messages() map[string]string
 }
 
@@ -29,6 +31,7 @@ type FormRequest struct {
 	validator *validator.Validator
 	ctx       context.Context
 	user      *foundation.User
+	params    map[string]string
 }
 
 func (f *FormRequest) SetContext(ctx context.Context) {
@@ -39,6 +42,18 @@ func (f *FormRequest) SetContext(ctx context.Context) {
 
 func (f *FormRequest) Context() context.Context {
 	return f.ctx
+}
+
+func (f *FormRequest) SetPathParams(params map[string]string) {
+	f.params = params
+}
+
+func (f *FormRequest) Param(key string) string {
+	if f.params == nil {
+		return ""
+	}
+
+	return f.params[key]
 }
 
 func (f *FormRequest) setValidatorInstance(validator *validator.Validator) {

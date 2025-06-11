@@ -13,6 +13,7 @@ import (
 
 	"github.com/martin3zra/acme/pkg/auth"
 	"github.com/martin3zra/acme/pkg/foundation"
+	"github.com/martin3zra/acme/pkg/session"
 	"github.com/romsar/gonertia/v2"
 )
 
@@ -54,6 +55,7 @@ func (ctx *Context) Render(component string, props map[string]any) {
 
 // Error sends a parsed HTML to the client
 func (ctx *Context) Error(err error, status ...int) {
+	// TODO: When production instead of output the error to the client, redirect to the error page. https://advanced-inertia.com/blog/error-handling
 	var titleHttpCode = map[int]string{
 		500: "Internal Error.",
 		403: "Forbidden.",
@@ -87,6 +89,13 @@ func (ctx *Context) Error(err error, status ...int) {
 func (ctx *Context) WithContext(c context.Context) *Context {
 	ctx.Request = ctx.Request.WithContext(c)
 	return ctx
+}
+
+func (ctx *Context) Flash(name string, value any) {
+	session.GetSession(ctx.Request).Flash(name, value)
+}
+func (ctx *Context) Errors(name string, value string) {
+	session.GetSession(ctx.Request).Errors(name, value)
 }
 
 func (ctx *Context) Redirect(path string, status ...int) {

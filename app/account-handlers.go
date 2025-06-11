@@ -244,6 +244,7 @@ func (s *Server) sendVerificationEmail(ctx *routing.Context) {
 }
 
 func (s *Server) accountProfileHandler(ctx *routing.Context) {
+	userUuid := ctx.Query("user_id")
 	companies, err := s.findCompanies(ctx.Request.Context())
 	if err != nil {
 		log.Println("something wrong occurred fetching companies:", err)
@@ -262,6 +263,38 @@ func (s *Server) accountProfileHandler(ctx *routing.Context) {
 		"companies":    companies,
 		"users":        users,
 		"roles":        RoleMap,
+	}
+
+	if ensureUUIDIsValid(userUuid) {
+		user, err := s.findUserByUUID(userUuid)
+		if err != nil {
+			ctx.Error(err)
+			return
+		}
+
+		linked, err := s.findUserLinkedCompanies(ctx.Request.Context(), user.Id)
+		if err != nil {
+			ctx.Error(err)
+			return
+		}
+
+		linkedMap := make([]map[string]any, 0)
+		for _, link := range linked {
+			linkedMap = append(linkedMap, map[string]any{
+				"uuid": link.UUID,
+				"role": link.Role,
+			})
+		}
+		props["currentUser"] = map[string]any{
+			"uuid":              user.UUID,
+			"name":              user.Name,
+			"email":             user.Email,
+			"status":            user.Status,
+			"email_verified_at": user.EmailVerifiedAt,
+			"linkedCompanies":   linkedMap,
+		}
+		props["initialState"] = true
+		props["subject"] = "user:view"
 	}
 
 	if ctx.QueryHas("open") {

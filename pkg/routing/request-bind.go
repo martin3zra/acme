@@ -12,15 +12,16 @@ func WithRequest[T any](handler func(ctx *Context, body *T)) HandlerFunc {
 	return func(ctx *Context) {
 		var body T
 
-		err := support.ParseRequest(ctx.Request, &body)
+		err := support.ParseRequest(ctx.Request, &body, ctx.Params)
 		if err != nil {
-
 			if e, ok := err.(foundation.ErrorFormatter); ok {
 				if e.Status() == http.StatusForbidden {
 					ctx.Error(err, e.Status())
 					return
 				}
 			}
+
+			ctx.Errors("status", err.Error())
 			ctx.Back()
 			return
 		}

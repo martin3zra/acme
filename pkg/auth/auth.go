@@ -85,9 +85,9 @@ func (a *Auth) GetCurrentPassword(userId int) (string, error) {
 // Retrieve the currently authenticated user...
 func User(ctx context.Context) *foundation.User {
 	var user foundation.User
-	userCtx := ctx.Value(ContextUserID{}).(map[string]any)
+	userCtx := ctx.Value(ContextUserID{})
 	if userCtx != nil {
-		userJson, _ := json.Marshal(userCtx)
+		userJson, _ := json.Marshal(userCtx.(map[string]any))
 
 		json.Unmarshal([]byte(userJson), &user)
 	}

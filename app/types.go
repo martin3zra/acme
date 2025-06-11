@@ -11,6 +11,7 @@ import (
 
 	"github.com/martin3zra/acme/app/mail"
 	"github.com/martin3zra/acme/pkg/auth"
+	"github.com/martin3zra/acme/pkg/database"
 	"github.com/martin3zra/acme/pkg/foundation"
 	"github.com/martin3zra/acme/pkg/mailer"
 	"github.com/martin3zra/acme/pkg/routing"
@@ -599,20 +600,24 @@ func (StoreCompanyForm) Rules() map[string]any {
 	}
 }
 
-type CompanyRole struct {
-	Company string `json:"company"`
-	Role    string `json:"role"`
-}
-
 type StoreProfileForm struct {
 	support.FormRequest
-	ID        string        `json:"id"`
-	Name      string        `json:"name"`
-	Email     string        `json:"email"`
-	Companies []CompanyRole `json:"companies"`
+	Name  string `json:"name"`
+	Email string `json:"email"`
 }
 
 func (form StoreProfileForm) Rules() map[string]any {
+
+	db := form.Context().Value(database.ConnectionKey{}).(*sql.DB)
+	if db == nil {
+		panic("database connection need to be set.")
+	}
+
+	var userId int
+	if err := db.QueryRow("SELECT owner_id FROM accounts WHERE uuid = $1", form.Param("account")).Scan(&userId); err != nil {
+		panic("unable to find the account owner.")
+	}
+
 	return map[string]any{
 		"name": "required|min:3",
 		"email": []any{
@@ -621,7 +626,35 @@ func (form StoreProfileForm) Rules() map[string]any {
 			"min:8",
 			"max:120",
 			"lowercase",
-			validator.Rule{}.Unique("users", "email"),
+			validator.Rule{}.
+				Unique("users", "email").
+				Ignore(userId, "id"),
+		},
+	}
+}
+
+type CompanyRole struct {
+	Company string `json:"company"`
+	Role    string `json:"role"`
+}
+
+type StoreUserForm struct {
+	support.FormRequest
+	Name      string        `json:"name"`
+	Email     string        `json:"email"`
+	Companies []CompanyRole `json:"companies"`
+}
+
+func (form StoreUserForm) Rules() map[string]any {
+	return map[string]any{
+		"name": "required|min:3",
+		"email": []any{
+			"required",
+			"email",
+			"min:8",
+			"max:120",
+			"lowercase",
+			validator.Rule{}.Unique("users", "email").Ignore(form.Param("id"), "uuid"),
 		},
 		"companies":           "required|min:1",
 		"companies.*.company": "required|exists:companies,uuid",
@@ -629,13 +662,10 @@ func (form StoreProfileForm) Rules() map[string]any {
 	}
 }
 
-func (form *StoreProfileForm) Authorize() bool {
-	return Can(form.User(), "create:users")
-}
-
 type User struct {
 	foundation.User
 	account *account
+	Linked  int `json:"linked"`
 }
 
 func (u *User) SendEmailVerification(notify mailer.Mailer, attributes map[string]string) {

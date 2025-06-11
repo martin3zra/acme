@@ -4,10 +4,12 @@ import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet';
+import useCallbackState from '@/hooks/use-callback-state';
 import { useInitials } from '@/hooks/use-initials';
 import { useTranslation } from '@/hooks/use-translation';
 import AppLayout from '@/layouts/app-layout';
 import { BreadcrumbItem, Company, PageProps, Role, User, UserVerb, Verb } from '@/types';
+import { router, usePage } from '@inertiajs/react';
 import { format } from 'date-fns';
 import { BadgeCheck } from 'lucide-react';
 import { useState } from 'react';
@@ -36,7 +38,7 @@ export default function Account({
   companies,
   company,
   users,
-  user,
+  currentUser,
   roles,
   initialState = false,
   subject = 'profile',
@@ -44,21 +46,22 @@ export default function Account({
   companies: Company[];
   company: Company;
   users: User[];
-  user: User;
+  currentUser: User;
   roles: Role[];
   initialState: boolean;
   subject: SheetContentType;
 }>) {
   const t = useTranslation().trans;
   const getInitials = useInitials();
-  const [state, setState] = useState<State>({ sheetState: initialState, sheetContent: subject });
+  const page = usePage<PageProps>();
+  const [state, setState] = useCallbackState<State>({ sheetState: initialState, sheetContent: subject });
   const [selectedCompany, setSelectedCompany] = useState<CreateFormParams>({
     company: company,
     action: company !== undefined ? 'view' : 'create',
   });
   const [selectedUser, setSelectedUser] = useState<UserFormParams>({
-    user: user,
-    action: user !== undefined ? 'view' : 'create',
+    user: currentUser,
+    action: currentUser !== undefined ? 'view' : 'create',
   });
   const hasCompanies = companies.length > 0;
   const hasUsers = users.length > 0;
@@ -78,9 +81,23 @@ export default function Account({
       return;
     }
 
-    setSelectedUser({ user, action });
+    if (action !== 'view') return;
 
-    setState({ sheetState: true, sheetContent: action === 'view' ? 'user:view' : 'user:form' });
+    setState(
+      (current) => ({ sheetState: !current.sheetState, sheetContent: action === 'view' ? 'user:view' : 'user:form' }),
+      (newVal) => {
+        if (newVal.sheetState) findSelectedUser(user.uuid);
+      },
+    );
+  };
+
+  const findSelectedUser = (uuid: string) => {
+    router.visit(page.url, {
+      except: ['companies', 'users'],
+      data: { user_id: uuid },
+      preserveScroll: true,
+      preserveState: 'errors',
+    });
   };
 
   const onEditProfile = () => {
@@ -90,6 +107,14 @@ export default function Account({
   const onOpenChange = (open: boolean) => {
     setSelectedUser({ user: undefined, action: 'create' });
     setState({ sheetState: open, sheetContent: 'profile' });
+
+    if (open) return;
+    // Remove query string from URL
+    router.replace({
+      url: window.location.pathname,
+      preserveScroll: true,
+      preserveState: true,
+    });
   };
 
   const modalHandler = (open: boolean = false) => {
@@ -144,7 +169,7 @@ export default function Account({
             <SheetTitle>{t(`global.profile`)}</SheetTitle>
             <SheetDescription className="text-[12px]">Manage your subscription and billing details</SheetDescription>
           </SheetHeader>
-          <div className="grid gap-4 px-4">
+          <div className="grid gap-4 overflow-y-scroll px-4">
             {state.sheetContent === 'company:view' && selectedCompany.company !== undefined && <Show company={selectedCompany.company} />}
             {state.sheetContent === 'company:form' && selectedCompany.company !== undefined && (
               <CreateCompanyForm params={selectedCompany} onFinish={modalHandler} />
