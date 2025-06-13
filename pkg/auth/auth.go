@@ -14,8 +14,6 @@ import (
 
 type ContextUserID struct{}
 
-type ContextCompanyID struct{}
-
 type Auth struct {
 	db       *sql.DB
 	Hashable foundation.Hash
@@ -65,9 +63,9 @@ func (a *Auth) EnsureIsCurrentPassword(hashed, password string) bool {
 func (a *Auth) attempt(column, value any) (foundation.Authenticatable, error) {
 	user := new(foundation.User)
 	err := a.db.QueryRow(fmt.Sprintf("SELECT * FROM users WHERE %s = $1", column), value).
-		Scan(&user.Id, &user.FirstName, &user.LastName, &user.Email,
+		Scan(&user.Id, &user.Name, &user.Email,
 			&user.Password, &user.EmailVerifiedAt, &user.LastPasswordReset, &user.CreatedAt,
-			&user.UpdatedAt, &user.DeletedAt, &user.UUID, &user.Status, &user.MustChangePassword)
+			&user.UpdatedAt, &user.DeletedAt, &user.UUID, &user.Status, &user.MustChangePassword, &user.PendingEmail)
 	if err != nil {
 		return nil, err
 	}
@@ -87,9 +85,9 @@ func (a *Auth) GetCurrentPassword(userId int) (string, error) {
 // Retrieve the currently authenticated user...
 func User(ctx context.Context) *foundation.User {
 	var user foundation.User
-	userCtx := ctx.Value(ContextUserID{}).(map[string]any)
+	userCtx := ctx.Value(ContextUserID{})
 	if userCtx != nil {
-		userJson, _ := json.Marshal(userCtx)
+		userJson, _ := json.Marshal(userCtx.(map[string]any))
 
 		json.Unmarshal([]byte(userJson), &user)
 	}

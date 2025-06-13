@@ -9,14 +9,15 @@ type User struct {
 	Id                 int        `json:"id"`
 	UUID               string     `json:"uuid"`
 	Status             string     `json:"status"`
-	FirstName          string     `json:"first_name"`
-	LastName           string     `json:"last_name"`
+	Name               string     `json:"name"`
 	Email              string     `json:"email"`
+	PendingEmail       *string    `json:"pending_email"`
 	Password           string     `json:"-"`
 	EmailVerifiedAt    *time.Time `json:"email_verified_at"`
 	LastPasswordReset  *time.Time `json:"last_password_reset"`
 	MustChangePassword bool       `json:"must_change_password"`
 	Timestamps
+	Role string `json:"role"`
 }
 
 func (u *User) GetAuthIdentifier() int {
@@ -25,6 +26,10 @@ func (u *User) GetAuthIdentifier() int {
 
 func (u *User) GetAuthIdentifierName() string {
 	return "email"
+}
+
+func (u *User) SetRole(role string) {
+	u.Role = role
 }
 
 func (u *User) GetAuthPassword() string {
@@ -46,6 +51,7 @@ type Authenticatable interface {
 	GetAuthIdentifier() int
 	GetAuthIdentifierName() string
 	GetAuthPassword() string
+	SetRole(role string)
 }
 
 type MustVerifyPassword interface {

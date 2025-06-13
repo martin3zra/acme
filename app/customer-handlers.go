@@ -5,7 +5,6 @@ import (
 
 	"github.com/martin3zra/acme/pkg/i18n"
 	"github.com/martin3zra/acme/pkg/routing"
-	"github.com/martin3zra/acme/pkg/support"
 )
 
 func (s *Server) customersHandler(ctx *routing.Context) {
@@ -17,7 +16,7 @@ func (s *Server) customersHandler(ctx *routing.Context) {
 		return
 	}
 	props := map[string]any{
-		"translations": mergeTranslations(ctx.Request.Context(), loadTranslations("customers")),
+		"translations": trans("customers"),
 		"customers":    customers,
 	}
 	if ensureUUIDIsValid(uuid) {
@@ -32,91 +31,68 @@ func (s *Server) customersHandler(ctx *routing.Context) {
 	ctx.Render("Customers/Index", props)
 }
 
-func (s *Server) storeCustomerHandler(ctx *routing.Context) {
+func (s *Server) storeCustomerHandler() routing.HandlerFunc {
+	return routing.WithRequest(func(ctx *routing.Context, form *StoreCustomerForm) {
 
-	var form StoreCustomerForm
-	err := support.ParseRequest(ctx.Request, &form)
-	if err != nil {
-		ctx.Back(http.StatusBadRequest)
-		return
-	}
+		err := s.storeCustomer(ctx.Request.Context(), form)
+		if err != nil {
+			ctx.BackWith("status", s.trans("global.wasNotCreated", i18n.Replacements{"subject": "@global.customer"}), http.StatusBadRequest)
+			return
+		}
 
-	err = s.storeCustomer(ctx.Request.Context(), form)
-	if err != nil {
-		s.session.Errors("status", s.trans("global.wasNotCreated", i18n.Replacements{"subject": "@global.customer"}))
-		ctx.Back(http.StatusBadRequest)
-		return
-	}
+		ctx.Flash("success", s.trans("global.wasCreated", i18n.Replacements{"subject": "@global.customer"}))
 
-	s.session.Flash("success", s.trans("global.wasCreated", i18n.Replacements{"subject": "@global.customer"}))
-
-	ctx.Redirect("/customers")
+		ctx.Redirect("/customers")
+	})
 }
 
-func (s *Server) updateCustomerHandler(ctx *routing.Context) {
-	var form UpdateCustomerForm
-	err := support.ParseRequest(ctx.Request, &form)
-	if err != nil {
-		ctx.Back()
-		return
-	}
+func (s *Server) updateCustomerHandler() routing.HandlerFunc {
+	return routing.WithRequest(func(ctx *routing.Context, form *UpdateCustomerForm) {
 
-	err = s.updateCustomer(ctx.Request.Context(), ctx.Int("id"), form)
-	if err != nil {
-		s.session.Errors("status", s.trans("global.wasNotUpdated", i18n.Replacements{"subject": "@global.customer"}))
-		ctx.Back()
-		return
-	}
+		err := s.updateCustomer(ctx.Request.Context(), ctx.Int("id"), form)
+		if err != nil {
+			ctx.BackWith("status", s.trans("global.wasNotUpdated", i18n.Replacements{"subject": "@global.customer"}))
+			return
+		}
 
-	s.session.Flash("success", s.trans("global.wasUpdated", i18n.Replacements{"subject": "@global.customer"}))
+		ctx.Flash("success", s.trans("global.wasUpdated", i18n.Replacements{"subject": "@global.customer"}))
 
-	ctx.Redirect("/customers")
+		ctx.Redirect("/customers")
+	})
 }
 
-func (s *Server) deleteCustomerHandler(ctx *routing.Context) {
-	var form ConfirmsPasswords
-	err := support.ParseRequest(ctx.Request, &form)
-	if err != nil {
-		ctx.Back()
-		return
-	}
+func (s *Server) deleteCustomerHandler() routing.HandlerFunc {
+	return routing.WithRequest(func(ctx *routing.Context, form *ConfirmsPasswords) {
 
-	err = s.deleteCustomer(ctx.Request.Context(), ctx.Int("id"))
-	if err != nil {
-		s.session.Errors("current_password", s.trans("global.wasNotDeleted", i18n.Replacements{"subject": "@global.customer"}))
-		ctx.Back()
-		return
-	}
+		err := s.deleteCustomer(ctx.Request.Context(), ctx.Int("id"))
+		if err != nil {
+			ctx.BackWith("current_password", s.trans("global.wasNotDeleted", i18n.Replacements{"subject": "@global.customer"}))
+			return
+		}
 
-	s.session.Flash("success", s.trans("global.wasDeleted", i18n.Replacements{"subject": "@global.customer"}))
+		ctx.Flash("success", s.trans("global.wasDeleted", i18n.Replacements{"subject": "@global.customer"}))
 
-	ctx.Redirect("/customers")
+		ctx.Redirect("/customers")
+	})
 }
 
-func (s *Server) changeStatusCustomerHandler(ctx *routing.Context) {
+func (s *Server) changeStatusCustomerHandler() routing.HandlerFunc {
+	return routing.WithRequest(func(ctx *routing.Context, form *ConfirmsPasswords) {
 
-	var form ConfirmsPasswords
-	err := support.ParseRequest(ctx.Request, &form)
-	if err != nil {
-		ctx.Back()
-		return
-	}
+		customer, err := s.findCustomeByID(ctx.Request.Context(), ctx.Int("id"))
+		if err != nil {
+			ctx.BackWith("status", s.trans("global.wasNotUpdated", i18n.Replacements{"subject": "@global.customer"}))
+			return
+		}
 
-	customer, err := s.findCustomeByID(ctx.Request.Context(), ctx.Int("id"))
-	if err != nil {
-		s.session.Errors("status", s.trans("global.wasNotUpdated", i18n.Replacements{"subject": "@global.customer"}))
-		ctx.Back()
-		return
-	}
+		err = s.toggleCustomerStatus(ctx.Request.Context(), customer)
+		if err != nil {
+			ctx.BackWith("status", s.trans("global.wasNotUpdated", i18n.Replacements{"subject": "@global.customer"}))
+			return
+		}
 
-	err = s.toggleCustomerStatus(ctx.Request.Context(), customer)
-	if err != nil {
-		s.session.Errors("status", s.trans("global.wasNotUpdated", i18n.Replacements{"subject": "@global.customer"}))
-		ctx.Back()
-		return
-	}
+		ctx.Flash("success", s.trans("global.wasUpdated", i18n.Replacements{"subject": "@global.customer"}))
 
-	s.session.Flash("success", s.trans("global.wasUpdated", i18n.Replacements{"subject": "@global.customer"}))
-
-	ctx.Redirect("/customers")
+		ctx.Redirect("/customers")
+	})
 }

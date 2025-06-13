@@ -155,7 +155,7 @@ func (s *Server) findCustomersBySearchCriteria(ctx context.Context, term string)
 	return data, nil
 }
 
-func (s *Server) storeCustomer(ctx context.Context, form StoreCustomerForm) error {
+func (s *Server) storeCustomer(ctx context.Context, form *StoreCustomerForm) error {
 	_, err := s.db.Exec("INSERT INTO customers (company_id, name, contact_name, email, phone) "+
 		"VALUES ($1, $2, $3, $4, $5)",
 		CurrentCompany(ctx).ID, form.Name, form.Contact, form.Email, form.Phone,
@@ -164,7 +164,7 @@ func (s *Server) storeCustomer(ctx context.Context, form StoreCustomerForm) erro
 	return err
 }
 
-func (s *Server) updateCustomer(ctx context.Context, customerID int, form UpdateCustomerForm) error {
+func (s *Server) updateCustomer(ctx context.Context, customerID int, form *UpdateCustomerForm) error {
 
 	_, err := s.db.Exec(
 		"UPDATE customers SET name = $1, contact_name = $2,  email = $3, phone = $4 WHERE company_id = $5 AND id = $6",

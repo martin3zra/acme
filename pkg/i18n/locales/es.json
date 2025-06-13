@@ -6,6 +6,8 @@
     "delete": "Eliminar",
     "edit": "Editar",
     "save": "Guardar",
+    "verified": "Verificado",
+    "link": "Vinculado",
     "email": "Correo electrónico",
     "password": "Contraseña",
     "password_confirmation": "Confirmar Contraseña",
@@ -32,8 +34,12 @@
     "totalReceived": "Total recibido",
     "currency": "Moneda",
     "customer": "Cliente",
+    "user": "Usuario",
+    "company": "Compañia",
+    "invoice": "Factura",
     "item": "Producto",
     "contact": "Contacto",
+    "profile": "Perfil",
     "voided": "Anulada",
     "name": "Nombre",
     "phone": "Teléfono",
@@ -49,7 +55,7 @@
     "limitReached": "Límite alcanzado",
     "credentialsDoesNotMatch": "Estás credenciales no coinciden con nuestros registros.",
     "wasNotCreated": "No se creó :subject. Algo salió mal.",
-    "wasCreated": ":subject fue actualizad@action con éxito!",
+    "wasCreated": ":subject fue cread@action con éxito!",
     "wasNotUpdated": "No se actualizó :subject. Algo salió mal.",
     "wasUpdated": ":subject fue actualizad@action con éxito!",
     "wasNotDeleted": "No se elimino :subject. Algo salió mal.",
@@ -57,6 +63,7 @@
     "wasNotVoided": "No se anulo :subject. Algo salió mal.",
     "wasVoided": ":subject fue anulad@action con éxito!",
     "visit": "Visita :to ",
+    "city": "Ciudad",
     "nouns": {
       "customer": {
         "gender":"m"
@@ -174,6 +181,10 @@
       "search": "Buscar cliente...",
       "addNew": "Registrar nuevo cliente",
       "emptyText": "No se encontraron clientes"
+    },
+    "restricted": {
+      "title": "Acceso restringido",
+      "description": "Aún no estás asociado a una cuenta comercial, por lo que no puedes acceder a la aplicación."
     }
   },
   "verify": {
@@ -208,6 +219,63 @@
       "title": "¡Felicidades! Estás listo para empezar.",
       "description": "Tu compañia ha sido creada exitosamente. Ahora puedes empezar a usar nuestra plataforma para gestionar tus facturas, clientes y pagos.",
       "action": "Ir al panel de control"
+    }
+  },
+  "companies": {
+    "single": {
+      "title": "Crear una nueva compañia",
+      "description": "Proporcione los detalles necesarios para configurar su organización. Esta información le ayudará a identificar y gestionar a su equipo dentro del sistema.",
+      "name": "Nombre de la compañia",
+      "rnc": "Número de Razón Social (RNC)",
+      "rnc_short": "RNC",
+      "city": "Ciudad",
+      "address": "Dirección",
+      "phone": "Teléfono de la compañia",
+      "email": "Correo electrónico de la compañia",
+      "website": "Sitio web de la c",
+      "action": "Guardar y continuar"
+    },
+    "viewCompany": {
+      "title": "Ver compañia",
+      "description": "Detalles de la compañia seleccionada."
+    },
+    "newCompany": {
+      "title": "Nueva compañia",
+      "description": "Crea una nueva compañia para facturarle."
+    },
+    "editCompany": {
+      "title": "Editar compañia",
+      "description": "Edita los detalles de la compañia seleccionada"
+    },
+    "trashCompany": {
+      "title": "Borrar compañia",
+      "description": "Borra los detalles de la compañia seleccionada."
+    }
+  },
+  "users": {
+    "single": {
+      "title": "Crear un nuevo usuario",
+      "description": "Proporcione los detalles necesarios para configurar el usuario. Esta información le ayudará a identificar y gestionar dentro de su equipo el sistema."
+    },
+    "viewUser": {
+      "title": "Ver usuario",
+      "description": "Detalles del usuario seleccionado."
+    },
+    "newUser": {
+      "title": "Nueva usuario",
+      "description": "Crea una nueva usuario."
+    },
+    "editUser": {
+      "title": "Editar usuario",
+      "description": "Edita los detalles del usuario seleccionado"
+    },
+    "trashUser": {
+      "title": "Borrar usuario",
+      "description": "Borra los detalles del usuario seleccionado."
+    },
+    "permissionUser": {
+      "title": "Permisos",
+      "description": "Maneja los permisos del usuario seleccionado."
     }
   },
   "auth": {

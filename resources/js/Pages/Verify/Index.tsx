@@ -52,8 +52,11 @@ export default function Verify({ status, email, csrf_token }: PageProps<{ status
       )}
 
       {status === 'account-verified' && (
-        <>
-          <Link href="/login">{t('verify.login')}</Link>
+        <div className="flex gap-6">
+          <Link href="/home">
+            {t('global.visit', { to: 'tu' })}
+            {t('global.navMain.dashboard')}
+          </Link>
 
           <Link
             href="/logout"
@@ -64,7 +67,7 @@ export default function Verify({ status, email, csrf_token }: PageProps<{ status
           >
             Log Out
           </Link>
-        </>
+        </div>
       )}
 
       {status === 'create-password' && <CreatePassword />}

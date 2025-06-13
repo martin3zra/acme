@@ -204,7 +204,7 @@ func (s *Server) generatePrefixedInvoiceNumber(value int) string {
 	return foundation.GeneratePrefixedNumber("INV-", 10, value)
 }
 
-func (s *Server) storeInvoice(ctx context.Context, form StoreInvoiceForm) error {
+func (s *Server) storeInvoice(ctx context.Context, form *StoreInvoiceForm) error {
 	companyID := CurrentCompany(ctx).ID
 	return database.WithTransaction(s.db, func(tx *sql.Tx) error {
 		taxReceiptSequence, err := s.grabTaxReceiptSequence(tx, companyID, form.TaxReceipt)
@@ -261,7 +261,7 @@ func (s *Server) storeInvoice(ctx context.Context, form StoreInvoiceForm) error 
 	})
 }
 
-func (s *Server) updateInvoice(ctx context.Context, uuid string, form UpdateInvoiceForm) error {
+func (s *Server) updateInvoice(ctx context.Context, uuid string, form *UpdateInvoiceForm) error {
 	companyID := CurrentCompany(ctx).ID
 	invoice, err := s.findInvoicesByUUID(ctx, uuid)
 	if err != nil {
@@ -370,7 +370,7 @@ func (s *Server) voidInvoice(ctx context.Context, uuid string) error {
 	})
 }
 
-func (s *Server) attachInvoiceLines(tx *sql.Tx, companyId, invoiceId int, form StoreInvoiceForm) error {
+func (s *Server) attachInvoiceLines(tx *sql.Tx, companyId, invoiceId int, form *StoreInvoiceForm) error {
 	vals := []any{}
 	for _, line := range form.Lines {
 		vals = append(vals, companyId, invoiceId, line.ID, line.Unit, line.Qty, line.Price, line.Rate, line.amount, line.tax, line.total)
@@ -384,7 +384,7 @@ func (s *Server) attachInvoiceLines(tx *sql.Tx, companyId, invoiceId int, form S
 	return err
 }
 
-func (s *Server) processInvoiceLines(tx *sql.Tx, companyId, invoiceId int, form UpdateInvoiceForm) error {
+func (s *Server) processInvoiceLines(tx *sql.Tx, companyId, invoiceId int, form *UpdateInvoiceForm) error {
 
 	lines := s.filterInvoiceLines(form.Lines, ADDED, UPDATED, DELETED)
 	for _, line := range lines {

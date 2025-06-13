@@ -166,7 +166,7 @@ func (s *Server) findItemsByReference(ctx context.Context, term string) (*item, 
 	return i, nil
 }
 
-func (s *Server) storeItem(ctx context.Context, form StoreItemForm) error {
+func (s *Server) storeItem(ctx context.Context, form *StoreItemForm) error {
 	companyID := CurrentCompany(ctx).ID
 	return database.WithTransaction(s.db, func(tx *sql.Tx) error {
 		stmt, err := tx.Prepare("INSERT INTO items (name, price, description, tax_id, company_id) " +
@@ -202,7 +202,7 @@ func (s *Server) attachItemUnit(tx *sql.Tx, companyID, itemID, unitID int) error
 	return err
 }
 
-func (s *Server) updateItem(ctx context.Context, itemID int, form UpdateItemForm) error {
+func (s *Server) updateItem(ctx context.Context, itemID int, form *UpdateItemForm) error {
 	companyID := CurrentCompany(ctx).ID
 	return database.WithTransaction(s.db, func(tx *sql.Tx) error {
 

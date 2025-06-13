@@ -3,32 +3,23 @@ package app
 import (
 	"github.com/martin3zra/acme/pkg/auth"
 	"github.com/martin3zra/acme/pkg/routing"
-	"github.com/martin3zra/acme/pkg/session"
-	"github.com/martin3zra/acme/pkg/support"
 )
 
-func (s *Server) createPasswordHandler(ctx *routing.Context) {
+func (s *Server) createPasswordHandler() routing.HandlerFunc {
+	return routing.WithRequest(func(ctx *routing.Context, form *CreatePasswordForm) {
 
-	session := session.GetSession(ctx.Request)
-	user := auth.User(ctx.Request.Context())
-	var form CreatePasswordForm
-	err := support.ParseRequest(ctx.Request, &form)
-	if err != nil {
-		ctx.Back()
-		return
-	}
+		user := auth.User(ctx.Request.Context())
+		if err := user.MarkPasswordAsChanged(s.db, form.Password); err != nil {
+			ctx.BackWith("password", err.Error())
+			return
+		}
 
-	if err = user.MarkPasswordAsChanged(s.db, form.Password); err != nil {
-		session.Errors("password", err.Error())
-		ctx.Back()
-		return
-	}
+		u := UserFromFoundationUser(user)
+		if u.IsOwner(s.db) {
+			ctx.Redirect("/onboarding")
+			return
+		}
 
-	u := UserFromFoundationUser(user)
-	if u.IsOwner(s.db) {
-		ctx.Redirect("/onboarding")
-		return
-	}
-
-	ctx.Redirect("/home")
+		ctx.Redirect("/home")
+	})
 }

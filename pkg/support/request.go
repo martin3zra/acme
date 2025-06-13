@@ -10,23 +10,27 @@ import (
 	"github.com/martin3zra/acme/pkg/session"
 )
 
-func ParseRequest(r *http.Request, params any) error {
+func ParseRequest(r *http.Request, body any, params ...map[string]string) error {
 
 	defer r.Body.Close()
-	if err := json.NewDecoder(r.Body).Decode(&params); err != nil {
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		log.Println(err)
 		return new(foundation.BadRequest)
 	}
 
-	formRequest, ok := params.(FormRequestContract)
+	formRequest, ok := body.(FormRequestContract)
 	if ok {
 		formRequest.SetContext(r.Context())
+		if len(params) > 0 {
+			formRequest.SetPathParams(params[0])
+		}
 
 		if !formRequest.Authorize() {
+			session.GetSession(r).Errors("status", "Unauthorized")
 			return foundation.Unauthorized{}
 		}
 
-		formRequest.Validate(params, formRequest.Rules(), formRequest.PrepareForValidation)
+		formRequest.Validate(body, formRequest.Rules(), formRequest.PrepareForValidation)
 		errorMesssages := formRequest.Errors()
 		if len(errorMesssages) > 0 {
 			session.GetSession(r).FormErrors(foundation.ErrorBag(errorMesssages))

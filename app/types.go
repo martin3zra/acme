@@ -6,12 +6,12 @@ import (
 	"database/sql/driver"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"log"
 	"time"
 
 	"github.com/martin3zra/acme/app/mail"
 	"github.com/martin3zra/acme/pkg/auth"
+	"github.com/martin3zra/acme/pkg/database"
 	"github.com/martin3zra/acme/pkg/foundation"
 	"github.com/martin3zra/acme/pkg/mailer"
 	"github.com/martin3zra/acme/pkg/routing"
@@ -68,6 +68,10 @@ func (StoreCustomerForm) Rules() map[string]any {
 	}
 }
 
+func (form StoreCustomerForm) Authorize() bool {
+	return Can(form.User(), "create:customer")
+}
+
 type UpdateCustomerForm struct {
 	support.FormRequest
 	ID      int    `json:"id"`
@@ -75,6 +79,10 @@ type UpdateCustomerForm struct {
 	Contact string `json:"contact"`
 	Email   string `json:"email"`
 	Phone   string `json:"phone"`
+}
+
+func (form UpdateCustomerForm) Authorize() bool {
+	return Can(form.User(), "update:customer")
 }
 
 func (form UpdateCustomerForm) Rules() map[string]any {
@@ -113,6 +121,10 @@ type StoreItemForm struct {
 	UnitID      int     `json:"unit_id"`
 }
 
+func (form StoreItemForm) Authorize() bool {
+	return Can(form.User(), "create:item")
+}
+
 func (StoreItemForm) Rules() map[string]any {
 	return map[string]any{
 		"name": []any{
@@ -138,6 +150,10 @@ type UpdateItemForm struct {
 	UnitID      int     `json:"unit_id"`
 }
 
+func (form UpdateItemForm) Authorize() bool {
+	return Can(form.User(), "update:item")
+}
+
 func (form UpdateItemForm) Rules() map[string]any {
 	return map[string]any{
 		"name":        []any{"required", "min:3", "max:120", validator.Rule{}.Unique("items", "name").Ignore(form.ID, "id")},
@@ -161,6 +177,38 @@ var InvoiceTermType = struct {
 }{
 	Cash:   _CASH,
 	Credit: _CREDIT,
+}
+
+type Role string
+
+const (
+	_DEVELOPER  Role = "developer"  //  Access to APIs, integrations, and developer tools
+	_OWNER      Role = "owner"      // Full control of billing, settings, and organization
+	_ADMIN      Role = "admin"      //  Manages users, roles, and global settings
+	_SUPERVISOR Role = "supervisor" // Manages team data, limited settings access
+	_STANDARD   Role = "standard"   // Regular user with core feature access
+)
+
+var Roles = struct {
+	Developer  Role
+	Owner      Role
+	Admin      Role
+	Supervisor Role
+	Standard   Role
+}{
+	Developer:  _DEVELOPER,
+	Owner:      _OWNER,
+	Admin:      _ADMIN,
+	Supervisor: _SUPERVISOR,
+	Standard:   _STANDARD,
+}
+
+var RoleMap = []map[string]any{
+	// {"id": string(Roles.Developer), "label": Roles.Developer},
+	// {"id": string(Roles.Owner), "label": Roles.Owner},
+	{"id": string(Roles.Admin), "label": Roles.Admin, "description": "Manages users, roles, and global settings"},
+	{"id": string(Roles.Supervisor), "label": Roles.Supervisor, "description": "Manages team data, limited settings access"},
+	{"id": string(Roles.Standard), "label": Roles.Standard, "description": "Regular user with core feature access"},
 }
 
 type PaidStatus string
@@ -365,6 +413,10 @@ type StoreInvoiceForm struct {
 	termType   TermType
 }
 
+func (form StoreInvoiceForm) Authorize() bool {
+	return Can(form.User(), "create:invoice")
+}
+
 func (form StoreInvoiceForm) Rules() map[string]any {
 	return map[string]any{
 		"customer_id":    "bail|required|exists:customers,id",
@@ -433,10 +485,10 @@ func (form *StoreInvoiceForm) computeTax() {
 		}
 		// We can store the line discoun on the database
 		// We can add a discount value amount to the invoice.
-		line.amount = (line.Price * float64(line.Qty))
-		line.discount = line.amount * (discountPercentage / 100)
-		line.tax = (line.amount - line.discount) * (line.Rate / 100)
-		line.total = line.amount - line.discount + line.tax
+		line.amount = round(line.Price*float64(line.Qty), 2)
+		line.discount = round(line.amount*(discountPercentage/100), 2)
+		line.tax = round((line.amount-line.discount)*(line.Rate/100), 2)
+		line.total = round(line.amount-line.discount+line.tax, 2)
 
 		form.tax += line.tax
 		form.amount += line.amount
@@ -447,6 +499,10 @@ func (form *StoreInvoiceForm) computeTax() {
 
 type UpdateInvoiceForm struct {
 	StoreInvoiceForm
+}
+
+func (form UpdateInvoiceForm) Authorize() bool {
+	return Can(form.User(), "update:invoice")
 }
 
 func (form UpdateInvoiceForm) Rules() map[string]any {
@@ -490,6 +546,10 @@ type StorePaymentForm struct {
 	Amount     float64        `json:"amount"`
 }
 
+func (form StorePaymentForm) Authorize() bool {
+	return Can(form.User(), "create:payment")
+}
+
 func (form StorePaymentForm) Rules() map[string]any {
 	return map[string]any{
 		"customer_id":        "bail|required|exists:customers,uuid",
@@ -512,6 +572,10 @@ type UpdatePaymentForm struct {
 	Lines      []*PaymentLine `json:"lines"`
 	Payment    Payment        `json:"payment"`
 	Amount     float64        `json:"amount"`
+}
+
+func (form UpdatePaymentForm) Authorize() bool {
+	return Can(form.User(), "update:payment")
 }
 
 func (form UpdatePaymentForm) Rules() map[string]any {
@@ -555,6 +619,10 @@ type StoreCompanyForm struct {
 	Address string `json:"address"`
 }
 
+func (form StoreCompanyForm) Authorize() bool {
+	return Can(form.User(), "create:company")
+}
+
 func (StoreCompanyForm) Rules() map[string]any {
 	return map[string]any{
 		"name": []any{
@@ -568,9 +636,76 @@ func (StoreCompanyForm) Rules() map[string]any {
 	}
 }
 
+type StoreProfileForm struct {
+	support.FormRequest
+	Name  string `json:"name"`
+	Email string `json:"email"`
+}
+
+func (form StoreProfileForm) Rules() map[string]any {
+
+	db := form.Context().Value(database.ConnectionKey{}).(*sql.DB)
+	if db == nil {
+		panic("database connection need to be set.")
+	}
+
+	var userId int
+	if err := db.QueryRow("SELECT owner_id FROM accounts WHERE uuid = $1", form.Param("account")).Scan(&userId); err != nil {
+		panic("unable to find the account owner.")
+	}
+
+	return map[string]any{
+		"name": "required|min:3",
+		"email": []any{
+			"required",
+			"email",
+			"min:8",
+			"max:120",
+			"lowercase",
+			validator.Rule{}.
+				Unique("users", "email").
+				Ignore(userId, "id"),
+		},
+	}
+}
+
+type CompanyRole struct {
+	Company string `json:"company"`
+	Role    string `json:"role"`
+}
+
+type StoreUserForm struct {
+	support.FormRequest
+	Name      string        `json:"name"`
+	Email     string        `json:"email"`
+	Companies []CompanyRole `json:"companies"`
+}
+
+func (form StoreUserForm) Authorize() bool {
+	return Can(form.User(), "create:user")
+}
+
+func (form StoreUserForm) Rules() map[string]any {
+	return map[string]any{
+		"name": "required|min:3",
+		"email": []any{
+			"required",
+			"email",
+			"min:8",
+			"max:120",
+			"lowercase",
+			validator.Rule{}.Unique("users", "email").Ignore(form.Param("id"), "uuid"),
+		},
+		"companies":           "required|min:1",
+		"companies.*.company": "required|exists:companies,uuid",
+		"companies.*.role":    "required|in:admin,supervisor,standard",
+	}
+}
+
 type User struct {
 	foundation.User
 	account *account
+	Linked  int `json:"linked"`
 }
 
 func (u *User) SendEmailVerification(notify mailer.Mailer, attributes map[string]string) {
@@ -586,7 +721,24 @@ func (u *User) SendEmailVerification(notify mailer.Mailer, attributes map[string
 	}
 
 	notify.
-		To(u.Email, fmt.Sprintf("%s %s", u.FirstName, u.LastName)).
+		To(u.Email, u.Name).
+		Send(mail.NewVerification(foundation.AsMap(u), url))
+}
+
+func (u *User) SendEmailVerificationChange(notify mailer.Mailer, attributes map[string]string) {
+	url, err := routing.TemporarySignedURL(
+		attributes["url"],
+		map[string]string{},
+		attributes["secret"],
+		60*time.Minute,
+	)
+	if err != nil {
+		log.Fatal(err)
+		return
+	}
+
+	notify.
+		To(*u.PendingEmail, u.Name).
 		Send(mail.NewVerification(foundation.AsMap(u), url))
 }
 
@@ -601,8 +753,8 @@ func (u *User) MarkEmailAsVerified(db *sql.DB) bool {
 
 func (u *User) Account(db *sql.DB) *account {
 	var a = new(account)
-	if err := db.QueryRow("SELECT id, uuid, name, owner_id, status, verified_at, created_at, updated_at, deleted_at FROM accounts WHERE owner_id = $1", u.Id).
-		Scan(&a.ID, &a.UUID, &a.Name, &a.Owner.ID, &a.Status, &a.VerifiedAt, &a.CreatedAt, &a.UpdatedAt, &a.DeletedAt); err != nil {
+	if err := db.QueryRow("SELECT id, uuid, owner_id, status, verified_at, created_at, updated_at, deleted_at FROM accounts WHERE owner_id = $1", u.Id).
+		Scan(&a.ID, &a.UUID, &a.Owner.ID, &a.Status, &a.VerifiedAt, &a.CreatedAt, &a.UpdatedAt, &a.DeletedAt); err != nil {
 		log.Println("An error occurred fetching the account using the ownerID:", err)
 		return nil
 	}
@@ -612,26 +764,26 @@ func (u *User) Account(db *sql.DB) *account {
 	return a
 }
 
-func (u *User) OwnedBy(db *sql.DB) *account {
+func (u *User) OwnedBy(db *sql.DB) (*account, error) {
 	if u.account != nil {
-		return u.account
+		return u.account, nil
 	}
 
 	var a = new(account)
 	if err := db.QueryRow(`
-    SELECT id, uuid, name, owner_id, status, verified_at, created_at, updated_at, deleted_at
+    SELECT accounts.id, accounts.uuid, accounts.owner_id, accounts.status, accounts.verified_at, accounts.created_at, accounts.updated_at, accounts.deleted_at
     FROM accounts
     INNER JOIN accounts_users on accounts.id = accounts_users.account_id
     WHERE accounts_users.user_id = $1
   `, u.Id).
-		Scan(&a.ID, &a.UUID, &a.Name, &a.Owner.ID, &a.Status, &a.VerifiedAt, &a.CreatedAt, &a.UpdatedAt, &a.DeletedAt); err != nil {
+		Scan(&a.ID, &a.UUID, &a.Owner.ID, &a.Status, &a.VerifiedAt, &a.CreatedAt, &a.UpdatedAt, &a.DeletedAt); err != nil {
 		log.Println("An error occurred fetching the owned account using the userId:", err)
-		return nil
+		return nil, err
 	}
 
 	u.account = a
 
-	return a
+	return a, nil
 }
 
 func (u *User) IsOwner(db *sql.DB) bool {
@@ -643,7 +795,8 @@ func (u *User) IsNotOwner(db *sql.DB) bool {
 }
 
 func (u *User) IsOwned(db *sql.DB) bool {
-	return u.OwnedBy(db) != nil
+	_, err := u.OwnedBy(db)
+	return err == nil
 }
 
 func (u *User) IsNotOwned(db *sql.DB) bool {
@@ -662,15 +815,16 @@ func UserFromContext(ctx context.Context) *User {
 }
 
 func UserFromFoundationUser(u *foundation.User) *User {
+	// TODO set the role here.
 	return &User{
 		User: *u,
 	}
 }
 
-func (u *User) currentCompany(db *sql.DB) Company {
+func (u *User) currentCompany(db *sql.DB) (*Company, error) {
 	result := db.QueryRow(`
-    SELECT companies.id, companies.name, companies.identifier, companies.city,
-    companies.address, companies.created_at, companies.updated_at
+    SELECT companies.id, companies.uuid, companies.name, companies.identifier, companies.city,
+    companies.address, companies.created_at, companies.updated_at, companies_users.role
     FROM companies
     JOIN companies_users ON companies.id = companies_users.company_id
     WHERE companies_users.user_id = $1 AND companies_users.current = true
@@ -678,26 +832,45 @@ func (u *User) currentCompany(db *sql.DB) Company {
 	var company Company
 	err := result.Scan(
 		&company.ID,
+		&company.UUID,
 		&company.Name,
 		&company.Identifier,
 		&company.City,
 		&company.Address,
 		&company.CreatedAt,
 		&company.UpdatedAt,
+		&company.UserRole,
 	)
 	if err != nil {
-		log.Fatalf("CurrentCompany: failed to scan company: %v", err)
+		return nil, err
 	}
 
-	return company
+	return &company, err
 }
 
-func CurrentCompany(ctx context.Context) Company {
-	cc := ctx.Value(auth.ContextCompanyID{}).(map[string]any)
-	company, err := mapTo[Company](cc)
-	if err != nil {
-		log.Fatalf("CurrentCompany: failed to map company: %v", err)
+func CurrentCompany(ctx context.Context) *Company {
+	cc := ctx.Value(support.CompanyKey{})
+	if cc == nil {
+		return nil
 	}
 
-	return company
+	return cc.(*Company)
+}
+
+func CurrentAccount(ctx context.Context) int {
+	ac := ctx.Value(support.AccountKey{})
+	if ac == nil {
+		return 0
+	}
+
+	data, ok := ac.(map[string]any)
+	if !ok {
+		return 0
+	}
+	if val, ok := data["id"]; ok {
+		if intVal, err := toInt(val); err == nil {
+			return intVal
+		}
+	}
+	return 0
 }

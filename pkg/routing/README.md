@@ -5,55 +5,64 @@ A lightweight HTTP routing library built on Go’s standard `net/http` package. 
 ## Features
 
 - **Route Registration:**
-  - Easily register routes with HTTP methods like GET, POST, PUT, DELETE.
-  - Define dynamic segments (e.g., `/users/:id`) that extract URL parameters.
+  - Register routes easily with HTTP methods like GET, POST, PUT, DELETE.
+  - Define dynamic segments (e.g., `/users/:id`) that automatically extract URL parameters.
 
 - **Middleware Support:**
   - Apply global middleware via `WithMiddleware`.
-  - Chain and wrap middleware in the order of registration.
-  - Exclude specific middleware on a per-route basis using `WithoutMiddleware`.
+  - Chain and wrap middleware in the order they were registered.
+  - Exclude specific middleware per route using `WithoutMiddleware`.
   - Remove middleware for an entire router (or group) using `WithoutNextMiddleware`.
 
 - **Route Grouping and Prefixing:**
-  - Group routes under a common prefix using the new `Prefix` method. Instead of passing a prefix directly to `Group`, you now call `Prefix` to yield a sub‑router with an updated path.
-  - Define a group with group‑specific middleware. Any middleware added after calling `Prefix` is applied only to that group.
-  - Supports the following syntax, similar to Laravel:
+  - **Group with Prefix:**
+    The new API allows you to group routes under a common prefix with a dedicated method called `GroupPrefix`. This method temporarily updates the router’s prefix for the duration of the group callback and restores it afterward—providing a clean, Laravel‑like API without spawning separate router instances.
+
+    For example, you can now write:
     ```go
     // Create a group with a prefix:
-    r.Prefix("/admin").Group(func(admin *routing.Router) {
-        admin.GET("/dashboard", dashboardHandler) // Matches "/admin/dashboard"
-    })
-
-    // Nested groups are supported:
-    r.Prefix("/api").Group(func(api *routing.Router) {
-        api.Prefix("/v1").Group(func(v1 *routing.Router) {
-            v1.GET("/resource", resourceHandler) // Matches "/api/v1/resource"
+    r.GroupPrefix("admin", func(admin *routing.Router) {
+        admin.GET("users", func(ctx *routing.Context) {
+            // Matches "/admin/users"
         })
     })
 
-    // Middleware can be excluded on specific routes:
-    r.Prefix("/blog").Group(func(blog *routing.Router) {
-        blog.GET("/post", postHandler).WithoutMiddleware(authMiddleware)
+    // Nested groups are supported:
+    r.GroupPrefix("api", func(api *routing.Router) {
+        api.GroupPrefix("v1", func(v1 *routing.Router) {
+            v1.GET("resource", resourceHandler) // Matches "/api/v1/resource"
+        })
+        api.GET("status", statusHandler) // Matches "/api/status"
+    })
+
+    // Middleware Exclusion Example:
+    r.GroupPrefix("blog", func(blog *routing.Router) {
+        // Exclude a specific middleware from this route.
+        blog.GET("post", postHandler).WithoutMiddleware(authMiddleware)
     })
     ```
-  - Extra middleware added in a group wrap only the routes in that group. The underlying implementation ensures that group‑specific middleware is applied only once (preventing double wrapping).
+
+    In these examples, notice that the sub‑route definitions use relative paths (without a leading slash) so that they concatenate correctly with the group’s prefix. If a group is created with an empty prefix, the behavior remains unchanged.
+
+  - **Group Without Prefix:**
+    Standard grouping (using `Group(fn)`) continues to be available when no additional path modification is needed. Group‑specific middleware can also be applied in this fashion.
 
 - **Data Binding:**
-  - Built‑in support for query parameter binding (using `BindQuery`).
-  - Built‑in JSON payload binding (using `BindJSON`) for request bodies.
+  - Built‑in support for binding query parameters (using `BindQuery`).
+  - Built‑in JSON payload binding (using `BindJSON`) for processing request bodies.
 
 - **Routing Robustness:**
-  - Path normalization automatically removes trailing slashes (except for the root).
-  - Provides proper 405 (Method Not Allowed) responses when paths match but the method does not.
-  - Offers comprehensive dynamic route matching.
+  - Automatic path normalization removes trailing slashes (except for the root).
+  - Provides 405 (Method Not Allowed) responses when a path is found but the HTTP method does not match.
+  - Comprehensive dynamic route matching, ensuring robust route resolution.
 
 ## Installation
 
-Simply copy the `pkg/routing` directory into your project. Since this is a lightweight package with no external dependencies (aside from Go’s standard library), you can integrate it directly into your codebase.
+Simply copy the `pkg/routing` directory into your project. Since this is a lightweight package with no external dependencies (aside from the Go standard library), you can integrate it directly into your codebase.
 
 ## Basic Usage
 
-Below is a sample application demonstrating how to create a router, register routes, add middleware, use the new prefix‑based grouping, nest groups, and skip middleware when needed.
+Below is a sample application demonstrating how to create a router, register routes, add middleware, use the new clean prefix‑based grouping API, nest groups, and skip middleware when needed.
 
 ```go
 package main
@@ -130,41 +139,38 @@ func main() {
 
     metricsMiddleware := func(next routing.HandlerFunc) routing.HandlerFunc {
         return func(ctx *routing.Context) {
-            // (Imagine logging metrics here, e.g., incrementing counters)
+            // Imagine logging metrics here.
             ctx.Response.Header().Set("X-Metrics", "recorded")
             next(ctx)
         }
     }
 
-    // Global routes can continue to be registered as normal.
+    // Global routes can also be registered normally.
     r.GET("/public", func(ctx *routing.Context) {
         ctx.Text(http.StatusOK, "Public content")
     })
 
-    // Group routes under "/api" while applying group-specific middleware.
-    // Global auth middleware can be added and later selectively skipped.
-    r.WithMiddleware(authMiddleware)
-
-    // Create a prefixed group. Using the new Prefix method allows you to clearly separate the prefix.
-    r.Prefix("/api").Group(func(api *routing.Router) {
-        // This "/api/secure" route inherits the global auth middleware.
-        api.GET("/secure", func(ctx *routing.Context) {
+    // Group routes under "/api" with nested grouping and selective middleware.
+    r.WithMiddleware(authMiddleware) // Global auth middleware.
+    r.GroupPrefix("api", func(api *routing.Router) {
+        // "/api/secure" route inherits auth middleware.
+        api.GET("secure", func(ctx *routing.Context) {
             ctx.Text(http.StatusOK, "Secure API Content")
         })
-        // This "/api/public" route explicitly skips auth middleware.
-        api.GET("/public", func(ctx *routing.Context) {
+        // "/api/public" route skips auth middleware.
+        api.GET("public", func(ctx *routing.Context) {
             ctx.Text(http.StatusOK, "Public API Content")
         }).WithoutMiddleware(authMiddleware)
     })
 
-    // Nested group example.
-    r.Prefix("/admin").Group(func(admin *routing.Router) {
-        admin.GET("/dashboard", func(ctx *routing.Context) {
+    // Nested group example for admin routes.
+    r.GroupPrefix("admin", func(admin *routing.Router) {
+        admin.GET("dashboard", func(ctx *routing.Context) {
             ctx.Text(http.StatusOK, "Admin Dashboard")
         })
-        // Nested group under "/admin":
-        admin.Prefix("/settings").Group(func(settings *routing.Router) {
-            settings.GET("/profile", func(ctx *routing.Context) {
+        // Nested group within admin.
+        admin.GroupPrefix("settings", func(settings *routing.Router) {
+            settings.GET("profile", func(ctx *routing.Context) {
                 ctx.Text(http.StatusOK, "Profile Settings")
             })
         })
@@ -178,9 +184,3 @@ func main() {
     fmt.Println("Server starting on port :8080")
     log.Fatal(http.ListenAndServe(":8080", r))
 }
-```
-
-## Additional Considerations
-- __Middleware Wrapping:__ Group‑specific middleware is applied only once. If no extra middleware is added in a group, the global middleware chain continues to wrap the route during request handling. You can remove unwanted middleware from a group using `WithoutNextMiddleware`.
-- __Nested Groups:__ When groups are nested, the prefixes are concatenated automatically. For example, a group with prefix `/api` nested with another group with prefix `/v1` will yield routes under `/api/v1`.
-- __Skipping Middleware:__ On a per-route basis, you can use .`WithoutMiddleware(mw)` to exclude specific middleware regardless of whether they were added globally or at the group level.

@@ -7,8 +7,10 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"strings"
 	"time"
 
+	"github.com/martin3zra/acme/pkg/foundation"
 	"github.com/martin3zra/acme/pkg/i18n"
 	"github.com/martin3zra/acme/pkg/inertia"
 	"github.com/martin3zra/acme/pkg/mailer"
@@ -40,7 +42,7 @@ func NewServer(assets, resources *embed.FS) *Server {
 	if err != nil {
 		panic(err)
 	}
-	translator := i18n.NewTranslator(loadTranslations("global"))
+	translator := i18n.NewTranslator(trans("global"))
 
 	server := &Server{
 		qs:         qs,
@@ -116,4 +118,91 @@ func (s *Server) configureMailClient() {
 
 func (s *Server) trans(key string, replacements ...i18n.Replacements) string {
 	return s.translator.Trans(key, replacements...)
+}
+
+var rolePermissionsCache = map[string]map[string]bool{}
+
+var groupedPermissions = map[string]map[string][]string{
+	"owner": {"*": {"*"}},
+	"admin": {
+		"view":    {"dashboard", "invoice", "customer", "item", "payment", "setting"},
+		"viewAny": {"dashboard", "invoice", "customer", "item", "payment", "setting"},
+		"create":  {"dashboard", "invoice", "customer", "item", "payment", "setting"},
+		"delete":  {"dashboard", "invoice", "customer", "item", "payment", "setting"},
+		"edit":    {"dashboard", "invoice", "customer", "item", "payment", "setting"},
+	},
+	"supervisor": {
+		"view":    {"dashboard", "customer", "item", "payment"},
+		"viewAny": {"dashboard", "invoice", "item", "payment"},
+		"create":  {"dashboard", "invoice", "customer", "item", "payment"},
+		"delete":  {"dashboard", "invoice", "customer", "item", "payment"},
+		"edit":    {"dashboard", "invoice", "customer", "item", "payment"},
+	},
+	"standard": {
+		"view":   {"invoice", "customer"},
+		"create": {"invoice"},
+	},
+}
+
+func permissions(role string) map[string]bool {
+	if cached, exists := rolePermissionsCache[role]; exists {
+		return cached
+	}
+
+	flatPermissions := make(map[string]bool)
+
+	if rolePermissions, exists := groupedPermissions[role]; exists {
+		for action, modules := range rolePermissions {
+			for _, module := range modules {
+				flatPermissions[action+":"+module] = true
+
+				// If role has full module access ("view:*"), create general key
+				if module == "*" {
+					flatPermissions[action+":*"] = true
+				}
+
+				// If role has full action access ("*:invoice"), create wildcard key
+				if action == "*" {
+					flatPermissions["*:"+module] = true
+				}
+			}
+		}
+
+		// If role has full access ("*:*"), create a general wildcard key
+		if _, exists := rolePermissions["*"]; exists {
+			flatPermissions["*"] = true
+		}
+	}
+
+	rolePermissionsCache[role] = flatPermissions
+	return flatPermissions
+}
+
+func Can(user *foundation.User, actionModule string) bool {
+	permissions := permissions(user.Role)
+
+	// If the user requests "*" (full access check), return true if full access exists
+	if actionModule == "*" {
+		return permissions["*"]
+	}
+
+	// Standard permission checks
+	if permissions[actionModule] {
+		return true
+	}
+
+	// Action-wide wildcard (e.g., "view:*")
+	action := actionModule[:strings.Index(actionModule, ":")]
+	if permissions[action+":*"] {
+		return true
+	}
+
+	// Module-wide wildcard (e.g., "*:invoice")
+	module := actionModule[strings.Index(actionModule, ":")+1:]
+	if permissions["*:"+module] {
+		return true
+	}
+
+	// Check for complete wildcard "*:*"
+	return permissions["*"]
 }

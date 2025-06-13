@@ -8,6 +8,10 @@ import (
 	"github.com/martin3zra/acme/pkg/validator"
 )
 
+type AccountKey struct{}
+
+type CompanyKey struct{}
+
 type FormRequestContract interface {
 	PrepareForValidation()
 	PassedValidation()
@@ -15,23 +19,41 @@ type FormRequestContract interface {
 	Validate(object any, rules map[string]any, prepareForValidation func()) validator.Validator
 	Rules() map[string]any
 	Errors() validator.Errors
-	User() *foundation.User
 	SetContext(ctx context.Context)
+	Context() context.Context
+	User() *foundation.User
+	SetPathParams(params map[string]string)
+	Param(key string) string
 	Messages() map[string]string
 }
 
 type FormRequest struct {
 	validator *validator.Validator
 	ctx       context.Context
+	user      *foundation.User
+	params    map[string]string
 }
 
 func (f *FormRequest) SetContext(ctx context.Context) {
 	f.ctx = ctx
+	f.user = auth.User(ctx)
 	f.getValidatorInstance()
 }
 
-func (f *FormRequest) User() *foundation.User {
-	return auth.User(f.ctx)
+func (f *FormRequest) Context() context.Context {
+	return f.ctx
+}
+
+func (f *FormRequest) SetPathParams(params map[string]string) {
+	f.params = params
+}
+
+func (f *FormRequest) Param(key string) string {
+	if f.params == nil {
+		return ""
+	}
+
+	return f.params[key]
 }
 
 func (f *FormRequest) setValidatorInstance(validator *validator.Validator) {
@@ -77,6 +99,10 @@ func (f *FormRequest) PassesAuthorization() bool { return true }
 
 func (f *FormRequest) FailedAuthorization() {
 	// return here everything for a 403 status code
+}
+
+func (f *FormRequest) User() *foundation.User {
+	return f.user
 }
 
 func (f *FormRequest) Messages() map[string]string {

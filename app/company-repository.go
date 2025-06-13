@@ -1,6 +1,7 @@
 package app
 
 import (
+	"context"
 	"database/sql"
 
 	"github.com/martin3zra/acme/pkg/database"
@@ -9,11 +10,39 @@ import (
 
 type Company struct {
 	ID         int    `json:"id"`
+	UUID       string `json:"uuid"`
 	Name       string `json:"name"`
 	Identifier string `json:"identifier"`
 	City       string `json:"city"`
 	Address    string `json:"address"`
+	UserRole   string `json:"_"`
 	foundation.Timestamps
+}
+
+func (s *Server) findCompanies(ctx context.Context) ([]*Company, error) {
+	rows, err := s.db.Query("SELECT id, uuid, name, identifier, city, address, created_at, updated_at, deleted_at FROM companies WHERE account_id = $1", CurrentAccount(ctx))
+	if err != nil {
+		return nil, err
+	}
+	data := make([]*Company, 0)
+	for rows.Next() {
+		c := new(Company)
+		if err = rows.Scan(
+			&c.ID,
+			&c.UUID,
+			&c.Name,
+			&c.Identifier,
+			&c.City,
+			&c.Address,
+			&c.CreatedAt,
+			&c.UpdatedAt,
+			&c.DeletedAt,
+		); err != nil {
+			return nil, err
+		}
+		data = append(data, c)
+	}
+	return data, nil
 }
 
 func (s *Server) findCompanyById(id int) (*Company, error) {
@@ -35,15 +64,15 @@ func (s *Server) findCompanyById(id int) (*Company, error) {
 	return &company, nil
 }
 
-func (s *Server) storeCompany(userID int, form StoreCompanyForm) error {
+func (s *Server) storeCompany(accountID, userID int, form StoreCompanyForm) error {
 	return database.WithTransaction(s.db, func(tx *sql.Tx) error {
 		var companyID int
-		stmt, err := tx.Prepare("INSERT INTO companies (name, identifier, city, address) VALUES($1, $2, $3, $4) RETURNING id")
+		stmt, err := tx.Prepare("INSERT INTO companies (account_id, name, identifier, city, address) VALUES($1, $2, $3, $4, $5) RETURNING id")
 		if err != nil {
 			return err
 		}
 
-		if err = stmt.QueryRow(form.Name, form.RNC, form.City, form.Address).Scan(&companyID); err != nil {
+		if err = stmt.QueryRow(accountID, form.Name, form.RNC, form.City, form.Address).Scan(&companyID); err != nil {
 			return err
 		}
 

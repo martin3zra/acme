@@ -1,10 +1,20 @@
+import { LucideIcon } from 'lucide-react';
+
+export interface LinkedCompany {
+  uuid: string;
+  role: string;
+}
 export interface User {
   id: number;
-  first_name: string;
-  last_name: string;
+  uuid: string;
+  name: string;
   email: string;
+  pending_email: string;
   avatar?: string;
   email_verified_at: string | null;
+  status: string;
+  linked: number;
+  linkedCompanies: LinkedCompany[];
   created_at: string;
   updated_at: string;
   [key: string]: unknown; // This allows for additional properties
@@ -13,10 +23,17 @@ export interface User {
 export interface Auth {
   user: User;
   company: Company;
+  account: AuthAccount;
+}
+
+export interface AuthAccount {
+  uuid: string;
+  owner: boolean;
 }
 
 export interface Company {
   id: number;
+  uuid: string;
   name: string;
   address: string;
   identifier: string;
@@ -147,6 +164,8 @@ export type InvoiceVerb = Exclude<Verb, 'trash'> | 'void' | 'record-payment';
 export type PaymentVerb = Verb | 'void';
 
 export type CustomerVerb = Verb | 'record-payment';
+
+export type UserVerb = Verb | 'permission';
 
 export interface PaymentFormType {
   amount: number;
@@ -340,3 +359,20 @@ export const defaultBreadcrumbs: BreadcrumbItem[] = [
     href: '/home',
   },
 ];
+
+export interface NavItem {
+  title: string;
+  url: string;
+  icon?: LucideIcon | null;
+  isActive?: boolean;
+  requiredAbility?: string;
+  components: string[];
+}
+
+export type Role = {
+  id: string;
+  label: string;
+  description: string;
+};
+
+export type RoleType = 'developer' | 'owner' | 'admin' | 'supervisor' | 'standard';

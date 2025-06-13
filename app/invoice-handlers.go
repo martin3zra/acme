@@ -7,7 +7,6 @@ import (
 	"github.com/martin3zra/acme/pkg/foundation"
 	"github.com/martin3zra/acme/pkg/i18n"
 	"github.com/martin3zra/acme/pkg/routing"
-	"github.com/martin3zra/acme/pkg/support"
 	inertia "github.com/romsar/gonertia/v2"
 )
 
@@ -20,7 +19,7 @@ func (s *Server) invoicesHandler(ctx *routing.Context) {
 	}
 
 	props := map[string]any{
-		"translations": mergeTranslations(ctx.Request.Context(), loadTranslations("invoices")),
+		"translations": trans("invoices"),
 		"invoices":     invoices,
 	}
 
@@ -56,7 +55,7 @@ func (s *Server) createInvoiceHandler(ctx *routing.Context) {
 	}
 
 	ctx.Render("Invoices/Create", map[string]any{
-		"translations": mergeTranslations(ctx.Request.Context(), loadTranslations("invoices")),
+		"translations": trans("invoices"),
 		"tax_receipts": foundation.MapSlice(taxReceipts, func(receipt *taxReceipt) map[string]any {
 			return map[string]any{
 				"id":        receipt.ID,
@@ -110,7 +109,7 @@ func (s *Server) editInvoiceHandler(ctx *routing.Context) {
 	}
 	term := ctx.Query("search")
 	ctx.Render("Invoices/Edit", map[string]any{
-		"translations": mergeTranslations(ctx.Request.Context(), loadTranslations("invoices")),
+		"translations": trans("invoices"),
 		"invoice": map[string]any{
 			"header": invoice,
 			"lines":  lines,
@@ -145,75 +144,58 @@ func (s *Server) editInvoiceHandler(ctx *routing.Context) {
 	})
 }
 
-func (s *Server) storeInvoiceHandler(ctx *routing.Context) {
-	var form StoreInvoiceForm
-	err := support.ParseRequest(ctx.Request, &form)
-	if err != nil {
-		ctx.Back()
-		return
-	}
+func (s *Server) storeInvoiceHandler() routing.HandlerFunc {
+	return routing.WithRequest(func(ctx *routing.Context, form *StoreInvoiceForm) {
 
-	if form.Terms == 1 && form.total != form.paymentTotalAmount() {
-		s.session.Errors("status", "Invoice total amount and the payment details are different.")
-		ctx.Back()
-		return
-	}
+		if form.Terms == 1 && form.total != form.paymentTotalAmount() {
+			ctx.BackWith("status", "Invoice total amount and the payment details are different.")
+			return
+		}
 
-	err = s.storeInvoice(ctx.Request.Context(), form)
-	if err != nil {
-		log.Printf("Error creating invoice: %v", err)
-		s.session.Errors("status", s.trans("global.wasNotCreated", i18n.Replacements{"subject": "@global.invoice"}))
-		ctx.Back()
-		return
-	}
-	s.session.Flash("success", s.trans("global.wasCreated", i18n.Replacements{"subject": "@global.invoice"}))
+		err := s.storeInvoice(ctx.Request.Context(), form)
+		if err != nil {
+			log.Printf("Error creating invoice: %v", err)
+			ctx.BackWith("status", s.trans("global.wasNotCreated", i18n.Replacements{"subject": "@global.invoice"}))
+			return
+		}
+		ctx.Flash("success", s.trans("global.wasCreated", i18n.Replacements{"subject": "@global.invoice"}))
 
-	ctx.Redirect("/invoices")
+		ctx.Redirect("/invoices")
+	})
 }
 
-func (s *Server) updateInvoiceHandler(ctx *routing.Context) {
-	var form UpdateInvoiceForm
-	err := support.ParseRequest(ctx.Request, &form)
-	if err != nil {
-		ctx.Back()
-		return
-	}
+func (s *Server) updateInvoiceHandler() routing.HandlerFunc {
+	return routing.WithRequest(func(ctx *routing.Context, form *UpdateInvoiceForm) {
 
-	if form.Terms == 1 && form.total != form.paymentTotalAmount() {
-		s.session.Errors("status", "Invoice total amount and the payment details are different.")
-		ctx.Back()
-		return
-	}
+		if form.Terms == 1 && form.total != form.paymentTotalAmount() {
+			ctx.BackWith("status", "Invoice total amount and the payment details are different.")
+			return
+		}
 
-	err = s.updateInvoice(ctx.Request.Context(), ctx.Param("uuid"), form)
-	if err != nil {
-		log.Printf("Error updating invoice: %v", err)
-		s.session.Errors("status", s.trans("global.wasNotUpdated", i18n.Replacements{"subject": "@global.invoice"}))
-		ctx.Back()
-		return
-	}
+		err := s.updateInvoice(ctx.Request.Context(), ctx.Param("id"), form)
+		if err != nil {
+			log.Printf("Error updating invoice: %v", err)
+			ctx.BackWith("status", s.trans("global.wasNotUpdated", i18n.Replacements{"subject": "@global.invoice"}))
+			return
+		}
 
-	s.session.Flash("success", s.trans("global.wasUpdated", i18n.Replacements{"subject": "@global.invoice"}))
+		ctx.Flash("success", s.trans("global.wasUpdated", i18n.Replacements{"subject": "@global.invoice"}))
 
-	ctx.Redirect("/invoices")
+		ctx.Redirect("/invoices")
+	})
 }
 
-func (s *Server) voidInvoiceHandler(ctx *routing.Context) {
-	var form ConfirmsPasswords
-	err := support.ParseRequest(ctx.Request, &form)
-	if err != nil {
-		ctx.Back()
-		return
-	}
+func (s *Server) voidInvoiceHandler() routing.HandlerFunc {
+	return routing.WithRequest(func(ctx *routing.Context, form *ConfirmsPasswords) {
 
-	err = s.voidInvoice(ctx.Request.Context(), ctx.Param("uuid"))
-	if err != nil {
-		log.Printf("Error voiding invoice: %v", err)
-		s.session.Errors("status", s.trans("global.wasNotVoided", i18n.Replacements{"subject": "@global.invoice"}))
-		ctx.Back()
-		return
-	}
-	s.session.Flash("success", s.trans("global.wasVoided", i18n.Replacements{"subject": "@global.invoice"}))
+		err := s.voidInvoice(ctx.Request.Context(), ctx.Param("uuid"))
+		if err != nil {
+			log.Printf("Error voiding invoice: %v", err)
+			ctx.BackWith("status", s.trans("global.wasNotVoided", i18n.Replacements{"subject": "@global.invoice"}))
+			return
+		}
+		ctx.Flash("success", s.trans("global.wasVoided", i18n.Replacements{"subject": "@global.invoice"}))
 
-	ctx.Redirect("/invoices")
+		ctx.Redirect("/invoices")
+	})
 }

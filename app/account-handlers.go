@@ -2,9 +2,12 @@ package app
 
 import (
 	"fmt"
+	"log"
+	"strings"
 
 	"github.com/martin3zra/acme/pkg/auth"
 	"github.com/martin3zra/acme/pkg/foundation"
+	"github.com/martin3zra/acme/pkg/i18n"
 	"github.com/martin3zra/acme/pkg/routing"
 	"github.com/martin3zra/acme/pkg/support"
 )
@@ -13,7 +16,7 @@ func (s *Server) verifyAccountHandler(ctx *routing.Context) {
 
 	renderWithStatus := func(status string) {
 		props := map[string]any{
-			"translations": mergeTranslations(ctx.Request.Context(), loadTranslations("verify")),
+			"translations": trans("verify"),
 			"status":       status,
 		}
 		ctx.Render("Verify/Index", props)
@@ -83,7 +86,7 @@ func (s *Server) verifyEmailHandler(ctx *routing.Context) {
 
 	renderWithStatus := func(status string) {
 		props := map[string]any{
-			"translations": mergeTranslations(ctx.Request.Context(), loadTranslations("verify")),
+			"translations": trans("verify"),
 			"status":       status,
 		}
 		ctx.Render("Verify/Index", props)
@@ -115,21 +118,41 @@ func (s *Server) verifyEmailHandler(ctx *routing.Context) {
 
 	// TODO : Check if the user isOrphan => abort(403, 'Sorry, but this user does not belongs to any account in our platform.');
 	// TODO : Add owner relationship to the user (select the account that owns that user.)
-  // TODO : Add new middle to ensure account is verified
+	// TODO : Add new middle to ensure account is verified
 
-	if user.HasVerifiedEmail() {
-		renderWithStatus("already-verified")
-		return
-	}
+	if ctx.Query("action") == "change" {
+		if !foundation.NewHashable().Sha1Equals(fmt.Sprintf("%schange", *user.PendingEmail), hash) {
+			renderWithStatus("hash-do-not-match")
+			return
+		}
 
-	if !foundation.NewHashable().Sha1Equals(user.Email, hash) {
-		renderWithStatus("hash-do-not-match")
-		return
-	}
+		if err := s.updatePendingEmail(user); err != nil {
+			log.Println("Something wrong happened updating the pending email: ", err)
+			ctx.Error(err)
+			return
+		}
 
-	if !user.MarkEmailAsVerified(s.db) {
-		ctx.Error(err)
-		return
+		user, err = s.findUserByUUID(userUUID)
+		if err != nil {
+			renderWithStatus("not-found")
+			return
+		}
+	} else {
+
+		if user.HasVerifiedEmail() {
+			renderWithStatus("already-verified")
+			return
+		}
+
+		if !foundation.NewHashable().Sha1Equals(user.Email, hash) {
+			renderWithStatus("hash-do-not-match")
+			return
+		}
+
+		if !user.MarkEmailAsVerified(s.db) {
+			ctx.Error(err)
+			return
+		}
 	}
 
 	loggedUser, err := auth.NewAuth(ctx.Request.Context()).LoginUsingId(user.Id)
@@ -137,8 +160,21 @@ func (s *Server) verifyEmailHandler(ctx *routing.Context) {
 		ctx.Error(err)
 		return
 	}
+	attrs := map[string]any{"current_company": nil, "account": nil}
+	account, err := user.OwnedBy(s.db)
+	if err == nil {
+		attrs["account"] = map[string]any{
+			"id":    account.ID,
+			"uuid":  account.UUID,
+			"owner": user.Account(s.db) != nil,
+		}
+	}
+	company, err := user.currentCompany(s.db)
+	if err == nil {
+		attrs["current_company"] = company
+	}
 
-	err = s.sessionManager.ReGenerate(ctx.Request, loggedUser, map[string]any{})
+	err = s.sessionManager.ReGenerate(ctx.Request, loggedUser, attrs)
 	if err != nil {
 		ctx.Error(err)
 		return
@@ -157,7 +193,7 @@ func (s *Server) verifyEmailPromptHandler(ctx *routing.Context) {
 
 	renderWithStatus := func(status string) {
 		props := map[string]any{
-			"translations": mergeTranslations(ctx.Request.Context(), loadTranslations("verify")),
+			"translations": trans("verify"),
 			"status":       status,
 			"email":        true,
 		}
@@ -192,7 +228,7 @@ func (s *Server) sendVerificationEmail(ctx *routing.Context) {
 			"secret": string(s.config.secretKey),
 		})
 
-		ctx.BackWith(map[string]string{"status": "verification-link-sent"})
+		ctx.BackWithQuery(map[string]any{"status": "verification-link-sent"})
 		return
 	}
 
@@ -204,5 +240,135 @@ func (s *Server) sendVerificationEmail(ctx *routing.Context) {
 
 	s.sendAccountVerificationNotification(*account)
 
-	ctx.BackWith(map[string]string{"status": "verification-link-sent"})
+	ctx.BackWithQuery(map[string]any{"status": "verification-link-sent"})
+}
+
+func (s *Server) accountProfileHandler(ctx *routing.Context) {
+	userUuid := ctx.Query("user_id")
+	companies, err := s.findCompanies(ctx.Request.Context())
+	if err != nil {
+		log.Println("something wrong occurred fetching companies:", err)
+		ctx.Error(err)
+		return
+	}
+	users, err := s.findUsers(ctx.Request.Context())
+	if err != nil {
+		log.Println("something wrong occurred fetching users:", err)
+		ctx.Error(err)
+		return
+	}
+
+	props := map[string]any{
+		"translations": trans("companies", "users"),
+		"companies":    companies,
+		"users":        users,
+		"roles":        RoleMap,
+	}
+
+	if ensureUUIDIsValid(userUuid) {
+		user, err := s.findUserByUUID(userUuid)
+		if err != nil {
+			ctx.Error(err)
+			return
+		}
+
+		linked, err := s.findUserLinkedCompanies(ctx.Request.Context(), user.Id)
+		if err != nil {
+			ctx.Error(err)
+			return
+		}
+
+		linkedMap := make([]map[string]any, 0)
+		for _, link := range linked {
+			linkedMap = append(linkedMap, map[string]any{
+				"uuid": link.UUID,
+				"role": link.Role,
+			})
+		}
+		props["currentUser"] = map[string]any{
+			"uuid":              user.UUID,
+			"name":              user.Name,
+			"email":             user.Email,
+			"status":            user.Status,
+			"email_verified_at": user.EmailVerifiedAt,
+			"linkedCompanies":   linkedMap,
+		}
+		props["initialState"] = true
+		props["subject"] = "user:view"
+	}
+
+	if ctx.QueryHas("open") {
+		props["initialState"] = ctx.Query("open")
+	}
+
+	if ctx.QueryHas("subject") {
+		props["subject"] = ctx.Query("subject")
+	}
+
+	ctx.Render("Settings/Account", props)
+}
+
+func (s *Server) updateAccountProfileHandler() routing.HandlerFunc {
+	return routing.WithRequest(func(ctx *routing.Context, form *StoreProfileForm) {
+
+		uuid := ctx.Param("account")
+		user, err := s.findUserByAccountUUID(uuid)
+		if err != nil {
+			s.session.Errors("name", "Something wrong happened")
+			log.Println("errors", err.Error())
+			ctx.Back()
+			return
+		}
+
+		if err := s.updateProfile(uuid, form); err != nil {
+			s.session.Errors("name", "Something wrong happened")
+			log.Println("errors", err.Error())
+			ctx.Back()
+			return
+		}
+
+		if !strings.EqualFold(user.Email, form.Email) {
+			if user.PendingEmail != nil {
+				s.session.Errors("email", fmt.Sprintf("You already have a pending email change to %s. Please verify it before requesting a new one.", *user.PendingEmail))
+				ctx.Back()
+				return
+			}
+
+			user.PendingEmail = &form.Email
+
+			user.SendEmailVerificationChange(s.mailer, map[string]string{
+				"url": fmt.Sprintf(
+					"%s/verify-email/%s/%s?action=change",
+					s.config.host,
+					user.UUID,
+					foundation.NewHashable().Sha1(fmt.Sprintf("%s%s", form.Email, "change")),
+				),
+				"secret": string(s.config.secretKey),
+			})
+		}
+
+		attrs := map[string]any{"current_company": nil, "account": nil}
+		account, err := user.OwnedBy(s.db)
+		if err == nil {
+			attrs["account"] = map[string]any{
+				"id":    account.ID,
+				"uuid":  account.UUID,
+				"owner": user.Account(s.db) != nil,
+			}
+		}
+		company, err := user.currentCompany(s.db)
+		if err == nil {
+			attrs["current_company"] = company
+		}
+		// re-generate session
+		err = s.sessionManager.ReGenerate(ctx.Request, user, attrs)
+		if err != nil {
+			ctx.Error(err)
+			return
+		}
+
+		s.session.Flash("success", s.trans("global.wasUpdated", i18n.Replacements{"subject": "@global.profile"}))
+
+		ctx.Back()
+	})
 }

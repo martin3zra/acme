@@ -16,7 +16,7 @@ export const isNotEmpty = (value: string | null | undefined): boolean => {
 };
 
 export const subtractFloats = (a: number, b: number, precision: number = 2): number => {
-  const result = a - b;
+  const result = Math.abs(a - b);
   const factor = Math.pow(10, precision);
   return Math.round(result * factor) / factor;
 };

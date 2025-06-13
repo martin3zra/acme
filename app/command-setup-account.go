@@ -17,13 +17,13 @@ func (s *Server) SetupAccount() {
 
 	if err := database.WithTransaction(s.db, func(tx *sql.Tx) error {
 
-		stmt, err := tx.Prepare("INSERT INTO users (first_name, last_name, email, password, status) VALUES($1,$2,$3,$4,$5) RETURNING id")
+		stmt, err := tx.Prepare("INSERT INTO users (name, email, password, status) VALUES($1,$2,$3,$4) RETURNING id")
 		if err != nil {
 			return err
 		}
 
 		var userID int
-		err = stmt.QueryRow(name, "", email, foundation.NewHashable().Make("password"), "disabled").Scan(&userID)
+		err = stmt.QueryRow(name, email, foundation.NewHashable().Make("password"), "disabled").Scan(&userID)
 		if err != nil {
 			return err
 		}
