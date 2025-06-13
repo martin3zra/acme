@@ -7,6 +7,7 @@ import (
 
 	"slices"
 
+	"github.com/martin3zra/acme/pkg/foundation"
 	"github.com/romsar/gonertia/v2"
 )
 
@@ -42,10 +43,7 @@ func hasPermission(next HandlerFunc, permission string) HandlerFunc {
 		userPerms := ctx.Request.Context().Value(PermissionKey{}).(map[string]bool)
 
 		if !userPerms[permission] {
-			ctx.Inertia.Render(ctx.Response, ctx.Request, "Error/Index", map[string]any{
-				"status":  http.StatusForbidden,
-				"message": "Forbidden: Missing permission " + permission,
-			})
+			ctx.Error(foundation.Unauthorized{})
 			return
 		}
 
@@ -59,6 +57,18 @@ func (rt *Route) Can(permission string) *Route {
 	// Inject a middleware that checks for this permission
 	rt.Handler = hasPermission(rt.Handler, permission)
 
+	return rt
+}
+
+func (rt *Route) Middleware(mws ...Middleware) *Route {
+	for _, mw := range mws {
+		// If the middleware is already excluded, skip it.
+		if middlewareExcluded(mw, rt.Excluded) {
+			continue
+		}
+		// Otherwise, wrap the handler with the middleware.
+		rt.Handler = mw(rt.Handler)
+	}
 	return rt
 }
 

@@ -14,7 +14,7 @@ import (
 func (s *Server) login(ctx *routing.Context) {
 
 	ctx.Render("Auth/Login", map[string]any{
-		"translations": mergeTranslations(ctx.Request.Context(), loadTranslations("auth")),
+		"translations": trans("auth"),
 	})
 }
 

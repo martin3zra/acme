@@ -14,31 +14,35 @@ const navMain: NavItem[] = [
     url: '/home',
     icon: LayoutDashboardIcon,
     components: ['Home/Index'],
+    requiredAbility: 'viewAny:dashboard',
   },
   {
     title: 'global.navMain.invoices',
     url: '/invoices',
     icon: ClipboardList,
     components: ['Invoices/Index', 'Invoices/Create'],
-    requiredAbility: 'create:invoice',
+    requiredAbility: 'viewAny:invoice',
   },
   {
     title: 'global.navMain.customers',
     url: '/customers',
     icon: UsersIcon,
     components: ['Customers/Index'],
+    requiredAbility: 'viewAny:customer',
   },
   {
     title: 'global.navMain.items',
     url: '/items',
     icon: LayoutListIcon,
     components: ['Items/Index'],
+    requiredAbility: 'viewAny:item',
   },
   {
     title: 'global.navMain.payments',
     url: '/payments',
     icon: CreditCard,
     components: ['Payments/Index', 'Payments/Create'],
+    requiredAbility: 'viewAny:payment',
   },
 ];
 
@@ -47,16 +51,19 @@ const navSecondary: NavItem[] = [
     title: 'global.navSecondary.settings',
     url: '/settings/:account/profile',
     icon: SettingsIcon,
+    components: [],
   },
   {
     title: 'global.navSecondary.get-help',
     url: '#',
     icon: HelpCircleIcon,
+    components: [],
   },
   {
     title: 'global.navSecondary.search',
     url: '#',
     icon: SearchIcon,
+    components: [],
   },
 ];
 

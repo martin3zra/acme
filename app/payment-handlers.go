@@ -5,7 +5,6 @@ import (
 
 	"github.com/martin3zra/acme/pkg/i18n"
 	"github.com/martin3zra/acme/pkg/routing"
-	"github.com/martin3zra/acme/pkg/support"
 	inertia "github.com/romsar/gonertia/v2"
 )
 
@@ -16,7 +15,7 @@ func (s *Server) paymentsHandler(ctx *routing.Context) {
 		return
 	}
 	props := map[string]any{
-		"translations": mergeTranslations(ctx.Request.Context(), loadTranslations("payments")),
+		"translations": trans("payments"),
 		"payments":     payments,
 	}
 
@@ -52,7 +51,7 @@ func (s *Server) createPaymentHandler(ctx *routing.Context) {
 	invoiceUuid := ctx.Query("invoice_id")
 
 	props := map[string]any{
-		"translations": mergeTranslations(ctx.Request.Context(), loadTranslations("payments")),
+		"translations": trans("payments"),
 		"customers": inertia.Optional(func() (any, error) {
 			customers, err := s.findCustomersBySearchCriteria(ctx.Request.Context(), term)
 			if err != nil {
@@ -95,45 +94,35 @@ func (s *Server) createPaymentHandler(ctx *routing.Context) {
 	ctx.Render("Payments/Create", props)
 }
 
-func (s *Server) storePaymentHandler(ctx *routing.Context) {
-	var form StorePaymentForm
-	err := support.ParseRequest(ctx.Request, &form)
-	if err != nil {
-		ctx.Back()
-		return
-	}
+func (s *Server) storePaymentHandler() routing.HandlerFunc {
+	return routing.WithRequest(func(ctx *routing.Context, form *StorePaymentForm) {
 
-	err = s.storePayment(ctx.Request.Context(), form)
-	if err != nil {
-		log.Printf("Error recording payment: %v", err)
-		s.session.Errors("status", s.trans("global.wasNotCreated", i18n.Replacements{"subject": "@global.payment"}))
-		ctx.Back()
-		return
-	}
+		err := s.storePayment(ctx.Request.Context(), form)
+		if err != nil {
+			log.Printf("Error recording payment: %v", err)
+			ctx.BackWith("status", s.trans("global.wasNotCreated", i18n.Replacements{"subject": "@global.payment"}))
+			return
+		}
 
-	s.session.Flash("success", s.trans("global.wasCreated", i18n.Replacements{"subject": "@global.payment"}))
+		ctx.Flash("success", s.trans("global.wasCreated", i18n.Replacements{"subject": "@global.payment"}))
 
-	ctx.Redirect("/payments")
+		ctx.Redirect("/payments")
+	})
 }
 
-func (s *Server) voidPaymentHandler(ctx *routing.Context) {
-	var form ConfirmsPasswords
-	err := support.ParseRequest(ctx.Request, &form)
-	if err != nil {
-		ctx.Back()
-		return
-	}
+func (s *Server) voidPaymentHandler() routing.HandlerFunc {
+	return routing.WithRequest(func(ctx *routing.Context, form *ConfirmsPasswords) {
 
-	err = s.voidPayment(ctx.Request.Context(), ctx.Param("id"))
-	if err != nil {
-		log.Printf("Error voiding payment: %v", err)
-		s.session.Errors("status", s.trans("global.wasNotVoided", i18n.Replacements{"subject": "@global.payment"}))
-		ctx.Back()
-		return
-	}
-	s.session.Flash("success", s.trans("global.wasVoided", i18n.Replacements{"subject": "@global.payment"}))
+		err := s.voidPayment(ctx.Request.Context(), ctx.Param("id"))
+		if err != nil {
+			log.Printf("Error voiding payment: %v", err)
+			ctx.BackWith("status", s.trans("global.wasNotVoided", i18n.Replacements{"subject": "@global.payment"}))
+			return
+		}
+		ctx.Flash("success", s.trans("global.wasVoided", i18n.Replacements{"subject": "@global.payment"}))
 
-	ctx.Redirect("/payments")
+		ctx.Redirect("/payments")
+	})
 }
 
 func (s *Server) editPaymentHandler(ctx *routing.Context) {
@@ -157,7 +146,7 @@ func (s *Server) editPaymentHandler(ctx *routing.Context) {
 	}
 
 	ctx.Render("Payments/Edit", map[string]any{
-		"translations": mergeTranslations(ctx.Request.Context(), loadTranslations("payments")),
+		"translations": trans("payments"),
 		"payment": map[string]any{
 			"header": payment,
 			"lines":  lines,
@@ -166,23 +155,18 @@ func (s *Server) editPaymentHandler(ctx *routing.Context) {
 	})
 }
 
-func (s *Server) updatePaymentHandler(ctx *routing.Context) {
-	var form UpdatePaymentForm
-	err := support.ParseRequest(ctx.Request, &form)
-	if err != nil {
-		ctx.Back()
-		return
-	}
+func (s *Server) updatePaymentHandler() routing.HandlerFunc {
+	return routing.WithRequest(func(ctx *routing.Context, form *UpdatePaymentForm) {
 
-	err = s.updatePayment(ctx.Request.Context(), ctx.Param("id"), form)
-	if err != nil {
-		log.Printf("Error recording payment: %v", err)
-		s.session.Errors("status", s.trans("global.wasNotUpdated", i18n.Replacements{"subject": "@global.payment"}))
-		ctx.Back()
-		return
-	}
+		err := s.updatePayment(ctx.Request.Context(), ctx.Param("id"), form)
+		if err != nil {
+			log.Printf("Error recording payment: %v", err)
+			ctx.BackWith("status", s.trans("global.wasNotUpdated", i18n.Replacements{"subject": "@global.payment"}))
+			return
+		}
 
-	s.session.Flash("success", s.trans("global.wasUpdated", i18n.Replacements{"subject": "@global.payment"}))
+		ctx.Flash("success", s.trans("global.wasUpdated", i18n.Replacements{"subject": "@global.payment"}))
 
-	ctx.Redirect("/payments")
+		ctx.Redirect("/payments")
+	})
 }

@@ -7,6 +7,8 @@ import (
 	"log"
 	"net/http"
 	"net/url"
+	"os"
+	"slices"
 	"strconv"
 	"strings"
 	"text/template"
@@ -46,6 +48,13 @@ func (ctx *Context) JSON(status int, data any) {
 
 // Inertia sends the component and props to be use for inertiajs protocol
 func (ctx *Context) Render(component string, props map[string]any) {
+	if t, ok := props["translations"]; ok {
+		trans, ok := t.(map[string]string)
+		if ok {
+			// Merge shared translations with page-specific ones
+			props["translations"] = ctx.mergeTranslations(trans)
+		}
+	}
 	err := ctx.Inertia.Render(ctx.Response, ctx.Request, component, props)
 	if err != nil {
 		log.Fatalf("Error rending the inertia component: %v", err)
@@ -55,15 +64,23 @@ func (ctx *Context) Render(component string, props map[string]any) {
 
 // Error sends a parsed HTML to the client
 func (ctx *Context) Error(err error, status ...int) {
-	// TODO: When production instead of output the error to the client, redirect to the error page. https://advanced-inertia.com/blog/error-handling
 	var titleHttpCode = map[int]string{
 		500: "Internal Error.",
 		403: "Forbidden.",
 		401: "Unauthorized.",
 	}
+
 	defaultStatus := 500
 	if len(status) > 0 {
 		defaultStatus = status[0]
+	}
+
+	isProduction := os.Getenv("APP_ENV")
+	if slices.Contains([]string{"prod", "production"}, isProduction) {
+		ctx.Render("Error/Index", map[string]any{
+			"status": defaultStatus,
+		})
+		return
 	}
 
 	title, ok := titleHttpCode[defaultStatus]
@@ -106,6 +123,12 @@ func (ctx *Context) Redirect(path string, status ...int) {
 	http.Redirect(ctx.Response, ctx.Request, path, http.StatusSeeOther)
 }
 
+func (ctx *Context) BackWithError(err error, status ...int) {
+	// TODO: do some checking on this error.
+	log.Println(err)
+	ctx.Back(status...)
+}
+
 func (ctx *Context) Back(status ...int) {
 	if len(status) > 0 {
 		ctx.Inertia.Back(ctx.Response, ctx.Request, status[0])
@@ -114,7 +137,12 @@ func (ctx *Context) Back(status ...int) {
 	ctx.Inertia.Back(ctx.Response, ctx.Request, http.StatusSeeOther)
 }
 
-func (ctx *Context) BackWith(attributes map[string]any) {
+func (ctx *Context) BackWith(name string, value string, status ...int) {
+	ctx.Errors(name, value)
+	ctx.Back(status...)
+}
+
+func (ctx *Context) BackWithQuery(attributes map[string]any) {
 	// Get the referer (previous page URL)
 	referer := ctx.Request.Referer()
 	if referer == "" {
@@ -175,4 +203,26 @@ func (ctx *Context) Int(key string) int {
 		return intValue
 	}
 	return 0
+}
+
+// mergeTranslations merges shared "translations" with page-specific ones.
+func (ctx *Context) mergeTranslations(pageTranslations map[string]string) map[string]string {
+	merged := map[string]string{}
+
+	// ✅ Get existing props from context
+	sharedProps := gonertia.PropsFromContext(ctx.Request.Context())
+
+	// Get shared translations if available
+	if shared, ok := sharedProps["translations"].(map[string]string); ok {
+		for k, v := range shared {
+			merged[k] = v
+		}
+	}
+
+	// Merge page-specific
+	for k, v := range pageTranslations {
+		merged[k] = v
+	}
+
+	return merged
 }

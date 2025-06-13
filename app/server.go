@@ -42,7 +42,7 @@ func NewServer(assets, resources *embed.FS) *Server {
 	if err != nil {
 		panic(err)
 	}
-	translator := i18n.NewTranslator(loadTranslations("global"))
+	translator := i18n.NewTranslator(trans("global"))
 
 	server := &Server{
 		qs:         qs,
@@ -125,25 +125,22 @@ var rolePermissionsCache = map[string]map[string]bool{}
 var groupedPermissions = map[string]map[string][]string{
 	"owner": {"*": {"*"}},
 	"admin": {
-		"view":    {"dashboard", "invoice", "customer", "items", "payments", "settings"},
-		"viewAny": {"dashboard", "invoice", "customer", "items", "payments", "settings"},
-		"create":  {"dashboard", "invoice", "customer", "items", "payments", "settings"},
-		"delete":  {"dashboard", "invoice", "customer", "items", "payments", "settings"},
-		"edit":    {"dashboard", "invoice", "customer", "items", "payments", "settings"},
+		"view":    {"dashboard", "invoice", "customer", "item", "payment", "setting"},
+		"viewAny": {"dashboard", "invoice", "customer", "item", "payment", "setting"},
+		"create":  {"dashboard", "invoice", "customer", "item", "payment", "setting"},
+		"delete":  {"dashboard", "invoice", "customer", "item", "payment", "setting"},
+		"edit":    {"dashboard", "invoice", "customer", "item", "payment", "setting"},
 	},
 	"supervisor": {
-		"view":    {"dashboard", "customer", "items", "payments"},
-		"viewAny": {"dashboard", "invoice", "customer", "items", "payments"},
-		"create":  {"dashboard", "customer", "items", "payments"},
-		"delete":  {"dashboard", "invoice", "customer", "items", "payments"},
-		"edit":    {"dashboard", "invoice", "customer", "items", "payments"},
+		"view":    {"dashboard", "customer", "item", "payment"},
+		"viewAny": {"dashboard", "invoice", "item", "payment"},
+		"create":  {"dashboard", "invoice", "customer", "item", "payment"},
+		"delete":  {"dashboard", "invoice", "customer", "item", "payment"},
+		"edit":    {"dashboard", "invoice", "customer", "item", "payment"},
 	},
 	"standard": {
-		"view":    {"dashboard", "invoice", "customer", "items", "payments"},
-		"viewAny": {"dashboard", "invoice", "customer", "items", "payments"},
-		"create":  {"dashboard", "invoice", "customer", "items", "payments"},
-		"delete":  {"dashboard", "invoice", "customer", "items", "payments"},
-		"edit":    {"dashboard", "invoice", "customer", "items", "payments"},
+		"view":   {"invoice", "customer"},
+		"create": {"invoice"},
 	},
 }
 

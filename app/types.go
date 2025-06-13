@@ -68,6 +68,10 @@ func (StoreCustomerForm) Rules() map[string]any {
 	}
 }
 
+func (form StoreCustomerForm) Authorize() bool {
+	return Can(form.User(), "create:customer")
+}
+
 type UpdateCustomerForm struct {
 	support.FormRequest
 	ID      int    `json:"id"`
@@ -75,6 +79,10 @@ type UpdateCustomerForm struct {
 	Contact string `json:"contact"`
 	Email   string `json:"email"`
 	Phone   string `json:"phone"`
+}
+
+func (form UpdateCustomerForm) Authorize() bool {
+	return Can(form.User(), "update:customer")
 }
 
 func (form UpdateCustomerForm) Rules() map[string]any {
@@ -113,6 +121,10 @@ type StoreItemForm struct {
 	UnitID      int     `json:"unit_id"`
 }
 
+func (form StoreItemForm) Authorize() bool {
+	return Can(form.User(), "create:item")
+}
+
 func (StoreItemForm) Rules() map[string]any {
 	return map[string]any{
 		"name": []any{
@@ -136,6 +148,10 @@ type UpdateItemForm struct {
 	Description string  `json:"description"`
 	TaxID       int     `json:"tax_id"`
 	UnitID      int     `json:"unit_id"`
+}
+
+func (form UpdateItemForm) Authorize() bool {
+	return Can(form.User(), "update:item")
 }
 
 func (form UpdateItemForm) Rules() map[string]any {
@@ -397,6 +413,10 @@ type StoreInvoiceForm struct {
 	termType   TermType
 }
 
+func (form StoreInvoiceForm) Authorize() bool {
+	return Can(form.User(), "create:invoice")
+}
+
 func (form StoreInvoiceForm) Rules() map[string]any {
 	return map[string]any{
 		"customer_id":    "bail|required|exists:customers,id",
@@ -481,6 +501,10 @@ type UpdateInvoiceForm struct {
 	StoreInvoiceForm
 }
 
+func (form UpdateInvoiceForm) Authorize() bool {
+	return Can(form.User(), "update:invoice")
+}
+
 func (form UpdateInvoiceForm) Rules() map[string]any {
 	return map[string]any{
 		"customer_id":    "bail|required|exists:customers,id",
@@ -522,6 +546,10 @@ type StorePaymentForm struct {
 	Amount     float64        `json:"amount"`
 }
 
+func (form StorePaymentForm) Authorize() bool {
+	return Can(form.User(), "create:payment")
+}
+
 func (form StorePaymentForm) Rules() map[string]any {
 	return map[string]any{
 		"customer_id":        "bail|required|exists:customers,uuid",
@@ -544,6 +572,10 @@ type UpdatePaymentForm struct {
 	Lines      []*PaymentLine `json:"lines"`
 	Payment    Payment        `json:"payment"`
 	Amount     float64        `json:"amount"`
+}
+
+func (form UpdatePaymentForm) Authorize() bool {
+	return Can(form.User(), "update:payment")
 }
 
 func (form UpdatePaymentForm) Rules() map[string]any {
@@ -585,6 +617,10 @@ type StoreCompanyForm struct {
 	RNC     string `json:"rnc"`
 	City    string `json:"city"`
 	Address string `json:"address"`
+}
+
+func (form StoreCompanyForm) Authorize() bool {
+	return Can(form.User(), "create:company")
 }
 
 func (StoreCompanyForm) Rules() map[string]any {
@@ -643,6 +679,10 @@ type StoreUserForm struct {
 	Name      string        `json:"name"`
 	Email     string        `json:"email"`
 	Companies []CompanyRole `json:"companies"`
+}
+
+func (form StoreUserForm) Authorize() bool {
+	return Can(form.User(), "create:user")
 }
 
 func (form StoreUserForm) Rules() map[string]any {

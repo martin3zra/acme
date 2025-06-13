@@ -38,7 +38,7 @@ func (s *Server) SharedProps(next routing.HandlerFunc) routing.HandlerFunc {
 		csrfToken := session.Get("csrf_token")
 		errors := session.Get("errors")
 		flash := session.Get("flash")
-		translations := loadTranslations("global")
+		translations := trans("global")
 
 		var (
 			currentCompany *Company

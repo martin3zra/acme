@@ -16,7 +16,7 @@ func (s *Server) verifyAccountHandler(ctx *routing.Context) {
 
 	renderWithStatus := func(status string) {
 		props := map[string]any{
-			"translations": mergeTranslations(ctx.Request.Context(), loadTranslations("verify")),
+			"translations": trans("verify"),
 			"status":       status,
 		}
 		ctx.Render("Verify/Index", props)
@@ -86,7 +86,7 @@ func (s *Server) verifyEmailHandler(ctx *routing.Context) {
 
 	renderWithStatus := func(status string) {
 		props := map[string]any{
-			"translations": mergeTranslations(ctx.Request.Context(), loadTranslations("verify")),
+			"translations": trans("verify"),
 			"status":       status,
 		}
 		ctx.Render("Verify/Index", props)
@@ -193,7 +193,7 @@ func (s *Server) verifyEmailPromptHandler(ctx *routing.Context) {
 
 	renderWithStatus := func(status string) {
 		props := map[string]any{
-			"translations": mergeTranslations(ctx.Request.Context(), loadTranslations("verify")),
+			"translations": trans("verify"),
 			"status":       status,
 			"email":        true,
 		}
@@ -228,7 +228,7 @@ func (s *Server) sendVerificationEmail(ctx *routing.Context) {
 			"secret": string(s.config.secretKey),
 		})
 
-		ctx.BackWith(map[string]any{"status": "verification-link-sent"})
+		ctx.BackWithQuery(map[string]any{"status": "verification-link-sent"})
 		return
 	}
 
@@ -240,7 +240,7 @@ func (s *Server) sendVerificationEmail(ctx *routing.Context) {
 
 	s.sendAccountVerificationNotification(*account)
 
-	ctx.BackWith(map[string]any{"status": "verification-link-sent"})
+	ctx.BackWithQuery(map[string]any{"status": "verification-link-sent"})
 }
 
 func (s *Server) accountProfileHandler(ctx *routing.Context) {
@@ -259,7 +259,7 @@ func (s *Server) accountProfileHandler(ctx *routing.Context) {
 	}
 
 	props := map[string]any{
-		"translations": mergeTranslations(ctx.Request.Context(), loadTranslations("companies", "users")),
+		"translations": trans("companies", "users"),
 		"companies":    companies,
 		"users":        users,
 		"roles":        RoleMap,

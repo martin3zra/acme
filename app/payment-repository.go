@@ -190,7 +190,7 @@ func (s *Server) findPaymentLines(ctx context.Context, paymentID int) ([]*paymen
 	return data, nil
 }
 
-func (s *Server) storePayment(ctx context.Context, form StorePaymentForm) error {
+func (s *Server) storePayment(ctx context.Context, form *StorePaymentForm) error {
 
 	customer, err := s.findCustomeByUUID(ctx, form.CustomerID)
 	if err != nil {
@@ -232,7 +232,7 @@ func (s *Server) storePayment(ctx context.Context, form StorePaymentForm) error 
 	})
 }
 
-func (s *Server) attachPaymentLines(tx *sql.Tx, ctx context.Context, paymentId int, form StorePaymentForm) error {
+func (s *Server) attachPaymentLines(tx *sql.Tx, ctx context.Context, paymentId int, form *StorePaymentForm) error {
 	companyId := CurrentCompany(ctx).ID
 	vals := []any{}
 	for _, line := range form.Lines {
@@ -300,7 +300,7 @@ func (s *Server) voidPayment(ctx context.Context, uuid string) error {
 	})
 }
 
-func (s *Server) updatePayment(ctx context.Context, uuid string, form UpdatePaymentForm) error {
+func (s *Server) updatePayment(ctx context.Context, uuid string, form *UpdatePaymentForm) error {
 	payment, err := s.findPaymentByUUID(ctx, uuid)
 	if err != nil {
 		return err
@@ -340,7 +340,7 @@ func (s *Server) updatePayment(ctx context.Context, uuid string, form UpdatePaym
 	})
 }
 
-func (s *Server) processPaymentLines(tx *sql.Tx, ctx context.Context, paymentId int, customer *customer, form UpdatePaymentForm) error {
+func (s *Server) processPaymentLines(tx *sql.Tx, ctx context.Context, paymentId int, customer *customer, form *UpdatePaymentForm) error {
 
 	paymentLines, err := s.findPaymentLines(ctx, paymentId)
 	if err != nil {

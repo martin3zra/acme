@@ -23,8 +23,7 @@ func (s *Server) storeCompanyHandler(ctx *routing.Context) {
 	if account == nil {
 		account, err = user.OwnedBy(s.db)
 		if err != nil {
-			log.Println("Unable to create company, we can't find an account to associated it.")
-			ctx.Back()
+			ctx.BackWithError(err)
 			return
 		}
 	}
@@ -32,8 +31,7 @@ func (s *Server) storeCompanyHandler(ctx *routing.Context) {
 	err = s.storeCompany(account.ID, user.Id, form)
 	if err != nil {
 		log.Printf("Error creating company: %v", err)
-		s.session.Errors("status", s.trans("global.wasNotCreated", i18n.Replacements{"subject": "@global.company"}))
-		ctx.Back()
+		ctx.BackWith("status", s.trans("global.wasNotCreated", i18n.Replacements{"subject": "@global.company"}))
 		return
 	}
 
@@ -48,19 +46,18 @@ func (s *Server) storeCompanyHandler(ctx *routing.Context) {
 		return
 	}
 
-	ctx.BackWith(map[string]any{"status": "success"})
+	ctx.BackWithQuery(map[string]any{"status": "success"})
 }
 
 func (s *Server) companyHandler(ctx *routing.Context) {
 
 	companies, err := s.findCompanies(ctx.Request.Context())
 	if err != nil {
-		log.Println("something wrong occurred fetching companies:", err)
 		ctx.Error(err)
 		return
 	}
 	ctx.Render("Settings/Companies/Index", map[string]any{
-		"translations": mergeTranslations(ctx.Request.Context(), loadTranslations("companies")),
+		"translations": trans("companies"),
 		"companies":    companies,
 	})
 }

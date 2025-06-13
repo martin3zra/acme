@@ -14,7 +14,7 @@ func (s *Server) storeUserHandler() routing.HandlerFunc {
 		user, err := s.storeUser(ctx.Request.Context(), form)
 		if err != nil {
 			s.session.Errors("error", s.trans("global.wasNotCreated", i18n.Replacements{"subject": "@global.user"}))
-			ctx.BackWith(map[string]any{
+			ctx.BackWithQuery(map[string]any{
 				"open":    true,
 				"subject": "user:form",
 			})
@@ -37,7 +37,7 @@ func (s *Server) updateUserHandler() routing.HandlerFunc {
 		err := s.updateUser(ctx.Request.Context(), form)
 		if err != nil {
 			ctx.Errors("error", s.trans("global.wasNotUpdated", i18n.Replacements{"subject": "@global.user"}))
-			ctx.BackWith(map[string]any{
+			ctx.BackWithQuery(map[string]any{
 				"open":    true,
 				"subject": "user:form",
 			})
