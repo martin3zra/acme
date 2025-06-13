@@ -137,6 +137,10 @@ func AuthenticatedMiddleware(next routing.HandlerFunc) routing.HandlerFunc {
 
 		userId := sess.Get("user_id")
 		if userId == nil || userId.(float64) == 0 {
+			if strings.HasPrefix(ctx.Request.RequestURI, "/") {
+				next(ctx)
+				return
+			}
 			ctx.Redirect("/login", http.StatusSeeOther)
 			return
 		}

@@ -91,6 +91,13 @@ func (s *Server) bootRoutes() {
 				})
 		})
 
+	s.route.
+		GET("/", func(ctx *routing.Context) {
+			props := map[string]any{}
+			ctx.Render("Welcome/Index", props)
+		}).
+		WithoutMiddleware(RedirectIfAuthenticated, Verified, EnforceVerifiedUserAccess)
+
 	uiAssets := foundation.GetBuildAssets(s.assets, "public/build")
 	s.route.FileServer("/build/", http.FS(uiAssets))
 }

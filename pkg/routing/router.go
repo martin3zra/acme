@@ -33,8 +33,8 @@ type Route struct {
 
 // WithoutMiddleware excludes the specified middleware from being applied
 // on this route.
-func (rt *Route) WithoutMiddleware(mw Middleware) *Route {
-	rt.Excluded = append(rt.Excluded, mw)
+func (rt *Route) WithoutMiddleware(mw ...Middleware) *Route {
+	rt.Excluded = append(rt.Excluded, mw...)
 	return rt
 }
 
