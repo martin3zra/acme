@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"regexp"
 	"slices"
 	"strconv"
 	"strings"
@@ -194,6 +195,18 @@ func (ctx *Context) Param(key string) string {
 	if ctx.Params == nil {
 		return ""
 	}
+
+	// Check if the given key contains "id" and validate it as a UUID.
+	if strings.Contains(strings.ToLower(key), "id") {
+		var re = regexp.MustCompile(`^[a-fA-F0-9]{8}-[a-fA-F0-9]{4}-[1-5][a-fA-F0-9]{3}-[89abAB][a-fA-F0-9]{3}-[a-fA-F0-9]{12}$`)
+		if re.MatchString(ctx.Params[key]) {
+			reUUID := `^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$`
+			if regexp.MustCompile(reUUID).MatchString(ctx.Params[key]) {
+				return ctx.Params[key]
+			}
+		}
+	}
+
 	return ctx.Params[key]
 }
 

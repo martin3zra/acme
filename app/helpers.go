@@ -4,17 +4,10 @@ import (
 	"encoding/json"
 	"fmt"
 	"math"
-	"regexp"
 	"strconv"
 
 	"github.com/martin3zra/acme/pkg/i18n"
 )
-
-func ensureUUIDIsValid(str string) bool {
-	regex := `^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$`
-	r := regexp.MustCompile(regex)
-	return r.MatchString(str)
-}
 
 func filter[T any](s []T, predicate func(T) bool) []T {
 	result := make([]T, 0, len(s)) // Pre-allocate for efficiency

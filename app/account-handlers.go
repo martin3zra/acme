@@ -35,11 +35,6 @@ func (s *Server) verifyAccountHandler(ctx *routing.Context) {
 	accountUUID := ctx.Param("uuid")
 	hash := ctx.Param("hash")
 
-	if !ensureUUIDIsValid(accountUUID) {
-		renderWithStatus("uuid-is-not-valid")
-		return
-	}
-
 	account, err := s.findAccountByUUID(accountUUID)
 	if err != nil {
 		renderWithStatus("not-found")
@@ -104,11 +99,6 @@ func (s *Server) verifyEmailHandler(ctx *routing.Context) {
 
 	userUUID := ctx.Param("uuid")
 	hash := ctx.Param("hash")
-
-	if !ensureUUIDIsValid(userUUID) {
-		renderWithStatus("uuid-is-not-valid")
-		return
-	}
 
 	user, err := s.findUserByUUID(userUUID)
 	if err != nil {
@@ -265,7 +255,7 @@ func (s *Server) accountProfileHandler(ctx *routing.Context) {
 		"roles":        RoleMap,
 	}
 
-	if ensureUUIDIsValid(userUuid) {
+	if userUuid != "" {
 		user, err := s.findUserByUUID(userUuid)
 		if err != nil {
 			ctx.Error(err)

@@ -23,7 +23,7 @@ func (s *Server) invoicesHandler(ctx *routing.Context) {
 		"invoices":     invoices,
 	}
 
-	if ensureUUIDIsValid(uuid) {
+	if uuid != "" {
 		invoice, err := s.findInvoicesByUUID(ctx.Request.Context(), uuid)
 		if err != nil {
 			ctx.Error(err)

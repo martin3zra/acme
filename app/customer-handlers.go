@@ -19,7 +19,7 @@ func (s *Server) customersHandler(ctx *routing.Context) {
 		"translations": trans("customers"),
 		"customers":    customers,
 	}
-	if ensureUUIDIsValid(uuid) {
+	if uuid != "" {
 		customer, err := s.findCustomeByUUID(ctx.Request.Context(), uuid)
 		if err != nil {
 			ctx.Error(err)
