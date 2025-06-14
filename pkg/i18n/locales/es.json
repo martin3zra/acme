@@ -431,6 +431,8 @@
       }
     },
     "single": {
+      "title": "Producto",
+      "description": "Proporcione los detalles necesarios para configurar el producto. Esta información le ayudará a identificar y gestionar dentro de su catalogo en el sistema.",
       "type": "Tipo",
       "service": "Servicio",
       "product": "Producto"
