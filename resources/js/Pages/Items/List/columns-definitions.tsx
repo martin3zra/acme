@@ -15,7 +15,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Item, Replacements, Verb } from '@/types';
 import { ColumnDef } from '@tanstack/react-table';
-import { ArrowUpDown, MoreHorizontal } from 'lucide-react';
+import { ArrowUpDown, MoreHorizontal, Package, Wrench } from 'lucide-react';
 
 type Props = {
   onDidClick: (item: Item, action: Verb) => void;
@@ -59,6 +59,19 @@ export const getColumns = ({ onDidClick, t }: Props): ColumnDef<Item>[] => {
       },
       cell: (props) => {
         return <TextCell columnWidth={props.column.getSize()} value={props.getValue() as string} />;
+      },
+    },
+    {
+      accessorKey: 'item_type',
+      meta: t('items.single.type'),
+      header: (props) => {
+        return <HeaderCell title={t('items.single.type')} alignment="left" columnWidth={props.column.getSize()} />;
+      },
+      cell: (props) => {
+        if (props.row.original.item_type === 'service') {
+          return <Wrench />;
+        }
+        return <Package />;
       },
     },
     {

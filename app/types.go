@@ -119,6 +119,7 @@ type StoreItemForm struct {
 	Description string  `json:"description"`
 	TaxID       int     `json:"tax_id"`
 	UnitID      int     `json:"unit_id"`
+	ItemType    string  `json:"item_type"` // e.g. "product", "service"
 }
 
 func (form StoreItemForm) Authorize() bool {
@@ -137,6 +138,7 @@ func (StoreItemForm) Rules() map[string]any {
 		"price":       "required|min:0",
 		"tax_id":      "bail|required|exists:taxes,id",
 		"unit_id":     "bail|required|exists:units,id",
+		"item_type":   "bail|required|in:product,service",
 	}
 }
 
@@ -148,6 +150,7 @@ type UpdateItemForm struct {
 	Description string  `json:"description"`
 	TaxID       int     `json:"tax_id"`
 	UnitID      int     `json:"unit_id"`
+	ItemType    string  `json:"item_type"` // e.g. "product", "service"
 }
 
 func (form UpdateItemForm) Authorize() bool {
@@ -161,6 +164,7 @@ func (form UpdateItemForm) Rules() map[string]any {
 		"price":       "required|min:0",
 		"tax_id":      "required|exists:taxes,id",
 		"unit_id":     "required|exists:units,id",
+		"item_type":   "bail|required|in:product,service",
 	}
 }
 

@@ -430,6 +430,11 @@
         "search": "Escriba un nombre de artículo..."
       }
     },
+    "single": {
+      "type": "Tipo",
+      "service": "Servicio",
+      "product": "Producto"
+    },
     "viewItem": {
       "title": "Ver producto",
       "description": "Detalles del cliente seleccionado."

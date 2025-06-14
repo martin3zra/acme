@@ -20,7 +20,7 @@ func (s *Server) paymentsHandler(ctx *routing.Context) {
 	}
 
 	uuid := ctx.Query("id")
-	if uuid == "" {
+	if uuid != "" {
 		payment, err := s.findPaymentByUUID(ctx.Request.Context(), uuid)
 		if err != nil {
 			ctx.Error(err)

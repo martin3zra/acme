@@ -16,6 +16,7 @@ type item struct {
 	Name        string  `json:"name"`
 	Price       float64 `json:"price"`
 	Description string  `json:"description"`
+	ItemType    string  `json:"item_type"`
 	// Units       []*UnitResponse `json:"units"`
 	Tax  tax `json:"tax"`
 	Unit struct {
@@ -30,7 +31,7 @@ type item struct {
 func (s *Server) findItemByID(ctx context.Context, itemID int) (*item, error) {
 	var i item
 	err := s.db.QueryRow("SELECT i.id, i.uuid, i.name, i.price, i.description, i.tax_id, t.name, t.rate, i.status, "+
-		"i.created_at, i.updated_at, i.deleted_at, iu.unit_id, iu.name as unit_name  "+
+		"i.item_type, i.created_at, i.updated_at, i.deleted_at, iu.unit_id, iu.name as unit_name  "+
 		"FROM items i "+
 		"INNER JOIN taxes t ON(i.company_id = t.company_id AND i.tax_id = t.id)"+
 		"LEFT JOIN LATERAL (SELECT iu.unit_id, u.name FROM items_units iu INNER JOIN units u ON (iu.unit_id = u.id) WHERE iu.item_id = i.id limit 1) iu ON true "+
@@ -44,6 +45,7 @@ func (s *Server) findItemByID(ctx context.Context, itemID int) (*item, error) {
 		&i.Tax.Name,
 		&i.Tax.Rate,
 		&i.Status,
+		&i.ItemType,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.DeletedAt,
@@ -60,7 +62,7 @@ func (s *Server) findItemByID(ctx context.Context, itemID int) (*item, error) {
 func (s *Server) findItems(ctx context.Context) ([]*item, error) {
 
 	is, err := s.db.Query("SELECT i.id, i.uuid, i.name, i.price, i.description, i.tax_id, t.name, t.rate, i.status, "+
-		"i.created_at, i.updated_at, i.deleted_at, iu.unit_id, iu.name as unit_name "+
+		"i.item_type, i.created_at, i.updated_at, i.deleted_at, iu.unit_id, iu.name as unit_name "+
 		"FROM items i "+
 		"INNER JOIN taxes t ON(i.company_id = t.company_id AND i.tax_id = t.id) "+
 		"LEFT JOIN LATERAL (SELECT iu.unit_id, u.name FROM items_units iu INNER JOIN units u ON (iu.unit_id = u.id) WHERE iu.item_id = i.id limit 1) iu ON true "+
@@ -81,6 +83,7 @@ func (s *Server) findItems(ctx context.Context) ([]*item, error) {
 			&i.Tax.Name,
 			&i.Tax.Rate,
 			&i.Status,
+			&i.ItemType,
 			&i.CreatedAt,
 			&i.UpdatedAt,
 			&i.DeletedAt,
@@ -99,7 +102,7 @@ func (s *Server) findItemsByCriteria(ctx context.Context, term string) ([]*item,
 		return nil, errors.New("need to specifiy the item you're looking for")
 	}
 	is, err := s.db.Query("SELECT i.id, i.uuid, i.name, i.price, i.description, i.tax_id, t.name, t.rate, i.status, "+
-		"i.created_at, i.updated_at, i.deleted_at, iu.unit_id, iu.name as unit_name "+
+		"i.item_type,i.created_at, i.updated_at, i.deleted_at, iu.unit_id, iu.name as unit_name "+
 		"FROM items i "+
 		"INNER JOIN taxes t ON(i.company_id = t.company_id AND i.tax_id = t.id) "+
 		"LEFT JOIN LATERAL (SELECT iu.unit_id, u.name FROM items_units iu INNER JOIN units u ON (iu.unit_id = u.id) WHERE iu.item_id = i.id limit 1) iu ON true "+
@@ -120,6 +123,7 @@ func (s *Server) findItemsByCriteria(ctx context.Context, term string) ([]*item,
 			&i.Tax.Name,
 			&i.Tax.Rate,
 			&i.Status,
+			&i.ItemType,
 			&i.CreatedAt,
 			&i.UpdatedAt,
 			&i.DeletedAt,
@@ -138,7 +142,7 @@ func (s *Server) findItemsByReference(ctx context.Context, term string) (*item, 
 		return nil, errors.New("need to specifiy the item you're looking for")
 	}
 
-	result := s.db.QueryRow("SELECT i.id, i.uuid, i.name, i.price, i.description, i.tax_id, t.name, t.rate, "+
+	result := s.db.QueryRow("SELECT i.id, i.uuid, i.name, i.price, i.description, i.item_type, i.tax_id, t.name, t.rate, "+
 		"iu.unit_id, iu.name as unit_name "+
 		"FROM items i "+
 		"INNER JOIN taxes t ON(i.company_id = t.company_id AND i.tax_id = t.id) "+
@@ -155,6 +159,7 @@ func (s *Server) findItemsByReference(ctx context.Context, term string) (*item, 
 		&i.Name,
 		&i.Price,
 		&i.Description,
+		&i.ItemType,
 		&i.Tax.ID,
 		&i.Tax.Name,
 		&i.Tax.Rate,
@@ -169,7 +174,7 @@ func (s *Server) findItemsByReference(ctx context.Context, term string) (*item, 
 func (s *Server) storeItem(ctx context.Context, form *StoreItemForm) error {
 	companyID := CurrentCompany(ctx).ID
 	return database.WithTransaction(s.db, func(tx *sql.Tx) error {
-		stmt, err := tx.Prepare("INSERT INTO items (name, price, description, tax_id, company_id) " +
+		stmt, err := tx.Prepare("INSERT INTO items (name, price, description, tax_id, item_type, company_id) " +
 			"VALUES ($1, $2, $3, $4, $5) RETURNING id")
 		if err != nil {
 			return err
@@ -181,6 +186,7 @@ func (s *Server) storeItem(ctx context.Context, form *StoreItemForm) error {
 			form.Price,
 			form.Description,
 			form.TaxID,
+			form.ItemType,
 			companyID,
 		).Scan(&itemID)
 
@@ -207,8 +213,8 @@ func (s *Server) updateItem(ctx context.Context, itemID int, form *UpdateItemFor
 	return database.WithTransaction(s.db, func(tx *sql.Tx) error {
 
 		_, err := tx.Exec(
-			"UPDATE items SET name = $1, description = $2, price = $3, tax_id = $4 WHERE company_id = $5 AND id = $6",
-			form.Name, form.Description, form.Price, form.TaxID, companyID, itemID,
+			"UPDATE items SET name = $1, description = $2, price = $3, tax_id = $4, item_type = $5 WHERE company_id = $6 AND id = $7",
+			form.Name, form.Description, form.Price, form.TaxID, form.ItemType, companyID, itemID,
 		)
 
 		if err != nil {

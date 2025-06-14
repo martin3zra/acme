@@ -8,8 +8,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useHeader } from '@/composables/use-headers';
 import { useVerb } from '@/composables/use-verbs';
 import { useTranslation } from '@/hooks/use-translation';
-import { Item, PageProps, Tax, Unit, Verb } from '@/types';
+import { Item, ItemType, ItemTypes, PageProps, Tax, Unit, Verb } from '@/types';
+import { Field, Radio, RadioGroup } from '@headlessui/react';
 import { useForm, usePage } from '@inertiajs/react';
+import { CheckCircleIcon } from 'lucide-react';
 import { FormEventHandler, useState } from 'react';
 
 export type CreateFormParams = {
@@ -31,6 +33,7 @@ type ItemForm = {
   price: number;
   tax_id: number;
   unit_id: number;
+  item_type: ItemType; // This can be 'product' or 'service'
 };
 
 export default function CreateForm({ onFinish, params }: CreateFormProps) {
@@ -45,6 +48,7 @@ export default function CreateForm({ onFinish, params }: CreateFormProps) {
     price: params.item?.price || 0,
     tax_id: params.item?.tax.id || 0,
     unit_id: params.item?.unit.id || 0,
+    item_type: params.item?.item_type || 'product', // Default to 'product'
   });
 
   const viewMode = params.action === 'view';
@@ -72,6 +76,22 @@ export default function CreateForm({ onFinish, params }: CreateFormProps) {
     <div>
       {propsErrors.status && <div className="mb-4 text-center text-sm font-medium text-red-600">{propsErrors.status}</div>}
       <form onSubmit={submit} className="space-y-6">
+        <Label htmlFor="name">{t('items.single.type')}</Label>
+        <div className="col-span-2">
+          <RadioGroup className="grid grid-cols-3 gap-6" value={data.item_type} onChange={(type: ItemType) => setData('item_type', type)}>
+            {ItemTypes.map((type: ItemType) => (
+              <Field key={type}>
+                <Radio
+                  value={type}
+                  className="group data-checked:bg-primary data-checked:text-primary-foreground bg-primary/5 data-focus:outline-primary relative flex cursor-pointer grid-cols-1 rounded-lg px-5 py-4 shadow-md transition focus:not-data-focus:outline-none data-focus:outline"
+                >
+                  <div className="flex w-full capitalize">{t(`items.single.${type}`)}</div>
+                  <CheckCircleIcon className="size-6 opacity-0 transition group-data-checked:opacity-100" />
+                </Radio>
+              </Field>
+            ))}
+          </RadioGroup>
+        </div>
         <div className="grid grid-cols-2 gap-2">
           <div className="grid gap-2">
             <Label htmlFor="name">{t('global.name')}</Label>

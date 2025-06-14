@@ -57,14 +57,14 @@ func (s *Server) bootRoutes() {
 					route.GET("/invoices", s.invoicesHandler).Can("viewAny:invoice")
 					route.POST("/invoices", s.storeInvoiceHandler())
 					route.GET("/invoices/create", s.createInvoiceHandler).Can("create:invoice")
-					route.GET("/invoices/:id/edit", s.editInvoiceHandler)
+					route.GET("/invoices/:id/edit", s.editInvoiceHandler).Can("update:invoice")
 					route.PUT("/invoices/:id/void", s.voidInvoiceHandler())
 					route.PUT("/invoices/:id", s.updateInvoiceHandler())
 
 					route.GET("/payments", s.paymentsHandler).Can("viewAny:payment")
 					route.POST("/payments", s.storePaymentHandler())
 					route.GET("/payments/create", s.createPaymentHandler).Can("create:payment")
-					route.GET("/payments/:id/edit", s.editPaymentHandler).Can("edit:payment")
+					route.GET("/payments/:id/edit", s.editPaymentHandler).Can("update:payment")
 					route.PUT("/payments/:id/void", s.voidPaymentHandler())
 					route.PUT("/payments/:id", s.updatePaymentHandler())
 
