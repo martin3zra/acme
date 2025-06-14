@@ -35,6 +35,11 @@ type ItemForm = {
   tax_id: number;
   unit_id: number;
   item_type: ItemType; // This can be 'product' or 'service'
+  reference?: string;
+  code?: string;
+  sku?: string;
+  barcode?: string;
+  vendor_reference?: string;
 };
 
 export default function CreateForm({ onFinish, params }: CreateFormProps) {
@@ -42,7 +47,7 @@ export default function CreateForm({ onFinish, params }: CreateFormProps) {
   const [dialogOpen, setDialogOpen] = useState(false);
   const { headers } = useHeader();
   const { errors: propsErrors } = usePage<PageProps>().props;
-  const { data, setData, post, put, errors, reset, processing } = useForm<Required<ItemForm>>({
+  const { data, setData, post, put, transform, errors, reset, processing } = useForm<Required<ItemForm>>({
     id: params.item?.id,
     name: params.item?.name || '',
     description: params.item?.description || '',
@@ -50,6 +55,11 @@ export default function CreateForm({ onFinish, params }: CreateFormProps) {
     tax_id: params.item?.tax.id || 0,
     unit_id: params.item?.unit.id || 0,
     item_type: params.item?.item_type || 'product', // Default to 'product'
+    reference: params.item?.identifiers?.reference || '',
+    code: params.item?.identifiers?.code || '',
+    sku: params.item?.identifiers?.sku || '',
+    barcode: params.item?.identifiers?.barcode || '',
+    vendor_reference: params.item?.identifiers?.vendor_reference || '',
   });
 
   const viewMode = params.action === 'view';
@@ -67,11 +77,21 @@ export default function CreateForm({ onFinish, params }: CreateFormProps) {
   const verbName = useVerb().action(params.action);
 
   const submit = () => {
-    // if (params.action === 'create') {
-    //   post('/items', options)
-    //   return
-    // };
-    // if (params.action === 'edit') put(`/items/${params.item!.id}`, options);
+    transform((data) => {
+      const { reference, code, sku, barcode, vendor_reference, ...rest } = data;
+      return {
+        ...rest,
+        identifiers: {
+          reference,
+          code,
+          sku,
+          barcode,
+          vendor_reference,
+        },
+      };
+    });
+    if (params.action === 'create') post('/items', options);
+    if (params.action === 'edit') put(`/items/${params.item!.id}`, options);
   };
 
   return (
@@ -82,8 +102,8 @@ export default function CreateForm({ onFinish, params }: CreateFormProps) {
         <FormSection.Form>
           {propsErrors.status && <div className="mb-4 text-center text-sm font-medium text-red-600">{propsErrors.status}</div>}
 
-          <div className="col-span-6 flex flex-col gap-y-6">
-            <div className="col-span-6 flex flex-col gap-2">
+          <div className="col-span-4 flex flex-col gap-y-6">
+            <div className="flex flex-col gap-2">
               <Label htmlFor="name">{t('items.single.type')}</Label>
               <RadioGroup className="grid grid-cols-3 gap-6" value={data.item_type} onChange={(type: ItemType) => setData('item_type', type)}>
                 {ItemTypes.map((type: ItemType) => (
@@ -99,7 +119,7 @@ export default function CreateForm({ onFinish, params }: CreateFormProps) {
                 ))}
               </RadioGroup>
             </div>
-            <div className="col-span-6 flex flex-col gap-2">
+            <div className="flex flex-col gap-2">
               <div className="gap-2">
                 <Label htmlFor="name">{t('global.name')}</Label>
                 <Input
@@ -115,8 +135,8 @@ export default function CreateForm({ onFinish, params }: CreateFormProps) {
                 <InputError className="mt-2" message={errors.name} />
               </div>
             </div>
-            <div className="col-span-6 flex flex-col gap-2">
-              <div className="flex items-center justify-between">
+            <div className="flex flex-col gap-2">
+              <div className="flex items-center justify-between gap-x-2">
                 <div className="flex flex-col gap-2">
                   <Label>{t('global.unit')}</Label>
                   <Select
@@ -176,7 +196,7 @@ export default function CreateForm({ onFinish, params }: CreateFormProps) {
                 </div>
               </div>
             </div>
-            <div className="col-span-6 flex flex-col gap-2">
+            <div className="flex flex-col gap-2">
               <div className="grid gap-2">
                 <Label htmlFor="description">{t('global.description')}</Label>
                 <textarea
@@ -189,6 +209,82 @@ export default function CreateForm({ onFinish, params }: CreateFormProps) {
                   readOnly={viewMode}
                 />
                 <InputError className="mt-2" message={errors.description} />
+              </div>
+            </div>
+          </div>
+          <div className="col-span-2 space-y-6">
+            <div className="flex flex-col gap-2">
+              <div className="gap-2">
+                <Label htmlFor="reference">{t('global.reference')}</Label>
+                <Input
+                  id="reference"
+                  className="mt-1 block w-full"
+                  value={data.reference}
+                  onChange={(e) => setData('reference', e.target.value)}
+                  autoComplete="reference"
+                  placeholder="Item reference"
+                  readOnly={viewMode}
+                />
+                <InputError className="mt-2" message={errors.reference} />
+              </div>
+            </div>
+            <div className="flex flex-col gap-2">
+              <div className="gap-2">
+                <Label htmlFor="code">{t('global.code')}</Label>
+                <Input
+                  id="code"
+                  className="mt-1 block w-full"
+                  value={data.code}
+                  onChange={(e) => setData('code', e.target.value)}
+                  autoComplete="code"
+                  placeholder="Item code"
+                  readOnly={viewMode}
+                />
+                <InputError className="mt-2" message={errors.code} />
+              </div>
+            </div>
+            <div className="flex flex-col gap-2">
+              <div className="gap-2">
+                <Label htmlFor="sku">{t('global.sku')}</Label>
+                <Input
+                  id="sku"
+                  className="mt-1 block w-full"
+                  value={data.sku}
+                  onChange={(e) => setData('sku', e.target.value)}
+                  autoComplete="sku"
+                  placeholder="Item sku"
+                  readOnly={viewMode}
+                />
+                <InputError className="mt-2" message={errors.sku} />
+              </div>
+            </div>
+            <div className="flex flex-col gap-2">
+              <div className="gap-2">
+                <Label htmlFor="barcode">{t('global.barcode')}</Label>
+                <Input
+                  id="barcode"
+                  className="mt-1 block w-full"
+                  value={data.barcode}
+                  onChange={(e) => setData('barcode', e.target.value)}
+                  autoComplete="barcode"
+                  placeholder="Item barcode"
+                  readOnly={viewMode}
+                />
+                <InputError className="mt-2" message={errors.barcode} />
+              </div>
+            </div>
+            <div className="flex flex-col gap-2">
+              <div className="gap-2">
+                <Label htmlFor="vendor_reference">{t('items.single.vendor_reference')}</Label>
+                <Input
+                  id="vendor_reference"
+                  className="mt-1 block w-full"
+                  value={data.vendor_reference}
+                  onChange={(e) => setData('vendor_reference', e.target.value)}
+                  placeholder="Item vendor reference"
+                  readOnly={viewMode}
+                />
+                <InputError className="mt-2" message={errors.vendor_reference} />
               </div>
             </div>
           </div>

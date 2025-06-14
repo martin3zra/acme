@@ -45,6 +45,9 @@
     "phone": "Teléfono",
     "description": "Descripción",
     "reference": "Referencia",
+    "code": "Código",
+    "sku": "SKU",
+    "barcode": "Código de barras",
     "unit": "Unidad",
     "qty": "Cantidad",
     "price": "Precio",
@@ -435,7 +438,8 @@
       "description": "Proporcione los detalles necesarios para configurar el producto. Esta información le ayudará a identificar y gestionar dentro de su catalogo en el sistema.",
       "type": "Tipo",
       "service": "Servicio",
-      "product": "Producto"
+      "product": "Producto",
+      "vendor_reference": "Referencia del proveedor"
     },
     "viewItem": {
       "title": "Ver producto",
