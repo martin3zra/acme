@@ -109,7 +109,17 @@ func (s *Server) findItemsByCriteria(ctx context.Context, term string) ([]*item,
 		"FROM items i "+
 		"INNER JOIN taxes t ON(i.company_id = t.company_id AND i.tax_id = t.id) "+
 		"LEFT JOIN LATERAL (SELECT iu.unit_id, u.name FROM items_units iu INNER JOIN units u ON (iu.unit_id = u.id) WHERE iu.item_id = i.id limit 1) iu ON true "+
-		"WHERE i.company_id = $1 AND i.name ILIKE $2 AND i.deleted_at IS NULL ORDER BY i.name", CurrentCompany(ctx).ID, "%"+term+"%")
+		"WHERE i.company_id = $1 AND ("+
+		"i.name ILIKE $2 OR "+
+		"identifiers->>'reference' ILIKE $2 OR "+
+		"identifiers->>'code' ILIKE $2 OR "+
+		"identifiers->>'sku' ILIKE $2 OR "+
+		"identifiers->>'barcode' ILIKE $2 OR "+
+		"identifiers->>'vendor_reference' ILIKE $2"+
+		") "+
+		"AND i.deleted_at IS NULL ORDER BY i.name",
+		CurrentCompany(ctx).ID, "%"+term+"%",
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -151,7 +161,7 @@ func (s *Server) findItemsByReference(ctx context.Context, term string) (*item, 
 		"FROM items i "+
 		"INNER JOIN taxes t ON(i.company_id = t.company_id AND i.tax_id = t.id) "+
 		"LEFT JOIN LATERAL (SELECT iu.unit_id, u.name FROM items_units iu INNER JOIN units u ON (iu.unit_id = u.id) WHERE iu.item_id = i.id limit 1) iu ON true "+
-		"WHERE i.company_id = $1 AND i.name = $2 AND i.deleted_at IS NULL", CurrentCompany(ctx).ID, term)
+		"WHERE i.company_id = $1 AND i.identifiers->>'reference' = $2 AND i.deleted_at IS NULL", CurrentCompany(ctx).ID, term)
 	if result.Err() != nil {
 		return nil, result.Err()
 	}
