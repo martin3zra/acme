@@ -49,6 +49,11 @@ func (ctx *Context) JSON(status int, data any) {
 
 // Inertia sends the component and props to be use for inertiajs protocol
 func (ctx *Context) Render(component string, props map[string]any) {
+	abilities := ctx.Request.Context().Value(PermissionKey{})
+	if abilities != nil {
+		props["abilities"] = abilities.(map[string]bool)
+	}
+
 	if t, ok := props["translations"]; ok {
 		trans, ok := t.(map[string]string)
 		if ok {

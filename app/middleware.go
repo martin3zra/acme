@@ -3,9 +3,7 @@ package app
 import (
 	"context"
 	"database/sql"
-	"encoding/json"
 	"fmt"
-	"html/template"
 	"net/http"
 	"strings"
 
@@ -167,15 +165,7 @@ func AuthenticatedMiddleware(next routing.HandlerFunc) routing.HandlerFunc {
 		acCtx := context.WithValue(userCtx, support.AccountKey{}, ac)
 		ccCtx := context.WithValue(acCtx, support.CompanyKey{}, cc)
 
-		rolePermissions := permissions(cc.UserRole)
-		abilities, _ := json.Marshal(rolePermissions)
-
-		// Fetch all permission for the user role or any specific user permission
-		ctxWithProps := gonertia.SetTemplateData(ccCtx, gonertia.TemplateData{
-			"abilities": template.JS(abilities),
-		})
-
-		ctxWithProps = context.WithValue(ctxWithProps, routing.PermissionKey{}, rolePermissions)
+		ctxWithProps := context.WithValue(ccCtx, routing.PermissionKey{}, permissions(cc.UserRole))
 
 		next(ctx.WithContext(ctxWithProps))
 	}
