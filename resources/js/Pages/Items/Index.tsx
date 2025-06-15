@@ -85,7 +85,7 @@ export default function Index({ auth, items, taxes, units }: PageProps<{ items: 
         {hasItems && <List data={items} onSelectItem={onSelectItem} />}
 
         <Sheet open={open} onOpenChange={onOpenChange}>
-          <SheetContent side="right" className="m-4 flex h-[calc(~'(100%-var(--spacing)*4)/3')] w-full flex-col rounded-md sm:max-w-4xl">
+          <SheetContent side="right" className="m-4 flex h-[calc(~'(100%-var(--spacing)*4)/3')] w-full flex-col rounded-md sm:max-w-7xl">
             <SheetHeader>
               <SheetTitle>
                 {t(`global.actions.${verbName}`)} {t('global.item')}

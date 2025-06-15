@@ -94,3 +94,13 @@ func MapSlice[T, U any](s []T, f func(T) U) []U {
 	}
 	return result
 }
+
+func ResolveError(err error) error {
+	for {
+		unw := errors.Unwrap(err)
+		if unw == nil {
+			return err
+		}
+		err = unw
+	}
+}

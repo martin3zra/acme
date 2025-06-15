@@ -3,9 +3,7 @@ package app
 import (
 	"context"
 	"database/sql"
-	"encoding/json"
 	"fmt"
-	"html/template"
 	"net/http"
 	"strings"
 
@@ -103,7 +101,7 @@ func Verified(next routing.HandlerFunc) routing.HandlerFunc {
 	return func(ctx *routing.Context) {
 
 		user := auth.User(ctx.Request.Context())
-		if user == nil || user.EmailVerifiedAt == nil {
+		if user != nil && !user.IsEmpty() && user.EmailVerifiedAt == nil {
 			ctx.Redirect("/verify-email")
 			return
 		}
@@ -115,7 +113,13 @@ func Verified(next routing.HandlerFunc) routing.HandlerFunc {
 func EnforceVerifiedUserAccess(next routing.HandlerFunc) routing.HandlerFunc {
 	return func(ctx *routing.Context) {
 		db := ctx.Request.Context().Value(database.ConnectionKey{}).(*sql.DB)
-		user := UserFromFoundationUser(auth.User(ctx.Request.Context()))
+		loggedUser := auth.User(ctx.Request.Context())
+		if loggedUser == nil || loggedUser.IsEmpty() {
+			next(ctx)
+			return
+		}
+
+		user := UserFromFoundationUser(loggedUser)
 
 		if user.IsOrphan(db) {
 			ctx.Redirect("/verify-account", http.StatusForbidden)
@@ -137,7 +141,7 @@ func AuthenticatedMiddleware(next routing.HandlerFunc) routing.HandlerFunc {
 
 		userId := sess.Get("user_id")
 		if userId == nil || userId.(float64) == 0 {
-			if strings.HasPrefix(ctx.Request.RequestURI, "/") {
+			if ctx.Request.RequestURI == "/" {
 				next(ctx)
 				return
 			}
@@ -161,15 +165,7 @@ func AuthenticatedMiddleware(next routing.HandlerFunc) routing.HandlerFunc {
 		acCtx := context.WithValue(userCtx, support.AccountKey{}, ac)
 		ccCtx := context.WithValue(acCtx, support.CompanyKey{}, cc)
 
-		rolePermissions := permissions(cc.UserRole)
-		abilities, _ := json.Marshal(rolePermissions)
-
-		// Fetch all permission for the user role or any specific user permission
-		ctxWithProps := gonertia.SetTemplateData(ccCtx, gonertia.TemplateData{
-			"abilities": template.JS(abilities),
-		})
-
-		ctxWithProps = context.WithValue(ctxWithProps, routing.PermissionKey{}, rolePermissions)
+		ctxWithProps := context.WithValue(ccCtx, routing.PermissionKey{}, permissions(cc.UserRole))
 
 		next(ctx.WithContext(ctxWithProps))
 	}

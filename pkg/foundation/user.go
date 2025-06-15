@@ -20,6 +20,10 @@ type User struct {
 	Role string `json:"role"`
 }
 
+func (u *User) IsEmpty() bool {
+	return *u == (User{})
+}
+
 func (u *User) GetAuthIdentifier() int {
 	return u.Id
 }

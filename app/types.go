@@ -112,13 +112,40 @@ func (ConfirmsPasswords) Rules() map[string]any {
 	}
 }
 
+type ItemIdentifiers struct {
+	Reference       *string `json:"reference,omitempty"`
+	Code            *string `json:"code,omitempty"`
+	SKU             *string `json:"sku,omitempty"`
+	Barcode         *string `json:"barcode,omitempty"`
+	VendorReference *string `json:"vendor_reference,omitempty"`
+}
+
+func (d *ItemIdentifiers) Value() (driver.Value, error) {
+	return json.Marshal(d)
+}
+
+func (d *ItemIdentifiers) Scan(value any) error {
+	if value == nil {
+		return nil
+	}
+
+	b, ok := value.([]byte)
+	if !ok {
+		return errors.New("type assertion to []byte failed")
+	}
+
+	return json.Unmarshal(b, &d)
+}
+
 type StoreItemForm struct {
 	support.FormRequest
-	Name        string  `json:"name"`
-	Price       float64 `json:"price"`
-	Description string  `json:"description"`
-	TaxID       int     `json:"tax_id"`
-	UnitID      int     `json:"unit_id"`
+	Name        string          `json:"name"`
+	Price       float64         `json:"price"`
+	Description string          `json:"description"`
+	TaxID       int             `json:"tax_id"`
+	UnitID      int             `json:"unit_id"`
+	ItemType    string          `json:"item_type"` // e.g. "product", "service"
+	Identifiers ItemIdentifiers `json:"identifiers,omitempty"`
 }
 
 func (form StoreItemForm) Authorize() bool {
@@ -133,21 +160,30 @@ func (StoreItemForm) Rules() map[string]any {
 			"max:120",
 			validator.Rule{}.Unique("items", "name"),
 		},
-		"description": "sometimes|min:3|max:120",
-		"price":       "required|min:0",
-		"tax_id":      "bail|required|exists:taxes,id",
-		"unit_id":     "bail|required|exists:units,id",
+		"description":                  "sometimes|min:3|max:120",
+		"price":                        "required|min:0",
+		"tax_id":                       "bail|required|exists:taxes,id",
+		"unit_id":                      "bail|required|exists:units,id",
+		"item_type":                    "bail|required|in:product,service",
+		"identifiers":                  "sometimes",
+		"identifiers.reference":        "sometimes|nullable|max:100",
+		"identifiers.code":             "sometimes|nullable|max:50",
+		"identifiers.sku":              "sometimes|nullable|max:50",
+		"identifiers.barcode":          "sometimes|nullable|max:32",
+		"identifiers.vendor_reference": "sometimes|nullable|max:100",
 	}
 }
 
 type UpdateItemForm struct {
 	support.FormRequest
-	ID          int     `json:"id"`
-	Name        string  `json:"name"`
-	Price       float64 `json:"price"`
-	Description string  `json:"description"`
-	TaxID       int     `json:"tax_id"`
-	UnitID      int     `json:"unit_id"`
+	ID          int             `json:"id"`
+	Name        string          `json:"name"`
+	Price       float64         `json:"price"`
+	Description string          `json:"description"`
+	TaxID       int             `json:"tax_id"`
+	UnitID      int             `json:"unit_id"`
+	ItemType    string          `json:"item_type"` // e.g. "product", "service"
+	Identifiers ItemIdentifiers `json:"identifiers,omitempty"`
 }
 
 func (form UpdateItemForm) Authorize() bool {
@@ -156,11 +192,18 @@ func (form UpdateItemForm) Authorize() bool {
 
 func (form UpdateItemForm) Rules() map[string]any {
 	return map[string]any{
-		"name":        []any{"required", "min:3", "max:120", validator.Rule{}.Unique("items", "name").Ignore(form.ID, "id")},
-		"description": "sometimes|min:3|max:120",
-		"price":       "required|min:0",
-		"tax_id":      "required|exists:taxes,id",
-		"unit_id":     "required|exists:units,id",
+		"name":                         []any{"required", "min:3", "max:120", validator.Rule{}.Unique("items", "name").Ignore(form.ID, "id")},
+		"description":                  "sometimes|min:3|max:120",
+		"price":                        "required|min:0",
+		"tax_id":                       "required|exists:taxes,id",
+		"unit_id":                      "required|exists:units,id",
+		"item_type":                    "bail|required|in:product,service",
+		"identifiers":                  "sometimes",
+		"identifiers.reference":        "sometimes|nullable|max:100",
+		"identifiers.code":             "sometimes|nullable|max:50",
+		"identifiers.sku":              "sometimes|nullable|max:50",
+		"identifiers.barcode":          "sometimes|nullable|max:32",
+		"identifiers.vendor_reference": "sometimes|nullable|max:100",
 	}
 }
 

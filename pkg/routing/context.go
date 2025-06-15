@@ -2,12 +2,15 @@ package routing
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log"
 	"net/http"
 	"net/url"
 	"os"
+	"regexp"
 	"slices"
 	"strconv"
 	"strings"
@@ -48,6 +51,11 @@ func (ctx *Context) JSON(status int, data any) {
 
 // Inertia sends the component and props to be use for inertiajs protocol
 func (ctx *Context) Render(component string, props map[string]any) {
+	abilities := ctx.Request.Context().Value(PermissionKey{})
+	if abilities != nil {
+		props["abilities"] = abilities.(map[string]bool)
+	}
+
 	if t, ok := props["translations"]; ok {
 		trans, ok := t.(map[string]string)
 		if ok {
@@ -57,7 +65,7 @@ func (ctx *Context) Render(component string, props map[string]any) {
 	}
 	err := ctx.Inertia.Render(ctx.Response, ctx.Request, component, props)
 	if err != nil {
-		log.Fatalf("Error rending the inertia component: %v", err)
+		log.Println("Error rending the inertia component: ", err)
 		ctx.Error(err)
 	}
 }
@@ -68,11 +76,16 @@ func (ctx *Context) Error(err error, status ...int) {
 		500: "Internal Error.",
 		403: "Forbidden.",
 		401: "Unauthorized.",
+		404: "Not Found.",
 	}
 
 	defaultStatus := 500
 	if len(status) > 0 {
 		defaultStatus = status[0]
+	}
+
+	if errors.Is(err, sql.ErrNoRows) {
+		defaultStatus = http.StatusNotFound
 	}
 
 	isProduction := os.Getenv("APP_ENV")
@@ -92,7 +105,7 @@ func (ctx *Context) Error(err error, status ...int) {
 	// display errors when on dev mode. otherwise logged this error.
 	data := make(map[string]any)
 	data["title"] = title
-	data["message"] = err.Error()
+	data["message"] = foundation.ResolveError(err)
 	data["status"] = defaultStatus
 	tmpl, _ := template.ParseFiles(errorViewFile)
 	tmplErr := tmpl.Execute(ctx.Response, data)
@@ -194,6 +207,18 @@ func (ctx *Context) Param(key string) string {
 	if ctx.Params == nil {
 		return ""
 	}
+
+	// Check if the given key contains "id" and validate it as a UUID.
+	if strings.Contains(strings.ToLower(key), "id") {
+		var re = regexp.MustCompile(`^[a-fA-F0-9]{8}-[a-fA-F0-9]{4}-[1-5][a-fA-F0-9]{3}-[89abAB][a-fA-F0-9]{3}-[a-fA-F0-9]{12}$`)
+		if re.MatchString(ctx.Params[key]) {
+			reUUID := `^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$`
+			if regexp.MustCompile(reUUID).MatchString(ctx.Params[key]) {
+				return ctx.Params[key]
+			}
+		}
+	}
+
 	return ctx.Params[key]
 }
 

@@ -72,6 +72,18 @@ export interface Customer {
   updated_at: string;
 }
 
+export const ItemTypes = ['product', 'service'] as const;
+
+export type ItemType = (typeof ItemTypes)[number];
+
+export interface ItemIdentifiers {
+  reference: string;
+  code: string;
+  sku: string;
+  barcode: string;
+  vendor_reference: string;
+}
+
 export interface Item {
   id: number;
   uuid: string;
@@ -81,6 +93,8 @@ export interface Item {
   unit: Unit;
   description: string;
   status: string;
+  item_type?: ItemType; // This can be 'product' or 'service'
+  identifiers?: ItemIdentifiers; // Optional identifiers for the item
 }
 
 export type LineAction = 'added' | 'updated' | 'deleted' | 'unchanged';

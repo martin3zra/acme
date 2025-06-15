@@ -15,7 +15,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Item, Replacements, Verb } from '@/types';
 import { ColumnDef } from '@tanstack/react-table';
-import { ArrowUpDown, MoreHorizontal } from 'lucide-react';
+import { ArrowUpDown, MoreHorizontal, Package, Wrench } from 'lucide-react';
 
 type Props = {
   onDidClick: (item: Item, action: Verb) => void;
@@ -38,6 +38,17 @@ export const getColumns = ({ onDidClick, t }: Props): ColumnDef<Item>[] => {
       enableHiding: false,
     },
     {
+      id: 'identifiers.reference',
+      accessorFn: (row) => row.identifiers?.reference ?? '', // prevent undefined
+      meta: t('global.reference'),
+      header: (props) => {
+        return <HeaderCell title={t('global.reference')} alignment="left" columnWidth={props.column.getSize()} />;
+      },
+      cell: (props) => {
+        return <TextCell columnWidth={props.column.getSize()} value={props.getValue() as string} />;
+      },
+    },
+    {
       accessorKey: 'name',
       meta: t('global.name'),
       header: ({ column }) => {
@@ -52,6 +63,50 @@ export const getColumns = ({ onDidClick, t }: Props): ColumnDef<Item>[] => {
       },
     },
     {
+      id: 'identifiers.code',
+      accessorFn: (row) => row.identifiers?.code ?? '', // prevent undefined
+      meta: t('global.code'),
+      header: (props) => {
+        return <HeaderCell title={t('global.code')} alignment="left" columnWidth={props.column.getSize()} />;
+      },
+      cell: (props) => {
+        return <TextCell columnWidth={props.column.getSize()} value={props.getValue() as string} />;
+      },
+    },
+    {
+      id: 'identifiers.sku',
+      accessorFn: (row) => row.identifiers?.sku ?? '', // prevent undefined
+      meta: t('global.sku'),
+      header: (props) => {
+        return <HeaderCell title={t('global.sku')} alignment="left" columnWidth={props.column.getSize()} />;
+      },
+      cell: (props) => {
+        return <TextCell columnWidth={props.column.getSize()} value={props.getValue() as string} />;
+      },
+    },
+    {
+      id: 'identifiers.barcode',
+      accessorFn: (row) => row.identifiers?.barcode ?? '', // prevent undefined
+      meta: t('global.barcode'),
+      header: (props) => {
+        return <HeaderCell title={t('global.barcode')} alignment="left" columnWidth={props.column.getSize()} />;
+      },
+      cell: (props) => {
+        return <TextCell columnWidth={props.column.getSize()} value={props.getValue() as string} />;
+      },
+    },
+    {
+      id: 'identifiers.vendor_reference',
+      accessorFn: (row) => row.identifiers?.vendor_reference ?? '', // prevent undefined
+      meta: t('items.single.vendor_reference'),
+      header: (props) => {
+        return <HeaderCell title={t('items.single.vendor_reference')} alignment="left" columnWidth={props.column.getSize()} />;
+      },
+      cell: (props) => {
+        return <TextCell columnWidth={props.column.getSize()} value={props.getValue() as string} />;
+      },
+    },
+    {
       accessorKey: 'description',
       meta: t('global.description'),
       header: (props) => {
@@ -59,6 +114,19 @@ export const getColumns = ({ onDidClick, t }: Props): ColumnDef<Item>[] => {
       },
       cell: (props) => {
         return <TextCell columnWidth={props.column.getSize()} value={props.getValue() as string} />;
+      },
+    },
+    {
+      accessorKey: 'item_type',
+      meta: t('items.single.type'),
+      header: (props) => {
+        return <HeaderCell title={t('items.single.type')} alignment="left" columnWidth={props.column.getSize()} />;
+      },
+      cell: (props) => {
+        if (props.row.original.item_type === 'service') {
+          return <Wrench />;
+        }
+        return <Package />;
       },
     },
     {

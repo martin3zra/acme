@@ -1,12 +1,14 @@
+import { usePage } from '@inertiajs/react';
+
 type Resource = {
   [key: string]: boolean;
 };
 export function useGate() {
+  const { props } = usePage();
   const usingWildcard = (ability: string = ''): boolean => {
-    // debugger;
     if (typeof window === 'undefined' || typeof window._abilities !== 'object' || window._abilities === null) return false;
 
-    const abilities = window._abilities;
+    const abilities = props.abilities as Resource;
     if (abilities && Object.keys(abilities).length === 0) return false;
 
     if (abilities['*'] || abilities[ability]) {

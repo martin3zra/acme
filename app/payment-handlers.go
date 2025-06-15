@@ -20,7 +20,7 @@ func (s *Server) paymentsHandler(ctx *routing.Context) {
 	}
 
 	uuid := ctx.Query("id")
-	if ensureUUIDIsValid(uuid) {
+	if uuid != "" {
 		payment, err := s.findPaymentByUUID(ctx.Request.Context(), uuid)
 		if err != nil {
 			ctx.Error(err)
@@ -70,11 +70,11 @@ func (s *Server) createPaymentHandler(ctx *routing.Context) {
 		}),
 	}
 
-	if ensureUUIDIsValid(paymentUuid) {
+	if paymentUuid != "" {
 		props["payment_uuid"] = paymentUuid
 	}
 
-	if ensureUUIDIsValid(customerUuid) {
+	if customerUuid != "" {
 		customer, err := s.findCustomeByUUID(ctx.Request.Context(), customerUuid)
 		if err != nil {
 			ctx.Error(err)
@@ -127,13 +127,7 @@ func (s *Server) voidPaymentHandler() routing.HandlerFunc {
 
 func (s *Server) editPaymentHandler(ctx *routing.Context) {
 
-	uuid := ctx.Param("id")
-	if !ensureUUIDIsValid(uuid) {
-		ctx.Back()
-		return
-	}
-
-	payment, err := s.findPaymentByUUID(ctx.Request.Context(), uuid)
+	payment, err := s.findPaymentByUUID(ctx.Request.Context(), ctx.Param("id"))
 	if err != nil {
 		ctx.Error(err)
 		return

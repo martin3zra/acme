@@ -28,7 +28,12 @@ export const List: FC<Props> = ({ data, onSelectItem }) => {
   const t = useTranslation().trans;
   const [sorting, setSorting] = useState<SortingState>([]);
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
-  const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({});
+  const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({
+    'identifiers.code': false,
+    'identifiers.sku': false,
+    'identifiers.barcode': false,
+    'identifiers.vendor_reference': false,
+  });
   const [rowSelection, setRowSelection] = useState({});
 
   const columns = getColumns({ onDidClick: onSelectItem, t });
