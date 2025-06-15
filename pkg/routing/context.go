@@ -2,7 +2,9 @@ package routing
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log"
 	"net/http"
@@ -63,7 +65,7 @@ func (ctx *Context) Render(component string, props map[string]any) {
 	}
 	err := ctx.Inertia.Render(ctx.Response, ctx.Request, component, props)
 	if err != nil {
-		log.Fatalf("Error rending the inertia component: %v", err)
+		log.Println("Error rending the inertia component: ", err)
 		ctx.Error(err)
 	}
 }
@@ -74,11 +76,16 @@ func (ctx *Context) Error(err error, status ...int) {
 		500: "Internal Error.",
 		403: "Forbidden.",
 		401: "Unauthorized.",
+		404: "Not Found.",
 	}
 
 	defaultStatus := 500
 	if len(status) > 0 {
 		defaultStatus = status[0]
+	}
+
+	if errors.Is(err, sql.ErrNoRows) {
+		defaultStatus = http.StatusNotFound
 	}
 
 	isProduction := os.Getenv("APP_ENV")
@@ -98,7 +105,7 @@ func (ctx *Context) Error(err error, status ...int) {
 	// display errors when on dev mode. otherwise logged this error.
 	data := make(map[string]any)
 	data["title"] = title
-	data["message"] = err.Error()
+	data["message"] = foundation.ResolveError(err)
 	data["status"] = defaultStatus
 	tmpl, _ := template.ParseFiles(errorViewFile)
 	tmplErr := tmpl.Execute(ctx.Response, data)
