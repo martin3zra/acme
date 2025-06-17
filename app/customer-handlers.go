@@ -1,8 +1,10 @@
 package app
 
 import (
+	"fmt"
 	"net/http"
 
+	"github.com/martin3zra/acme/pkg/foundation"
 	"github.com/martin3zra/acme/pkg/i18n"
 	"github.com/martin3zra/acme/pkg/routing"
 )
@@ -10,6 +12,12 @@ import (
 func (s *Server) customersHandler(ctx *routing.Context) {
 
 	uuid := ctx.Query("id")
+	taxReceipts, err := s.findTaxesReceipts(ctx.Request.Context())
+	if err != nil {
+		ctx.Error(err)
+		return
+	}
+
 	customers, err := s.findCustomers(ctx.Request.Context())
 	if err != nil {
 		ctx.Error(err)
@@ -18,6 +26,13 @@ func (s *Server) customersHandler(ctx *routing.Context) {
 	props := map[string]any{
 		"translations": trans("customers"),
 		"customers":    customers,
+		"tax_receipts": foundation.MapSlice(taxReceipts, func(receipt *taxReceipt) map[string]any {
+			return map[string]any{
+				"id":        receipt.ID,
+				"name":      fmt.Sprintf("%s-%s", receipt.Type, receipt.Name),
+				"available": receipt.Current < receipt.SequenceEnd,
+			}
+		}),
 	}
 	if uuid != "" {
 		customer, err := s.findCustomeByUUID(ctx.Request.Context(), uuid)

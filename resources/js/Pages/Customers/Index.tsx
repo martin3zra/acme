@@ -5,7 +5,7 @@ import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '
 import { useVerb } from '@/composables/use-verbs';
 import { useTranslation } from '@/hooks/use-translation';
 import AppLayout from '@/layouts/app-layout';
-import { Customer, CustomerVerb, PageProps } from '@/types';
+import { Customer, CustomerVerb, PageProps, TaxReceipt } from '@/types';
 import { router } from '@inertiajs/react';
 import { Plus } from 'lucide-react';
 import { useEffect, useState } from 'react';
@@ -13,20 +13,26 @@ import { List } from './List/Index';
 import CreateForm, { CreateFormParams } from './Shared/CreateForm';
 import { breadcrumbs } from './constants';
 
-export default function Index({ auth, customers, customer }: PageProps<{ customers: Customer[]; customer: Customer }>) {
+export default function Index({
+  auth,
+  customers,
+  customer,
+  tax_receipts,
+}: PageProps<{ customers: Customer[]; customer: Customer; tax_receipts: TaxReceipt[] }>) {
   const t = useTranslation().trans;
   const [open, setOpen] = useState(customer !== undefined);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [selectedCustomer, setSelectedCustomer] = useState<CreateFormParams>({
     customer: customer,
     action: customer !== undefined ? 'view' : 'create',
+    tax_receipts: tax_receipts,
   });
 
   const verbName = useVerb().action(selectedCustomer.action);
   const hasCustomers = customers.length > 0;
 
   const onCreateNewCustomer = () => {
-    setSelectedCustomer({ customer: undefined, action: 'create' });
+    setSelectedCustomer({ customer: undefined, action: 'create', tax_receipts });
     setOpen(!open);
   };
 
@@ -35,12 +41,12 @@ export default function Index({ auth, customers, customer }: PageProps<{ custome
       router.visit(`/payments/create`, { data: { customer_id: customer.uuid } });
       return;
     }
-    setSelectedCustomer({ customer, action });
+    setSelectedCustomer({ customer, action, tax_receipts });
   };
 
   const onOpenChange = (open: boolean) => {
     setOpen(open);
-    if (!open) setSelectedCustomer({ customer: undefined, action: 'create' });
+    if (!open) setSelectedCustomer({ customer: undefined, action: 'create', tax_receipts });
   };
 
   useEffect(() => {
@@ -88,14 +94,14 @@ export default function Index({ auth, customers, customer }: PageProps<{ custome
         {hasCustomers && <List data={customers} onSelectCustomer={onSelectCustomer} />}
 
         <Sheet open={open} onOpenChange={onOpenChange}>
-          <SheetContent side="right" className="m-4 flex h-[calc(~'(100%-var(--spacing)*4)/3')] w-full flex-col rounded-md sm:max-w-4xl">
+          <SheetContent side="right" className="m-4 flex h-[calc(~'(100%-var(--spacing)*4)/3')] w-full flex-col rounded-md sm:max-w-7xl">
             <SheetHeader>
               <SheetTitle>
                 {t(`global.actions.${verbName}`)} {t(`global.customer`).toLocaleLowerCase()}
               </SheetTitle>
               <SheetDescription className="text-[12px]">{t(`customers.newCustomer.description`)}</SheetDescription>
             </SheetHeader>
-            <div className="grid gap-4 px-4">
+            <div className="no-scrollbar grid gap-4 overflow-y-scroll px-4">
               <CreateForm params={selectedCustomer} onFinish={() => modalHandler(false)} />
             </div>
           </SheetContent>

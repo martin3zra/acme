@@ -398,16 +398,16 @@ export default function Create({
                 <InputError className="mt-2" message={errors.terms} />
               </div>
               <div className="flex flex-col gap-y-2">
-                <Label htmlFor="paymentTerms">{t('invoices.taxReceipt')}</Label>
+                <Label htmlFor="taxReceipt">{t('invoices.taxReceipt')}</Label>
                 <Select
-                  name="paymentTerms"
+                  name="taxReceipt"
                   onValueChange={handleTaxReceiptChange}
                   defaultValue={'0'}
                   value={String(invoiceForm.header.taxReceipt)}
                   required
                 >
                   <SelectTrigger className="w-full">
-                    <SelectValue placeholder="Select terms" />
+                    <SelectValue placeholder="Select taxReceipt" />
                   </SelectTrigger>
                   <SelectContent className="">
                     {tax_receipts.map((receipt) => (

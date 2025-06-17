@@ -7,8 +7,6 @@ import (
 	"log"
 	"net"
 	"net/http"
-	"os"
-	"path/filepath"
 	"reflect"
 	"strings"
 )
@@ -72,19 +70,6 @@ func ToJSON(m any) string {
 	}
 
 	return strings.ReplaceAll(string(js), ",", ", ")
-}
-
-// ResolvePath returns the absolute path to an asset file based on the mode.
-func ResolvePath(relativePath string) string {
-	// Get the path of the running binary
-	execPath, err := os.Executable()
-	if err != nil {
-		panic(err) // or handle more gracefully
-	}
-	baseDir := filepath.Dir(execPath)
-
-	// Join with the relative path to the static file
-	return filepath.Join(baseDir, relativePath)
 }
 
 func MapSlice[T, U any](s []T, f func(T) U) []U {

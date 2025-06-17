@@ -92,7 +92,7 @@ export default function Index({ auth, items, taxes, units }: PageProps<{ items: 
               </SheetTitle>
               <SheetDescription className="text-[12px]">{t(`items.newItem.description`)}</SheetDescription>
             </SheetHeader>
-            <div className="grid gap-4 px-4">
+            <div className="grid gap-4 overflow-y-scroll px-4">
               <CreateForm params={selectedItem} onFinish={() => modalHandler(false)} />
             </div>
           </SheetContent>

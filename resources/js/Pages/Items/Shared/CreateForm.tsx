@@ -104,7 +104,7 @@ export default function CreateForm({ onFinish, params }: CreateFormProps) {
 
           <div className="col-span-4 flex flex-col gap-y-6">
             <div className="flex flex-col gap-2">
-              <Label htmlFor="name">{t('items.single.type')}</Label>
+              <Label htmlFor="item_type">{t('items.single.type')}</Label>
               <RadioGroup className="grid grid-cols-3 gap-6" value={data.item_type} onChange={(type: ItemType) => setData('item_type', type)}>
                 {ItemTypes.map((type: ItemType) => (
                   <Field key={type}>

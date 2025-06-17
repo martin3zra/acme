@@ -75,6 +75,7 @@ func (s *Server) Boot() {
 
 func (s *Server) configureRouting() {
 	s.route = routing.New()
+	s.route.RegisterResources(s.resources)
 	s.route.RegisterInertia(
 		inertia.InitInertia(
 			s.assets,
@@ -133,7 +134,7 @@ var groupedPermissions = map[string]map[string][]string{
 	},
 	"supervisor": {
 		"view":    {"dashboard", "customer", "item", "payment"},
-		"viewAny": {"dashboard", "invoice", "item", "payment"},
+		"viewAny": {"dashboard", "invoice", "customer", "item", "payment"},
 		"create":  {"dashboard", "invoice", "customer", "item", "payment"},
 		"delete":  {"dashboard", "invoice", "customer", "item", "payment"},
 		"update":  {"dashboard", "invoice", "customer", "item", "payment"},

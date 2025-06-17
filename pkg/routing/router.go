@@ -1,6 +1,7 @@
 package routing
 
 import (
+	"embed"
 	"net/http"
 	"reflect"
 	"strings"
@@ -81,6 +82,7 @@ type Router struct {
 	// groupExcluded holds middleware to _exclude_ from this router’s group.
 	groupExcluded   []Middleware
 	inertia         *gonertia.Inertia
+	resources       embed.FS
 	isGroupedRouter bool // CHANGE: true if this router was created via Group()
 }
 
@@ -92,6 +94,11 @@ func New() *Router {
 		middlewares:     []Middleware{},
 		isGroupedRouter: false,
 	}
+}
+
+func (r *Router) RegisterResources(resources embed.FS) *Router {
+	r.resources = resources
+	return r
 }
 
 func (r *Router) RegisterInertia(i *gonertia.Inertia) *Router {
@@ -279,10 +286,11 @@ func (r *Router) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 			}
 			_, params := MatchRoute(route.Pattern, path)
 			ctx := &Context{
-				Response: w,
-				Request:  req,
-				Params:   params,
-				Inertia:  r.inertia,
+				Response:  w,
+				Request:   req,
+				Params:    params,
+				Inertia:   r.inertia,
+				resources: r.resources,
 			}
 			finalHandler := route.Handler
 

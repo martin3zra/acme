@@ -67,6 +67,12 @@
     "wasVoided": ":subject fue anulad@action con éxito!",
     "visit": "Visita :to ",
     "city": "Ciudad",
+    "credit_limit": "Limite de credito",
+    "paymentTerms": "Condiciones de pago",
+    "paymentMethod": "Metodo de pago",
+    "additionalInfo": "Información adicional",
+    "taxReceipt": "Tipo NCF",
+    "days": "días",
     "nouns": {
       "customer": {
         "gender":"m"
@@ -360,6 +366,14 @@
     "paidStatus": "Pagada",
     "paymentTerms": "Condiciones de pago",
     "taxReceipt": "Tipo NCF",
+    "single": {
+      "type": "Tipo de cliente",
+      "individual": "Individuo",
+      "business": "Negocio",
+      "paymentSection":"Sección de Pago",
+      "openBalance": "Balance inicial",
+      "openBalanceAsOf": "Balance inicial al día"
+    },
     "line": {
       "form": {
         "placeholder": "Referencia o presione ⌘K",
