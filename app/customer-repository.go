@@ -11,14 +11,19 @@ import (
 )
 
 type customer struct {
-	ID          int     `json:"id"`
-	UUID        string  `json:"uuid"`
-	Name        string  `json:"name"`
-	ContactName string  `json:"contact_name,omitempty,"`
-	Phone       string  `json:"phone"`
-	Email       string  `json:"email"`
-	AmountDue   float64 `json:"amount_due,omitempty,"`
-	Address     string  `json:"address"`
+	ID            int     `json:"id"`
+	UUID          string  `json:"uuid"`
+	Name          string  `json:"name"`
+	ContactName   string  `json:"contact_name,omitempty,"`
+	Phone         string  `json:"phone"`
+	Email         string  `json:"email"`
+	AmountDue     float64 `json:"amount_due,omitempty,"`
+	Address       string  `json:"address"`
+	CustomerType  string  `json:"customer_type"`
+	PaymentMethod string  `json:"payment_method"`
+	CreditLimit   float64 `json:"credit_limit"`
+	PaymentTerms  string  `json:"payment_terms"`
+	TaxReceipt    *int    `json:"tax_receipt"`
 	// Add timestamps properties
 	foundation.Timestamps
 	Status foundation.Status `json:"status,omitempty,"`
@@ -86,7 +91,7 @@ func (s *Server) findCustomeByUUID(ctx context.Context, customerID string) (*cus
 func (s *Server) findCustomers(ctx context.Context) ([]*customer, error) {
 
 	rows, err := s.db.Query("SELECT c.id, c.uuid, c.name, c.contact_name, c.phone, c.email, c.status, c.amount_due, "+
-		"c.created_at, c.updated_at, c.deleted_at "+
+		"c.customer_type, c.payment_method, c.credit_limit, c.payment_terms, c.tax_receipt_id, c.created_at, c.updated_at, c.deleted_at "+
 		"FROM customers c "+
 		"INNER JOIN companies ON (c.company_id = companies.id) "+
 		"WHERE c.company_id = $1 "+
@@ -106,6 +111,11 @@ func (s *Server) findCustomers(ctx context.Context) ([]*customer, error) {
 			&row.Email,
 			&row.Status,
 			&row.AmountDue,
+			&row.CustomerType,
+			&row.PaymentMethod,
+			&row.CreditLimit,
+			&row.PaymentTerms,
+			&row.TaxReceipt,
 			&row.CreatedAt,
 			&row.UpdatedAt,
 			&row.DeletedAt,
@@ -156,9 +166,9 @@ func (s *Server) findCustomersBySearchCriteria(ctx context.Context, term string)
 }
 
 func (s *Server) storeCustomer(ctx context.Context, form *StoreCustomerForm) error {
-	_, err := s.db.Exec("INSERT INTO customers (company_id, name, contact_name, email, phone) "+
-		"VALUES ($1, $2, $3, $4, $5)",
-		CurrentCompany(ctx).ID, form.Name, form.Contact, form.Email, form.Phone,
+	_, err := s.db.Exec("INSERT INTO customers (company_id, name, contact_name, email, phone, payment_method, payment_terms, credit_limit, customer_type, tax_receipt_id) "+
+		"VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)",
+		CurrentCompany(ctx).ID, form.Name, form.Contact, form.Email, form.Phone, form.PaymentMethod, form.Terms, form.CreditLimit, form.CustomerType, form.TaxReceipt,
 	)
 
 	return err
@@ -167,8 +177,8 @@ func (s *Server) storeCustomer(ctx context.Context, form *StoreCustomerForm) err
 func (s *Server) updateCustomer(ctx context.Context, customerID int, form *UpdateCustomerForm) error {
 
 	_, err := s.db.Exec(
-		"UPDATE customers SET name = $1, contact_name = $2,  email = $3, phone = $4 WHERE company_id = $5 AND id = $6",
-		form.Name, form.Contact, form.Email, form.Phone, CurrentCompany(ctx).ID, customerID,
+		"UPDATE customers SET name = $1, contact_name = $2,  email = $3, phone = $4, payment_method = $5, payment_terms = $6, credit_limit = $7, customer_type = $8, tax_receipt_id = $9 WHERE company_id = $10 AND id = $11",
+		form.Name, form.Contact, form.Email, form.Phone, form.PaymentMethod, form.Terms, form.CreditLimit, form.CustomerType, form.TaxReceipt, CurrentCompany(ctx).ID, customerID,
 	)
 
 	return err

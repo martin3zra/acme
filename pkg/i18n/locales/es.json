@@ -367,6 +367,8 @@
     "paymentTerms": "Condiciones de pago",
     "taxReceipt": "Tipo NCF",
     "single": {
+      "title": "Cliente",
+      "description": "Proporcione los detalles necesarios para configurar el cliente. Esta información le ayudará a identificar y gestionar dentro de su catalogo en el sistema.",
       "type": "Tipo de cliente",
       "individual": "Individuo",
       "business": "Negocio",

@@ -68,11 +68,11 @@ export interface Customer {
   address: string;
   status: string;
   payment_method: string;
-  terms: string;
+  payment_terms: string;
   amount_due: number;
   credit_limit: number;
   customer_type: string;
-  tax_receipt: string;
+  tax_receipt: number;
   open_balance: number;
   open_balance_as_of: Date;
   created_at: string;
@@ -205,7 +205,6 @@ export type CheckForm = PaymentFormType & {};
 
 export const PaymentMethods = ['cash', 'ck', 'card', 'bt'] as const;
 export type PaymentMethod = (typeof PaymentMethods)[number];
-// export type PaymentMethod = 'cash' | 'ck' | 'card' | 'bt';
 
 export type CardBrand = {
   value: string;
@@ -229,7 +228,7 @@ export type PaymentMethodType = {
 };
 
 export type PaymentTerm = {
-  value: number;
+  value: string;
   label: string;
 };
 

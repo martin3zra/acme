@@ -43,10 +43,10 @@ type CustomerForm = {
   email: string;
   phone: string;
   payment_method?: string;
-  terms?: string;
+  payment_terms?: string;
   credit_limit?: number;
   customer_type: string;
-  tax_receipt: string;
+  tax_receipt: number;
   open_balance: number;
   open_balance_as_of: Date | undefined;
 };
@@ -63,10 +63,10 @@ export default function CreateForm({ onFinish, params }: CreateFormProps) {
     email: params.customer?.email || '',
     phone: params.customer?.phone || '',
     payment_method: params.customer?.payment_method || '',
-    terms: params.customer?.terms || '',
+    payment_terms: params.customer?.payment_terms || '',
     credit_limit: params.customer?.credit_limit || 0,
     customer_type: params.customer?.customer_type || 'business',
-    tax_receipt: params.customer?.tax_receipt || '',
+    tax_receipt: params.customer?.tax_receipt || 0,
     open_balance: params.customer?.open_balance || 0,
     open_balance_as_of: params.customer?.open_balance_as_of || undefined,
   });
@@ -96,7 +96,7 @@ export default function CreateForm({ onFinish, params }: CreateFormProps) {
         <FormSection.Title>{t('customers.single.title')}</FormSection.Title>
         <FormSection.Description>{t('customers.single.description')}</FormSection.Description>
         <FormSection.Form>
-          {propsErrors.status && <div className="mb-4 text-center text-sm font-medium text-red-600">{propsErrors.status}</div>}
+          {propsErrors.status && <div className="col-span-6 mb-4 text-center text-sm font-medium text-red-600">{propsErrors.status}</div>}
           <div className="col-span-6">
             <div className="flex flex-col gap-2">
               <Label htmlFor="customer_type">{t('customers.single.type')}</Label>
@@ -199,7 +199,14 @@ export default function CreateForm({ onFinish, params }: CreateFormProps) {
           </div>
           <div className="col-span-2">
             <Label htmlFor="paymentTerms">{t('global.paymentTerms')}</Label>
-            <Select name="paymentTerms" onValueChange={(value) => setData('terms', value)} defaultValue={'0'} value={data.terms} required>
+            <Select
+              name="paymentTerms"
+              disabled={viewMode}
+              onValueChange={(value) => setData('payment_terms', value)}
+              defaultValue={'net30'}
+              value={data.payment_terms}
+              required
+            >
               <SelectTrigger className="mt-2 w-full">
                 <SelectValue placeholder={t('global.paymentTerms')} />
               </SelectTrigger>
@@ -211,7 +218,7 @@ export default function CreateForm({ onFinish, params }: CreateFormProps) {
                 ))}
               </SelectContent>
             </Select>
-            <InputError className="mt-2" message={errors.terms} />
+            <InputError className="mt-2" message={errors.payment_terms} />
           </div>
           <div className="col-span-2">
             <Label htmlFor="credit_limit">{t('global.credit_limit')}</Label>
@@ -234,9 +241,15 @@ export default function CreateForm({ onFinish, params }: CreateFormProps) {
           <div className="col-span-6 grid grid-cols-12 space-x-2">
             <div className="col-span-6">
               <Label htmlFor="taxReceipt">{t('global.taxReceipt')}</Label>
-              <Select name="taxReceipt" onValueChange={(value) => setData('tax_receipt', value)} value={data.tax_receipt} required>
+              <Select
+                name="taxReceipt"
+                onValueChange={(value) => setData('tax_receipt', Number(value))}
+                value={String(data.tax_receipt)}
+                required
+                disabled={viewMode}
+              >
                 <SelectTrigger className="mt-2 w-full">
-                  <SelectValue placeholder="Select taxReceipt" />
+                  <SelectValue placeholder={t('customers.taxReceipt')} />
                 </SelectTrigger>
                 <SelectContent className="">
                   {params.tax_receipts.map((receipt) => (
@@ -276,6 +289,7 @@ export default function CreateForm({ onFinish, params }: CreateFormProps) {
                 </PopoverTrigger>
                 <PopoverContent className="w-auto p-0">
                   <Calendar
+                    disabled={viewMode}
                     mode="single"
                     defaultMonth={data.open_balance_as_of}
                     selected={data.open_balance_as_of}

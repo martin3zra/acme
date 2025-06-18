@@ -46,10 +46,17 @@ func (f CreatePasswordForm) Rules() map[string]any {
 
 type StoreCustomerForm struct {
 	support.FormRequest
-	Name    string `json:"name"`
-	Contact string `json:"contact"`
-	Email   string `json:"email"`
-	Phone   string `json:"phone"`
+	Name            string        `json:"name"`
+	Contact         string        `json:"contact"`
+	Email           string        `json:"email"`
+	Phone           string        `json:"phone"`
+	PaymentMethod   string        `json:"payment_method"`
+	Terms           string        `json:"terms"`
+	CreditLimit     float64       `json:"credit_limit"`
+	CustomerType    string        `json:"customer_type"`
+	TaxReceipt      int           `json:"tax_receipt"`
+	OpenBalance     float64       `json:"open_balance"`
+	OpenBalanceAsOf time.Duration `json:"open_balance_as_of"`
 }
 
 func (StoreCustomerForm) Rules() map[string]any {
@@ -64,7 +71,14 @@ func (StoreCustomerForm) Rules() map[string]any {
 			"lowercase",
 			validator.Rule{}.Unique("customers", "email"),
 		},
-		"phone": "sometimes|min:3|max:120",
+		"phone":              "sometimes|min:3|max:120",
+		"payment_method":     "sometimes|in:cash,ck,card,bt",
+		"terms":              "sometimes|required",
+		"credit_limit":       "sometimes|required|min:0",
+		"customer_type":      "sometimes|required|in:individual,business",
+		"tax_receipt":        "sometimes|exists:tax_receipts,id",
+		"open_balance":       "sometimes|required|min:0",
+		"open_balance_as_of": "sometimes|required",
 	}
 }
 
@@ -74,11 +88,18 @@ func (form StoreCustomerForm) Authorize() bool {
 
 type UpdateCustomerForm struct {
 	support.FormRequest
-	ID      int    `json:"id"`
-	Name    string `json:"name"`
-	Contact string `json:"contact"`
-	Email   string `json:"email"`
-	Phone   string `json:"phone"`
+	ID              int           `json:"id"`
+	Name            string        `json:"name"`
+	Contact         string        `json:"contact"`
+	Email           string        `json:"email"`
+	Phone           string        `json:"phone"`
+	PaymentMethod   string        `json:"payment_method"`
+	Terms           string        `json:"terms"`
+	CreditLimit     float64       `json:"credit_limit"`
+	CustomerType    string        `json:"customer_type"`
+	TaxReceipt      int           `json:"tax_receipt"`
+	OpenBalance     float64       `json:"open_balance"`
+	OpenBalanceAsOf time.Duration `json:"open_balance_as_of"`
 }
 
 func (form UpdateCustomerForm) Authorize() bool {
@@ -97,7 +118,14 @@ func (form UpdateCustomerForm) Rules() map[string]any {
 			"lowercase",
 			validator.Rule{}.Unique("customers", "email").Ignore(form.ID, "id"),
 		},
-		"phone": "sometimes|min:3|max:120",
+		"phone":              "sometimes|min:3|max:120",
+		"payment_method":     "sometimes|in:cash,ck,card,bt",
+		"terms":              "sometimes|required",
+		"credit_limit":       "sometimes|required|min:0",
+		"customer_type":      "sometimes|required|in:individual,business",
+		"tax_receipt":        "sometimes|exists:tax_receipts,id",
+		"open_balance":       "sometimes|required|min:0",
+		"open_balance_as_of": "sometimes|required",
 	}
 }
 
