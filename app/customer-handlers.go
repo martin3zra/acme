@@ -2,11 +2,11 @@ package app
 
 import (
 	"fmt"
-	"net/http"
 
 	"github.com/martin3zra/acme/pkg/foundation"
 	"github.com/martin3zra/acme/pkg/i18n"
 	"github.com/martin3zra/acme/pkg/routing"
+	"github.com/martin3zra/acme/pkg/validator/locale"
 )
 
 func (s *Server) customersHandler(ctx *routing.Context) {
@@ -49,9 +49,14 @@ func (s *Server) customersHandler(ctx *routing.Context) {
 func (s *Server) storeCustomerHandler() routing.HandlerFunc {
 	return routing.WithRequest(func(ctx *routing.Context, form *StoreCustomerForm) {
 
+		if form.OpenBalance > 0 && form.OpenBalanceAsOf.IsZero() {
+			ctx.BackWith("open_balance_as_of", fmt.Sprintf(locale.SpanishMessages()["required"].(string), "open_balance_as_of"))
+			return
+		}
+
 		err := s.storeCustomer(ctx.Request.Context(), form)
 		if err != nil {
-			ctx.BackWith("status", s.trans("global.wasNotCreated", i18n.Replacements{"subject": "@global.customer"}), http.StatusBadRequest)
+			ctx.BackWithError(err)
 			return
 		}
 

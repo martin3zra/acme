@@ -58,6 +58,10 @@ export interface SharedData {
   csrf_token: string;
 }
 
+export const CustomerTypes = ['individual', 'business'] as const;
+
+export type CustomerType = (typeof CustomerTypes)[number];
+
 export interface Customer {
   id: number;
   uuid: string;

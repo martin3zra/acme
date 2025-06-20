@@ -156,6 +156,16 @@
         }
       }
     },
+    "paymentTermsOptions": {
+      "pia": "Pago por adelantado",
+      "net7": "7 días",
+      "net10": "10 días",
+      "net15": "15 días",
+      "net30": "30 días",
+      "net60": "60 días",
+      "net90": "90 días",
+      "net120": "120 días"
+    },
     "pagination": {
       "showing": "Mostrando",
       "of": "de",

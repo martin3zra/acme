@@ -14,7 +14,7 @@ import { useVerb } from '@/composables/use-verbs';
 import { useTranslation } from '@/hooks/use-translation';
 import { cn } from '@/lib/utils';
 import { paymentTerms } from '@/Pages/Invoices/constants';
-import { Customer, PageProps, PaymentMethods, TaxReceipt, Verb } from '@/types';
+import { Customer, CustomerType, CustomerTypes, PageProps, PaymentMethods, TaxReceipt, Verb } from '@/types';
 import { Field, Radio, RadioGroup } from '@headlessui/react';
 import { useForm, usePage } from '@inertiajs/react';
 import { format } from 'date-fns/format';
@@ -31,10 +31,6 @@ type CreateFormProps = {
   onFinish: () => void;
   params: CreateFormParams;
 };
-
-export const CustomerTypes = ['individual', 'business'] as const;
-
-export type CustomerType = (typeof CustomerTypes)[number];
 
 type CustomerForm = {
   id: number | undefined;
@@ -89,6 +85,9 @@ export default function CreateForm({ onFinish, params }: CreateFormProps) {
     if (params.action === 'create') post('/customers', options);
     if (params.action === 'edit') put(`/customers/${params.customer!.id}`, options);
   };
+  const handleDateChange = (date: unknown) => {
+    alert(date);
+  };
 
   return (
     <div className="flex flex-col space-y-6">
@@ -101,6 +100,7 @@ export default function CreateForm({ onFinish, params }: CreateFormProps) {
             <div className="flex flex-col gap-2">
               <Label htmlFor="customer_type">{t('customers.single.type')}</Label>
               <RadioGroup
+                id="customer_type"
                 className="grid grid-cols-3 gap-6"
                 value={data.customer_type}
                 onChange={(type: CustomerType) => setData('customer_type', type)}
@@ -198,7 +198,7 @@ export default function CreateForm({ onFinish, params }: CreateFormProps) {
             <InputError className="mt-2" message={errors.payment_method} />
           </div>
           <div className="col-span-2">
-            <Label htmlFor="paymentTerms">{t('global.paymentTerms')}</Label>
+            <Label>{t('global.paymentTerms')}</Label>
             <Select
               name="paymentTerms"
               disabled={viewMode}
@@ -213,7 +213,7 @@ export default function CreateForm({ onFinish, params }: CreateFormProps) {
               <SelectContent className="">
                 {paymentTerms.map((term, index) => (
                   <SelectItem key={index.toString()} value={term.value.toString()}>
-                    {`${term.label}`.replace(':days', t('global.days')).replace(':cash', t('global.paymentMethods.cash.title'))}
+                    {t(`global.paymentTermsOptions.${term.value}`)}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -240,7 +240,7 @@ export default function CreateForm({ onFinish, params }: CreateFormProps) {
           </div>
           <div className="col-span-6 grid grid-cols-12 space-x-2">
             <div className="col-span-6">
-              <Label htmlFor="taxReceipt">{t('global.taxReceipt')}</Label>
+              <Label>{t('global.taxReceipt')}</Label>
               <Select
                 name="taxReceipt"
                 onValueChange={(value) => setData('tax_receipt', Number(value))}
@@ -276,7 +276,7 @@ export default function CreateForm({ onFinish, params }: CreateFormProps) {
               <InputError className="mt-2" message={errors.open_balance} />
             </div>
             <div className="col-span-3">
-              <Label htmlFor="date">{t('customers.single.openBalanceAsOf')}</Label>
+              <Label>{t('customers.single.openBalanceAsOf')}</Label>
               <Popover>
                 <PopoverTrigger asChild>
                   <Button
@@ -287,9 +287,8 @@ export default function CreateForm({ onFinish, params }: CreateFormProps) {
                     {data.open_balance_as_of ? format(data.open_balance_as_of, 'PPP') : <span>{t('global.datePlaceholder')}</span>}
                   </Button>
                 </PopoverTrigger>
-                <PopoverContent className="w-auto p-0">
+                <PopoverContent className="pointer-events-auto w-auto p-0">
                   <Calendar
-                    disabled={viewMode}
                     mode="single"
                     defaultMonth={data.open_balance_as_of}
                     selected={data.open_balance_as_of}

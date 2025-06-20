@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/martin3zra/acme/pkg/database"
 	"github.com/martin3zra/acme/pkg/foundation"
 )
 
@@ -166,19 +167,46 @@ func (s *Server) findCustomersBySearchCriteria(ctx context.Context, term string)
 }
 
 func (s *Server) storeCustomer(ctx context.Context, form *StoreCustomerForm) error {
-	_, err := s.db.Exec("INSERT INTO customers (company_id, name, contact_name, email, phone, payment_method, payment_terms, credit_limit, customer_type, tax_receipt_id) "+
-		"VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)",
-		CurrentCompany(ctx).ID, form.Name, form.Contact, form.Email, form.Phone, form.PaymentMethod, form.Terms, form.CreditLimit, form.CustomerType, form.TaxReceipt,
-	)
+	return database.WithTransaction(s.db, func(tx *sql.Tx) error {
+		companyID := CurrentCompany(ctx).ID
+		stmt, err := tx.Prepare("INSERT INTO customers (company_id, name, contact_name, email, phone, payment_method, payment_terms, credit_limit, amount_due, customer_type, tax_receipt_id) " +
+			"VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING id")
+		if err != nil {
+			return err
+		}
 
-	return err
+		var customerID int
+		err = stmt.QueryRow(companyID, form.Name, form.Contact, form.Email, form.Phone, form.PaymentMethod, form.PaymentTerms, form.CreditLimit, form.OpenBalance, form.CustomerType, form.TaxReceipt).Scan(&customerID)
+		if err != nil {
+			return err
+		}
+
+		if form.OpenBalance == 0 || form.OpenBalanceAsOf.IsZero() {
+			return nil
+		}
+
+		stmt, err = tx.Prepare("INSERT INTO invoices (company_id, date, type, due_on, customer_id, amount, amount_due, total, note, status, paid_status) " +
+			"VALUES($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING id")
+		if err != nil {
+			return err
+		}
+
+		var invoiceID int
+		err = stmt.QueryRow(companyID, form.OpenBalanceAsOf, InvoiceTermType.Opening, form.OpenBalanceAsOf, customerID, form.OpenBalance, form.OpenBalance, form.OpenBalance, "Saldo inicial", InvoiceStatuses.Open, PaidStatuses.UnPaid).
+			Scan(&invoiceID)
+		if err != nil {
+			return err
+		}
+
+		return s.registerReceivable(tx, companyID, invoiceID, customerID)
+	})
 }
 
 func (s *Server) updateCustomer(ctx context.Context, customerID int, form *UpdateCustomerForm) error {
 
 	_, err := s.db.Exec(
 		"UPDATE customers SET name = $1, contact_name = $2,  email = $3, phone = $4, payment_method = $5, payment_terms = $6, credit_limit = $7, customer_type = $8, tax_receipt_id = $9 WHERE company_id = $10 AND id = $11",
-		form.Name, form.Contact, form.Email, form.Phone, form.PaymentMethod, form.Terms, form.CreditLimit, form.CustomerType, form.TaxReceipt, CurrentCompany(ctx).ID, customerID,
+		form.Name, form.Contact, form.Email, form.Phone, form.PaymentMethod, form.PaymentTerms, form.CreditLimit, form.CustomerType, form.TaxReceipt, CurrentCompany(ctx).ID, customerID,
 	)
 
 	return err
