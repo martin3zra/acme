@@ -11,20 +11,27 @@ import (
 	"github.com/martin3zra/acme/pkg/foundation"
 )
 
+type OpenBalance struct {
+	InvoiceID *int       `json:"invoice_id"`
+	Date      *time.Time `json:"date"`
+	Amount    *float64   `json:"amount"`
+}
+
 type customer struct {
-	ID            int     `json:"id"`
-	UUID          string  `json:"uuid"`
-	Name          string  `json:"name"`
-	ContactName   string  `json:"contact_name,omitempty,"`
-	Phone         string  `json:"phone"`
-	Email         string  `json:"email"`
-	AmountDue     float64 `json:"amount_due,omitempty,"`
-	Address       string  `json:"address"`
-	CustomerType  string  `json:"customer_type"`
-	PaymentMethod string  `json:"payment_method"`
-	CreditLimit   float64 `json:"credit_limit"`
-	PaymentTerms  string  `json:"payment_terms"`
-	TaxReceipt    *int    `json:"tax_receipt"`
+	ID            int          `json:"id"`
+	UUID          string       `json:"uuid"`
+	Name          string       `json:"name"`
+	ContactName   string       `json:"contact_name,omitempty,"`
+	Phone         string       `json:"phone"`
+	Email         string       `json:"email"`
+	AmountDue     float64      `json:"amount_due,omitempty,"`
+	Address       string       `json:"address"`
+	CustomerType  string       `json:"customer_type"`
+	PaymentMethod string       `json:"payment_method"`
+	CreditLimit   float64      `json:"credit_limit"`
+	PaymentTerms  string       `json:"payment_terms"`
+	TaxReceipt    *int         `json:"tax_receipt"`
+	OpenBalance   *OpenBalance `json:"open_balance"`
 	// Add timestamps properties
 	foundation.Timestamps
 	Status foundation.Status `json:"status,omitempty,"`
@@ -37,7 +44,7 @@ type receivable struct {
 		ID         int        `json:"id"`
 		UUID       string     `json:"uuid"`
 		Number     string     `json:"number"`
-		NCF        string     `json:"ncf"`
+		NCF        *string    `json:"ncf"`
 		Date       time.Time  `json:"date"`
 		DueOn      *time.Time `json:"due_on"`
 		Total      float64    `json:"total"`
@@ -73,17 +80,26 @@ func (s *Server) findCustomeByID(ctx context.Context, customerID int) (*customer
 func (s *Server) findCustomeByUUID(ctx context.Context, customerID string) (*customer, error) {
 
 	var c customer
+	var ob OpenBalance
 	err := s.db.QueryRow("SELECT c.id, c.uuid, c.name, c.contact_name, c.phone, c.email, c.status, c.amount_due, "+
+		"invoices.id as invoice_id, invoices.date, invoices.amount, c.customer_type, c.payment_method, c.credit_limit, c.payment_terms, c.tax_receipt_id, "+
 		"c.created_at, c.updated_at, c.deleted_at "+
 		"FROM customers c "+
 		"INNER JOIN companies ON (c.company_id = companies.id) "+
+		"LEFT JOIN (SELECT id, customer_id, date, amount FROM invoices WHERE invoices.type = 'opening'::invoice_terms) invoices ON invoices.customer_id = c.id "+
 		"WHERE c.company_id = $1 "+
 		"AND c.uuid = $2 "+
 		"AND c.deleted_at IS NULL", CurrentCompany(ctx).ID, customerID).
-		Scan(&c.ID, &c.UUID, &c.Name, &c.ContactName, &c.Phone, &c.Email, &c.Status, &c.AmountDue, &c.CreatedAt, &c.UpdatedAt, &c.DeletedAt)
+		Scan(&c.ID, &c.UUID, &c.Name, &c.ContactName, &c.Phone, &c.Email, &c.Status, &c.AmountDue, &ob.InvoiceID, &ob.Date, &ob.Amount, &c.CustomerType,
+			&c.PaymentMethod,
+			&c.CreditLimit,
+			&c.PaymentTerms,
+			&c.TaxReceipt, &c.CreatedAt, &c.UpdatedAt, &c.DeletedAt)
 	if err != nil {
 		return nil, err
 	}
+
+	c.OpenBalance = &ob
 
 	c.Address = "LOUISVILLE, Selby 3864 Johnson Street, United States of America"
 	return &c, nil
@@ -253,6 +269,7 @@ func (s *Server) updateCustomerAmountDue(tx *sql.Tx, companyId, customerId int, 
 	return err
 }
 
+// TODO we set the LEFT JOIN check for NULL values. on Tax receipt.
 func (s *Server) findCustomeReceivables(ctx context.Context, customerID string) ([]*receivable, error) {
 	rows, err := s.db.Query(`
     SELECT receivables.id, receivables.uuid, invoices.uuid, invoices.id,
@@ -261,7 +278,7 @@ func (s *Server) findCustomeReceivables(ctx context.Context, customerID string) 
 		FROM receivables
 		INNER JOIN companies ON (receivables.company_id = companies.id)
 		INNER JOIN invoices ON (receivables.company_id = invoices.company_id AND receivables.customer_id = invoices.customer_id AND receivables.invoice_id = invoices.id)
-    INNER JOIN tax_receipts ON (invoices.company_id = tax_receipts.company_id AND invoices.tax_receipt_id = tax_receipts.id)
+    LEFT JOIN tax_receipts ON (invoices.company_id = tax_receipts.company_id AND invoices.tax_receipt_id = tax_receipts.id)
 		INNER JOIN customers ON (receivables.company_id = customers.company_id AND receivables.customer_id = customers.id)
 		WHERE receivables.company_id = $1
     AND invoices.paid_status != 'paid'::paid_status

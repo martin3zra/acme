@@ -3,10 +3,11 @@ import HeadingSmall from '@/components/heading-small';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { useVerb } from '@/composables/use-verbs';
+import useCallbackState from '@/hooks/use-callback-state';
 import { useTranslation } from '@/hooks/use-translation';
 import AppLayout from '@/layouts/app-layout';
 import { Customer, CustomerVerb, PageProps, TaxReceipt } from '@/types';
-import { router } from '@inertiajs/react';
+import { router, usePage } from '@inertiajs/react';
 import { Plus } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { List } from './List/Index';
@@ -20,20 +21,25 @@ export default function Index({
   tax_receipts,
 }: PageProps<{ customers: Customer[]; customer: Customer; tax_receipts: TaxReceipt[] }>) {
   const t = useTranslation().trans;
-  const [open, setOpen] = useState(customer !== undefined);
+  const page = usePage<PageProps>();
+  const [open, setOpen] = useCallbackState<boolean>(customer !== undefined);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [selectedCustomer, setSelectedCustomer] = useState<CreateFormParams>({
-    customer: customer,
+    customer: undefined,
     action: customer !== undefined ? 'view' : 'create',
     tax_receipts: tax_receipts,
   });
+
+  useEffect(() => {
+    if (customer === undefined) return;
+    setSelectedCustomer((val) => ({ ...val, customer, action: 'view' }));
+  }, [customer, setSelectedCustomer]);
 
   const verbName = useVerb().action(selectedCustomer.action);
   const hasCustomers = customers.length > 0;
 
   const onCreateNewCustomer = () => {
     setSelectedCustomer({ customer: undefined, action: 'create', tax_receipts });
-    setOpen(!open);
   };
 
   const onSelectCustomer = (customer: Customer, action: CustomerVerb): void => {
@@ -41,12 +47,38 @@ export default function Index({
       router.visit(`/payments/create`, { data: { customer_id: customer.uuid } });
       return;
     }
+
     setSelectedCustomer({ customer, action, tax_receipts });
+
+    if (open) return;
+    setOpen(
+      (open) => !open,
+      (newVal) => {
+        if (newVal) findSelectedCustomer(customer.uuid);
+      },
+    );
+  };
+
+  const findSelectedCustomer = (uuid: string) => {
+    router.visit(page.url, {
+      except: ['customers', 'tax_receipts'],
+      data: { id: uuid },
+      preserveScroll: true,
+      preserveState: true,
+    });
   };
 
   const onOpenChange = (open: boolean) => {
     setOpen(open);
-    if (!open) setSelectedCustomer({ customer: undefined, action: 'create', tax_receipts });
+    if (!open) {
+      setSelectedCustomer({ customer: undefined, action: 'create', tax_receipts });
+      // Remove query string from URL
+      router.replace({
+        url: window.location.pathname,
+        preserveScroll: true,
+        preserveState: true,
+      });
+    }
   };
 
   useEffect(() => {
@@ -57,7 +89,7 @@ export default function Index({
         setDeleteDialogOpen(true);
       }
     }
-  }, [selectedCustomer]);
+  }, [selectedCustomer, setOpen]);
 
   const modalHandler = (open: boolean = false) => {
     onOpenChange(open);

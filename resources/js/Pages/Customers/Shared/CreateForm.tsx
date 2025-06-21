@@ -10,6 +10,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Separator } from '@/components/ui/separator';
 import { useHeader } from '@/composables/use-headers';
+import { useNumber } from '@/composables/use-number';
 import { useVerb } from '@/composables/use-verbs';
 import { useTranslation } from '@/hooks/use-translation';
 import { cn } from '@/lib/utils';
@@ -49,6 +50,7 @@ type CustomerForm = {
 
 export default function CreateForm({ onFinish, params }: CreateFormProps) {
   const t = useTranslation().trans;
+  const currency = useNumber().currency;
   const [dialogOpen, setDialogOpen] = useState(false);
   const { headers } = useHeader();
   const { errors: propsErrors } = usePage<PageProps>().props;
@@ -63,8 +65,8 @@ export default function CreateForm({ onFinish, params }: CreateFormProps) {
     credit_limit: params.customer?.credit_limit || 0,
     customer_type: params.customer?.customer_type || 'business',
     tax_receipt: params.customer?.tax_receipt || 0,
-    open_balance: params.customer?.open_balance || 0,
-    open_balance_as_of: params.customer?.open_balance_as_of || undefined,
+    open_balance: params.customer?.open_balance?.amount || 0,
+    open_balance_as_of: params.customer?.open_balance?.date || undefined,
   });
 
   const viewMode = params.action === 'view';
@@ -84,9 +86,6 @@ export default function CreateForm({ onFinish, params }: CreateFormProps) {
   const submit = () => {
     if (params.action === 'create') post('/customers', options);
     if (params.action === 'edit') put(`/customers/${params.customer!.id}`, options);
-  };
-  const handleDateChange = (date: unknown) => {
-    alert(date);
   };
 
   return (
@@ -261,44 +260,52 @@ export default function CreateForm({ onFinish, params }: CreateFormProps) {
               </Select>
               <InputError className="mt-2" message={errors.tax_receipt} />
             </div>
-            <div className="col-span-3">
-              <Label htmlFor="open_balance">{t('customers.single.openBalance')}</Label>
-              <Input
-                id="open_balance"
-                type="number"
-                className="mt-2 block w-full text-end"
-                value={data.open_balance}
-                onChange={(e) => setData('open_balance', e.target.valueAsNumber)}
-                required
-                placeholder={t('customers.single.openBalance')}
-                readOnly={viewMode}
-              />
-              <InputError className="mt-2" message={errors.open_balance} />
-            </div>
-            <div className="col-span-3">
-              <Label>{t('customers.single.openBalanceAsOf')}</Label>
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button
-                    variant={'outline'}
-                    className={cn('mt-2 w-[200px] justify-start text-left font-normal', !data.open_balance_as_of && 'text-muted-foreground')}
-                  >
-                    <CalendarIcon />
-                    {data.open_balance_as_of ? format(data.open_balance_as_of, 'PPP') : <span>{t('global.datePlaceholder')}</span>}
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="pointer-events-auto w-auto p-0">
-                  <Calendar
-                    mode="single"
-                    defaultMonth={data.open_balance_as_of}
-                    selected={data.open_balance_as_of}
-                    onSelect={(value) => setData('open_balance_as_of', value)}
-                    initialFocus
+            {(params.customer?.open_balance?.amount || 0) > 0 ? (
+              <h1 className="col-span-12 mt-2 font-extrabold text-red-500">
+                Opening Balance: {currency(params.customer?.open_balance?.amount || 0)} → Converted to INV-{params.customer?.open_balance.invoice_id}
+              </h1>
+            ) : (
+              <>
+                <div className="col-span-3">
+                  <Label htmlFor="open_balance">{t('customers.single.openBalance')}</Label>
+                  <Input
+                    id="open_balance"
+                    type="number"
+                    className="mt-2 block w-full text-end"
+                    value={data.open_balance}
+                    onChange={(e) => setData('open_balance', e.target.valueAsNumber)}
+                    required
+                    placeholder={t('customers.single.openBalance')}
+                    readOnly={viewMode}
                   />
-                </PopoverContent>
-              </Popover>
-              <InputError className="mt-2" message={errors.open_balance_as_of} />
-            </div>
+                  <InputError className="mt-2" message={errors.open_balance} />
+                </div>
+                <div className="col-span-3">
+                  <Label>{t('customers.single.openBalanceAsOf')}</Label>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant={'outline'}
+                        className={cn('mt-2 w-[200px] justify-start text-left font-normal', !data.open_balance_as_of && 'text-muted-foreground')}
+                      >
+                        <CalendarIcon />
+                        {data.open_balance_as_of ? format(data.open_balance_as_of, 'PPP') : <span>{t('global.datePlaceholder')}</span>}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="pointer-events-auto w-auto p-0">
+                      <Calendar
+                        mode="single"
+                        defaultMonth={data.open_balance_as_of}
+                        selected={data.open_balance_as_of}
+                        onSelect={(value) => setData('open_balance_as_of', value)}
+                        initialFocus
+                      />
+                    </PopoverContent>
+                  </Popover>
+                  <InputError className="mt-2" message={errors.open_balance_as_of} />
+                </div>
+              </>
+            )}
           </div>
         </FormSection.Form>
         {!viewMode && (

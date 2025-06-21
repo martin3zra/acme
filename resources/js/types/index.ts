@@ -62,6 +62,11 @@ export const CustomerTypes = ['individual', 'business'] as const;
 
 export type CustomerType = (typeof CustomerTypes)[number];
 
+export interface OpenBalance {
+  invoice_id: number;
+  date: Date;
+  amount: number;
+}
 export interface Customer {
   id: number;
   uuid: string;
@@ -77,7 +82,7 @@ export interface Customer {
   credit_limit: number;
   customer_type: string;
   tax_receipt: number;
-  open_balance: number;
+  open_balance: OpenBalance;
   open_balance_as_of: Date;
   created_at: string;
   updated_at: string;
