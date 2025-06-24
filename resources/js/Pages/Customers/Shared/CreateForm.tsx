@@ -260,11 +260,12 @@ export default function CreateForm({ onFinish, params }: CreateFormProps) {
               </Select>
               <InputError className="mt-2" message={errors.tax_receipt} />
             </div>
-            {(params.customer?.open_balance?.amount || 0) > 0 ? (
+            {(params.customer?.open_balance?.amount || 0) > 0 && (
               <h1 className="col-span-12 mt-2 font-extrabold text-red-500">
                 Opening Balance: {currency(params.customer?.open_balance?.amount || 0)} → Converted to INV-{params.customer?.open_balance.invoice_id}
               </h1>
-            ) : (
+            )}
+            {!viewMode && (
               <>
                 <div className="col-span-3">
                   <Label htmlFor="open_balance">{t('customers.single.openBalance')}</Label>

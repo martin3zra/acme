@@ -38,6 +38,16 @@ export const getColumns = ({ onDidClick, t }: Props): ColumnDef<Customer>[] => {
       enableHiding: false,
     },
     {
+      accessorKey: 'code',
+      meta: t('global.code'),
+      header: (props) => {
+        return <HeaderCell title={t('global.code')} alignment="left" columnWidth={props.column.getSize()} />;
+      },
+      cell: (props) => {
+        return <TextCell columnWidth={props.column.getSize()} value={props.getValue() as string} />;
+      },
+    },
+    {
       accessorKey: 'name',
       meta: t('global.name'),
       header: ({ column }) => {

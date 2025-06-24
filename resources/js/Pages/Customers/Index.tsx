@@ -40,6 +40,7 @@ export default function Index({
 
   const onCreateNewCustomer = () => {
     setSelectedCustomer({ customer: undefined, action: 'create', tax_receipts });
+    setOpen(true);
   };
 
   const onSelectCustomer = (customer: Customer, action: CustomerVerb): void => {

@@ -70,6 +70,7 @@ export interface OpenBalance {
 export interface Customer {
   id: number;
   uuid: string;
+  code: string;
   name: string;
   contact_name: string;
   phone: string;
