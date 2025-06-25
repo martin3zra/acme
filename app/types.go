@@ -471,7 +471,7 @@ type StoreInvoiceForm struct {
 	support.FormRequest
 	CustomerID int       `json:"customer_id"`
 	Date       time.Time `json:"date"`
-	Terms      int       `json:"terms"`
+	Terms      string    `json:"terms"`
 	TaxReceipt int       `json:"tax_receipt"`
 	Discount   Discount  `json:"discount"`
 	Notes      string    `json:"notes"`
@@ -527,12 +527,13 @@ func (form *StoreInvoiceForm) PassedValidation() {
 	form.dueOn = nil
 	form.paidStatus = PaidStatuses.Paid
 	form.termType = InvoiceTermType.Cash
-	if form.Terms > 1 {
+	termInDays := getNetDays(form.Terms)
+	if termInDays > 1 {
 		form.amountDue = form.total
 		form.paidStatus = PaidStatuses.UnPaid
 		form.termType = InvoiceTermType.Credit
 
-		dueDate := form.Date.AddDate(0, 0, form.Terms)
+		dueDate := form.Date.AddDate(0, 0, termInDays)
 		form.dueOn = &dueDate
 	}
 }

@@ -107,6 +107,17 @@ export const getColumns = ({ onDidClick, t }: Props): ColumnDef<Customer>[] => {
       },
     },
     {
+      accessorKey: 'credit_limit',
+      meta: t('global.credit_limit'),
+      // size: 880,
+      header: (props) => {
+        return <HeaderCell title={t('global.credit_limit')} alignment="right" columnWidth={props.column.getSize()} />;
+      },
+      cell: (props) => {
+        return <CurrencyCell columnWidth={props.column.getSize()} value={props.getValue() as string} />;
+      },
+    },
+    {
       accessorKey: 'amount_due',
       meta: t('global.balance'),
       // size: 880,

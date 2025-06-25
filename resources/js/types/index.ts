@@ -270,7 +270,7 @@ export type HeaderForm = {
   customer: Customer | undefined;
   date: Date | undefined;
   due: Date | undefined;
-  terms: number;
+  terms: string;
   taxReceipt: number;
   notes: string | undefined;
   discount: DiscountType;

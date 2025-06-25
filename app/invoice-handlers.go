@@ -147,7 +147,7 @@ func (s *Server) editInvoiceHandler(ctx *routing.Context) {
 func (s *Server) storeInvoiceHandler() routing.HandlerFunc {
 	return routing.WithRequest(func(ctx *routing.Context, form *StoreInvoiceForm) {
 
-		if form.Terms == 1 && form.total != form.paymentTotalAmount() {
+		if form.Terms == "pia" && form.total != form.paymentTotalAmount() {
 			ctx.BackWith("status", "Invoice total amount and the payment details are different.")
 			return
 		}
@@ -167,7 +167,7 @@ func (s *Server) storeInvoiceHandler() routing.HandlerFunc {
 func (s *Server) updateInvoiceHandler() routing.HandlerFunc {
 	return routing.WithRequest(func(ctx *routing.Context, form *UpdateInvoiceForm) {
 
-		if form.Terms == 1 && form.total != form.paymentTotalAmount() {
+		if form.Terms == "pia" && form.total != form.paymentTotalAmount() {
 			ctx.BackWith("status", "Invoice total amount and the payment details are different.")
 			return
 		}

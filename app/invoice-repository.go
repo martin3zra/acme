@@ -18,7 +18,7 @@ type invoice struct {
 	Customer     customer      `json:"customer"`
 	Date         time.Time     `json:"date"`
 	DueOn        *time.Time    `json:"due_on"`
-	Terms        int           `json:"terms"`
+	Terms        string        `json:"terms"`
 	TaxReceiptID int           `json:"tax_receipt_id"`
 	Amount       float64       `json:"amount"`
 	Discount     Discount      `json:"discount"`
@@ -138,11 +138,11 @@ func (s *Server) findInvoicesByUUID(ctx context.Context, uuid string) (*invoice,
 	if err != nil {
 		return nil, err
 	}
-	i.Terms = 1
+	i.Terms = "pia"
 	if i.DueOn != nil {
 		difference := i.DueOn.Sub(i.Date)
 		// Difference in days
-		i.Terms = int(difference.Hours()) / 24
+		i.Terms = fmt.Sprintf("net%d", int(difference.Hours())/24)
 	}
 
 	i.Number = s.generatePrefixedInvoiceNumber(i.ID)
@@ -187,11 +187,11 @@ func (s *Server) findInvoicesByID(ctx context.Context, invoiceId int) (*invoice,
 	if err != nil {
 		return nil, err
 	}
-	i.Terms = 1
+	i.Terms = "pia"
 	if i.DueOn != nil {
 		difference := i.DueOn.Sub(i.Date)
 		// Difference in days
-		i.Terms = int(difference.Hours()) / 24
+		i.Terms = fmt.Sprintf("net%d", int(difference.Hours())/24)
 	}
 
 	i.Number = s.generatePrefixedInvoiceNumber(i.ID)
@@ -247,7 +247,7 @@ func (s *Server) storeInvoice(ctx context.Context, form *StoreInvoiceForm) error
 		}
 
 		// trigger an event for this? Use pipe!!!
-		if form.Terms > 1 {
+		if form.Terms != "pia" {
 			if err = s.registerReceivable(tx, companyID, invoiceID, form.CustomerID); err != nil {
 				return err
 			}

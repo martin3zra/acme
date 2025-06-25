@@ -32,7 +32,7 @@ export default function Index({
 
   useEffect(() => {
     if (customer === undefined) return;
-    setSelectedCustomer((val) => ({ ...val, customer, action: 'view' }));
+    setSelectedCustomer((val) => ({ ...val, customer }));
   }, [customer, setSelectedCustomer]);
 
   const verbName = useVerb().action(selectedCustomer.action);

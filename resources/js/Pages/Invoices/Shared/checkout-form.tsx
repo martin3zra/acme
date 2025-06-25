@@ -19,6 +19,7 @@ type CheckoutFormProps = {
   action: string;
   openCheckout: boolean;
   setCheckout: React.Dispatch<React.SetStateAction<boolean>>;
+  defaultPaymentForm?: PaymentMethod;
   paymentForm: PaymentMethodsForm;
   errors: errorBag;
   setCancelConfirmation: React.Dispatch<React.SetStateAction<boolean>>;
@@ -50,7 +51,7 @@ class CheckoutForm extends React.Component<CheckoutFormProps, CheckoutFormState>
     const remainingBalance = Math.abs(props.totalAmount - receivedAmount);
 
     this.state = {
-      activePaymentForm: 'cash',
+      activePaymentForm: props.defaultPaymentForm || 'cash',
       paymentMethods: paymentMethods,
       receivedAmount: receivedAmount,
       remainingBalance: remainingBalance,

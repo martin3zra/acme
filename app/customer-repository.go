@@ -154,7 +154,8 @@ func (s *Server) findCustomersBySearchCriteria(ctx context.Context, term string)
 	if len(strings.TrimSpace(term)) == 0 {
 		return nil, errors.New("need to specifiy the customer you're looking for")
 	}
-	rows, err := s.db.Query("SELECT c.id, c.uuid, c.code, c.name, c.contact_name, c.phone, c.email, c.amount_due "+
+	rows, err := s.db.Query("SELECT c.id, c.uuid, c.code, c.name, c.contact_name, c.phone, c.email, c.amount_due, "+
+		"c.customer_type, c.payment_method, c.credit_limit, c.payment_terms, c.tax_receipt_id "+
 		"FROM customers c "+
 		"INNER JOIN companies ON (c.company_id = companies.id) "+
 		"WHERE c.company_id = $1 "+
@@ -175,6 +176,11 @@ func (s *Server) findCustomersBySearchCriteria(ctx context.Context, term string)
 			&row.Phone,
 			&row.Email,
 			&row.AmountDue,
+			&row.CustomerType,
+			&row.PaymentMethod,
+			&row.CreditLimit,
+			&row.PaymentTerms,
+			&row.TaxReceipt,
 		); err != nil {
 			return data, err
 		}

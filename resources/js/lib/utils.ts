@@ -1,3 +1,4 @@
+import { PaymentMethod, PaymentMethods } from '@/types';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 
@@ -19,4 +20,20 @@ export const subtractFloats = (a: number, b: number, precision: number = 2): num
   const result = Math.abs(a - b);
   const factor = Math.pow(10, precision);
   return Math.round(result * factor) / factor;
+};
+
+export const getNetDays = (term: string): number => {
+  const match = term.match(/^Net\s*(\d+)$/i);
+  if (match) {
+    return parseInt(match[1], 10);
+  }
+  return 0; // Return null if not a standard "Net" term
+};
+
+export const isPaymentMethod = (value: string): value is PaymentMethod => {
+  return (PaymentMethods as readonly string[]).includes(value);
+};
+
+export const parsePaymentMethod = (value: string, fallback: PaymentMethod = 'cash'): PaymentMethod => {
+  return isPaymentMethod(value) ? value : fallback;
 };
