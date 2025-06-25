@@ -285,7 +285,7 @@ export type InvoiceForm = {
 export type Payment = {
   id: number;
   uuid: string;
-  number: string;
+  code: string;
   date: string;
   amount: number;
   invoices: number;

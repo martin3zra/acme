@@ -14,7 +14,7 @@ import (
 type payment struct {
 	ID       int       `json:"id"`
 	UUID     string    `json:"uuid"`
-	Number   string    `json:"number"`
+	Code     string    `json:"code"`
 	Date     time.Time `json:"date"`
 	Amount   float64   `json:"amount"`
 	Notes    string    `json:"notes"`
@@ -38,7 +38,7 @@ type paymentLine struct {
 	Invoice struct {
 		ID         int        `json:"_"`
 		UUID       string     `json:"uuid"`
-		Number     string     `json:"number"`
+		Code       string     `json:"code"`
 		Date       time.Time  `json:"date"`
 		DueOn      *time.Time `json:"due_on"`
 		PaidStatus PaidStatus `json:"paid_status"`
@@ -54,7 +54,7 @@ type paymentLine struct {
 func (s *Server) findPayments(ctx context.Context) ([]*payment, error) {
 	rows, err := s.db.Query(`
     SELECT
-    receivables_income.id, receivables_income.uuid, receivables_income.date, receivables_income.amount,
+    receivables_income.id, receivables_income.uuid, receivables_income.code, receivables_income.date, receivables_income.amount,
     receivables_income.payment, receivables_income.status, receivables_income.notes, receivables_income.created_at, receivables_income.updated_at,
     (select count(*) from receivables_income_items
     where receivables_income.company_id = receivables_income_items.company_id
@@ -77,6 +77,7 @@ func (s *Server) findPayments(ctx context.Context) ([]*payment, error) {
 		if err = rows.Scan(
 			&i.ID,
 			&i.UUID,
+			&i.Code,
 			&i.Date,
 			&i.Amount,
 			&i.Payment,
@@ -92,8 +93,6 @@ func (s *Server) findPayments(ctx context.Context) ([]*payment, error) {
 			return nil, err
 		}
 
-		i.Number = s.generatePrefixedPaymentNumber(i.ID)
-
 		data = append(data, i)
 	}
 	return data, nil
@@ -104,7 +103,7 @@ func (s *Server) findPaymentByUUID(ctx context.Context, uuid string) (*payment, 
 	i := new(payment)
 	err := s.db.QueryRow(`
     SELECT
-    receivables_income.id, receivables_income.uuid, receivables_income.date, receivables_income.amount,
+    receivables_income.id, receivables_income.uuid, receivables_income.code, receivables_income.date, receivables_income.amount,
     receivables_income.payment, receivables_income.status, receivables_income.notes, receivables_income.created_at, receivables_income.updated_at,
     (select count(*) from receivables_income_items
     where receivables_income.company_id = receivables_income_items.company_id
@@ -118,6 +117,7 @@ func (s *Server) findPaymentByUUID(ctx context.Context, uuid string) (*payment, 
   `, CurrentCompany(ctx).ID, uuid).Scan(
 		&i.ID,
 		&i.UUID,
+		&i.Code,
 		&i.Date,
 		&i.Amount,
 		&i.Payment,
@@ -137,7 +137,6 @@ func (s *Server) findPaymentByUUID(ctx context.Context, uuid string) (*payment, 
 	}
 
 	i.Customer.Address = "LOUISVILLE, Selby 3864 Johnson Street, United States of America"
-	i.Number = s.generatePrefixedPaymentNumber(i.ID)
 
 	return i, nil
 }
@@ -147,7 +146,7 @@ func (s *Server) findPaymentLines(ctx context.Context, paymentID int) ([]*paymen
     select receivables_income_items.id, receivables_income_items.payment_amount,
     receivables_income_items.created_at, receivables_income_items.updated_at,
     receivables_income_items.deleted_at,
-    invoices.id, invoices.uuid, invoices.date, invoices.due_on, invoices.total, receivables_income_items.amount_due,
+    invoices.id, invoices.uuid, invoices.code, invoices.date, invoices.due_on, invoices.total, receivables_income_items.amount_due,
     invoices.paid_status, tax_receipts.series || tax_receipts.type || LPAD(invoices.tax_receipt_sequence::varchar,8,'0') as NCF, invoices.note
     from receivables_income_items
     inner join companies on receivables_income_items.company_id = companies.id
@@ -172,6 +171,7 @@ func (s *Server) findPaymentLines(ctx context.Context, paymentID int) ([]*paymen
 			&i.DeletedAt,
 			&i.Invoice.ID,
 			&i.Invoice.UUID,
+			&i.Invoice.Code,
 			&i.Invoice.Date,
 			&i.Invoice.DueOn,
 			&i.Invoice.Amount,
@@ -182,8 +182,6 @@ func (s *Server) findPaymentLines(ctx context.Context, paymentID int) ([]*paymen
 		); err != nil {
 			return nil, err
 		}
-
-		i.Invoice.Number = s.generatePrefixedInvoiceNumber(i.Invoice.ID)
 
 		data = append(data, i)
 	}
@@ -198,8 +196,8 @@ func (s *Server) storePayment(ctx context.Context, form *StorePaymentForm) error
 	}
 
 	return database.WithTransaction(s.db, func(tx *sql.Tx) error {
-		stmt, err := tx.Prepare("INSERT INTO receivables_income (company_id, customer_id, date, amount, notes, payment, status) " +
-			"VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id")
+		stmt, err := tx.Prepare("INSERT INTO receivables_income (company_id, customer_id, date, amount, notes, payment, status, code) " +
+			"VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id")
 		if err != nil {
 			return err
 		}
@@ -214,8 +212,19 @@ func (s *Server) storePayment(ctx context.Context, form *StorePaymentForm) error
 			form.Notes,
 			foundation.ToJSON(form.Payment),
 			PaymentStatuses.Completed,
+			"pending",
 		).Scan(&paymentID)
 
+		if err != nil {
+			return err
+		}
+
+		code := foundation.GeneratePrefixedNumber("PAY-", 10, paymentID)
+		stmt, err = tx.Prepare("UPDATE receivables_income SET code = $3 WHERE company_id = $1 AND id = $2")
+		if err != nil {
+			return err
+		}
+		_, err = stmt.Exec(companyId, paymentID, code)
 		if err != nil {
 			return err
 		}
@@ -254,10 +263,6 @@ func (s *Server) attachPaymentLines(tx *sql.Tx, ctx context.Context, paymentId i
 	_, err := tx.Exec(stmt, vals...)
 
 	return err
-}
-
-func (s *Server) generatePrefixedPaymentNumber(value int) string {
-	return foundation.GeneratePrefixedNumber("PAY-", 10, value)
 }
 
 func (s *Server) voidPayment(ctx context.Context, uuid string) error {

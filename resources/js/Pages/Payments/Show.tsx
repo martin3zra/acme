@@ -25,7 +25,7 @@ export default function Show({ payment, auth }: Props) {
           <div className="col-span-6 flex items-center gap-x-6 [&>div]:flex [&>div]:gap-x-2">
             <div>
               <Label>{t('payments.single.title')}</Label>
-              <Label>#{payment.header.number}</Label>
+              <Label>#{payment.header.code}</Label>
             </div>
             {/* <div>
               <Label>NCF</Label>

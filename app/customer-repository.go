@@ -4,7 +4,6 @@ import (
 	"context"
 	"database/sql"
 	"errors"
-	"fmt"
 	"strings"
 	"time"
 
@@ -207,7 +206,7 @@ func (s *Server) storeCustomer(ctx context.Context, form *StoreCustomerForm) err
 			return err
 		}
 
-		code := fmt.Sprintf("CUST-%06d", customerID)
+		code := foundation.GeneratePrefixedNumber("CUST-", 6, customerID)
 		stmt, err = tx.Prepare("UPDATE customers SET code = $3 WHERE company_id = $1 AND id = $2")
 		if err != nil {
 			return err

@@ -41,7 +41,7 @@ export const getColumns = ({ onDidClick, t }: Props): ColumnDef<Payment>[] => {
       enableHiding: false,
     },
     {
-      accessorKey: 'number',
+      accessorKey: 'code',
       meta: t('global.number'),
       // size: 880,
       header: (props) => {

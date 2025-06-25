@@ -133,7 +133,7 @@ export default function Index({
 
         {selectedPayment && (
           <ConfirmsPassword
-            title={t('payments.confirmsPassword.title', { payment: selectedPayment.number })}
+            title={t('payments.confirmsPassword.title', { payment: selectedPayment.code })}
             description={t('payments.confirmsPassword.description', { total: selectedPayment.amount })}
             action={t('payments.confirmsPassword.confirm')}
             verb={'update'}
