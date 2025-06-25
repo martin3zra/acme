@@ -15,9 +15,17 @@
                     <h1 class="mb-4 font-extrabold text-9xl text-red-600">{{ .status }}</h1>
                     <p class="mb-4 text-3xl tracking-tight font-bold text-gray-900 md:text-4xl">{{ .title }}</p>
                     <p class="mb-4 text-lg font-light text-gray-500">{{ .message }} </p>
+                    <button class="mt-10 px-6 py-2 rounded-full text-white bg-primary uppercase cursor-pointer" id="go-back">
+                      Go Back
+                    </button>
                 </div>
             </div>
         </section>
     </div>
+    <script>
+      document.getElementById("go-back").addEventListener("click", () => {
+        history.back();
+      });
+    </script>
 </body>
 </html>

@@ -2,13 +2,14 @@ import { defaultBTForm, defaultCardForm, defaultCashForm, defaultCheckForm } fro
 import { BreadcrumbItem, defaultBreadcrumbs, DiscountType, HeaderForm, InvoiceForm, PaymentMethodsForm, PaymentTerm } from '@/types';
 
 export const paymentTerms: PaymentTerm[] = [
-  { value: 1, label: 'Cash' },
-  { value: 7, label: '7 Days' },
-  { value: 10, label: '10 Days' },
-  { value: 15, label: '15 Days' },
-  { value: 30, label: '30 Days' },
-  { value: 60, label: '60 Days' },
-  { value: 90, label: '90 Days' },
+  { value: 'pia', label: 'Payment In Advance' },
+  { value: 'net7', label: 'Net 7' },
+  { value: 'net10', label: 'Net 10' },
+  { value: 'net15', label: 'Net 15' },
+  { value: 'net30', label: 'Net 30' },
+  { value: 'net60', label: 'Net 60' },
+  { value: 'net90', label: 'Net 90' },
+  { value: 'net120', label: 'Net 120' },
 ];
 
 export const breadcrumbs: BreadcrumbItem[] = [

@@ -38,6 +38,16 @@ export const getColumns = ({ onDidClick, t }: Props): ColumnDef<Customer>[] => {
       enableHiding: false,
     },
     {
+      accessorKey: 'code',
+      meta: t('global.code'),
+      header: (props) => {
+        return <HeaderCell title={t('global.code')} alignment="left" columnWidth={props.column.getSize()} />;
+      },
+      cell: (props) => {
+        return <TextCell columnWidth={props.column.getSize()} value={props.getValue() as string} />;
+      },
+    },
+    {
       accessorKey: 'name',
       meta: t('global.name'),
       header: ({ column }) => {
@@ -94,6 +104,17 @@ export const getColumns = ({ onDidClick, t }: Props): ColumnDef<Customer>[] => {
       },
       cell: (props) => {
         return <StatusBadge type="status" status={props.row.original.status} />;
+      },
+    },
+    {
+      accessorKey: 'credit_limit',
+      meta: t('global.credit_limit'),
+      // size: 880,
+      header: (props) => {
+        return <HeaderCell title={t('global.credit_limit')} alignment="right" columnWidth={props.column.getSize()} />;
+      },
+      cell: (props) => {
+        return <CurrencyCell columnWidth={props.column.getSize()} value={props.getValue() as string} />;
       },
     },
     {

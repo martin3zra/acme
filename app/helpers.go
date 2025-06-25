@@ -4,7 +4,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"math"
+	"regexp"
 	"strconv"
+	"strings"
 
 	"github.com/martin3zra/acme/pkg/i18n"
 )
@@ -59,4 +61,19 @@ func toInt(value any) (int, error) {
 	default:
 		return 0, fmt.Errorf("unsupported type: %T", value)
 	}
+}
+
+func getNetDays(term string) int {
+	term = strings.TrimSpace(strings.ToLower(term))
+
+	re := regexp.MustCompile(`^net\s*(\d+)$`)
+	matches := re.FindStringSubmatch(term)
+
+	if len(matches) == 2 {
+		if days, err := strconv.Atoi(matches[1]); err == nil {
+			return days
+		}
+	}
+
+	return 0 // Not a recognized "Net" term
 }

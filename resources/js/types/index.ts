@@ -58,16 +58,33 @@ export interface SharedData {
   csrf_token: string;
 }
 
+export const CustomerTypes = ['individual', 'business'] as const;
+
+export type CustomerType = (typeof CustomerTypes)[number];
+
+export interface OpenBalance {
+  invoice_id: number;
+  date: Date;
+  amount: number;
+}
 export interface Customer {
   id: number;
   uuid: string;
+  code: string;
   name: string;
   contact_name: string;
   phone: string;
   email: string;
   address: string;
   status: string;
+  payment_method: string;
+  payment_terms: string;
   amount_due: number;
+  credit_limit: number;
+  customer_type: string;
+  tax_receipt: number;
+  open_balance: OpenBalance;
+  open_balance_as_of: Date;
   created_at: string;
   updated_at: string;
 }
@@ -196,7 +213,8 @@ export type CashForm = {
 
 export type CheckForm = PaymentFormType & {};
 
-export type PaymentMethod = 'cash' | 'ck' | 'card' | 'bt';
+export const PaymentMethods = ['cash', 'ck', 'card', 'bt'] as const;
+export type PaymentMethod = (typeof PaymentMethods)[number];
 
 export type CardBrand = {
   value: string;
@@ -220,7 +238,7 @@ export type PaymentMethodType = {
 };
 
 export type PaymentTerm = {
-  value: number;
+  value: string;
   label: string;
 };
 
@@ -252,7 +270,7 @@ export type HeaderForm = {
   customer: Customer | undefined;
   date: Date | undefined;
   due: Date | undefined;
-  terms: number;
+  terms: string;
   taxReceipt: number;
   notes: string | undefined;
   discount: DiscountType;

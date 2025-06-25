@@ -23,8 +23,21 @@ import { useDebounced } from '@/hooks/use-debounced';
 import { usePersistedState } from '@/hooks/use-persisted-state';
 import { useTranslation } from '@/hooks/use-translation';
 import AppLayout from '@/layouts/app-layout';
-import { addDays, cn, isNotEmpty } from '@/lib/utils';
-import { BTForm, CardForm, CashForm, CheckForm, Customer, InvoiceForm, Item, LineForm, PageProps, PaymentMethod, TaxReceipt } from '@/types';
+import { addDays, cn, getNetDays, isNotEmpty, parsePaymentMethod } from '@/lib/utils';
+import {
+  BTForm,
+  CardForm,
+  CashForm,
+  CheckForm,
+  Customer,
+  InvoiceForm,
+  Item,
+  LineForm,
+  PageProps,
+  PaymentMethod,
+  PaymentTerm,
+  TaxReceipt,
+} from '@/types';
 import { Textarea } from '@headlessui/react';
 import { router, useForm, usePage } from '@inertiajs/react';
 import { format } from 'date-fns';
@@ -60,7 +73,7 @@ export default function Create({
   const { errors: propsErrors } = usePage<PageProps>().props;
   const { post, transform, processing, errors } = useForm({
     customer_id: 0,
-    terms: 0,
+    terms: 'pia',
     tax_receipt: 0,
     lines: [],
     date: new Date(),
@@ -160,7 +173,10 @@ export default function Create({
 
   const handleCustomerSelection = (customer: Customer | undefined) => {
     setInvoiceForm(() => {
-      return { ...invoiceForm, header: { ...invoiceForm.header, customer } };
+      return {
+        ...invoiceForm,
+        header: { ...invoiceForm.header, terms: customer?.payment_terms || 'pia', taxReceipt: customer?.tax_receipt || 0, customer },
+      };
     });
 
     setOpen(false);
@@ -169,8 +185,8 @@ export default function Create({
   const handleDateChange = (date: unknown) => {
     invoiceForm.header.date = date as Date;
     invoiceForm.header.due = undefined;
-    if (invoiceForm.header.terms > 1) {
-      invoiceForm.header.due = addDays(invoiceForm.header.date, invoiceForm.header.terms);
+    if (getNetDays(invoiceForm.header.terms) > 0) {
+      invoiceForm.header.due = addDays(invoiceForm.header.date, getNetDays(invoiceForm.header.terms));
     }
 
     setInvoiceForm(() => {
@@ -179,16 +195,16 @@ export default function Create({
   };
 
   const handlePaymentTermsChange = (value: string) => {
-    invoiceForm.header.terms = Number(value);
+    invoiceForm.header.terms = value;
 
-    if (invoiceForm.header.terms > 1 && invoiceForm.header.date) {
-      invoiceForm.header.due = addDays(invoiceForm.header.date, invoiceForm.header.terms);
+    if (getNetDays(invoiceForm.header.terms) > 0 && invoiceForm.header.date) {
+      invoiceForm.header.due = addDays(invoiceForm.header.date, getNetDays(invoiceForm.header.terms));
     } else {
       invoiceForm.header.due = undefined;
     }
 
     setInvoiceForm(() => {
-      return { ...invoiceForm, header: { ...invoiceForm.header, terms: Number(value) } };
+      return { ...invoiceForm, header: { ...invoiceForm.header, terms: value } };
     });
   };
 
@@ -237,7 +253,7 @@ export default function Create({
   const handleCheckout = (event: React.MouseEvent<HTMLButtonElement>) => {
     event.preventDefault();
     if (computeTotalAmount() === 0) return;
-    if (invoiceForm.header.terms === 1) {
+    if (invoiceForm.header.terms === 'pia') {
       Object.keys(propsErrors).forEach((key) => delete propsErrors[key]);
       setCheckout(true);
       return;
@@ -320,7 +336,7 @@ export default function Create({
             {t('global.actions.cancel')}
           </Button>
           <Button onClick={handleCheckout} disabled={processing || computeTotalAmount() === 0}>
-            {invoiceForm.header.terms === 1 ? t('global.actions.checkout') : t('global.actions.save')}
+            {invoiceForm.header.terms === 'pia' ? t('global.actions.checkout') : t('global.actions.save')}
           </Button>
         </div>
       </AppLayout.Actions>
@@ -377,19 +393,13 @@ export default function Create({
             <div className="col-span-6 flex flex-col gap-y-6">
               <div className="flex flex-col gap-y-2">
                 <Label htmlFor="paymentTerms">{t('invoices.paymentTerms')}</Label>
-                <Select
-                  name="paymentTerms"
-                  onValueChange={handlePaymentTermsChange}
-                  defaultValue={'0'}
-                  value={String(invoiceForm.header.terms)}
-                  required
-                >
+                <Select name="paymentTerms" onValueChange={handlePaymentTermsChange} value={invoiceForm.header.terms} required>
                   <SelectTrigger className="w-full">
                     <SelectValue placeholder="Select terms" />
                   </SelectTrigger>
                   <SelectContent className="">
-                    {paymentTerms.map((term, index) => (
-                      <SelectItem key={index.toString()} value={term.value.toString()}>
+                    {paymentTerms.map((term: PaymentTerm) => (
+                      <SelectItem key={term.value} value={term.value}>
                         {term.label}
                       </SelectItem>
                     ))}
@@ -398,16 +408,16 @@ export default function Create({
                 <InputError className="mt-2" message={errors.terms} />
               </div>
               <div className="flex flex-col gap-y-2">
-                <Label htmlFor="paymentTerms">{t('invoices.taxReceipt')}</Label>
+                <Label htmlFor="taxReceipt">{t('invoices.taxReceipt')}</Label>
                 <Select
-                  name="paymentTerms"
+                  name="taxReceipt"
                   onValueChange={handleTaxReceiptChange}
                   defaultValue={'0'}
                   value={String(invoiceForm.header.taxReceipt)}
                   required
                 >
                   <SelectTrigger className="w-full">
-                    <SelectValue placeholder="Select terms" />
+                    <SelectValue placeholder="Select taxReceipt" />
                   </SelectTrigger>
                   <SelectContent className="">
                     {tax_receipts.map((receipt) => (
@@ -531,6 +541,7 @@ export default function Create({
           openCheckout={openCheckout}
           setCheckout={setCheckout}
           paymentForm={invoiceForm.payment}
+          defaultPaymentForm={parsePaymentMethod(invoiceForm.header.customer?.payment_method || 'cash')}
           totalAmount={computeTotalAmount()}
           onCompleteCheckout={placedInvoice}
           processing={processing}

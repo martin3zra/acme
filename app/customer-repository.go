@@ -4,21 +4,36 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"fmt"
 	"strings"
 	"time"
 
+	"github.com/martin3zra/acme/pkg/database"
 	"github.com/martin3zra/acme/pkg/foundation"
 )
 
+type OpenBalance struct {
+	InvoiceID *int       `json:"invoice_id"`
+	Date      *time.Time `json:"date"`
+	Amount    *float64   `json:"amount"`
+}
+
 type customer struct {
-	ID          int     `json:"id"`
-	UUID        string  `json:"uuid"`
-	Name        string  `json:"name"`
-	ContactName string  `json:"contact_name,omitempty,"`
-	Phone       string  `json:"phone"`
-	Email       string  `json:"email"`
-	AmountDue   float64 `json:"amount_due,omitempty,"`
-	Address     string  `json:"address"`
+	ID            int          `json:"id"`
+	UUID          string       `json:"uuid"`
+	Code          string       `json:"code"`
+	Name          string       `json:"name"`
+	ContactName   string       `json:"contact_name,omitempty,"`
+	Phone         string       `json:"phone"`
+	Email         string       `json:"email"`
+	AmountDue     float64      `json:"amount_due,omitempty,"`
+	Address       string       `json:"address"`
+	CustomerType  string       `json:"customer_type"`
+	PaymentMethod string       `json:"payment_method"`
+	CreditLimit   float64      `json:"credit_limit"`
+	PaymentTerms  string       `json:"payment_terms"`
+	TaxReceipt    *int         `json:"tax_receipt"`
+	OpenBalance   *OpenBalance `json:"open_balance"`
 	// Add timestamps properties
 	foundation.Timestamps
 	Status foundation.Status `json:"status,omitempty,"`
@@ -31,7 +46,7 @@ type receivable struct {
 		ID         int        `json:"id"`
 		UUID       string     `json:"uuid"`
 		Number     string     `json:"number"`
-		NCF        string     `json:"ncf"`
+		NCF        *string    `json:"ncf"`
 		Date       time.Time  `json:"date"`
 		DueOn      *time.Time `json:"due_on"`
 		Total      float64    `json:"total"`
@@ -48,14 +63,14 @@ type receivable struct {
 func (s *Server) findCustomeByID(ctx context.Context, customerID int) (*customer, error) {
 
 	var c customer
-	err := s.db.QueryRow("SELECT c.id, c.uuid, c.name, c.contact_name, c.phone, c.email, c.status, c.amount_due, "+
+	err := s.db.QueryRow("SELECT c.id, c.uuid, c.code, c.name, c.contact_name, c.phone, c.email, c.status, c.amount_due, "+
 		"c.created_at, c.updated_at, c.deleted_at "+
 		"FROM customers c "+
 		"INNER JOIN companies ON (c.company_id = companies.id) "+
 		"WHERE c.company_id = $1 "+
 		"AND c.id = $2 "+
 		"AND c.deleted_at IS NULL", CurrentCompany(ctx).ID, customerID).
-		Scan(&c.ID, &c.UUID, &c.Name, &c.ContactName, &c.Phone, &c.Email, &c.Status, &c.AmountDue, &c.CreatedAt, &c.UpdatedAt, &c.DeletedAt)
+		Scan(&c.ID, &c.UUID, &c.Code, &c.Name, &c.ContactName, &c.Phone, &c.Email, &c.Status, &c.AmountDue, &c.CreatedAt, &c.UpdatedAt, &c.DeletedAt)
 	if err != nil {
 		return nil, err
 	}
@@ -67,17 +82,26 @@ func (s *Server) findCustomeByID(ctx context.Context, customerID int) (*customer
 func (s *Server) findCustomeByUUID(ctx context.Context, customerID string) (*customer, error) {
 
 	var c customer
-	err := s.db.QueryRow("SELECT c.id, c.uuid, c.name, c.contact_name, c.phone, c.email, c.status, c.amount_due, "+
+	var ob OpenBalance
+	err := s.db.QueryRow("SELECT c.id, c.uuid, c.code, c.name, c.contact_name, c.phone, c.email, c.status, c.amount_due, "+
+		"invoices.id as invoice_id, invoices.date, invoices.amount, c.customer_type, c.payment_method, c.credit_limit, c.payment_terms, c.tax_receipt_id, "+
 		"c.created_at, c.updated_at, c.deleted_at "+
 		"FROM customers c "+
 		"INNER JOIN companies ON (c.company_id = companies.id) "+
+		"LEFT JOIN (SELECT id, customer_id, date, amount FROM invoices WHERE invoices.type = 'opening'::invoice_terms) invoices ON invoices.customer_id = c.id "+
 		"WHERE c.company_id = $1 "+
 		"AND c.uuid = $2 "+
 		"AND c.deleted_at IS NULL", CurrentCompany(ctx).ID, customerID).
-		Scan(&c.ID, &c.UUID, &c.Name, &c.ContactName, &c.Phone, &c.Email, &c.Status, &c.AmountDue, &c.CreatedAt, &c.UpdatedAt, &c.DeletedAt)
+		Scan(&c.ID, &c.UUID, &c.Code, &c.Name, &c.ContactName, &c.Phone, &c.Email, &c.Status, &c.AmountDue, &ob.InvoiceID, &ob.Date, &ob.Amount, &c.CustomerType,
+			&c.PaymentMethod,
+			&c.CreditLimit,
+			&c.PaymentTerms,
+			&c.TaxReceipt, &c.CreatedAt, &c.UpdatedAt, &c.DeletedAt)
 	if err != nil {
 		return nil, err
 	}
+
+	c.OpenBalance = &ob
 
 	c.Address = "LOUISVILLE, Selby 3864 Johnson Street, United States of America"
 	return &c, nil
@@ -85,8 +109,8 @@ func (s *Server) findCustomeByUUID(ctx context.Context, customerID string) (*cus
 
 func (s *Server) findCustomers(ctx context.Context) ([]*customer, error) {
 
-	rows, err := s.db.Query("SELECT c.id, c.uuid, c.name, c.contact_name, c.phone, c.email, c.status, c.amount_due, "+
-		"c.created_at, c.updated_at, c.deleted_at "+
+	rows, err := s.db.Query("SELECT c.id, c.uuid, c.code, c.name, c.contact_name, c.phone, c.email, c.status, c.amount_due, "+
+		"c.customer_type, c.payment_method, c.credit_limit, c.payment_terms, c.tax_receipt_id, c.created_at, c.updated_at, c.deleted_at "+
 		"FROM customers c "+
 		"INNER JOIN companies ON (c.company_id = companies.id) "+
 		"WHERE c.company_id = $1 "+
@@ -100,12 +124,18 @@ func (s *Server) findCustomers(ctx context.Context) ([]*customer, error) {
 		if err = rows.Scan(
 			&row.ID,
 			&row.UUID,
+			&row.Code,
 			&row.Name,
 			&row.ContactName,
 			&row.Phone,
 			&row.Email,
 			&row.Status,
 			&row.AmountDue,
+			&row.CustomerType,
+			&row.PaymentMethod,
+			&row.CreditLimit,
+			&row.PaymentTerms,
+			&row.TaxReceipt,
 			&row.CreatedAt,
 			&row.UpdatedAt,
 			&row.DeletedAt,
@@ -124,7 +154,8 @@ func (s *Server) findCustomersBySearchCriteria(ctx context.Context, term string)
 	if len(strings.TrimSpace(term)) == 0 {
 		return nil, errors.New("need to specifiy the customer you're looking for")
 	}
-	rows, err := s.db.Query("SELECT c.id, c.uuid, c.name, c.contact_name, c.phone, c.email, c.amount_due "+
+	rows, err := s.db.Query("SELECT c.id, c.uuid, c.code, c.name, c.contact_name, c.phone, c.email, c.amount_due, "+
+		"c.customer_type, c.payment_method, c.credit_limit, c.payment_terms, c.tax_receipt_id "+
 		"FROM customers c "+
 		"INNER JOIN companies ON (c.company_id = companies.id) "+
 		"WHERE c.company_id = $1 "+
@@ -139,11 +170,17 @@ func (s *Server) findCustomersBySearchCriteria(ctx context.Context, term string)
 		if err = rows.Scan(
 			&row.ID,
 			&row.UUID,
+			&row.Code,
 			&row.Name,
 			&row.ContactName,
 			&row.Phone,
 			&row.Email,
 			&row.AmountDue,
+			&row.CustomerType,
+			&row.PaymentMethod,
+			&row.CreditLimit,
+			&row.PaymentTerms,
+			&row.TaxReceipt,
 		); err != nil {
 			return data, err
 		}
@@ -156,19 +193,56 @@ func (s *Server) findCustomersBySearchCriteria(ctx context.Context, term string)
 }
 
 func (s *Server) storeCustomer(ctx context.Context, form *StoreCustomerForm) error {
-	_, err := s.db.Exec("INSERT INTO customers (company_id, name, contact_name, email, phone) "+
-		"VALUES ($1, $2, $3, $4, $5)",
-		CurrentCompany(ctx).ID, form.Name, form.Contact, form.Email, form.Phone,
-	)
+	return database.WithTransaction(s.db, func(tx *sql.Tx) error {
+		companyID := CurrentCompany(ctx).ID
+		stmt, err := tx.Prepare("INSERT INTO customers (company_id, name, contact_name, email, phone, payment_method, payment_terms, credit_limit, amount_due, customer_type, tax_receipt_id, code) " +
+			"VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12) RETURNING id")
+		if err != nil {
+			return err
+		}
 
-	return err
+		var customerID int
+		err = stmt.QueryRow(companyID, form.Name, form.Contact, form.Email, form.Phone, form.PaymentMethod, form.PaymentTerms, form.CreditLimit, form.OpenBalance, form.CustomerType, form.TaxReceipt, "pending").Scan(&customerID)
+		if err != nil {
+			return err
+		}
+
+		code := fmt.Sprintf("CUST-%06d", customerID)
+		stmt, err = tx.Prepare("UPDATE customers SET code = $3 WHERE company_id = $1 AND id = $2")
+		if err != nil {
+			return err
+		}
+		_, err = stmt.Exec(companyID, customerID, code)
+		if err != nil {
+			return err
+		}
+
+		if form.OpenBalance == 0 || form.OpenBalanceAsOf.IsZero() {
+			return nil
+		}
+
+		stmt, err = tx.Prepare("INSERT INTO invoices (company_id, date, type, due_on, customer_id, amount, amount_due, total, note, status, paid_status) " +
+			"VALUES($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING id")
+		if err != nil {
+			return err
+		}
+
+		var invoiceID int
+		err = stmt.QueryRow(companyID, form.OpenBalanceAsOf, InvoiceTermType.Opening, form.OpenBalanceAsOf, customerID, form.OpenBalance, form.OpenBalance, form.OpenBalance, "Saldo inicial", InvoiceStatuses.Open, PaidStatuses.UnPaid).
+			Scan(&invoiceID)
+		if err != nil {
+			return err
+		}
+
+		return s.registerReceivable(tx, companyID, invoiceID, customerID)
+	})
 }
 
 func (s *Server) updateCustomer(ctx context.Context, customerID int, form *UpdateCustomerForm) error {
 
 	_, err := s.db.Exec(
-		"UPDATE customers SET name = $1, contact_name = $2,  email = $3, phone = $4 WHERE company_id = $5 AND id = $6",
-		form.Name, form.Contact, form.Email, form.Phone, CurrentCompany(ctx).ID, customerID,
+		"UPDATE customers SET name = $1, contact_name = $2,  email = $3, phone = $4, payment_method = $5, payment_terms = $6, credit_limit = $7, customer_type = $8, tax_receipt_id = $9 WHERE company_id = $10 AND id = $11",
+		form.Name, form.Contact, form.Email, form.Phone, form.PaymentMethod, form.PaymentTerms, form.CreditLimit, form.CustomerType, form.TaxReceipt, CurrentCompany(ctx).ID, customerID,
 	)
 
 	return err
@@ -215,6 +289,7 @@ func (s *Server) updateCustomerAmountDue(tx *sql.Tx, companyId, customerId int, 
 	return err
 }
 
+// TODO we set the LEFT JOIN check for NULL values. on Tax receipt.
 func (s *Server) findCustomeReceivables(ctx context.Context, customerID string) ([]*receivable, error) {
 	rows, err := s.db.Query(`
     SELECT receivables.id, receivables.uuid, invoices.uuid, invoices.id,
@@ -223,7 +298,7 @@ func (s *Server) findCustomeReceivables(ctx context.Context, customerID string) 
 		FROM receivables
 		INNER JOIN companies ON (receivables.company_id = companies.id)
 		INNER JOIN invoices ON (receivables.company_id = invoices.company_id AND receivables.customer_id = invoices.customer_id AND receivables.invoice_id = invoices.id)
-    INNER JOIN tax_receipts ON (invoices.company_id = tax_receipts.company_id AND invoices.tax_receipt_id = tax_receipts.id)
+    LEFT JOIN tax_receipts ON (invoices.company_id = tax_receipts.company_id AND invoices.tax_receipt_id = tax_receipts.id)
 		INNER JOIN customers ON (receivables.company_id = customers.company_id AND receivables.customer_id = customers.id)
 		WHERE receivables.company_id = $1
     AND invoices.paid_status != 'paid'::paid_status

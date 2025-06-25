@@ -1,15 +1,23 @@
 package app
 
 import (
-	"net/http"
+	"fmt"
 
+	"github.com/martin3zra/acme/pkg/foundation"
 	"github.com/martin3zra/acme/pkg/i18n"
 	"github.com/martin3zra/acme/pkg/routing"
+	"github.com/martin3zra/acme/pkg/validator/locale"
 )
 
 func (s *Server) customersHandler(ctx *routing.Context) {
 
 	uuid := ctx.Query("id")
+	taxReceipts, err := s.findTaxesReceipts(ctx.Request.Context())
+	if err != nil {
+		ctx.Error(err)
+		return
+	}
+
 	customers, err := s.findCustomers(ctx.Request.Context())
 	if err != nil {
 		ctx.Error(err)
@@ -18,6 +26,13 @@ func (s *Server) customersHandler(ctx *routing.Context) {
 	props := map[string]any{
 		"translations": trans("customers"),
 		"customers":    customers,
+		"tax_receipts": foundation.MapSlice(taxReceipts, func(receipt *taxReceipt) map[string]any {
+			return map[string]any{
+				"id":        receipt.ID,
+				"name":      fmt.Sprintf("%s-%s", receipt.Type, receipt.Name),
+				"available": receipt.Current < receipt.SequenceEnd,
+			}
+		}),
 	}
 	if uuid != "" {
 		customer, err := s.findCustomeByUUID(ctx.Request.Context(), uuid)
@@ -34,9 +49,14 @@ func (s *Server) customersHandler(ctx *routing.Context) {
 func (s *Server) storeCustomerHandler() routing.HandlerFunc {
 	return routing.WithRequest(func(ctx *routing.Context, form *StoreCustomerForm) {
 
+		if form.OpenBalance > 0 && form.OpenBalanceAsOf.IsZero() {
+			ctx.BackWith("open_balance_as_of", fmt.Sprintf(locale.SpanishMessages()["required"].(string), "open_balance_as_of"))
+			return
+		}
+
 		err := s.storeCustomer(ctx.Request.Context(), form)
 		if err != nil {
-			ctx.BackWith("status", s.trans("global.wasNotCreated", i18n.Replacements{"subject": "@global.customer"}), http.StatusBadRequest)
+			ctx.BackWithError(err)
 			return
 		}
 

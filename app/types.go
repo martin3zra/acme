@@ -46,10 +46,17 @@ func (f CreatePasswordForm) Rules() map[string]any {
 
 type StoreCustomerForm struct {
 	support.FormRequest
-	Name    string `json:"name"`
-	Contact string `json:"contact"`
-	Email   string `json:"email"`
-	Phone   string `json:"phone"`
+	Name            string    `json:"name"`
+	Contact         string    `json:"contact"`
+	Email           string    `json:"email"`
+	Phone           string    `json:"phone"`
+	PaymentMethod   string    `json:"payment_method"`
+	PaymentTerms    string    `json:"payment_terms"`
+	CreditLimit     float64   `json:"credit_limit"`
+	CustomerType    string    `json:"customer_type"`
+	TaxReceipt      int       `json:"tax_receipt"`
+	OpenBalance     float64   `json:"open_balance"`
+	OpenBalanceAsOf time.Time `json:"open_balance_as_of"`
 }
 
 func (StoreCustomerForm) Rules() map[string]any {
@@ -64,7 +71,14 @@ func (StoreCustomerForm) Rules() map[string]any {
 			"lowercase",
 			validator.Rule{}.Unique("customers", "email"),
 		},
-		"phone": "sometimes|min:3|max:120",
+		"phone":              "sometimes|min:3|max:120",
+		"payment_method":     "sometimes|in:cash,ck,card,bt",
+		"payment_terms":      "sometimes|required",
+		"credit_limit":       "sometimes|required|min:0",
+		"customer_type":      "sometimes|required|in:individual,business",
+		"tax_receipt":        "sometimes|exists:tax_receipts,id",
+		"open_balance":       "sometimes|min:0",
+		"open_balance_as_of": "sometimes",
 	}
 }
 
@@ -74,11 +88,18 @@ func (form StoreCustomerForm) Authorize() bool {
 
 type UpdateCustomerForm struct {
 	support.FormRequest
-	ID      int    `json:"id"`
-	Name    string `json:"name"`
-	Contact string `json:"contact"`
-	Email   string `json:"email"`
-	Phone   string `json:"phone"`
+	ID              int       `json:"id"`
+	Name            string    `json:"name"`
+	Contact         string    `json:"contact"`
+	Email           string    `json:"email"`
+	Phone           string    `json:"phone"`
+	PaymentMethod   string    `json:"payment_method"`
+	PaymentTerms    string    `json:"payment_terms"`
+	CreditLimit     float64   `json:"credit_limit"`
+	CustomerType    string    `json:"customer_type"`
+	TaxReceipt      int       `json:"tax_receipt"`
+	OpenBalance     float64   `json:"open_balance"`
+	OpenBalanceAsOf time.Time `json:"open_balance_as_of"`
 }
 
 func (form UpdateCustomerForm) Authorize() bool {
@@ -97,7 +118,14 @@ func (form UpdateCustomerForm) Rules() map[string]any {
 			"lowercase",
 			validator.Rule{}.Unique("customers", "email").Ignore(form.ID, "id"),
 		},
-		"phone": "sometimes|min:3|max:120",
+		"phone":              "sometimes|min:3|max:120",
+		"payment_method":     "sometimes|in:cash,ck,card,bt",
+		"payment_terms":      "sometimes|required",
+		"credit_limit":       "sometimes|required|min:0",
+		"customer_type":      "sometimes|required|in:individual,business",
+		"tax_receipt":        "sometimes|exists:tax_receipts,id",
+		"open_balance":       "sometimes|min:0",
+		"open_balance_as_of": "sometimes",
 	}
 }
 
@@ -210,16 +238,19 @@ func (form UpdateItemForm) Rules() map[string]any {
 type TermType string
 
 const (
-	_CASH   TermType = "cash"
-	_CREDIT TermType = "credit"
+	_CASH    TermType = "cash"
+	_CREDIT  TermType = "credit"
+	_OPENING TermType = "opening"
 )
 
 var InvoiceTermType = struct {
-	Cash   TermType
-	Credit TermType
+	Cash    TermType
+	Credit  TermType
+	Opening TermType
 }{
-	Cash:   _CASH,
-	Credit: _CREDIT,
+	Cash:    _CASH,
+	Credit:  _CREDIT,
+	Opening: _OPENING,
 }
 
 type Role string
@@ -440,7 +471,7 @@ type StoreInvoiceForm struct {
 	support.FormRequest
 	CustomerID int       `json:"customer_id"`
 	Date       time.Time `json:"date"`
-	Terms      int       `json:"terms"`
+	Terms      string    `json:"terms"`
 	TaxReceipt int       `json:"tax_receipt"`
 	Discount   Discount  `json:"discount"`
 	Notes      string    `json:"notes"`
@@ -496,12 +527,13 @@ func (form *StoreInvoiceForm) PassedValidation() {
 	form.dueOn = nil
 	form.paidStatus = PaidStatuses.Paid
 	form.termType = InvoiceTermType.Cash
-	if form.Terms > 1 {
+	termInDays := getNetDays(form.Terms)
+	if termInDays > 1 {
 		form.amountDue = form.total
 		form.paidStatus = PaidStatuses.UnPaid
 		form.termType = InvoiceTermType.Credit
 
-		dueDate := form.Date.AddDate(0, 0, form.Terms)
+		dueDate := form.Date.AddDate(0, 0, termInDays)
 		form.dueOn = &dueDate
 	}
 }

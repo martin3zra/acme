@@ -67,6 +67,12 @@
     "wasVoided": ":subject fue anulad@action con éxito!",
     "visit": "Visita :to ",
     "city": "Ciudad",
+    "credit_limit": "Limite de credito",
+    "paymentTerms": "Condiciones de pago",
+    "paymentMethod": "Metodo de pago",
+    "additionalInfo": "Información adicional",
+    "taxReceipt": "Tipo NCF",
+    "days": "días",
     "nouns": {
       "customer": {
         "gender":"m"
@@ -149,6 +155,16 @@
           "reference": "Número de transferencia"
         }
       }
+    },
+    "paymentTermsOptions": {
+      "pia": "Pago por adelantado",
+      "net7": "7 días",
+      "net10": "10 días",
+      "net15": "15 días",
+      "net30": "30 días",
+      "net60": "60 días",
+      "net90": "90 días",
+      "net120": "120 días"
     },
     "pagination": {
       "showing": "Mostrando",
@@ -360,6 +376,16 @@
     "paidStatus": "Pagada",
     "paymentTerms": "Condiciones de pago",
     "taxReceipt": "Tipo NCF",
+    "single": {
+      "title": "Cliente",
+      "description": "Proporcione los detalles necesarios para configurar el cliente. Esta información le ayudará a identificar y gestionar dentro de su catalogo en el sistema.",
+      "type": "Tipo de cliente",
+      "individual": "Individuo",
+      "business": "Negocio",
+      "paymentSection":"Sección de Pago",
+      "openBalance": "Balance inicial",
+      "openBalanceAsOf": "Balance inicial al día"
+    },
     "line": {
       "form": {
         "placeholder": "Referencia o presione ⌘K",

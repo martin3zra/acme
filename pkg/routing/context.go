@@ -3,6 +3,7 @@ package routing
 import (
 	"context"
 	"database/sql"
+	"embed"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -24,10 +25,11 @@ import (
 
 // Context wraps request and response and provides helper methods.
 type Context struct {
-	Response http.ResponseWriter
-	Request  *http.Request
-	Params   map[string]string
-	Inertia  *gonertia.Inertia
+	Response  http.ResponseWriter
+	Request   *http.Request
+	Params    map[string]string
+	Inertia   *gonertia.Inertia
+	resources embed.FS
 }
 
 // User fetch user from Request Context
@@ -88,6 +90,10 @@ func (ctx *Context) Error(err error, status ...int) {
 		defaultStatus = http.StatusNotFound
 	}
 
+	if e, ok := err.(foundation.ErrorFormatter); ok {
+		defaultStatus = e.Status()
+	}
+
 	isProduction := os.Getenv("APP_ENV")
 	if slices.Contains([]string{"prod", "production"}, isProduction) {
 		ctx.Render("Error/Index", map[string]any{
@@ -101,17 +107,22 @@ func (ctx *Context) Error(err error, status ...int) {
 		title = "Something went wrong."
 	}
 
-	errorViewFile := foundation.ResolvePath("resources/views/error/500.html")
 	// display errors when on dev mode. otherwise logged this error.
 	data := make(map[string]any)
 	data["title"] = title
 	data["message"] = foundation.ResolveError(err)
 	data["status"] = defaultStatus
-	tmpl, _ := template.ParseFiles(errorViewFile)
-	tmplErr := tmpl.Execute(ctx.Response, data)
 
-	if tmplErr != nil {
+	tmpl, err := template.ParseFS(ctx.resources, "resources/views/error/500.html")
+	if err != nil {
 		log.Println(err.Error())
+		http.Error(ctx.Response, "Internal Server Error", http.StatusInternalServerError)
+		return
+	}
+
+	tmplErr := tmpl.Execute(ctx.Response, data)
+	if tmplErr != nil {
+		log.Println(tmplErr.Error())
 		http.Error(ctx.Response, "Internal Server Error", http.StatusInternalServerError)
 	}
 }
