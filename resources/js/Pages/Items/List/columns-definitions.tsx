@@ -194,7 +194,7 @@ export const getColumns = ({ onDidClick, t }: Props): ColumnDef<Item>[] => {
                 <MoreHorizontal />
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
+            <DropdownMenuContent align="end" className="[&_[data-slot=dropdown-menu-item]]:cursor-pointer">
               <DropdownMenuLabel>{t('global.actions.title')}</DropdownMenuLabel>
               <DropdownMenuSeparator />
               <DropdownMenuItem onClick={() => onDidClick(props.row.original, 'view')}>{t('items.viewItem.title')}</DropdownMenuItem>

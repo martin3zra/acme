@@ -151,7 +151,7 @@ export const getColumns = ({ onDidClick, t }: Props): ColumnDef<ReceivableInvoic
                 <MoreHorizontal />
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
+            <DropdownMenuContent align="end" className="[&_[data-slot=dropdown-menu-item]]:cursor-pointer">
               <DropdownMenuLabel>{t('global.actions.title')}</DropdownMenuLabel>
               <DropdownMenuSeparator />
               <DropdownMenuItem>

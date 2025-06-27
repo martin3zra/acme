@@ -3,6 +3,7 @@ package app
 import (
 	"fmt"
 	"log"
+	"strings"
 
 	"github.com/martin3zra/acme/pkg/foundation"
 	"github.com/martin3zra/acme/pkg/i18n"
@@ -54,6 +55,16 @@ func (s *Server) createInvoiceHandler(ctx *routing.Context) {
 		return
 	}
 
+	var customer *customer
+	customerID := ctx.Query("customer_id")
+	if strings.TrimSpace(customerID) != "" {
+		customer, err = s.findCustomeByUUID(ctx.Request.Context(), customerID)
+		if err != nil {
+			ctx.Error(err)
+			return
+		}
+	}
+
 	ctx.Render("Invoices/Create", map[string]any{
 		"translations": trans("invoices"),
 		"tax_receipts": foundation.MapSlice(taxReceipts, func(receipt *taxReceipt) map[string]any {
@@ -63,6 +74,7 @@ func (s *Server) createInvoiceHandler(ctx *routing.Context) {
 				"available": receipt.Current < receipt.SequenceEnd,
 			}
 		}),
+		"customer": customer,
 		"customers": inertia.Optional(func() (any, error) {
 			customers, err := s.findCustomersBySearchCriteria(ctx.Request.Context(), term)
 			if err != nil {

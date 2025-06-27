@@ -151,19 +151,20 @@ export const getColumns = ({ onDidClick, t }: Props): ColumnDef<Customer>[] => {
                 <MoreHorizontal />
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
+            <DropdownMenuContent align="end" className="[&_[data-slot=dropdown-menu-item]]:cursor-pointer">
               <DropdownMenuLabel>{t('global.actions.title')}</DropdownMenuLabel>
               <DropdownMenuSeparator />
               <DropdownMenuItem onClick={() => onDidClick(props.row.original, 'view')}>{t('customers.viewCustomer.title')}</DropdownMenuItem>
               <DropdownMenuItem onClick={() => onDidClick(props.row.original, 'edit')}>{t('customers.editCustomer.title')}</DropdownMenuItem>
               <DropdownMenuItem onClick={() => onDidClick(props.row.original, 'trash')}>{t('customers.trashCustomer.title')}</DropdownMenuItem>
+              {(props.row.original.status !== 'disabled' || props.row.original.amount_due > 0) && <DropdownMenuSeparator />}
+              {props.row.original.status !== 'disabled' && (
+                <DropdownMenuItem onClick={() => onDidClick(props.row.original, 'issue-invoice')}>{t('customers.issueInvoice')}</DropdownMenuItem>
+              )}
               {props.row.original.amount_due > 0 && (
-                <>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={() => onDidClick(props.row.original, 'record-payment')} disabled={props.row.original.amount_due === 0}>
-                    {t('global.actions.makePayment')}
-                  </DropdownMenuItem>
-                </>
+                <DropdownMenuItem onClick={() => onDidClick(props.row.original, 'record-payment')} disabled={props.row.original.amount_due === 0}>
+                  {t('global.actions.makePayment')}
+                </DropdownMenuItem>
               )}
             </DropdownMenuContent>
           </DropdownMenu>

@@ -47,7 +47,7 @@ export const defaultHeaderForm: HeaderForm = {
   customer: undefined,
   date: undefined,
   due: undefined,
-  terms: 0,
+  terms: 'pia',
   taxReceipt: 0,
   notes: undefined,
   discount: defaultDiscount,

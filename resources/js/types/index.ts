@@ -195,7 +195,7 @@ export type InvoiceVerb = Exclude<Verb, 'trash'> | 'void' | 'record-payment';
 
 export type PaymentVerb = Verb | 'void';
 
-export type CustomerVerb = Verb | 'record-payment';
+export type CustomerVerb = Verb | 'record-payment' | 'issue-invoice';
 
 export type UserVerb = Verb | 'permission';
 

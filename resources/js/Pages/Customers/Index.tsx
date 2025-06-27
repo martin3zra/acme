@@ -44,8 +44,9 @@ export default function Index({
   };
 
   const onSelectCustomer = (customer: Customer, action: CustomerVerb): void => {
-    if (action === 'record-payment') {
-      router.visit(`/payments/create`, { data: { customer_id: customer.uuid } });
+    if (action === 'record-payment' || action === 'issue-invoice') {
+      const url = action === 'record-payment' ? '/payments/create' : '/invoices/create';
+      router.visit(url, { data: { customer_id: customer.uuid } });
       return;
     }
 

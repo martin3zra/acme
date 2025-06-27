@@ -51,10 +51,11 @@ import { Lines } from './Shared/lines';
 export default function Create({
   auth,
   customers,
+  customer,
   items,
   item,
   tax_receipts,
-}: PageProps<{ customers: Customer[]; items: Item[]; item: Item; tax_receipts: TaxReceipt[] }>) {
+}: PageProps<{ customers: Customer[]; customer: Customer; items: Item[]; item: Item; tax_receipts: TaxReceipt[] }>) {
   const t = useTranslation().trans;
   const currency = useNumber().currency;
   const [open, setOpen] = React.useState(false);
@@ -66,7 +67,10 @@ export default function Create({
   const [search, setSearch] = React.useState('');
   const dedbouncedSearch = useDebounced(search, 500);
   const [amount, setAmount] = React.useState(0);
-  const [invoiceForm, setInvoiceForm, removeInvoiceForm] = usePersistedState<InvoiceForm>('invoice', defaultInvoiceForm);
+  const [invoiceForm, setInvoiceForm, removeInvoiceForm] = usePersistedState<InvoiceForm>('invoice', {
+    ...defaultInvoiceForm,
+    header: { ...defaultInvoiceForm.header, customer: customer },
+  });
   const [currentItem, setCurrentItem] = React.useState<Item | undefined>(undefined);
 
   const { headers } = useHeader();
