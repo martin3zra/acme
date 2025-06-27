@@ -16,7 +16,7 @@ import { useTranslation } from '@/hooks/use-translation';
 import { cn } from '@/lib/utils';
 import { paymentTerms } from '@/Pages/Invoices/constants';
 import { Customer, CustomerType, CustomerTypes, PageProps, PaymentMethods, TaxReceipt, Verb } from '@/types';
-import { Field, Radio, RadioGroup } from '@headlessui/react';
+import { Field, Radio, RadioGroup, Switch } from '@headlessui/react';
 import { useForm, usePage } from '@inertiajs/react';
 import { format } from 'date-fns/format';
 import { CalendarIcon, CheckCircleIcon } from 'lucide-react';
@@ -41,6 +41,7 @@ type CustomerForm = {
   phone: string;
   payment_method?: string;
   payment_terms?: string;
+  credit_limited: boolean;
   credit_limit?: number;
   customer_type: string;
   tax_receipt: number;
@@ -62,6 +63,7 @@ export default function CreateForm({ onFinish, params }: CreateFormProps) {
     phone: params.customer?.phone || '',
     payment_method: params.customer?.payment_method || '',
     payment_terms: params.customer?.payment_terms || '',
+    credit_limited: params.customer?.credit_limited || false,
     credit_limit: params.customer?.credit_limit || 0,
     customer_type: params.customer?.customer_type || 'business',
     tax_receipt: params.customer?.tax_receipt || 0,
@@ -221,17 +223,38 @@ export default function CreateForm({ onFinish, params }: CreateFormProps) {
           </div>
           <div className="col-span-2">
             <Label htmlFor="credit_limit">{t('global.credit_limit')}</Label>
-            <Input
-              id="credit_limit"
-              type="number"
-              className="mt-2 block w-full text-end"
-              value={data.credit_limit}
-              onChange={(e) => setData('credit_limit', e.target.valueAsNumber)}
-              required
-              placeholder={t('global.credit_limit')}
-              readOnly={viewMode}
-            />
-            <InputError className="mt-2" message={errors.credit_limit} />
+            <div className="mt-2 flex space-x-6">
+              <Switch
+                className={cn(
+                  'relative inline-flex h-8 w-20 cursor-pointer items-center rounded-full transition',
+                  data.credit_limited ? 'bg-primary' : 'bg-gray-300',
+                )}
+                disabled={viewMode}
+                checked={data.credit_limited}
+                onChange={(checked: boolean) => {
+                  setData('credit_limited', checked);
+                  if (!checked) setData('credit_limit', 0);
+                }}
+              >
+                <span
+                  className={cn(
+                    'inline-block h-6 w-6 transform rounded-full bg-white transition',
+                    data.credit_limited ? 'translate-x-6' : 'translate-x-1',
+                  )}
+                />
+              </Switch>
+              <Input
+                id="credit_limit"
+                type="number"
+                className="text-end"
+                value={data.credit_limit}
+                onChange={(e) => setData('credit_limit', e.target.valueAsNumber)}
+                disabled={!data.credit_limited}
+                placeholder={t('global.credit_limit')}
+                readOnly={viewMode}
+              />
+              <InputError className="mt-2" message={errors.credit_limit} />
+            </div>
           </div>
           <Separator className="col-span-6" />
           <div className="col-span-6">

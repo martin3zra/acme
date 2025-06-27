@@ -80,6 +80,7 @@ export interface Customer {
   payment_method: string;
   payment_terms: string;
   amount_due: number;
+  credit_limited: boolean;
   credit_limit: number;
   customer_type: string;
   tax_receipt: number;

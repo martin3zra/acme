@@ -152,7 +152,18 @@ func (s *Server) storeInvoiceHandler() routing.HandlerFunc {
 			return
 		}
 
-		err := s.storeInvoice(ctx.Request.Context(), form)
+		customer, err := s.findCustomeByID(ctx.Request.Context(), form.CustomerID)
+		if err != nil {
+			ctx.BackWithError(err)
+			return
+		}
+
+		if customer.CreditLimited && customer.AmountDue+form.total > customer.CreditLimit {
+			ctx.BackWith("status", "Credit limit exceeded.")
+			return
+		}
+
+		err = s.storeInvoice(ctx.Request.Context(), form)
 		if err != nil {
 			log.Printf("Error creating invoice: %v", err)
 			ctx.BackWith("status", s.trans("global.wasNotCreated", i18n.Replacements{"subject": "@global.invoice"}))
@@ -172,7 +183,18 @@ func (s *Server) updateInvoiceHandler() routing.HandlerFunc {
 			return
 		}
 
-		err := s.updateInvoice(ctx.Request.Context(), ctx.Param("id"), form)
+		customer, err := s.findCustomeByID(ctx.Request.Context(), form.CustomerID)
+		if err != nil {
+			ctx.BackWithError(err)
+			return
+		}
+
+		if customer.CreditLimited && customer.AmountDue+form.total > customer.CreditLimit {
+			ctx.BackWith("status", "Credit limit exceeded.")
+			return
+		}
+
+		err = s.updateInvoice(ctx.Request.Context(), ctx.Param("id"), form)
 		if err != nil {
 			log.Printf("Error updating invoice: %v", err)
 			ctx.BackWith("status", s.trans("global.wasNotUpdated", i18n.Replacements{"subject": "@global.invoice"}))

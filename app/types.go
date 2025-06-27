@@ -52,6 +52,7 @@ type StoreCustomerForm struct {
 	Phone           string    `json:"phone"`
 	PaymentMethod   string    `json:"payment_method"`
 	PaymentTerms    string    `json:"payment_terms"`
+	CreditLimited   bool      `json:"credit_limited"`
 	CreditLimit     float64   `json:"credit_limit"`
 	CustomerType    string    `json:"customer_type"`
 	TaxReceipt      int       `json:"tax_receipt"`
@@ -74,6 +75,7 @@ func (StoreCustomerForm) Rules() map[string]any {
 		"phone":              "sometimes|min:3|max:120",
 		"payment_method":     "sometimes|in:cash,ck,card,bt",
 		"payment_terms":      "sometimes|required",
+		"credit_limited":     "required",
 		"credit_limit":       "sometimes|required|min:0",
 		"customer_type":      "sometimes|required|in:individual,business",
 		"tax_receipt":        "sometimes|exists:tax_receipts,id",
@@ -95,6 +97,7 @@ type UpdateCustomerForm struct {
 	Phone           string    `json:"phone"`
 	PaymentMethod   string    `json:"payment_method"`
 	PaymentTerms    string    `json:"payment_terms"`
+	CreditLimited   bool      `json:"credit_limited"`
 	CreditLimit     float64   `json:"credit_limit"`
 	CustomerType    string    `json:"customer_type"`
 	TaxReceipt      int       `json:"tax_receipt"`
