@@ -235,6 +235,7 @@ func (s *Server) sendVerificationEmail(ctx *routing.Context) {
 
 func (s *Server) accountProfileHandler(ctx *routing.Context) {
 	userUuid := ctx.Query("user_id")
+	companyUuid := ctx.Query("company_id")
 	companies, err := s.findCompanies(ctx.Request.Context())
 	if err != nil {
 		log.Println("something wrong occurred fetching companies:", err)
@@ -285,6 +286,26 @@ func (s *Server) accountProfileHandler(ctx *routing.Context) {
 		}
 		props["initialState"] = true
 		props["subject"] = "user:view"
+	}
+
+	if companyUuid != "" {
+		company, err := s.findCompanyByUUID(ctx.Request.Context(), companyUuid)
+		if err != nil {
+			ctx.Error(err)
+			return
+		}
+		sequences, err := s.findSequences(ctx.Request.Context(), companyUuid)
+		if err != nil {
+			ctx.Error(err)
+			return
+		}
+
+		company.Sequences = &sequences.Sequence
+		company.SeqLastUpdatedAt = &sequences.UpdatedAt
+		props["company"] = company
+
+		props["initialState"] = true
+		props["subject"] = "company:view"
 	}
 
 	if ctx.QueryHas("open") {

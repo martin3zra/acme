@@ -130,7 +130,7 @@ var groupedPermissions = map[string]map[string][]string{
 		"viewAny": {"dashboard", "invoice", "customer", "item", "payment", "setting"},
 		"create":  {"dashboard", "invoice", "customer", "item", "payment", "setting"},
 		"delete":  {"dashboard", "invoice", "customer", "item", "payment", "setting"},
-		"update":  {"dashboard", "invoice", "customer", "item", "payment", "setting"},
+		"update":  {"dashboard", "invoice", "customer", "item", "payment", "setting", "company:sequence"},
 	},
 	"supervisor": {
 		"view":    {"dashboard", "customer", "item", "payment"},

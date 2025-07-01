@@ -67,13 +67,24 @@ export default function Account({
   const hasUsers = users.length > 0;
 
   const onSelectCompany = (company: Company, action: Verb): void => {
-    if (action === 'trash') {
-      return;
-    }
+    if (action === 'trash') return;
+    if (action !== 'view') return;
 
-    setSelectedCompany({ company, action });
+    setState(
+      (current) => ({ sheetState: !current.sheetState, sheetContent: action === 'view' ? 'company:view' : 'company:form' }),
+      (newVal) => {
+        if (newVal.sheetState) findSelectCompany(company.uuid);
+      },
+    );
+  };
 
-    setState({ sheetState: true, sheetContent: action === 'view' ? 'company:view' : 'company:form' });
+  const findSelectCompany = (uuid: string) => {
+    router.visit(page.url, {
+      except: ['companies', 'users'],
+      data: { company_id: uuid },
+      preserveScroll: true,
+      preserveState: false,
+    });
   };
 
   const onSelectUser = (user: User, action: UserVerb): void => {
@@ -106,6 +117,7 @@ export default function Account({
 
   const onOpenChange = (open: boolean) => {
     setSelectedUser({ user: undefined, action: 'create' });
+    setSelectedCompany({ company: undefined, action: 'view' });
     setState({ sheetState: open, sheetContent: 'profile' });
 
     if (open) return;

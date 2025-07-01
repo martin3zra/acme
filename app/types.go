@@ -952,3 +952,52 @@ func CurrentAccount(ctx context.Context) int {
 	}
 	return 0
 }
+
+type SequenceConfig struct {
+	Prefix  string `json:"prefix"`
+	Next    int    `json:"next"`
+	Padding int    `json:"padding"`
+}
+
+type InvoiceSequence struct {
+	Default SequenceConfig `json:"default"`
+	Credit  SequenceConfig `json:"credit"`
+	Cash    SequenceConfig `json:"cash"`
+}
+
+type CompanySequence struct {
+	Invoice  InvoiceSequence `json:"invoice"`
+	Customer SequenceConfig  `json:"customer"`
+	Estimate SequenceConfig  `json:"estimate"`
+	Payment  SequenceConfig  `json:"payment"`
+}
+
+type SequenceForm struct {
+	support.FormRequest
+	CompanySequence
+}
+
+func (SequenceForm) Rules() map[string]any {
+	return map[string]any{
+		"invoice":                 "required",
+		"invoice.default.padding": "required|min:3",
+		"invoice.default.next":    "required|min:1",
+		"invoice.cash.padding":    "required|min:3",
+		"invoice.cash.next":       "required|min:1",
+		"invoice.credit.padding":  "required|min:3",
+		"invoice.credit.next":     "required|min:1",
+		"customer":                "required",
+		"customer.padding":        "required|min:3",
+		"customer.next":           "required|min:1",
+		"estimate":                "required",
+		"estimate.padding":        "required|min:3",
+		"estimate.next":           "required|min:1",
+		"payment":                 "required",
+		"payment.padding":         "required|min:3",
+		"payment.next":            "required|min:1",
+	}
+}
+
+func (form SequenceForm) Authorize() bool {
+	return Can(form.User(), "update:company:sequence")
+}

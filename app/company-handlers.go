@@ -1,6 +1,7 @@
 package app
 
 import (
+	"fmt"
 	"log"
 
 	"github.com/martin3zra/acme/pkg/auth"
@@ -59,5 +60,19 @@ func (s *Server) companyHandler(ctx *routing.Context) {
 	ctx.Render("Settings/Companies/Index", map[string]any{
 		"translations": trans("companies"),
 		"companies":    companies,
+	})
+}
+
+func (s *Server) companyUpdateSequences() routing.HandlerFunc {
+	return routing.WithRequest(func(ctx *routing.Context, form *SequenceForm) {
+
+		if err := s.updateSequences(ctx.Request.Context(), ctx.Param("id"), form); err != nil {
+			ctx.Error(err)
+			return
+		}
+
+		ctx.Flash("success", "Sequences updated successfully!")
+
+		ctx.Redirect(fmt.Sprintf("/settings/%s/profile", ctx.Param("account")))
 	})
 }

@@ -75,6 +75,7 @@ func (s *Server) bootRoutes() {
 						route.PUT("/profile", s.updateAccountProfileHandler())
 
 						route.GET("/companies", s.companyHandler).Can("viewAny:company")
+						route.PUT("/companies/:id/sequences", s.companyUpdateSequences())
 						route.POST("/users", s.storeUserHandler())
 						route.PUT("/users/:id", s.updateUserHandler())
 					})

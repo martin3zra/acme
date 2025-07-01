@@ -46,6 +46,11 @@ func (va *ValidatesAttributes) hasParentKey() bool {
 	return va.parentKey != ""
 }
 
+func (v *ValidatesAttributes) onStructEnd(path string) {
+	fmt.Println("✅ Finished processing:", path)
+	// Optional: push to log, call hook, etc.
+}
+
 func (va *ValidatesAttributes) Ignore(ignore any, column ...string) {
 	va.ignore = ignore
 	if len(column) == 0 {

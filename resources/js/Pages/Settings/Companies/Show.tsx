@@ -6,13 +6,16 @@ import { useTranslation } from '@/hooks/use-translation';
 import { Company } from '@/types';
 import { Avatar, AvatarFallback } from '@radix-ui/react-avatar';
 import { BadgeCheck } from 'lucide-react';
+import SequenceView from './Sequences';
 
 export type Props = {
   company: Company;
 };
+
 export default function Show({ company }: Props) {
   const t = useTranslation().trans;
   const getInitials = useInitials();
+
   return (
     <div>
       <Tabs defaultValue="overview" className="min-w-[400px]">
@@ -62,7 +65,9 @@ export default function Show({ company }: Props) {
             </Card>
           </div>
         </TabsContent>
-        <TabsContent value="preferences">Make changes to your preferences here.</TabsContent>
+        <TabsContent value="preferences">
+          <SequenceView uuid={company.uuid} sequences={company.sequences} />
+        </TabsContent>
         <TabsContent value="taxes">Change your taxes here.</TabsContent>
       </Tabs>
     </div>

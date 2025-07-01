@@ -31,6 +31,27 @@ export interface AuthAccount {
   owner: boolean;
 }
 
+export type SequenceField = string | number;
+
+export type ModuleType = 'invoices' | 'customers' | 'payments';
+
+export type SequenceTypeKey = 'prefix' | 'suffix' | 'next';
+
+export type SequenceConfig = {
+  prefix: string;
+  next: number;
+  padding: number;
+  [key: string]: SequenceField;
+};
+
+export type Sequences = {
+  [module: string]:
+    | {
+        [type: string]: SequenceConfig;
+      }
+    | SequenceConfig;
+};
+
 export interface Company {
   id: number;
   uuid: string;
@@ -38,6 +59,7 @@ export interface Company {
   address: string;
   identifier: string;
   city: string;
+  sequences: Sequences;
   created_at: string;
   updated_at: string;
 }
