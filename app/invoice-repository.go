@@ -54,7 +54,7 @@ type line struct {
 }
 
 func (s *Server) findInvoices(ctx context.Context) ([]*invoice, error) {
-	rows, err := s.db.Query("SELECT invoices.id, invoices.uuid, invoices.date, invoices.due_on, invoices.amount, invoices.discount, invoices.tax, "+
+	rows, err := s.db.Query("SELECT invoices.id, invoices.uuid, invoices.code, invoices.date, invoices.due_on, invoices.amount, invoices.discount, invoices.tax, "+
 		"invoices.total, invoices.amount_due, invoices.status, invoices.paid_status, invoices.payment, invoices.note, invoices.tax_receipt_id,"+
 		"tax_receipts.series || tax_receipts.type || LPAD(invoices.tax_receipt_sequence::varchar,8,'0') as NCF, "+
 		"customers.id, customers.uuid, customers.name, customers.email, customers.phone "+
@@ -73,6 +73,7 @@ func (s *Server) findInvoices(ctx context.Context) ([]*invoice, error) {
 		if err = rows.Scan(
 			&i.ID,
 			&i.UUID,
+			&i.Number,
 			&i.Date,
 			&i.DueOn,
 			&i.Amount,
@@ -94,7 +95,7 @@ func (s *Server) findInvoices(ctx context.Context) ([]*invoice, error) {
 		); err != nil {
 			return nil, err
 		}
-		i.Number = s.generatePrefixedInvoiceNumber(i.ID)
+
 		i.Customer.Address = "LOUISVILLE, Selby 3864 Johnson Street, United States of America"
 
 		data = append(data, i)
@@ -104,7 +105,7 @@ func (s *Server) findInvoices(ctx context.Context) ([]*invoice, error) {
 
 func (s *Server) findInvoicesByUUID(ctx context.Context, uuid string) (*invoice, error) {
 	i := new(invoice)
-	err := s.db.QueryRow("SELECT invoices.id, invoices.uuid, invoices.date, invoices.due_on, invoices.amount, invoices.amount_due, invoices.discount, invoices.tax, "+
+	err := s.db.QueryRow("SELECT invoices.id, invoices.uuid, invoices.code, invoices.date, invoices.due_on, invoices.amount, invoices.amount_due, invoices.discount, invoices.tax, "+
 		"invoices.total, invoices.status, invoices.paid_status, invoices.payment, invoices.note, invoices.tax_receipt_id, "+
 		"tax_receipts.series || tax_receipts.type || LPAD(invoices.tax_receipt_sequence::varchar,8,'0') as NCF, invoices.note, "+
 		"customers.id, customers.uuid, customers.name, customers.email, customers.phone "+
@@ -116,6 +117,7 @@ func (s *Server) findInvoicesByUUID(ctx context.Context, uuid string) (*invoice,
 		Scan(
 			&i.ID,
 			&i.UUID,
+			&i.Number,
 			&i.Date,
 			&i.DueOn,
 			&i.Amount,
@@ -145,7 +147,6 @@ func (s *Server) findInvoicesByUUID(ctx context.Context, uuid string) (*invoice,
 		i.Terms = fmt.Sprintf("net%d", int(difference.Hours())/24)
 	}
 
-	i.Number = s.generatePrefixedInvoiceNumber(i.ID)
 	i.Customer.Address = "LOUISVILLE, Selby 3864 Johnson Street, United States of America"
 
 	return i, nil
@@ -153,7 +154,7 @@ func (s *Server) findInvoicesByUUID(ctx context.Context, uuid string) (*invoice,
 
 func (s *Server) findInvoicesByID(ctx context.Context, invoiceId int) (*invoice, error) {
 	i := new(invoice)
-	err := s.db.QueryRow("SELECT invoices.id, invoices.uuid, invoices.date, invoices.due_on, invoices.amount, invoices.amount_due, invoices.discount, invoices.tax, "+
+	err := s.db.QueryRow("SELECT invoices.id, invoices.uuid, invoices.code, invoices.date, invoices.due_on, invoices.amount, invoices.amount_due, invoices.discount, invoices.tax, "+
 		"invoices.total, invoices.status, invoices.paid_status, invoices.payment, invoices.note, invoices.tax_receipt_id, "+
 		"tax_receipts.series || tax_receipts.type || LPAD(invoices.tax_receipt_sequence::varchar,8,'0') as NCF, invoices.note, "+
 		"customers.id, customers.uuid, customers.name, customers.email, customers.phone "+
@@ -165,6 +166,7 @@ func (s *Server) findInvoicesByID(ctx context.Context, invoiceId int) (*invoice,
 		Scan(
 			&i.ID,
 			&i.UUID,
+			&i.Number,
 			&i.Date,
 			&i.DueOn,
 			&i.Amount,
@@ -194,14 +196,9 @@ func (s *Server) findInvoicesByID(ctx context.Context, invoiceId int) (*invoice,
 		i.Terms = fmt.Sprintf("net%d", int(difference.Hours())/24)
 	}
 
-	i.Number = s.generatePrefixedInvoiceNumber(i.ID)
 	i.Customer.Address = "LOUISVILLE, Selby 3864 Johnson Street, United States of America"
 
 	return i, nil
-}
-
-func (s *Server) generatePrefixedInvoiceNumber(value int) string {
-	return foundation.GeneratePrefixedNumber("INV-", 10, value)
 }
 
 func (s *Server) storeInvoice(ctx context.Context, form *StoreInvoiceForm) error {
@@ -212,8 +209,13 @@ func (s *Server) storeInvoice(ctx context.Context, form *StoreInvoiceForm) error
 			return err
 		}
 
-		stmt, err := tx.Prepare("INSERT INTO invoices (company_id, tax_receipt_id, tax_receipt_sequence, date, type, due_on, customer_id, amount, discount, tax, amount_due, total, note, status, paid_status, payment) " +
-			"VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16) RETURNING id")
+		stmt, err := tx.Prepare("INSERT INTO invoices (company_id, tax_receipt_id, tax_receipt_sequence, date, type, due_on, customer_id, amount, discount, tax, amount_due, total, note, status, paid_status, payment, code) " +
+			"VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17) RETURNING id")
+		if err != nil {
+			return err
+		}
+
+		seqInfo, err := GetNextSequence(tx, companyID, fmt.Sprintf("invoice.%s", form.termType))
 		if err != nil {
 			return err
 		}
@@ -236,6 +238,7 @@ func (s *Server) storeInvoice(ctx context.Context, form *StoreInvoiceForm) error
 			InvoiceStatuses.Open,
 			form.paidStatus,
 			foundation.ToJSON(form.Payment),
+			seqInfo.Code,
 		).Scan(&invoiceID)
 
 		if err != nil {

@@ -198,6 +198,12 @@ func (s *Server) findCustomersBySearchCriteria(ctx context.Context, term string)
 func (s *Server) storeCustomer(ctx context.Context, form *StoreCustomerForm) error {
 	return database.WithTransaction(s.db, func(tx *sql.Tx) error {
 		companyID := CurrentCompany(ctx).ID
+
+		seqInfo, err := GetNextSequence(tx, companyID, "customer")
+		if err != nil {
+			return err
+		}
+
 		stmt, err := tx.Prepare("INSERT INTO customers (company_id, name, contact_name, email, phone, payment_method, payment_terms, credit_limited, credit_limit, amount_due, customer_type, tax_receipt_id, code) " +
 			"VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13) RETURNING id")
 		if err != nil {
@@ -205,17 +211,7 @@ func (s *Server) storeCustomer(ctx context.Context, form *StoreCustomerForm) err
 		}
 
 		var customerID int
-		err = stmt.QueryRow(companyID, form.Name, form.Contact, form.Email, form.Phone, form.PaymentMethod, form.PaymentTerms, form.CreditLimited, form.CreditLimit, form.OpenBalance, form.CustomerType, form.TaxReceipt, "pending").Scan(&customerID)
-		if err != nil {
-			return err
-		}
-
-		code := foundation.GeneratePrefixedNumber("CUST-", 6, customerID)
-		stmt, err = tx.Prepare("UPDATE customers SET code = $3 WHERE company_id = $1 AND id = $2")
-		if err != nil {
-			return err
-		}
-		_, err = stmt.Exec(companyID, customerID, code)
+		err = stmt.QueryRow(companyID, form.Name, form.Contact, form.Email, form.Phone, form.PaymentMethod, form.PaymentTerms, form.CreditLimited, form.CreditLimit, form.OpenBalance, form.CustomerType, form.TaxReceipt, seqInfo.Code).Scan(&customerID)
 		if err != nil {
 			return err
 		}

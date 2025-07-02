@@ -202,29 +202,25 @@ func (s *Server) storePayment(ctx context.Context, form *StorePaymentForm) error
 			return err
 		}
 
-		companyId := CurrentCompany(ctx).ID
+		companyID := CurrentCompany(ctx).ID
+
+		seqInfo, err := GetNextSequence(tx, companyID, "payment")
+		if err != nil {
+			return err
+		}
+
 		var paymentID int
 		err = stmt.QueryRow(
-			companyId,
+			companyID,
 			customer.ID,
 			form.Date,
 			form.Amount,
 			form.Notes,
 			foundation.ToJSON(form.Payment),
 			PaymentStatuses.Completed,
-			"pending",
+			seqInfo.Code,
 		).Scan(&paymentID)
 
-		if err != nil {
-			return err
-		}
-
-		code := foundation.GeneratePrefixedNumber("PAY-", 10, paymentID)
-		stmt, err = tx.Prepare("UPDATE receivables_income SET code = $3 WHERE company_id = $1 AND id = $2")
-		if err != nil {
-			return err
-		}
-		_, err = stmt.Exec(companyId, paymentID, code)
 		if err != nil {
 			return err
 		}
@@ -233,7 +229,7 @@ func (s *Server) storePayment(ctx context.Context, form *StorePaymentForm) error
 			return err
 		}
 
-		if err = s.updateCustomerAmountDue(tx, companyId, customer.ID, -form.Amount); err != nil {
+		if err = s.updateCustomerAmountDue(tx, companyID, customer.ID, -form.Amount); err != nil {
 			return err
 		}
 

@@ -366,7 +366,7 @@ export interface PaymentLine {
   payment: number;
   invoice: {
     uuid: string;
-    number: string;
+    code: string;
     amount: number;
     amount_due: number;
     date: string;
@@ -390,7 +390,7 @@ export function mapPaymentLineToReceivableInvoice(paymentLine: PaymentLine): Rec
   return {
     id: paymentLine.id,
     uuid: invoice.uuid,
-    number: invoice.number,
+    number: invoice.code,
     ncf: invoice.ncf, // Placeholder since PaymentLine does not have this field
     date: new Date(invoice.date),
     due_on: new Date(invoice.due_on), // Placeholder, not present in PaymentLine

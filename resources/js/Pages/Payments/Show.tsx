@@ -101,7 +101,7 @@ export default function Show({ payment, auth }: Props) {
             <tbody>
               {payment.lines.map((line) => (
                 <tr key={line.id}>
-                  <td>{line.invoice.number}</td>
+                  <td>{line.invoice.code}</td>
                   <td>{formatDate(line.invoice.date, 'dd-MM-yyyy')}</td>
                   <td data-format="number" className="!min-w-20">
                     {currency(line.invoice.amount)}

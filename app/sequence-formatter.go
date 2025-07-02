@@ -2,61 +2,61 @@ package app
 
 import (
 	"database/sql"
-	"encoding/json"
 	"fmt"
+	"strings"
 )
 
-func (s *Server) GenerateNextSequence(tx *sql.Tx, companyID int, module string, subType string) (string, error) {
-	var sequenceJSON []byte
-	err := tx.QueryRow("SELECT sequences FROM companies_setttings WHERE company_id = $1 FOR UPDATE", companyID).Scan(&sequenceJSON)
-	if err != nil {
-		return "", err
+type SequenceInfo struct {
+	Next    int
+	Prefix  string
+	Padding int
+	Code    string // formatted code
+}
+
+// Helper to convert "invoice.credit" → {invoice,credit,next}
+func buildJSONPath(path string) string {
+	segments := strings.Split(path, ".")
+	segments = append(segments, "next")
+	return "{" + strings.Join(segments, ",") + "}"
+}
+
+func GetNextSequence(tx *sql.Tx, companyID int, jsonPath string) (*SequenceInfo, error) {
+	// Build the array path for jsonb_set and json access
+	pathArray := buildJSONPath(jsonPath)
+
+	query := fmt.Sprintf(`
+    WITH current AS (
+        SELECT
+            company_id,
+            (sequences#>>'%s')::int        AS seq,
+            sequences#>>'{%s,prefix}'      AS prefix,
+            (sequences#>>'{%s,padding}')::int AS padding
+        FROM companies_settings
+        WHERE company_id = $1
+        FOR UPDATE
+    ),
+    updated AS (
+        UPDATE companies_settings
+        SET sequences = jsonb_set(
+            sequences,
+            '%s',
+            to_jsonb(current.seq + 1),
+            false
+        )
+        FROM current
+        WHERE companies_settings.company_id = current.company_id
+        RETURNING current.seq, current.prefix, current.padding
+    )
+    SELECT
+        prefix || lpad(seq::text, padding, '0') AS code,
+        seq, prefix, padding
+    FROM updated;
+`, pathArray, strings.Join(strings.Split(jsonPath, "."), ","), strings.Join(strings.Split(jsonPath, "."), ","), pathArray)
+
+	var info SequenceInfo
+	if err := tx.QueryRow(query, companyID).Scan(&info.Code, &info.Next, &info.Prefix, &info.Padding); err != nil {
+		return nil, err
 	}
 
-	var sequences map[string]any
-	if err := json.Unmarshal(sequenceJSON, &sequences); err != nil {
-		return "", err
-	}
-
-	// Drill into the config depending on module and subtype
-	var cfg map[string]any
-	switch typed := sequences[module].(type) {
-	case map[string]any:
-		if subType != "" {
-			cfg, _ = typed[subType].(map[string]any)
-		} else {
-			cfg = typed
-		}
-	}
-
-	if cfg == nil {
-		return "", fmt.Errorf("sequence config not found for module: %s", module)
-	}
-
-	prefix := cfg["prefix"].(string)
-	next := int(cfg["next"].(float64))
-	padding := int(cfg["padding"].(float64))
-
-	seqStr := fmt.Sprintf("%s%0*d", prefix, padding, next)
-
-	// Increment and store back
-	cfg["next"] = next + 1
-
-	if subType != "" {
-		sequences[module].(map[string]any)[subType] = cfg
-	} else {
-		sequences[module] = cfg
-	}
-
-	updatedJSON, err := json.Marshal(sequences)
-	if err != nil {
-		return "", err
-	}
-
-	_, err = tx.Exec(`UPDATE business_settings SET sequences = $1, updated_at = now() WHERE business_id = $2`, updatedJSON, companyID)
-	if err != nil {
-		return "", err
-	}
-
-	return seqStr, nil
+	return &info, nil
 }

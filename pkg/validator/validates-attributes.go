@@ -112,6 +112,9 @@ func (va *ValidatesAttributes) validateBetween(value reflect.Value, params []str
 func (va *ValidatesAttributes) validateRuleWithoutAttributes(rule string, value reflect.Value) bool {
 
 	if rule == "required" {
+		if value.Kind() == reflect.Bool {
+			return true
+		}
 		return !value.IsZero()
 	}
 
