@@ -204,6 +204,7 @@ export interface Invoice {
 export interface InvoiceWithLines {
   header: Invoice;
   lines: InvoiceLine[];
+  pdfURL: string;
 }
 
 export interface BreadcrumbItem {

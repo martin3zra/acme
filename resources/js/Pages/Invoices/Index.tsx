@@ -95,6 +95,10 @@ export default function Index({
 
         {hasInvoices && <List data={invoices} onSelectInvoice={onSelectInvoice} />}
 
+        {/* {invoice !== undefined && invoice.pdfURL && (
+          <iframe src={invoice.pdfURL} width="100%" height="600" className="rounded border" title="Invoice Preview"></iframe>
+        )} */}
+
         {invoice && (
           <Sheet open={open} onOpenChange={onOpenChange}>
             <SheetContent side="right" className="m-4 flex h-[calc(~'(100%-var(--spacing)*4)/3')] w-full flex-col rounded-md sm:max-w-[1380px]">
@@ -126,9 +130,9 @@ export default function Index({
                       </>
                     )}
 
-                    <Button>
-                      <Printer /> {t('global.actions.print')}
-                    </Button>
+                    <a href={invoice.pdfURL} className="bg-primary flex items-center gap-x-3 rounded-sm px-4 text-white" target="_blank">
+                      <Printer className="size-4" /> {t('global.actions.print')}
+                    </a>
                   </div>
                 </div>
               </SheetHeader>

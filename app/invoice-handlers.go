@@ -4,7 +4,9 @@ import (
 	"fmt"
 	"log"
 	"strings"
+	"time"
 
+	"codeberg.org/go-pdf/fpdf"
 	"github.com/martin3zra/acme/pkg/foundation"
 	"github.com/martin3zra/acme/pkg/i18n"
 	"github.com/martin3zra/acme/pkg/routing"
@@ -37,9 +39,17 @@ func (s *Server) invoicesHandler(ctx *routing.Context) {
 			return
 		}
 
+		uri := fmt.Sprintf("%s/invoices/%s/print/%s", s.config.host, uuid, foundation.NewHashable().Sha1(uuid))
+		pdfURL, err := routing.TemporarySignedURL(uri, map[string]string{}, string(s.config.secretKey), 5*time.Minute)
+		if err != nil {
+			ctx.Error(err)
+			return
+		}
+
 		props["invoice"] = map[string]any{
 			"header": invoice,
 			"lines":  lines,
+			"pdfURL": pdfURL,
 		}
 		props["showInvoice"] = true
 	}
@@ -232,4 +242,92 @@ func (s *Server) voidInvoiceHandler() routing.HandlerFunc {
 
 		ctx.Redirect("/invoices")
 	})
+}
+
+func (s *Server) printInvoiceHandler(ctx *routing.Context) {
+
+	// uuid := ctx.Param("id")
+	// hash := ctx.Param("hash")
+	pdf := fpdf.New("P", "mm", "A4", "")
+	pdf.SetMargins(15, 20, 15)
+	pdf.AddPage()
+
+	// Company Info
+	pdf.SetFont("Arial", "B", 16)
+	pdf.Cell(0, 10, "INVOICE")
+	pdf.Ln(12)
+
+	pdf.SetFont("Arial", "", 12)
+	pdf.Cell(100, 6, "From:")
+	pdf.Cell(0, 6, "To:")
+	pdf.Ln(6)
+	pdf.Cell(100, 6, "Acme Corp")
+	pdf.Cell(0, 6, "John Doe")
+	pdf.Ln(6)
+	pdf.Cell(100, 6, "123 Business Rd.")
+	pdf.Cell(0, 6, "456 Client St.")
+	pdf.Ln(6)
+	pdf.Cell(100, 6, "New York, NY")
+	pdf.Cell(0, 6, "Los Angeles, CA")
+	pdf.Ln(12)
+
+	// Invoice Info
+	pdf.Cell(40, 6, "Invoice #: 001")
+	pdf.Cell(60, 6, "")
+	pdf.Cell(40, 6, "Date:")
+	pdf.Cell(0, 6, time.Now().Format("2006-01-02"))
+	pdf.Ln(10)
+
+	// Table Header
+	pdf.SetFillColor(240, 240, 240)
+	pdf.SetFont("Arial", "B", 12)
+	pdf.CellFormat(80, 8, "Description", "1", 0, "", true, 0, "")
+	pdf.CellFormat(30, 8, "Qty", "1", 0, "C", true, 0, "")
+	pdf.CellFormat(40, 8, "Unit Price", "1", 0, "R", true, 0, "")
+	pdf.CellFormat(40, 8, "Total", "1", 1, "R", true, 0, "")
+
+	// Dummy Data
+	items := []struct {
+		Description string
+		Quantity    int
+		UnitPrice   float64
+	}{
+		{"Website Design", 1, 1200.00},
+		{"Hosting (12 months)", 1, 240.00},
+		{"Domain (1 year)", 1, 15.00},
+	}
+
+	pdf.SetFont("Arial", "", 12)
+	var subtotal float64
+	for _, item := range items {
+		lineTotal := float64(item.Quantity) * item.UnitPrice
+		subtotal += lineTotal
+
+		pdf.CellFormat(80, 8, item.Description, "1", 0, "", false, 0, "")
+		pdf.CellFormat(30, 8, fmt.Sprintf("%d", item.Quantity), "1", 0, "C", false, 0, "")
+		pdf.CellFormat(40, 8, fmt.Sprintf("$%.2f", item.UnitPrice), "1", 0, "R", false, 0, "")
+		pdf.CellFormat(40, 8, fmt.Sprintf("$%.2f", lineTotal), "1", 1, "R", false, 0, "")
+	}
+
+	// Totals
+	taxRate := 0.18
+	tax := subtotal * taxRate
+	total := subtotal + tax
+
+	pdf.Ln(4)
+	pdf.Cell(150, 8, "Subtotal:")
+	pdf.CellFormat(40, 8, fmt.Sprintf("$%.2f", subtotal), "", 1, "R", false, 0, "")
+	pdf.Cell(150, 8, "Tax (18%):")
+	pdf.CellFormat(40, 8, fmt.Sprintf("$%.2f", tax), "", 1, "R", false, 0, "")
+	pdf.SetFont("Arial", "B", 12)
+	pdf.Cell(150, 10, "Total:")
+	pdf.CellFormat(40, 10, fmt.Sprintf("$%.2f", total), "", 1, "R", false, 0, "")
+
+	// Output
+	ctx.Response.Header().Set("Content-Type", "application/pdf")
+	ctx.Response.Header().Set("Content-Disposition", "inline; filename=invoice.pdf")
+
+	if err := pdf.Output(ctx.Response); err != nil {
+		ctx.Error(err)
+	}
 }
