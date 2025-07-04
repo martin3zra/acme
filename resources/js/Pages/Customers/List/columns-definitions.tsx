@@ -1,6 +1,7 @@
 import { CurrencyCell } from '@/components/data-table/currency-cell';
 import { DateCell } from '@/components/data-table/date-cell';
 import { HeaderCell } from '@/components/data-table/header-cell';
+import { HeaderSortCell } from '@/components/data-table/header-sort-cell';
 import { TextCell } from '@/components/data-table/text-cell';
 import { StatusBadge } from '@/components/status-badge';
 import { Button } from '@/components/ui/button';
@@ -15,7 +16,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Customer, CustomerVerb, Replacements } from '@/types';
 import { ColumnDef } from '@tanstack/react-table';
-import { ArrowUpDown, MoreHorizontal } from 'lucide-react';
+import { Building, MoreHorizontal, UserCheck } from 'lucide-react';
 
 type Props = {
   onDidClick: (customer: Customer, action: CustomerVerb) => void;
@@ -48,14 +49,24 @@ export const getColumns = ({ onDidClick, t }: Props): ColumnDef<Customer>[] => {
       },
     },
     {
+      accessorKey: 'customer_type',
+      meta: t('global.type'),
+      size: 40,
+      header: (props) => {
+        return <HeaderCell title={t('global.type')} alignment="left" columnWidth={props.column.getSize()} className="px-0" />;
+      },
+      cell: (props) => {
+        if (props.row.original.customer_type === 'individual') {
+          return <UserCheck />;
+        }
+        return <Building />;
+      },
+    },
+    {
       accessorKey: 'name',
       meta: t('global.name'),
       header: ({ column }) => {
-        return (
-          <Button className="uppercase" variant="ghost" onClick={() => column.toggleSorting(column.getIsSorted() === 'asc')}>
-            {t('global.name')} <ArrowUpDown />
-          </Button>
-        );
+        return <HeaderSortCell<Customer> title={t('global.name')} column={column} />;
       },
       cell: (props) => {
         return <TextCell columnWidth={props.column.getSize()} value={props.getValue() as string} />;
@@ -85,11 +96,7 @@ export const getColumns = ({ onDidClick, t }: Props): ColumnDef<Customer>[] => {
       accessorKey: 'email',
       meta: t('global.email'),
       header: ({ column }) => {
-        return (
-          <Button className="uppercase" variant="ghost" onClick={() => column.toggleSorting(column.getIsSorted() === 'asc')}>
-            {t('global.email')} <ArrowUpDown />
-          </Button>
-        );
+        return <HeaderSortCell<Customer> title={t('global.email')} column={column} />;
       },
       cell: (props) => {
         return <TextCell columnWidth={props.column.getSize()} value={props.getValue() as string} />;

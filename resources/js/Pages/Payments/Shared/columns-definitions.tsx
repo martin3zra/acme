@@ -2,6 +2,7 @@ import { CurrencyCell } from '@/components/data-table/currency-cell';
 import { DateCell } from '@/components/data-table/date-cell';
 import { EditableCell } from '@/components/data-table/editable-cell';
 import { HeaderCell } from '@/components/data-table/header-cell';
+import { HeaderSortCell } from '@/components/data-table/header-sort-cell';
 import { TextCell } from '@/components/data-table/text-cell';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -16,7 +17,7 @@ import {
 import { PaymentVerb, ReceivableInvoiceForm, Replacements } from '@/types';
 import { Link } from '@inertiajs/react';
 import { ColumnDef } from '@tanstack/react-table';
-import { ArrowUpDown, MoreHorizontal } from 'lucide-react';
+import { MoreHorizontal } from 'lucide-react';
 
 type Props = {
   onDidClick: (item: ReceivableInvoiceForm, action: PaymentVerb) => void;
@@ -42,11 +43,7 @@ export const getColumns = ({ onDidClick, t }: Props): ColumnDef<ReceivableInvoic
       accessorKey: 'number',
       meta: t('payments.single.invoice'),
       header: ({ column }) => {
-        return (
-          <Button className="uppercase" variant="ghost" onClick={() => column.toggleSorting(column.getIsSorted() === 'asc')}>
-            {t('payments.single.invoice')} <ArrowUpDown />
-          </Button>
-        );
+        return <HeaderSortCell<ReceivableInvoiceForm> title={t('payments.single.invoice')} column={column} />;
       },
       cell: (props) => {
         return <TextCell columnWidth={props.column.getSize()} value={props.getValue() as string} />;

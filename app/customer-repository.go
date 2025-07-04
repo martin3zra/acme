@@ -291,7 +291,7 @@ func (s *Server) updateCustomerAmountDue(tx *sql.Tx, companyId, customerId int, 
 // TODO we set the LEFT JOIN check for NULL values. on Tax receipt.
 func (s *Server) findCustomeReceivables(ctx context.Context, customerID string) ([]*receivable, error) {
 	rows, err := s.db.Query(`
-    SELECT receivables.id, receivables.uuid, invoices.uuid, invoices.id,
+    SELECT receivables.id, receivables.uuid, invoices.uuid, invoices.id, invoices.code,
     invoices.date, invoices.due_on, invoices.total, invoices.amount_due, invoices.paid_status,
     tax_receipts.series || tax_receipts.type || LPAD(invoices.tax_receipt_sequence::varchar,8,'0') as NCF
 		FROM receivables
@@ -315,6 +315,7 @@ func (s *Server) findCustomeReceivables(ctx context.Context, customerID string) 
 			&row.UUID,
 			&row.Invoice.UUID,
 			&row.Invoice.ID,
+			&row.Invoice.Number,
 			&row.Invoice.Date,
 			&row.Invoice.DueOn,
 			&row.Invoice.Total,
@@ -324,8 +325,6 @@ func (s *Server) findCustomeReceivables(ctx context.Context, customerID string) 
 		); err != nil {
 			return data, err
 		}
-
-		row.Invoice.Number = s.generatePrefixedInvoiceNumber(row.Invoice.ID)
 
 		data = append(data, row)
 	}

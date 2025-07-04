@@ -1,6 +1,7 @@
 import { CurrencyCell } from '@/components/data-table/currency-cell';
 import { DateCell } from '@/components/data-table/date-cell';
 import { HeaderCell } from '@/components/data-table/header-cell';
+import { HeaderSortCell } from '@/components/data-table/header-sort-cell';
 import { LinkCell } from '@/components/data-table/link-cell';
 import { NumericCell } from '@/components/data-table/numeric-cell';
 import { TextCell } from '@/components/data-table/text-cell';
@@ -18,7 +19,7 @@ import {
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Payment, PaymentVerb, Replacements } from '@/types';
 import { ColumnDef } from '@tanstack/react-table';
-import { ArrowUpDown, MessageCircleMore, MoreHorizontal } from 'lucide-react';
+import { MessageCircleMore, MoreHorizontal } from 'lucide-react';
 
 type Props = {
   onDidClick: (item: Payment, action: PaymentVerb) => void;
@@ -72,11 +73,7 @@ export const getColumns = ({ onDidClick, t }: Props): ColumnDef<Payment>[] => {
       id: 'customer.name',
       meta: t('global.customer'),
       header: ({ column }) => {
-        return (
-          <Button className="uppercase" variant="ghost" onClick={() => column.toggleSorting(column.getIsSorted() === 'asc')}>
-            {t('global.customer')} <ArrowUpDown />
-          </Button>
-        );
+        return <HeaderSortCell<Payment> title={t('global.customer')} column={column} />;
       },
       cell: (props) => {
         return (

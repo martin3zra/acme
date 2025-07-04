@@ -73,6 +73,7 @@
     "additionalInfo": "Información adicional",
     "taxReceipt": "Tipo NCF",
     "days": "días",
+    "type": "Tipo",
     "nouns": {
       "customer": {
         "gender":"m"

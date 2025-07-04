@@ -104,7 +104,7 @@ export interface Customer {
   amount_due: number;
   credit_limited: boolean;
   credit_limit: number;
-  customer_type: string;
+  customer_type: 'individual' | 'business';
   tax_receipt: number;
   open_balance: OpenBalance;
   open_balance_as_of: Date;

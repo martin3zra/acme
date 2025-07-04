@@ -1,6 +1,7 @@
 import { CurrencyCell } from '@/components/data-table/currency-cell';
 import { DateCell } from '@/components/data-table/date-cell';
 import { HeaderCell } from '@/components/data-table/header-cell';
+import { HeaderSortCell } from '@/components/data-table/header-sort-cell';
 import { LinkCell } from '@/components/data-table/link-cell';
 import { TextCell } from '@/components/data-table/text-cell';
 import { StatusBadge } from '@/components/status-badge';
@@ -16,7 +17,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { DiscountType, Invoice, InvoiceVerb, Replacements } from '@/types';
 import { ColumnDef } from '@tanstack/react-table';
-import { ArrowUpDown, MoreHorizontal } from 'lucide-react';
+import { MoreHorizontal } from 'lucide-react';
 
 type Props = {
   onDidClick: (item: Invoice, action: InvoiceVerb) => void;
@@ -67,11 +68,7 @@ export const getColumns = ({ onDidClick, t }: Props): ColumnDef<Invoice>[] => {
       meta: t('global.customer'),
       size: 200,
       header: ({ column }) => {
-        return (
-          <Button className="font-semibold uppercase" variant="ghost" onClick={() => column.toggleSorting(column.getIsSorted() === 'asc')}>
-            {t('global.customer')} <ArrowUpDown />
-          </Button>
-        );
+        return <HeaderSortCell<Invoice> title={t('global.customer')} column={column} />;
       },
       cell: (props) => {
         return (

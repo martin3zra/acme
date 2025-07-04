@@ -1,6 +1,7 @@
 import { CurrencyCell } from '@/components/data-table/currency-cell';
 import { DateCell } from '@/components/data-table/date-cell';
 import { HeaderCell } from '@/components/data-table/header-cell';
+import { HeaderSortCell } from '@/components/data-table/header-sort-cell';
 import { TextCell } from '@/components/data-table/text-cell';
 import { StatusBadge } from '@/components/status-badge';
 import { Button } from '@/components/ui/button';
@@ -15,7 +16,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Item, Replacements, Verb } from '@/types';
 import { ColumnDef } from '@tanstack/react-table';
-import { ArrowUpDown, MoreHorizontal, Package, Wrench } from 'lucide-react';
+import { MoreHorizontal, Package, Wrench } from 'lucide-react';
 
 type Props = {
   onDidClick: (item: Item, action: Verb) => void;
@@ -52,11 +53,7 @@ export const getColumns = ({ onDidClick, t }: Props): ColumnDef<Item>[] => {
       accessorKey: 'name',
       meta: t('global.name'),
       header: ({ column }) => {
-        return (
-          <Button className="uppercase" variant="ghost" onClick={() => column.toggleSorting(column.getIsSorted() === 'asc')}>
-            {t('global.name')} <ArrowUpDown />
-          </Button>
-        );
+        return <HeaderSortCell<Item> title={t('global.name')} column={column} />;
       },
       cell: (props) => {
         return <TextCell columnWidth={props.column.getSize()} value={props.getValue() as string} />;
