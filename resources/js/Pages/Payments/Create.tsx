@@ -97,6 +97,16 @@ export default function Create({
       lines.push(line);
     });
 
+    // When we want to record a payment from the customer list
+    // and that customer only has one invoice pending and
+    // not record has been selected by default we set
+    // as select the existing invoice and the total
+    // received would be equal to the amount due
+    if (selectedRowId === -1 && receivables.length === 1) {
+      selectedRowId = receivables[0].invoice.id;
+      lines[0].payment = receivables[0].invoice.amount_due;
+    }
+
     if (selectedRowId > 0) {
       setRowSelection((prev) => ({
         ...prev,
