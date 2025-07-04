@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"fmt"
 
 	"github.com/martin3zra/acme/pkg/foundation"
 )
@@ -18,6 +19,11 @@ type taxReceipt struct {
 	Current       int    `json:"current"`
 	// Add timestamps properties
 	foundation.Timestamps
+}
+
+type taxReceiptSeq struct {
+	Seq    int64
+	Number string
 }
 
 func (s *Server) findTaxesReceipts(ctx context.Context) ([]*taxReceipt, error) {
@@ -51,23 +57,26 @@ func (s *Server) findTaxesReceipts(ctx context.Context) ([]*taxReceipt, error) {
 	return data, nil
 }
 
-func (s *Server) grabTaxReceiptSequence(tx *sql.Tx, companyId, taxReceiptID int) (int64, error) {
+func (s *Server) grabTaxReceiptSequence(tx *sql.Tx, companyId, taxReceiptID int) (*taxReceiptSeq, error) {
 	var sequence, sequenceEnd int64
-	row := tx.QueryRow("SELECT current, sequence_end FROM tax_receipts WHERE company_id = $1 AND id = $2", companyId, taxReceiptID)
-	err := row.Scan(&sequence, &sequenceEnd)
+	var series, taxType string
+	row := tx.QueryRow("SELECT series, type, current, sequence_end FROM tax_receipts WHERE company_id = $1 AND id = $2", companyId, taxReceiptID)
+	err := row.Scan(&series, &taxType, &sequence, &sequenceEnd)
 	if err != nil {
-		return 0, err
+		return nil, err
 	}
 
 	// abort the transaction when the current sequence is equals to the end sequence
 	if sequence == sequenceEnd {
-		return 0, errors.New("tax receipt reach end") //new(ErrTaxReceiptReachEnd)
+		return nil, errors.New("tax receipt reach end") //new(ErrTaxReceiptReachEnd)
 	}
 
 	_, err = tx.Exec("UPDATE tax_receipts SET current = $3 WHERE company_id = $1 AND id = $2", companyId, taxReceiptID, sequence+1)
 	if err != nil {
-		return 0, err
+		return nil, err
 	}
 
-	return sequence, nil
+	taxNumber := foundation.GeneratePrefixedNumber(fmt.Sprintf("%s%s", series, taxType), 8, int(sequence))
+
+	return &taxReceiptSeq{Seq: sequence, Number: taxNumber}, nil
 }

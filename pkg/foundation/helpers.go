@@ -3,6 +3,7 @@ package foundation
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"log"
 	"net"
 	"net/http"
@@ -56,6 +57,10 @@ func AsMap(obj any) map[string]any {
 	}
 
 	return result
+}
+
+func GeneratePrefixedNumber(prefix string, length, value int) string {
+	return fmt.Sprintf(fmt.Sprintf("%s%%0%dv", prefix, length), value)
 }
 
 func ToJSON(m any) string {

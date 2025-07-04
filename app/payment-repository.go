@@ -147,7 +147,7 @@ func (s *Server) findPaymentLines(ctx context.Context, paymentID int) ([]*paymen
     receivables_income_items.created_at, receivables_income_items.updated_at,
     receivables_income_items.deleted_at,
     invoices.id, invoices.uuid, invoices.code, invoices.date, invoices.due_on, invoices.total, receivables_income_items.amount_due,
-    invoices.paid_status, tax_receipts.series || tax_receipts.type || LPAD(invoices.tax_receipt_sequence::varchar,8,'0') as NCF, invoices.note
+    invoices.paid_status, invoices.tax_number, invoices.note
     from receivables_income_items
     inner join companies on receivables_income_items.company_id = companies.id
     inner join receivables_income on receivables_income_items.company_id = receivables_income.company_id and receivables_income_items.receivable_income_id = receivables_income.id

@@ -292,8 +292,7 @@ func (s *Server) updateCustomerAmountDue(tx *sql.Tx, companyId, customerId int, 
 func (s *Server) findCustomeReceivables(ctx context.Context, customerID string) ([]*receivable, error) {
 	rows, err := s.db.Query(`
     SELECT receivables.id, receivables.uuid, invoices.uuid, invoices.id, invoices.code,
-    invoices.date, invoices.due_on, invoices.total, invoices.amount_due, invoices.paid_status,
-    tax_receipts.series || tax_receipts.type || LPAD(invoices.tax_receipt_sequence::varchar,8,'0') as NCF
+    invoices.date, invoices.due_on, invoices.total, invoices.amount_due, invoices.paid_status, invoices.tax_number
 		FROM receivables
 		INNER JOIN companies ON (receivables.company_id = companies.id)
 		INNER JOIN invoices ON (receivables.company_id = invoices.company_id AND receivables.customer_id = invoices.customer_id AND receivables.invoice_id = invoices.id)
