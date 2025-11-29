@@ -9,6 +9,9 @@ import (
 	"net/http"
 	"reflect"
 	"strings"
+
+	"golang.org/x/text/language"
+	"golang.org/x/text/message"
 )
 
 func GetIpAddress(r *http.Request) (string, error) {
@@ -88,4 +91,18 @@ func ResolveError(err error) error {
 		}
 		err = unw
 	}
+}
+
+type AmountFormat struct {
+	Amount float64
+	Symbol string
+}
+
+func FormatAmount(amount float64, options ...string) string {
+	p := message.NewPrinter(language.English)
+	symbol := "$"
+	if len(options) > 0 {
+		symbol = options[0]
+	}
+	return p.Sprintf("%s%.2f", symbol, amount) // "$1,234,567.89"
 }

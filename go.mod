@@ -11,4 +11,7 @@ require (
 	golang.org/x/crypto v0.1.0
 )
 
-require codeberg.org/go-pdf/fpdf v0.11.1 // indirect
+require (
+	codeberg.org/go-pdf/fpdf v0.11.1 // indirect
+	golang.org/x/text v0.26.0 // indirect
+)

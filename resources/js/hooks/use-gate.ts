@@ -6,9 +6,14 @@ type Resource = {
 export function useGate() {
   const { props } = usePage();
   const usingWildcard = (ability: string = ''): boolean => {
-    if (typeof window === 'undefined' || typeof window._abilities !== 'object' || window._abilities === null) return false;
-
     const abilities = props.abilities as Resource;
+    if (
+      (typeof window === 'undefined' || typeof window._abilities !== 'object' || window._abilities === null) &&
+      abilities &&
+      Object.keys(abilities).length === 0
+    )
+      return false;
+
     if (abilities && Object.keys(abilities).length === 0) return false;
 
     if (abilities['*'] || abilities[ability]) {
