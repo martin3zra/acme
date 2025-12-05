@@ -23,7 +23,7 @@ func (w Verify) To() []mailer.Individual {
 	return []mailer.Individual{}
 }
 
-func (w Verify) Content() string { return "resources/views/mail/verify.html" }
+func (w Verify) Content() string { return "views/mail/verify.html" }
 
 func (w Verify) Data() map[string]any {
 

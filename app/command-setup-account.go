@@ -12,8 +12,8 @@ import (
 
 func (s *Server) SetupAccount() {
 
-	name := "Coffee Cups"          //console.Ask("What's the account name?")
-	email := "gcmassiel@gmail.com" //console.Ask("What's the owner email?")
+	name := console.Ask("What's the account name?")
+	email := console.Ask("What's the owner email?")
 
 	if err := database.WithTransaction(s.db, func(tx *sql.Tx) error {
 
@@ -28,9 +28,9 @@ func (s *Server) SetupAccount() {
 			return err
 		}
 
-		stmt, err = tx.Prepare("INSERT INTO accounts (name, owner_id) VALUES($1,$2) RETURNING id")
+		stmt, err = tx.Prepare("INSERT INTO accounts (owner_id) VALUES($1) RETURNING id")
 		var accountID int
-		stmt.QueryRow(name, userID).Scan(&accountID)
+		stmt.QueryRow(userID).Scan(&accountID)
 		if err != nil {
 			return err
 		}
@@ -44,7 +44,7 @@ func (s *Server) SetupAccount() {
 
 		return nil
 	}); err != nil {
-		console.Info("The new account wasn't created. Something wrong happened.")
+		console.Info("The new account wasn't created. Something wrong happened.", err)
 		log.Fatal(err)
 		return
 	}

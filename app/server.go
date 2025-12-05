@@ -36,7 +36,7 @@ type Server struct {
 	route      *routing.Router
 }
 
-func NewServer(assets, resources *embed.FS) *Server {
+func NewServer(assets, resources embed.FS) *Server {
 
 	qs, err := store.NewQueryStore(sqlQueriesFS, "sql/")
 	if err != nil {
@@ -48,11 +48,8 @@ func NewServer(assets, resources *embed.FS) *Server {
 		qs:         qs,
 		config:     LoadConfig(),
 		translator: translator,
-	}
-
-	if assets != nil && resources != nil {
-		server.assets = *assets
-		server.resources = *resources
+		assets:     assets,
+		resources:  resources,
 	}
 
 	return server
