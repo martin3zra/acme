@@ -1,16 +1,46 @@
 #!/usr/bin/env bash
+set -e
 
-echo "Building React application."
+# Default values
+TARGET_OS=${1:-darwin}      # macOS by default
+TARGET_ARCH=${2:-amd64}     # default architecture
+
+echo "=============================="
+echo " Building for: $TARGET_OS / $TARGET_ARCH"
+echo "=============================="
+
+# Validate supported OS's
+case "$TARGET_OS" in
+  darwin|linux|windows)
+    ;;
+  *)
+    echo "❌ Unsupported OS: $TARGET_OS"
+    echo "Allowed: darwin, linux, windows"
+    exit 1
+    ;;
+esac
+
+# React build
+echo "Building React application..."
 npm run build
 
-echo "check if the manifest file exists, if not, rename it."
-
+echo "Checking manifest.json..."
 if ! test -f public/build/manifest.json; then
-  echo "laravel-vite-plugin not running in dev mode, use build manifest file "
+  echo "Manifest not found — copying vite build manifest..."
   cp public/build/.vite/manifest.json public/build/manifest.json
-
-  echo "manifest.json file was copy to public/build "
+  echo "manifest.json copied!"
 fi
 
-echo "Building Golang application."
-go build -tags prod -o bin/acme
+# For Windows, add `.exe` automatically
+EXT=""
+[ "$TARGET_OS" = "windows" ] && EXT=".exe"
+
+# Go app build
+echo "Building Golang application..."
+GOOS="$TARGET_OS" GOARCH="$TARGET_ARCH" \
+go build -tags prod -o "bin/acme-${TARGET_OS}-${TARGET_ARCH}${EXT}"
+
+echo "=============================="
+echo " Build complete!"
+echo " Output: bin/acme-${TARGET_OS}-${TARGET_ARCH}${EXT}"
+echo "=============================="

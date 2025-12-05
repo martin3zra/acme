@@ -92,6 +92,7 @@ func LoadConfig() *Config {
 			password: os.Getenv("DB_PASSWORD"),
 			host:     os.Getenv("DB_HOST"),
 			port:     os.Getenv("DB_PORT"),
+			sslmode:  os.Getenv("DB_SSLMODE"),
 		},
 		session: Session{
 			lifetime: lifetimeSession,
@@ -118,6 +119,7 @@ type Database struct {
 	password string
 	host     string
 	port     string
+	sslmode  string
 }
 
 type Session struct {
