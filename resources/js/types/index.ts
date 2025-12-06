@@ -432,3 +432,7 @@ export type Role = {
 };
 
 export type RoleType = 'developer' | 'owner' | 'admin' | 'supervisor' | 'standard';
+
+export interface SlotProps {
+  children: React.ReactNode;
+}

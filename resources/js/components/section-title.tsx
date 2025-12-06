@@ -1,30 +1,28 @@
+import { SlotProps } from '@/types';
 import React, { JSX } from 'react';
 
-function Title({ children }: React.ReactNode): JSX.Element {
+function Title({ children }: SlotProps): JSX.Element {
   return <>{children}</>;
 }
 
-function Description({ children }: React.ReactNode): JSX.Element {
+function Description({ children }: SlotProps): JSX.Element {
   return <>{children}</>;
 }
 
-function Aside({ children }: React.ReactNode): JSX.Element {
+function Aside({ children }: SlotProps): JSX.Element {
   return <>{children}</>;
 }
 
-interface Props {
-  children: React.ReactNode;
-}
-
-class SectionTitle extends React.PureComponent<Props> {
+class SectionTitle extends React.PureComponent<SlotProps> {
   static Title = Title;
   static Description = Description;
   static Aside = Aside;
   render() {
     const { children } = this.props;
-    const title = (React.Children.toArray(children) as React.ReactNode).find((children: React.ReactNode) => children.type === Title);
-    const description = (React.Children.toArray(children) as React.ReactNode).find((children: React.ReactNode) => children.type === Description);
-    const aside = (React.Children.toArray(children) as React.ReactNode).find((children: React.ReactNode) => children.type === Aside);
+    const array = React.Children.toArray(children);
+    const title = array.find((child): child is React.ReactElement => React.isValidElement(child) && child.type === Title);
+    const description = array.find((child): child is React.ReactElement => React.isValidElement(child) && child.type === Description);
+    const aside = array.find((child): child is React.ReactElement => React.isValidElement(child) && child.type === Aside);
     return (
       <div className="flex justify-between md:col-span-1">
         <div className="px-4 sm:px-0">
