@@ -163,6 +163,10 @@ func AuthenticatedMiddleware(next routing.HandlerFunc) routing.HandlerFunc {
 		cc, _ := getCurrentCompany(attrsMap)
 
 		acCtx := context.WithValue(userCtx, support.AccountKey{}, ac)
+		if cc == nil {
+			next(ctx.WithContext(acCtx))
+			return
+		}
 		ccCtx := context.WithValue(acCtx, support.CompanyKey{}, cc)
 
 		ctxWithProps := context.WithValue(ccCtx, routing.PermissionKey{}, permissions(cc.UserRole))

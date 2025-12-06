@@ -34,7 +34,7 @@ func (a account) MarkAccountAsVerified(db *sql.DB) bool {
 			return err
 		}
 
-		if _, err := tx.Exec("UPDATE users SET email_verified_at = $2, status = 'enabled'::entity_status FROM accounts WHERE users.id = accounts.owner_id AND accounts.id = $1", a.ID, time.Now()); err != nil {
+		if _, err := tx.Exec("UPDATE users SET email_verified_at = $2, status = 'enabled'::user_status FROM accounts WHERE users.id = accounts.owner_id AND accounts.id = $1", a.ID, time.Now()); err != nil {
 			return err
 		}
 		return nil

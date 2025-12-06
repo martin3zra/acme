@@ -62,7 +62,14 @@ func (s *Server) verifyAccountHandler(ctx *routing.Context) {
 		return
 	}
 
-	err = s.sessionManager.ReGenerate(ctx.Request, user, map[string]any{})
+	attrs := map[string]any{"current_company": nil, "account": nil}
+	attrs["account"] = map[string]any{
+		"id":    account.ID,
+		"uuid":  account.UUID,
+		"owner": true,
+	}
+
+	err = s.sessionManager.ReGenerate(ctx.Request, user, attrs)
 	if err != nil {
 		ctx.Error(err)
 		return

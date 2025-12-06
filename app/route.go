@@ -33,14 +33,13 @@ func (s *Server) bootRoutes() {
 		WithMiddleware(AuthenticatedMiddleware, Verified, EnforceVerifiedUserAccess).
 		WithoutGroupMiddleware(RedirectIfAuthenticated).
 		Group(func(route *routing.Router) {
-			route.GET("/onboarding", s.onboardingHandler)
+			route.GET("/onboarding", s.onboardingHandler).WithoutMiddleware(RestrictedAccess)
+			route.POST("/companies", s.storeCompanyHandler).WithoutMiddleware(RestrictedAccess)
 
 			route.
 				WithMiddleware(RestrictedAccess).
 				Group(func(route *routing.Router) {
 					route.GET("/home", s.homeHandler)
-
-					route.POST("/companies", s.storeCompanyHandler)
 
 					route.GET("/customers", s.customersHandler).Can("viewAny:customer")
 					route.POST("/customers", s.storeCustomerHandler())
@@ -69,8 +68,6 @@ func (s *Server) bootRoutes() {
 					route.PUT("/payments/:id/void", s.voidPaymentHandler())
 					route.PUT("/payments/:id", s.updatePaymentHandler())
 
-					route.POST("/password", s.createPasswordHandler())
-
 					route.GroupPrefix("/settings/:account", func(route *routing.Router) {
 						route.GET("/profile", s.accountProfileHandler)
 						route.PUT("/profile", s.updateAccountProfileHandler())
@@ -86,6 +83,7 @@ func (s *Server) bootRoutes() {
 				WithoutGroupMiddleware(RestrictedAccess).
 				Group(func(route *routing.Router) {
 					route.POST("/logout", s.logoutHandler)
+					route.POST("/password", s.createPasswordHandler())
 
 					route.GET("/awaiting-association", func(ctx *routing.Context) {
 						ctx.Render("Restricted/AwaitingAssociation/Index", map[string]any{})

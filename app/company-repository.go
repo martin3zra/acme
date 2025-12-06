@@ -186,13 +186,13 @@ func (s *Server) linkCompanyDefaultSequences(tx *sql.Tx, companyID int) error {
 		},
 	}
 
-	tx.Exec(`
+	_, err := tx.Exec(`
     INSERT INTO companies_settings(company_id, sequences)
     VALUES($1, $2)
-    ON CONFLICT(company_id) DO UPDATE SET sequence = $2 updated_at = now()`,
+    ON CONFLICT(company_id) DO UPDATE SET sequences = $2, updated_at = now()`,
 		companyID, foundation.ToJSON(defaultSequences),
 	)
-	return nil
+	return err
 }
 
 func (s *Server) findSequences(ctx context.Context, uuid string) (*CompanySeq, error) {

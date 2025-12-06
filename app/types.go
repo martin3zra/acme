@@ -698,7 +698,12 @@ type StoreCompanyForm struct {
 }
 
 func (form StoreCompanyForm) Authorize() bool {
-	return Can(form.User(), "create:company")
+	db := form.Context().Value(database.ConnectionKey{}).(*sql.DB)
+	u := UserFromFoundationUser(form.User())
+	if u.IsOwner(db) {
+		return true
+	}
+	return Can(form.User(), "create:company") // OR OWNER
 }
 
 func (StoreCompanyForm) Rules() map[string]any {
@@ -855,7 +860,6 @@ func (u *User) OwnedBy(db *sql.DB) (*account, error) {
     WHERE accounts_users.user_id = $1
   `, u.Id).
 		Scan(&a.ID, &a.UUID, &a.Owner.ID, &a.Status, &a.VerifiedAt, &a.CreatedAt, &a.UpdatedAt, &a.DeletedAt); err != nil {
-		log.Println("An error occurred fetching the owned account using the userId:", err)
 		return nil, err
 	}
 

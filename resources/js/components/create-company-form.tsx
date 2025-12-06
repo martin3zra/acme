@@ -28,7 +28,7 @@ export type CreateFormProps = {
 export default function CreateCompanyForm({ onFinish, params }: CreateFormProps) {
   const t = useTranslation().trans;
   const { headers } = useHeader();
-  const { data, setData, errors, processing, post, reset } = useForm<Required<CompanyForm>>({
+  const { data, setData, errors, processing, post, transform, reset } = useForm<Required<CompanyForm>>({
     name: params.company?.name || '',
     identifier: params.company?.identifier || '',
     city: params.company?.city || '',
@@ -39,6 +39,10 @@ export default function CreateCompanyForm({ onFinish, params }: CreateFormProps)
   };
 
   const submit = () => {
+    transform((data) => ({
+      ...data,
+      rnc: data.identifier,
+    }));
     post('/companies', {
       ...headers,
       onFinish: () => {
@@ -61,8 +65,15 @@ export default function CreateCompanyForm({ onFinish, params }: CreateFormProps)
             <InputError message={errors.name} />
           </div>
           <div className="col-span-3 space-y-2 sm:col-span-3">
-            <Label htmlFor="rnc">{t('companies.single.rnc')}</Label>
-            <Input type="text" name="rnc" maxLength={11} className="h-12 text-start md:text-xl" value={data.identifier} onChange={handleChange} />
+            <Label htmlFor="identifier">{t('companies.single.rnc')}</Label>
+            <Input
+              type="text"
+              name="identifier"
+              maxLength={11}
+              className="h-12 text-start md:text-xl"
+              value={data.identifier}
+              onChange={handleChange}
+            />
             <InputError message={errors.identifier} />
           </div>
           <div className="col-span-6 space-y-2">

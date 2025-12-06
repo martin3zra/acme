@@ -36,7 +36,12 @@ func (s *Server) storeCompanyHandler(ctx *routing.Context) {
 		return
 	}
 
-	attrs := map[string]any{"current_company": nil}
+	attrs := map[string]any{"current_company": nil, "account": nil}
+	attrs["account"] = map[string]any{
+		"id":    account.ID,
+		"uuid":  account.UUID,
+		"owner": true, // TODO Check here if this need to be confirm.
+	}
 	company, err := user.currentCompany(s.db)
 	if err == nil {
 		attrs["current_company"] = company
