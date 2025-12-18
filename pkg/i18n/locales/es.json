@@ -51,6 +51,7 @@
     "barcode": "Código de barras",
     "unit": "Unidad",
     "qty": "Cantidad",
+    "qtyAbrev": "QTY",
     "price": "Precio",
     "notes": "Notas",
     "noNotesWasLeft": "No se dejó ninguna nota.",
