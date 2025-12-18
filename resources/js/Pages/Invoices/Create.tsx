@@ -48,6 +48,10 @@ import CheckoutForm from './Shared/checkout-form';
 import { CustomerSection } from './Shared/customer-section';
 import { Lines } from './Shared/lines';
 
+interface InvoiceRedirectProps {
+  redirectTo: string;
+}
+
 export default function Create({
   auth,
   customers,
@@ -283,9 +287,14 @@ export default function Create({
     post('/invoices', {
       ...headers,
       preserveState: 'errors',
-      onSuccess: () => {
+      onSuccess: (event) => {
+        const page = event as unknown as { props: InvoiceRedirectProps };
         removeInvoiceForm();
-        router.get('/invoices');
+        if (page.props.redirectTo) {
+          router.visit(page.props.redirectTo);
+          return;
+        }
+        router.visit('/invoices');
       },
     });
   };

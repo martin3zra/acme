@@ -20,8 +20,9 @@ let onSuccessEvent = (e) => {
         toast.success(message);
       }, 200);
     }
-
-    delete props.flash;
+    if (props.flash.redirectTo) {
+      props.redirectTo = props.flash.redirectTo
+    }
   }
 };
 

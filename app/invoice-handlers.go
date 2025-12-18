@@ -194,8 +194,18 @@ func (s *Server) storeInvoiceHandler() routing.HandlerFunc {
 			return
 		}
 		ctx.Flash("success", s.trans("global.wasCreated", i18n.Replacements{"subject": "@global.invoice"}))
+		ctx.Flash("redirectTo", "/invoices")
 
-		ctx.Redirect("/invoices")
+		preferences, err := s.findRedirectPreferences(ctx.Request.Context(), CurrentCompany(ctx.Request.Context()).UUID)
+		if err != nil {
+			log.Printf("Error fetching redirect preferences: %v", err)
+			ctx.Back()
+			return
+		}
+
+		ctx.Flash("redirectTo", preferences.Redirect.Invoice)
+
+		ctx.Back()
 	})
 }
 

@@ -47,6 +47,28 @@ func (d *CompanySequence) Scan(value any) error {
 	return json.Unmarshal(b, &d)
 }
 
+type CompanyRedirectPreferences struct {
+	Redirect  RedirectPreferences `json:"redirect_preferences"`
+	UpdatedAt time.Time           `json:"updated_at"`
+}
+
+func (d *RedirectPreferences) Value() (driver.Value, error) {
+	return json.Marshal(d)
+}
+
+func (d *RedirectPreferences) Scan(value any) error {
+	if value == nil {
+		return nil
+	}
+
+	b, ok := value.([]byte)
+	if !ok {
+		return errors.New("type assertion to []byte failed")
+	}
+
+	return json.Unmarshal(b, &d)
+}
+
 func (s *Server) findCompanies(ctx context.Context) ([]*Company, error) {
 	rows, err := s.db.Query("SELECT id, uuid, name, identifier, city, address, created_at, updated_at, deleted_at FROM companies WHERE account_id = $1", CurrentAccount(ctx))
 	if err != nil {
@@ -186,11 +208,18 @@ func (s *Server) linkCompanyDefaultSequences(tx *sql.Tx, companyID int) error {
 		},
 	}
 
+	defaultRedirectPreferences := RedirectPreferences{
+		Invoice:  "create",
+		Customer: "list",
+		Product:  "list",
+		Payment:  "list",
+	}
+
 	_, err := tx.Exec(`
-    INSERT INTO companies_settings(company_id, sequences)
-    VALUES($1, $2)
-    ON CONFLICT(company_id) DO UPDATE SET sequences = $2, updated_at = now()`,
-		companyID, foundation.ToJSON(defaultSequences),
+    INSERT INTO companies_settings(company_id, sequences, redirect_preferences)
+    VALUES($1, $2, $3)
+    ON CONFLICT(company_id) DO UPDATE SET sequences = $2, redirect_preferences = $3, updated_at = now()`,
+		companyID, foundation.ToJSON(defaultSequences), foundation.ToJSON(defaultRedirectPreferences),
 	)
 	return err
 }
@@ -204,6 +233,17 @@ func (s *Server) findSequences(ctx context.Context, uuid string) (*CompanySeq, e
   `, CurrentAccount(ctx), uuid).
 		Scan(&seq.Sequence, &seq.UpdatedAt)
 	return &seq, err
+}
+
+func (s *Server) findRedirectPreferences(ctx context.Context, uuid string) (*CompanyRedirectPreferences, error) {
+	var crp CompanyRedirectPreferences
+	err := s.db.QueryRow(`
+    SELECT redirect_preferences, updated_at
+    FROM companies_settings
+    WHERE company_id = (SELECT id FROM companies WHERE account_id = $1 AND uuid = $2)
+  `, CurrentAccount(ctx), uuid).
+		Scan(&crp.Redirect, &crp.UpdatedAt)
+	return &crp, err
 }
 
 func (s *Server) updateSequences(ctx context.Context, uuid string, form *SequenceForm) error {

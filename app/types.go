@@ -363,6 +363,13 @@ var PaymentStatuses = struct {
 	Failed:    _PAYMENT_FAILED,
 }
 
+type RedirectPreferences struct {
+	Invoice  string `json:"invoice"`
+	Customer string `json:"customer"`
+	Product  string `json:"product"`
+	Payment  string `json:"payment"`
+}
+
 type LineAction string
 
 const (
