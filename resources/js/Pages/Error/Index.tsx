@@ -26,6 +26,11 @@ const statusConfig: Record<
     icon: <FileWarning className="text-muted-foreground h-12 w-12" />,
     description: "The page you are looking for doesn't exist.",
   },
+  412: {
+    title: 'Precondition Failed',
+    icon: <FileWarning className="text-muted-foreground h-12 w-12" />,
+    description: "The resource you are trying to access has missing prerequisites.",
+  },
   500: {
     title: 'Server Error',
     icon: <AlertTriangle className="h-12 w-12 text-red-500" />,

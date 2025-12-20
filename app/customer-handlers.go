@@ -10,6 +10,9 @@ import (
 )
 
 func (s *Server) customersHandler(ctx *routing.Context) {
+	if s.abortWhenPrerequisiteMissing(ctx, "customer") {
+		return
+	}
 
 	uuid := ctx.Query("id")
 	taxReceipts, err := s.findTaxesReceipts(ctx.Request.Context())

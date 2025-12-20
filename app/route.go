@@ -37,7 +37,7 @@ func (s *Server) bootRoutes() {
 			route.POST("/companies", s.storeCompanyHandler).WithoutMiddleware(RestrictedAccess)
 
 			route.
-				WithMiddleware(RestrictedAccess).
+				WithMiddleware(RestrictedAccess, AutoResourcePrerequisiteMiddleware).
 				Group(func(route *routing.Router) {
 					route.GET("/home", s.homeHandler)
 

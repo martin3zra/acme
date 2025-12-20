@@ -11,6 +11,7 @@ import { useEffect, useState } from 'react';
 import { breadcrumbs } from './constants';
 import { List } from './List/Index';
 import CreateForm, { CreateFormParams } from './Shared/CreateForm';
+import { Deferred } from '@inertiajs/react';
 
 export default function Index({ auth, items, taxes, units }: PageProps<{ items: Item[]; taxes: Tax[]; units: Unit[] }>) {
   const t = useTranslation().trans;
@@ -63,9 +64,11 @@ export default function Index({ auth, items, taxes, units }: PageProps<{ items: 
             title={t('items.title')}
             description={t('items.description')}
             rightPanel={
-              <Button onClick={onCreateNewItem}>
-                <Plus /> {t('items.newItem.title')}
-              </Button>
+              <Deferred data={['taxes', 'units']} fallback={<div>Loading...</div>}>
+                <Button onClick={onCreateNewItem}>
+                  <Plus /> {t('items.newItem.title')}
+                </Button>
+              </Deferred>
             }
           />
         )}
@@ -75,9 +78,11 @@ export default function Index({ auth, items, taxes, units }: PageProps<{ items: 
             <div className="absolute top-1/2 left-1/2 flex h-[244px] min-w-3xl -translate-x-1/2 -translate-y-1/2 flex-col items-center gap-4 rounded-[16px] bg-white p-[40px] shadow-[0px_8px_12px_-4px_rgba(16,12,12,0.08),0px_0px_2px_rgba(16,12,12,0.1),0px_1px_2px_rgba(16,12,12,0.1)]">
               <h4 className="text-2xl">{t('items.emptyState.title')}</h4>
               <p className="text-sm text-gray-400">{t('items.emptyState.description')}</p>
-              <Button onClick={onCreateNewItem}>
-                <Plus /> {t('items.newItem.title')}
-              </Button>
+              <Deferred data="attributes" fallback={<div>Loading...</div>}>
+                <Button onClick={onCreateNewItem}>
+                  <Plus /> {t('items.newItem.title')}
+                </Button>
+              </Deferred>
             </div>
           </>
         )}

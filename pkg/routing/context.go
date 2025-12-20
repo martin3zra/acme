@@ -79,6 +79,7 @@ func (ctx *Context) Error(err error, status ...int) {
 		403: "Forbidden.",
 		401: "Unauthorized.",
 		404: "Not Found.",
+		412: "Precondition Failed.",
 	}
 
 	defaultStatus := 500

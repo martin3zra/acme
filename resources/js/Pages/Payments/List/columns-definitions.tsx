@@ -57,7 +57,7 @@ export const getColumns = ({ onDidClick, t }: Props): ColumnDef<Payment>[] => {
               <Tooltip>
                 <TooltipTrigger>
                   <MessageCircleMore
-                    className="absolute inset-0 -top-0 left-[62%] hidden size-5 -translate-x-1/2 -translate-y-1/2 transform cursor-pointer"
+                    className="absolute inset-0 -top-0 left-[90%] hidden size-5 -translate-x-1/2 -translate-y-1/2 transform cursor-pointer"
                     data-slot={hasNotes ? 'has-notes' : 'default'}
                   />
                 </TooltipTrigger>

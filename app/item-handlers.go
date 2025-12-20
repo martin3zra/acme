@@ -9,6 +9,9 @@ import (
 )
 
 func (s *Server) itemsHandler(ctx *routing.Context) {
+	if s.abortWhenPrerequisiteMissing(ctx, "item") {
+		return
+	}
 
 	items, err := s.findItems(ctx.Request.Context())
 	if err != nil {

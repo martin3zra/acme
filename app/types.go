@@ -1012,3 +1012,24 @@ func (SequenceForm) Rules() map[string]any {
 func (form SequenceForm) Authorize() bool {
 	return Can(form.User(), "update:company:sequence")
 }
+
+type PrerequisiteResult struct {
+	Resource string `json:"resource"`
+	Ok       bool   `json:"ok"`
+	Missing  []struct {
+		Key     string `json:"key"`
+		Message string `json:"message"`
+	} `json:"missing"`
+}
+
+type prereqCacheKeyType struct{}
+
+var prereqCacheKey = prereqCacheKeyType{}
+
+type prereqCache map[string]PrerequisiteResult
+
+var (
+	ErrPrerequisitesMissing = errors.New("resource prerequisites missing")
+	ErrSettingsNotFound     = errors.New("company settings not found")
+	ErrInvalidConfiguration = errors.New("invalid resource configuration")
+)

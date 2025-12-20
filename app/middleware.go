@@ -3,6 +3,7 @@ package app
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"net/http"
 	"strings"
@@ -206,6 +207,30 @@ func RestrictedAccess(next routing.HandlerFunc) routing.HandlerFunc {
 	}
 }
 
+func AutoResourcePrerequisiteMiddleware(next routing.HandlerFunc) routing.HandlerFunc {
+	return func(ctx *routing.Context) {
+		resource, ok := resourceFromPath(ctx.Request.URL.Path)
+		if !ok {
+			next(ctx)
+			return
+		}
+
+		company := CurrentCompany(ctx.Request.Context())
+		if company == nil {
+			next(ctx)
+			return
+		}
+
+		rCtx, err := CheckResourcePrerequisites(ctx.Request.Context(), resource, company.ID)
+		if err != nil && !errors.Is(err, ErrPrerequisitesMissing) {
+			ctx.Error(err, http.StatusPreconditionFailed)
+			return
+		}
+
+		next(ctx.WithContext(rCtx))
+	}
+}
+
 func getCurrentCompany(attrs map[string]any) (*Company, error) {
 	raw, ok := attrs["current_company"]
 	if !ok {
@@ -241,4 +266,18 @@ func getAccount(attrs map[string]any) map[string]any {
 	}
 
 	return accountMap
+}
+
+func resourceFromPath(path string) (string, bool) {
+	parts := strings.Split(strings.Trim(path, "/"), "/")
+	if len(parts) < 1 {
+		return "", false
+	}
+
+	resource := parts[len(parts)-1]
+
+	// Normalize
+	resource = strings.TrimSuffix(resource, "s") // invoices → invoice
+
+	return resource, true
 }

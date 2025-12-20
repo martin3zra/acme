@@ -118,6 +118,26 @@ func (s *Server) trans(key string, replacements ...i18n.Replacements) string {
 	return s.translator.Trans(key, replacements...)
 }
 
+func (s *Server) abortWhenPrerequisiteMissing(ctx *routing.Context, resource string) bool {
+	cache, ok := ctx.Request.Context().Value(prereqCacheKey).(prereqCache)
+	if !ok {
+		return false
+	}
+
+	company := CurrentCompany(ctx.Request.Context())
+	key := fmt.Sprintf("%s:%d", resource, company.ID)
+	result, ok := cache[key]
+
+	if result.Ok || len(result.Missing) == 0 {
+		return false
+	}
+	ctx.Render("Error/Prerequisites", map[string]any{
+		"resource": resource,
+		"missing":  result.Missing,
+	})
+	return true
+}
+
 var rolePermissionsCache = map[string]map[string]bool{}
 
 var groupedPermissions = map[string]map[string][]string{

@@ -6,8 +6,10 @@ import (
 	"database/sql/driver"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"time"
 
+	"github.com/lib/pq"
 	"github.com/martin3zra/acme/pkg/database"
 	"github.com/martin3zra/acme/pkg/foundation"
 )
@@ -252,4 +254,60 @@ func (s *Server) updateSequences(ctx context.Context, uuid string, form *Sequenc
     SET sequences = $3, updated_at = now()
     WHERE company_id = (SELECT id FROM companies WHERE account_id = $1 AND uuid = $2)`, CurrentAccount(ctx), uuid, foundation.ToJSON(form.CompanySequence))
 	return err
+}
+
+func CheckResourcePrerequisites(ctx context.Context, resource string, companyID int) (context.Context, error) {
+	cache, _ := ctx.Value(prereqCacheKey).(prereqCache)
+	cacheKey := fmt.Sprintf("%s:%d", resource, companyID)
+
+	if cache != nil {
+		if cached, ok := cache[cacheKey]; ok {
+			if cached.Ok {
+				return ctx, nil
+			}
+			return ctx, ErrPrerequisitesMissing
+		}
+	}
+
+	db := ctx.Value(database.ConnectionKey{}).(*sql.DB)
+	var raw json.RawMessage
+
+	err := db.QueryRowContext(ctx, `SELECT check_resource_prerequisites($1, $2)`, resource, companyID).Scan(&raw)
+
+	if err != nil {
+		// 3️⃣ Convert DB errors → domain errors
+		if err == sql.ErrNoRows {
+			return ctx, ErrSettingsNotFound
+		}
+
+		// PostgreSQL error handling
+		var pqErr *pq.Error
+		if errors.As(err, &pqErr) {
+			switch pqErr.Code {
+			case "23514": // check_violation
+				return ctx, ErrInvalidConfiguration
+			default:
+				return ctx, fmt.Errorf("db error: %w", err)
+			}
+		}
+
+		return ctx, err
+	}
+
+	var result PrerequisiteResult
+	if err := json.Unmarshal(raw, &result); err != nil {
+		return ctx, err
+	}
+
+	if cache == nil {
+		cache = make(prereqCache)
+		ctx = context.WithValue(ctx, prereqCacheKey, cache)
+	}
+	cache[cacheKey] = result
+
+	if !result.Ok {
+		return ctx, ErrPrerequisitesMissing
+	}
+
+	return ctx, nil
 }

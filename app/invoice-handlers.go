@@ -16,6 +16,10 @@ import (
 )
 
 func (s *Server) invoicesHandler(ctx *routing.Context) {
+	if s.abortWhenPrerequisiteMissing(ctx, "invoice") {
+		return
+	}
+
 	uuid := ctx.Query("id")
 	invoices, err := s.findInvoices(ctx.Request.Context())
 	if err != nil {
@@ -370,7 +374,12 @@ func (s *Server) printInvoiceHandler(ctx *routing.Context) {
 		subtotal += float64(line.Qty) * line.Price
 		totalTax += line.Tax.Amount
 
-		pdf.CellFormat(widths[0], 8, *line.Identifier.Reference, "1", 0, "", false, 0, "")
+		reference := ""
+		if line.Identifier.Reference != nil {
+			reference = *line.Identifier.Reference
+		}
+
+		pdf.CellFormat(widths[0], 8, reference, "1", 0, "", false, 0, "")
 		pdf.CellFormat(widths[1], 8, line.Name, "1", 0, "", false, 0, "")
 		pdf.CellFormat(widths[2], 8, line.Unit.Name, "1", 0, "C", false, 0, "")
 		pdf.CellFormat(widths[3], 8, strconv.FormatInt(line.Qty, 10), "1", 0, "C", false, 0, "")

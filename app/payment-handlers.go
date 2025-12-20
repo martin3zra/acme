@@ -9,6 +9,10 @@ import (
 )
 
 func (s *Server) paymentsHandler(ctx *routing.Context) {
+	if s.abortWhenPrerequisiteMissing(ctx, "payment") {
+		return
+	}
+
 	payments, err := s.findPayments(ctx.Request.Context())
 	if err != nil {
 		ctx.Error(err)
