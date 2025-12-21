@@ -3,6 +3,7 @@ package app
 import (
 	"fmt"
 
+	"github.com/martin3zra/acme/pkg/cache"
 	"github.com/martin3zra/acme/pkg/foundation"
 	"github.com/martin3zra/acme/pkg/i18n"
 	"github.com/martin3zra/acme/pkg/routing"
@@ -38,12 +39,16 @@ func (s *Server) customersHandler(ctx *routing.Context) {
 		}),
 	}
 	if uuid != "" {
-		customer, err := s.findCustomeByUUID(ctx.Request.Context(), uuid)
+		c := cache.NewPgCache(s.db)
+		key := fmt.Sprintf("preview:customer:%s", uuid)
+		data, err := cache.Remember(ctx.Request.Context(), c, key, func() (*customer, error) {
+			return s.findCustomeByUUID(ctx.Request.Context(), uuid)
+		})
 		if err != nil {
 			ctx.Error(err)
 			return
 		}
-		props["customer"] = customer
+		props["customer"] = data
 	}
 
 	ctx.Render("Customers/Index", props)
