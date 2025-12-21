@@ -1,8 +1,10 @@
 package app
 
 import (
+	"fmt"
 	"log"
 
+	"github.com/martin3zra/acme/pkg/cache"
 	"github.com/martin3zra/acme/pkg/i18n"
 	"github.com/martin3zra/acme/pkg/routing"
 	inertia "github.com/romsar/gonertia/v2"
@@ -25,21 +27,29 @@ func (s *Server) paymentsHandler(ctx *routing.Context) {
 
 	uuid := ctx.Query("id")
 	if uuid != "" {
-		payment, err := s.findPaymentByUUID(ctx.Request.Context(), uuid)
-		if err != nil {
-			ctx.Error(err)
-			return
-		}
+		c := cache.NewPgCache(s.db)
+		key := fmt.Sprintf("preview:payment:%s", uuid)
+		data, err := cache.Remember(ctx.Request.Context(), c, key, func() (map[string]any, error) {
+			payment, err := s.findPaymentByUUID(ctx.Request.Context(), uuid)
+			if err != nil {
+				return nil, err
+			}
 
-		lines, err := s.findPaymentLines(ctx.Request.Context(), payment.ID)
+			lines, err := s.findPaymentLines(ctx.Request.Context(), payment.ID)
+			if err != nil {
+				return nil, err
+			}
+
+			return map[string]any{
+				"header": payment,
+				"lines":  lines,
+			}, nil
+		})
 		if err != nil {
 			ctx.Error(err)
 			return
 		}
-		props["payment"] = map[string]any{
-			"header": payment,
-			"lines":  lines,
-		}
+		props["payment"] = data
 		props["showPayment"] = true
 	}
 

@@ -21,6 +21,7 @@ export default function Index({
   showPayment,
 }: PageProps<{ payments: Payment[]; payment: PaymentWithLines; showPayment: boolean }>) {
   const t = useTranslation().trans;
+  const [loadingPayment, setLoadingPayment] = useCallbackState<boolean>(false);
   const [open, setOpen] = useCallbackState<boolean>(showPayment);
   const [selectedPayment, setSelectedPayment] = useCallbackState<Payment | undefined>(undefined);
   const [deleteDialogOpen, setDeleteDialogOpen] = useCallbackState<boolean>(false);
@@ -53,6 +54,8 @@ export default function Index({
       data: { id: uuid },
       preserveScroll: true,
       preserveState: true,
+      onStart: () => setLoadingPayment(true),
+      onFinish: () => setLoadingPayment(false),
     });
   };
 
@@ -89,7 +92,7 @@ export default function Index({
 
         {hasPayments && <List data={payments} onSelectPayment={onSelectPayment} />}
 
-        {payment && (
+        {payment && !loadingPayment && (
           <Sheet open={open} onOpenChange={onOpenChange}>
             <SheetContent side="right" className="m-4 flex h-[calc(~'(100%-var(--spacing)*4)/3')] w-full flex-col rounded-md sm:max-w-[1380px]">
               <SheetHeader>
