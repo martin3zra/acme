@@ -139,7 +139,7 @@ export default function Account({
   };
   return (
     <AppLayout breadcrumbs={breadcrumbs} user={auth.user}>
-      <div className="flex">
+      <div className="flex gap-x-1">
         <div className="flex basis-[30vw] flex-col gap-y-6 py-6">
           <div className="flex items-end gap-6">
             <div className="relative flex size-22 items-center">
@@ -165,7 +165,7 @@ export default function Account({
             <Button onClick={onEditProfile}>Edit Profile</Button>
           </div>
         </div>
-        <div className="basis-[70vw] space-y-6">
+        <div className="basis-[68vw] space-y-6">
           {hasCompanies && <CompanyList data={companies} onSelectCompany={onSelectCompany} />}
           {hasUsers && (
             <>
