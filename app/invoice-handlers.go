@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"codeberg.org/go-pdf/fpdf"
+	"github.com/martin3zra/acme/pkg/cache"
 	"github.com/martin3zra/acme/pkg/foundation"
 	"github.com/martin3zra/acme/pkg/i18n"
 	"github.com/martin3zra/acme/pkg/routing"
@@ -33,30 +34,36 @@ func (s *Server) invoicesHandler(ctx *routing.Context) {
 	}
 
 	if uuid != "" {
-		invoice, err := s.findInvoicesByUUID(ctx.Request.Context(), uuid)
+		c := cache.NewPgCache(s.db)
+		key := fmt.Sprintf("preview:invoice:%s", uuid)
+		data, err := cache.Remember(ctx.Request.Context(), c, key, func() (map[string]any, error) {
+			invoice, err := s.findInvoicesByUUID(ctx.Request.Context(), uuid)
+			if err != nil {
+				return nil, err
+			}
+
+			lines, err := s.findInvoiceLines(ctx.Request.Context(), invoice.ID)
+			if err != nil {
+				return nil, err
+			}
+
+			uri := fmt.Sprintf("%s/invoices/%s/print/%s", s.config.host, uuid, foundation.NewHashable().Sha1(uuid))
+			pdfURL, err := routing.PermanentSignedURL(uri, map[string]string{}, string(s.config.secretKey))
+			if err != nil {
+				return nil, nil
+			}
+
+			return map[string]any{
+				"header": invoice,
+				"lines":  lines,
+				"pdfURL": pdfURL,
+			}, nil
+		})
 		if err != nil {
 			ctx.Error(err)
 			return
 		}
-
-		lines, err := s.findInvoiceLines(ctx.Request.Context(), invoice.ID)
-		if err != nil {
-			ctx.Error(err)
-			return
-		}
-
-		uri := fmt.Sprintf("%s/invoices/%s/print/%s", s.config.host, uuid, foundation.NewHashable().Sha1(uuid))
-		pdfURL, err := routing.PermanentSignedURL(uri, map[string]string{}, string(s.config.secretKey))
-		if err != nil {
-			ctx.Error(err)
-			return
-		}
-
-		props["invoice"] = map[string]any{
-			"header": invoice,
-			"lines":  lines,
-			"pdfURL": pdfURL,
-		}
+		props["invoice"] = data
 		props["showInvoice"] = true
 	}
 

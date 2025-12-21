@@ -20,6 +20,7 @@ export default function Index({
   invoice,
   showInvoice,
 }: PageProps<{ invoices: Invoice[]; invoice: InvoiceWithLines; showInvoice: boolean }>) {
+  const [loadingInvoice, setLoadingInvoice] = useCallbackState<boolean>(false);
   const [open, setOpen] = useCallbackState<boolean>(showInvoice);
   const [selectedInvoice, setSelectedInvoice] = useCallbackState<Invoice | undefined>(undefined);
   const [deleteDialogOpen, setDeleteDialogOpen] = useCallbackState<boolean>(false);
@@ -59,6 +60,8 @@ export default function Index({
       data: { id: uuid },
       preserveScroll: true,
       preserveState: true,
+      onStart: () => setLoadingInvoice(true),
+      onFinish: () => setLoadingInvoice(false),
     });
   };
 
@@ -99,7 +102,7 @@ export default function Index({
           <iframe src={invoice.pdfURL} width="100%" height="600" className="rounded border" title="Invoice Preview"></iframe>
         )} */}
 
-        {invoice && (
+        {invoice && !loadingInvoice && (
           <Sheet open={open} onOpenChange={onOpenChange}>
             <SheetContent side="right" className="m-4 flex h-[calc(~'(100%-var(--spacing)*4)/3')] w-full flex-col rounded-md sm:max-w-[1380px]">
               <SheetHeader>
