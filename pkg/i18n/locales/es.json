@@ -2,6 +2,9 @@
   "global":{
     "ok": "Aceptar",
     "cancel": "Cancelar",
+    "default": "Predeterminado",
+    "credit": "Credito",
+    "cash": "Contado",
     "close": "Cerrar",
     "delete": "Eliminar",
     "edit": "Editar",

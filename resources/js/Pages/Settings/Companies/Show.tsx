@@ -17,15 +17,14 @@ export default function Show({ company }: Props) {
   const getInitials = useInitials();
 
   return (
-    <div>
-      <Tabs defaultValue="overview" className="min-w-[400px]">
-        <TabsList>
+      <Tabs defaultValue="overview" className="flex flex-1 min-h-0 flex-col [&_[data-slot=tabs-trigger]:not([data-state=active])]:cursor-pointer">
+        <TabsList className='shrink-0'>
           <TabsTrigger value="overview">Overview</TabsTrigger>
-          <TabsTrigger value="preferences">Preferences</TabsTrigger>
+          <TabsTrigger value="sequences">Sequences</TabsTrigger>
           <TabsTrigger value="taxes">Taxes</TabsTrigger>
         </TabsList>
         <TabsContent value="overview">
-          <div className="flex flex-col gap-y-6 py-6">
+          <div className="flex flex-col max-w-4xl gap-y-6 py-6">
             <div className="flex items-end gap-6">
               <div className="flex size-22 items-center">
                 <Avatar className="bg-muted flex h-22 w-22 items-center justify-center rounded-full">
@@ -65,11 +64,10 @@ export default function Show({ company }: Props) {
             </Card>
           </div>
         </TabsContent>
-        <TabsContent value="preferences">
+        <TabsContent value="sequences" className='flex-1 min-h-0 overflow-y-auto py-0'>
           <SequenceView uuid={company.uuid} sequences={company.sequences} />
         </TabsContent>
         <TabsContent value="taxes">Change your taxes here.</TabsContent>
       </Tabs>
-    </div>
   );
 }

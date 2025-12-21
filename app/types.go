@@ -979,8 +979,8 @@ type InvoiceSequence struct {
 type CompanySequence struct {
 	Invoice  InvoiceSequence `json:"invoice"`
 	Customer SequenceConfig  `json:"customer"`
-	Estimate SequenceConfig  `json:"estimate"`
-	Payment  SequenceConfig  `json:"payment"`
+	// Estimate SequenceConfig  `json:"estimate"`
+	Payment SequenceConfig `json:"payment"`
 }
 
 type SequenceForm struct {
@@ -1000,12 +1000,12 @@ func (SequenceForm) Rules() map[string]any {
 		"customer":                "required",
 		"customer.padding":        "required|min:3",
 		"customer.next":           "required|min:1",
-		"estimate":                "required",
-		"estimate.padding":        "required|min:3",
-		"estimate.next":           "required|min:1",
-		"payment":                 "required",
-		"payment.padding":         "required|min:3",
-		"payment.next":            "required|min:1",
+		// "estimate":                "required",
+		// "estimate.padding":        "required|min:3",
+		// "estimate.next":           "required|min:1",
+		"payment":         "required",
+		"payment.padding": "required|min:3",
+		"payment.next":    "required|min:1",
 	}
 }
 

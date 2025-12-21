@@ -176,12 +176,12 @@ export default function Account({
       </div>
 
       <Sheet open={state.sheetState} onOpenChange={onOpenChange}>
-        <SheetContent side="right" className="m-4 flex h-[calc(~'(100%-var(--spacing)*4)/3')] w-full flex-col rounded-md sm:max-w-[1380px]">
-          <SheetHeader>
+        <SheetContent side="right" className="m-4 flex h-[calc(100vh-2rem)] w-full flex-col rounded-md md:max-w-4xl sm:max-w-[1380px]">
+          <SheetHeader className='pb-0'>
             <SheetTitle>{t(`global.profile`)}</SheetTitle>
             <SheetDescription className="text-[12px]">Manage your subscription and billing details</SheetDescription>
           </SheetHeader>
-          <div className="grid gap-4 overflow-y-scroll px-4">
+          <div className="grid gap-2 overflow-y-scroll px-4">
             {state.sheetContent === 'company:view' && selectedCompany.company !== undefined && <Show company={selectedCompany.company} />}
             {state.sheetContent === 'company:form' && selectedCompany.company !== undefined && (
               <CreateCompanyForm params={selectedCompany} onFinish={modalHandler} />

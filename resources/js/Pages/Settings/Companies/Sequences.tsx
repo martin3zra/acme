@@ -3,7 +3,8 @@ import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useHeader } from '@/composables/use-headers';
-import { PageProps, SequenceConfig, Sequences } from '@/types';
+import { useTranslation } from '@/hooks/use-translation';
+import { PageProps, Replacements, SequenceConfig, Sequences } from '@/types';
 import { useForm, usePage } from '@inertiajs/react';
 
 type SeqProps = {
@@ -13,6 +14,7 @@ type SeqProps = {
 
 export default function SequenceView({ uuid, sequences }: SeqProps) {
   const { auth } = usePage<PageProps>().props;
+  const t = useTranslation().trans;
   const { headers } = useHeader();
   const { data, setData, transform, put, processing, errors } = useForm({
     sequences: sequences,
@@ -52,7 +54,7 @@ export default function SequenceView({ uuid, sequences }: SeqProps) {
       return {
         invoice: data.sequences.invoice,
         customer: data.sequences.customer,
-        estimate: data.sequences.estimate,
+        // estimate: data.sequences.estimate,
         payment: data.sequences.payment,
       };
     });
@@ -60,30 +62,27 @@ export default function SequenceView({ uuid, sequences }: SeqProps) {
   };
 
   return (
-    <>
-      <div className="mx-auto max-w-4xl space-y-6">
-        <h1 className="mb-4 text-2xl font-semibold">Sequence Settings</h1>
+      <div className="max-w-4xl space-y-2 py-4 [&_[data-slot='card']]:gap-1">
         {Object.entries(data.sequences).map(([module, value]) => (
           <Card key={module}>
-            <CardHeader className="font-bold capitalize">{module}</CardHeader>
+            <CardHeader className="font-bold capitalize">{t(`global.${module}`)}</CardHeader>
             {errors && <GroupedValidationList errors={errors} module={module} />}
-            <CardContent className="space-y-4">
+            <CardContent className="space-y-2">
               {typeof value === 'object' && 'prefix' in value ? (
-                <SequenceRow module={module} type={null} config={value as SequenceConfig} onChange={updateField} />
+                <SequenceRow t={t} module={module} type={null} config={value as SequenceConfig} onChange={updateField} />
               ) : (
                 Object.entries(value as Record<string, SequenceConfig>).map(([sub, cfg]) => (
-                  <SequenceRow key={sub} module={module} type={sub} config={cfg} onChange={updateField} />
+                  <SequenceRow t={t} key={sub} module={module} type={sub} config={cfg} onChange={updateField} />
                 ))
               )}
             </CardContent>
           </Card>
         ))}
 
-        <Button onClick={handleSave} type="submit" disabled={processing} className="h-12 uppercase md:text-xl">
-          Save All
+        <Button onClick={handleSave} type="submit" disabled={processing} className="h-12 py-2 md:text-xl">
+          {t('global.save')}
         </Button>
       </div>
-    </>
   );
 }
 
@@ -92,14 +91,15 @@ type RowProps = {
   type: string | null;
   config: SequenceConfig;
   onChange: (module: string, type: string | null, field: keyof SequenceConfig, value: string | number) => void;
+  t: (key: string, replacements?: Replacements) => string
 };
 
-function SequenceRow({ module, type, config, onChange }: RowProps) {
+function SequenceRow({ module, type, config, onChange, t }: RowProps) {
   const preview = `${config.prefix}${config.next.toString().padStart(config.padding, '0')}`;
 
   return (
     <div className="grid grid-cols-6 items-end gap-4">
-      <Label className="col-span-1 font-medium capitalize">{type ?? module}</Label>
+      <Label className="col-span-1 font-medium capitalize">{t(`global.${type ?? module}`)}</Label>
       <Input value={config.prefix} onChange={(e) => onChange(module, type, 'prefix', e.target.value)} placeholder="Prefix" />
       <Input type="number" value={config.next} onChange={(e) => onChange(module, type, 'next', parseInt(e.target.value))} placeholder="Next" />
       <Input
@@ -108,7 +108,7 @@ function SequenceRow({ module, type, config, onChange }: RowProps) {
         onChange={(e) => onChange(module, type, 'padding', parseInt(e.target.value))}
         placeholder="Padding"
       />
-      <div className="text-muted-foreground col-span-2 text-sm">Preview: {preview}</div>
+      <div className="text-muted-foreground col-span-2 text-sm">{preview}</div>
     </div>
   );
 }
