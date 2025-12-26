@@ -25,6 +25,7 @@ type payment struct {
 		Email     string  `json:"email"`
 		AmountDue float64 `json:"amount_due"`
 		Address   string  `json:"address"`
+		Phone     string  `json:"phone"`
 	} `json:"customer"`
 	Invoices int           `json:"invoices"`
 	Payment  Payment       `json:"payment"`
@@ -147,7 +148,8 @@ func (s *Server) findPaymentLines(ctx context.Context, paymentID int) ([]*paymen
     receivables_income_items.created_at, receivables_income_items.updated_at,
     receivables_income_items.deleted_at,
     invoices.id, invoices.uuid, invoices.code, invoices.date, invoices.due_on, invoices.total, receivables_income_items.amount_due,
-    invoices.paid_status, invoices.tax_number, invoices.note
+    CASE WHEN (receivables_income_items.amount_due - receivables_income_items.payment_amount) = 0 THEN 'paid' ELSE 'partial' END AS paid_status,
+	invoices.tax_number, invoices.note
     from receivables_income_items
     inner join companies on receivables_income_items.company_id = companies.id
     inner join receivables_income on receivables_income_items.company_id = receivables_income.company_id and receivables_income_items.receivable_income_id = receivables_income.id

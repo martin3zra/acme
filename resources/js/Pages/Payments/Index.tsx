@@ -116,9 +116,9 @@ export default function Index({
                       </>
                     )}
 
-                    <Button>
+                    <a href={payment.pdfURL}  className="bg-primary flex items-center gap-x-3 rounded-sm px-4 text-white" target="_blank" rel="noreferrer">
                       <Printer /> {t('global.actions.print')}
-                    </Button>
+                    </a>
                   </div>
                 </div>
               </SheetHeader>

@@ -66,6 +66,7 @@ func (s *Server) bootRoutes() {
 					route.GET("/payments/create", s.createPaymentHandler).Can("create:payment")
 					route.GET("/payments/:id/edit", s.editPaymentHandler).Can("update:payment")
 					route.PUT("/payments/:id/void", s.voidPaymentHandler())
+					route.GET("/payments/:id/print/:hash", s.printPaymentHandler).Middleware(Signed)
 					route.PUT("/payments/:id", s.updatePaymentHandler())
 
 					route.GroupPrefix("/settings/:account", func(route *routing.Router) {

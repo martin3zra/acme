@@ -20,6 +20,7 @@
     "number": "Número",
     "date": "Fecha",
     "dueDate": "Fecha de vencimiento",
+    "dueDateAbrev": "Vence",
     "addedAt": "Creado en",
     "payDate": "Pagado en",
     "datePlaceholder": "Elige una fecha",
@@ -40,6 +41,9 @@
     "user": "Usuario",
     "company": "Compañia",
     "invoice": "Factura",
+    "receiptOfPayment": "Recibo de Ingreso",
+    "weHaveReceivedFrom": "Hemos recibido de",
+    "address": "Dirección",
     "billTo": "Facturado A",
     "item": "Producto",
     "contact": "Contacto",
@@ -100,6 +104,10 @@
       "pending": "Pendiente",
       "removed": "Eliminado",
       "completed": "Completo"
+    },
+    "paymentLinesPaidStatuses": {
+      "paid": "Saldo",
+      "partial": "Abono"
     },
     "checkoutProcess": "Proceso de pago",
     "statuses": {

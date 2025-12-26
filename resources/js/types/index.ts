@@ -381,6 +381,7 @@ export interface PaymentLine {
 export interface PaymentWithLines {
   header: Payment;
   lines: PaymentLine[];
+  pdfURL: string;
 }
 
 export type onValueChangeType = (inputId: string, newValue: string | number) => void;

@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"math"
+	"path/filepath"
 	"regexp"
 	"strconv"
 	"strings"
@@ -142,4 +143,48 @@ func drawTextWatermarkKerned(
 	// restore
 	pdf.SetAlpha(1.0, "Normal")
 	pdf.TransformEnd()
+}
+
+type Font struct {
+	Name  string
+	Style string
+	Path  string
+}
+
+func registerFonts(pdf *fpdf.Fpdf) error {
+	fonts := []Font{
+		{"DejaVu", "", "/fonts/DejaVuSans.ttf"},
+		{"DejaVu", "I", "/fonts/DejaVu-Oblique.ttf"},
+		{"DejaVu", "B", "/fonts/DejaVu-Bold.ttf"},
+	}
+	for _, font := range fonts {
+		absPath, err := filepath.Abs(font.Path)
+		if err != nil {
+			return err
+		}
+		pdf.AddUTF8Font(font.Name, font.Style, absPath)
+		if pdf.Error() != nil {
+			return pdf.Error()
+		}
+	}
+
+	if pdf.Error() != nil {
+		return pdf.Error()
+	}
+	return nil
+}
+
+func truncate(pdf *fpdf.Fpdf, text string, maxWidth float64) string {
+	if pdf.GetStringWidth(text) <= maxWidth {
+		return text // no truncation → no ellipsis
+	}
+
+	ellipsis := "…"
+	ellipsisWidth := pdf.GetStringWidth(ellipsis)
+
+	for pdf.GetStringWidth(text)+ellipsisWidth > maxWidth && len(text) > 0 {
+		text = text[:len(text)-1]
+	}
+
+	return text + ellipsis
 }
