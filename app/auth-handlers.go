@@ -75,6 +75,12 @@ func (s *Server) authHandler(ctx *routing.Context) {
 		return
 	}
 
+	intended := session.Get("intended")
+	if intended != nil {
+		session.Delete("intended")
+		ctx.Redirect(intended.(string), http.StatusSeeOther)
+		return
+	}
 	ctx.Redirect("/home", http.StatusSeeOther)
 }
 

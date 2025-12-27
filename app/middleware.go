@@ -146,6 +146,7 @@ func AuthenticatedMiddleware(next routing.HandlerFunc) routing.HandlerFunc {
 				next(ctx)
 				return
 			}
+			sess.Put("intended", ctx.Request.RequestURI)
 			ctx.Redirect("/login", http.StatusSeeOther)
 			return
 		}
