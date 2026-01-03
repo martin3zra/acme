@@ -1,5 +1,6 @@
 import { CellContext } from '@tanstack/react-table';
 import React, { useState } from 'react';
+import { MoneyInput } from '../money-input';
 
 type EditableCellProps<TData, TValue> = CellContext<TData, TValue> & {
   identifier: string;
@@ -20,6 +21,18 @@ export function EditableCell<TData, TValue extends string | number>({
   const onBlur = () => {
     table.options.meta?.updateData(identifier, row.index, column.id, value);
   };
+
+  if (inputType === 'number') {
+    return (
+      <MoneyInput
+        id={identifier}
+        value={Number(value || 0)}
+        onChange={(c) => setValue(c as TValue)}
+        onBlur={onBlur}
+        className="h-10 w-full px-2 py-0 text-end border-0 shadow-none"
+      />
+    )
+  }
 
   return (
     <input

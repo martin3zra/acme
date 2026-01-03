@@ -1,4 +1,5 @@
 import FormSection from '@/components/form-section';
+import { MoneyInput } from '@/components/money-input';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useTranslation } from '@/hooks/use-translation';
@@ -7,11 +8,6 @@ import { BankOperationFormProps } from '@/types';
 export const CheckFormView = ({ amount, reference, onChange }: BankOperationFormProps) => {
   const t = useTranslation().trans;
   const handleChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    if (event.currentTarget.name === 'ck') {
-      onChange(event.currentTarget.valueAsNumber);
-      return;
-    }
-
     onChange(event.currentTarget.value);
   };
   return (
@@ -24,7 +20,7 @@ export const CheckFormView = ({ amount, reference, onChange }: BankOperationForm
             <Label htmlFor="ck" className="text-end">
               {t('global.amount')}
             </Label>
-            <Input type="number" min={0} name="ck" className="h-12 text-end md:text-xl" onChange={handleChange} autoFocus value={amount} />
+            <MoneyInput className="h-12 text-end md:text-xl" onChange={(c) => onChange(c)} autoFocus value={amount || 0} />
           </div>
           <div className="col-span-6 space-y-2 sm:col-span-4">
             <Label htmlFor="ck">{t('global.paymentMethods.ck.form.reference')}</Label>

@@ -66,7 +66,7 @@ func (s *Server) findPayments(ctx context.Context) ([]*payment, error) {
     INNER JOIN customers ON (receivables_income.company_id = customers.company_id AND receivables_income.customer_id = customers.id)
     WHERE receivables_income.company_id = $1
     AND receivables_income.deleted_at IS NULL
-    ORDER BY receivables_income.id
+    ORDER BY receivables_income.id DESC
   `, CurrentCompany(ctx).ID)
 	if err != nil {
 		return nil, err

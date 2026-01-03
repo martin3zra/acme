@@ -1,4 +1,4 @@
-import { Input } from '@/components/ui/input';
+import { MoneyInput } from '@/components/money-input';
 import { PaymentMethod } from '@/types';
 import { JSX } from 'react';
 
@@ -11,21 +11,15 @@ type InputViewProps = {
 };
 
 export const InputView = ({ value, method, autoFocus, onChange, onFocus }: InputViewProps): JSX.Element => {
-  const handleChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    onChange(method, event.currentTarget.valueAsNumber);
-  };
-
   return (
     <div className="p-0">
-      <Input
+      <MoneyInput
         key={method}
-        type="number"
-        min={0}
         className={`${method !== 'cash' && 'cursor-pointer'} border-none text-end`}
         value={value}
         autoFocus={autoFocus}
         onFocus={() => onFocus(method)}
-        onChange={handleChange}
+        onChange={(c) => onChange(method, c)}
         readOnly={method !== 'cash'}
       />
     </div>

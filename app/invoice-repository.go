@@ -62,7 +62,7 @@ func (s *Server) findInvoices(ctx context.Context) ([]*invoice, error) {
 		"INNER JOIN companies ON (invoices.company_id = companies.id) "+
 		"INNER JOIN customers ON (invoices.company_id = customers.company_id AND invoices.customer_id = customers.id) "+
 		"INNER JOIN tax_receipts ON (invoices.company_id = tax_receipts.company_id AND invoices.tax_receipt_id = tax_receipts.id) "+
-		"WHERE invoices.company_id = $1 ORDER BY invoices.id", CurrentCompany(ctx).ID)
+		"WHERE invoices.company_id = $1 ORDER BY invoices.id DESC", CurrentCompany(ctx).ID)
 	if err != nil {
 		return nil, err
 	}
