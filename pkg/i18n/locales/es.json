@@ -220,6 +220,28 @@
       "description": "Aún no estás asociado a una cuenta comercial, por lo que no puedes acceder a la aplicación."
     }
   },
+  "dashboard": {
+    "due_invoices": "Facturas vencidas",
+    "stats": {
+      "total_amount_due": "Monto total vencido",
+      "customers": "Clientes",
+      "invoices": "Facturas"
+    },
+    "viewItem": {
+      "invoice": {
+        "title": "Ver Factura",
+        "description": "Detalles de la factura seleccionada."
+      },
+      "customer": {
+        "title": "Ver Cliente",
+        "description": "Detalles del cliente seleccionado."
+      },
+      "payment": {
+        "title": "Registrar Pago",
+        "description": "Registrar pago de la Factura seleccionada."
+      }
+    }
+  },
   "verify": {
     "signatured-is-not-valid": "Intentamos procesar tu solicitud, pero parece que la firma que proporcionaste no es válida. Podría estar caducada, ser incorrecta o tener un formato incorrecto.\n\nNo te preocupes, ¡esto puede pasar! Para continuar, haz clic en el botón <b>Reenviar verificación</b>. Estaremos encantados de ayudarte.",
     "uuid-is-not-valid": "No pudimos completar tu solicitud porque el ID de cuenta que proporcionaste no parece ser válido. Esto podría deberse a un pequeño error tipográfico o a que usaste un ID desactualizado o incorrecto.",

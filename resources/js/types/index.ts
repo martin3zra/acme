@@ -1,4 +1,5 @@
 import { LucideIcon } from 'lucide-react';
+import { IconName } from './icons';
 
 export interface LinkedCompany {
   uuid: string;
@@ -436,4 +437,21 @@ export type RoleType = 'developer' | 'owner' | 'admin' | 'supervisor' | 'standar
 
 export interface SlotProps {
   children: React.ReactNode;
+}
+
+export interface StatItem {
+  label: string;
+  value: string;
+  icon: IconName | string;
+  bg: string;
+}
+
+export interface DueInvoice {
+  uuid: string;
+  due_on: string;
+  customer: {
+    uuid: string;
+    name: string;
+  };
+  amount: number;
 }
