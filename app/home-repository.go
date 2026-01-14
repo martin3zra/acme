@@ -21,6 +21,24 @@ type dueInvoice struct {
 	AmountDue float64 `json:"amount_due"`
 }
 
+type ChartData struct {
+	Month    string  `json:"month"`
+	Sales    float64 `json:"sales"`
+	Expenses float64 `json:"expenses"`
+}
+
+type Totals struct {
+	TotalSales    float64 `json:"totalSales"`
+	TotalReceipts float64 `json:"totalReceipts"`
+	TotalExpenses float64 `json:"totalExpenses"`
+	NetIncome     float64 `json:"netIncome"`
+}
+
+type DashboardData struct {
+	ChartData []ChartData `json:"chartData"`
+	Totals    Totals      `json:"totals"`
+}
+
 func (s *Server) findStats(ctx context.Context) (*stats, error) {
 	var data stats
 	err := s.db.QueryRow(`SELECT
@@ -54,4 +72,84 @@ func (s *Server) findLatestDueInvoices(ctx context.Context) ([]*dueInvoice, erro
 		data = append(data, row)
 	}
 	return data, nil
+}
+
+func (s *Server) findLastProfitOfLast12Months(ctx context.Context) ([]*ChartData, error) {
+	rows, err := s.db.Query(`
+    SELECT TO_CHAR(date, 'YYYY/Mon') AS year_month, SUM(CASE WHEN status = 'completed' THEN total ELSE 0 END) AS sales, SUM(0) AS expenses -- placeholder until expenses table exists 
+    FROM invoices 
+    WHERE company_id = $1
+    AND date >= (CURRENT_DATE - INTERVAL '12 months') 
+    GROUP BY TO_CHAR(date, 'YYYY/Mon')
+    ORDER BY MIN(date);
+  `, CurrentCompany(ctx).ID)
+	if err != nil {
+		return nil, err
+	}
+	data := make([]*ChartData, 0)
+	for rows.Next() {
+		row := new(ChartData)
+		if err = rows.Scan(&row.Month, &row.Sales, &row.Expenses); err != nil {
+			return data, err
+		}
+		data = append(data, row)
+	}
+	return data, nil
+}
+
+func (s *Server) findTotalsProfitOfLast12Months(ctx context.Context) (*Totals, error) {
+	var data Totals
+	err := s.db.QueryRow(`
+    SELECT
+      COALESCE(SUM(CASE WHEN status = 'completed' THEN total ELSE 0 END), 0) AS total_sales,
+      SUM(0) AS total_receipts, -- placeholder until receipts logic/table exists 
+      SUM(0) AS total_expenses, -- placeholder until expenses table exists
+      COALESCE(SUM(CASE WHEN status = 'completed' THEN total ELSE 0 END), 0) - COALESCE(SUM(0), 0) AS net_income
+    FROM invoices 
+    WHERE company_id = $1
+    AND date >= (CURRENT_DATE - INTERVAL '12 months');`, CurrentCompany(ctx).ID).
+		Scan(&data.TotalSales, &data.TotalReceipts, &data.TotalExpenses, &data.NetIncome)
+	return &data, err
+}
+
+func (s *Server) findLastProfitOfYear(ctx context.Context, year int) ([]*ChartData, error) {
+	rows, err := s.db.Query(`
+    SELECT
+      TO_CHAR(date, 'YYYY/Mon') AS year_month,
+      COALESCE(SUM(CASE WHEN status = 'completed' THEN total ELSE 0 END), 0) AS sales,
+      SUM(0) AS expenses
+    FROM invoices
+    WHERE company_id = $1
+    AND EXTRACT(YEAR FROM date) = $2
+    GROUP BY TO_CHAR(date, 'YYYY/Mon')
+    ORDER BY MIN(date);
+  `, CurrentCompany(ctx).ID, year)
+	if err != nil {
+		return nil, err
+	}
+	data := make([]*ChartData, 0)
+	for rows.Next() {
+		row := new(ChartData)
+		if err = rows.Scan(&row.Month, &row.Sales, &row.Expenses); err != nil {
+			return data, err
+		}
+		data = append(data, row)
+	}
+	return data, nil
+}
+
+func (s *Server) findTotalsProfitOfYear(ctx context.Context, year int) (*Totals, error) {
+	var data Totals
+	err := s.db.QueryRow(`
+    SELECT
+      COALESCE(SUM(CASE WHEN status = 'completed' THEN total ELSE 0 END), 0) AS total_sales,
+      COALESCE(SUM(0), 0) AS total_receipts,
+      COALESCE(SUM(0), 0) AS total_expenses,
+      COALESCE(SUM(CASE WHEN status = 'completed' THEN total ELSE 0 END), 0) - COALESCE(SUM(0), 0) AS net_income
+    FROM invoices
+    WHERE company_id = $1
+    AND EXTRACT(YEAR FROM date) = $2;
+  `, CurrentCompany(ctx).ID, year).
+		Scan(&data.TotalSales, &data.TotalReceipts, &data.TotalExpenses, &data.NetIncome)
+	return &data, err
 }

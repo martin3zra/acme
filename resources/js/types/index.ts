@@ -455,3 +455,16 @@ export interface DueInvoice {
   };
   amount: number;
 }
+
+export interface ChartPoint {
+  month: string;
+  sales: number;
+  expenses: number;
+}
+
+export interface Totals {
+  totalSales: number;
+  totalReceipts: number;
+  totalExpenses: number;
+  netIncome: number;
+}

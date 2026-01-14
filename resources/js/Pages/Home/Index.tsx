@@ -1,15 +1,26 @@
 import AppLayout from '@/layouts/app-layout';
-import { DueInvoice, PageProps, StatItem } from '@/types';
+import { ChartPoint, DueInvoice, PageProps, StatItem, Totals } from '@/types';
 import { router } from '@inertiajs/react';
+import { useState } from 'react';
 import { DueInvoicesList } from './DueInvoicesList';
 import DashboardSummary from './Shared/dashboard-summary';
+import SalesExpensesChart from './Shared/sales-expenses-chart';
+
+interface ChartDataPoint {
+  data: ChartPoint[];
+  totals: Totals;
+  availableYears: number[];
+}
 
 interface DashboardProps extends PageProps {
   stats: StatItem[];
+  period: string;
   due_invoices: DueInvoice[];
+  chart: ChartDataPoint;
 }
 
-export default function Home({ auth, stats, due_invoices }: DashboardProps) {
+export default function Home({ auth, stats, period: initialPeriod, due_invoices, chart }: DashboardProps) {
+  const [period, setPeriod] = useState<string>(initialPeriod);
   const handleOnSelectItem = (item: DueInvoice, action: 'view:customer' | 'view:invoice' | 'record:payment') => {
     const path = {
       'view:customer': `/customers?id=${item.customer.uuid}`,
@@ -18,10 +29,28 @@ export default function Home({ auth, stats, due_invoices }: DashboardProps) {
     }[action];
     router.visit(path);
   };
+  const handleOnPeriodChange = (newPeriod: string) => {
+    setPeriod(newPeriod);
+    router.visit('/home', {
+      except: ['stats', 'due_invoices'],
+      data: { period: newPeriod },
+      preserveState: true,
+      preserveScroll: true,
+    });
+  };
   return (
     <AppLayout user={auth.user}>
       <div className="space-y-6">
         <DashboardSummary stats={stats} />
+        <div className="py-4">
+          <SalesExpensesChart
+            period={period}
+            chartData={chart.data}
+            totals={chart.totals}
+            availableYears={chart.availableYears}
+            onPeriodChange={handleOnPeriodChange}
+          />
+        </div>
         <div className="grid auto-rows-min gap-4 sm:grid-cols-1 md:grid-cols-2">
           <DueInvoicesList data={due_invoices} onSelectItem={handleOnSelectItem} />
           <div className="bg-muted/50 rounded-xl" />
