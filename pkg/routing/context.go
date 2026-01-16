@@ -242,6 +242,11 @@ func (ctx *Context) Int(key string) int {
 	return 0
 }
 
+func (ctx *Context) WantsJson() bool {
+	acceptHeader := ctx.Request.Header.Get("Accept")
+	return strings.Contains(acceptHeader, "application/json")
+}
+
 // mergeTranslations merges shared "translations" with page-specific ones.
 func (ctx *Context) mergeTranslations(pageTranslations map[string]string) map[string]string {
 	merged := map[string]string{}

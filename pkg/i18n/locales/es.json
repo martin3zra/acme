@@ -19,6 +19,8 @@
     "noResults": "No hay resultados.",
     "number": "Número",
     "date": "Fecha",
+    "dateRange": "Rango de fechas",
+    "dateRangePresets": "Rango de fechas preestablecidos",
     "dueDate": "Fecha de vencimiento",
     "dueDateAbrev": "Vence",
     "addedAt": "Creado en",
@@ -196,7 +198,8 @@
       "invoices": "Facturas",
       "customers": "Clientes",
       "items": "Productos",
-      "payments": "Pagos"
+      "payments": "Pagos",
+      "reports": "Reportes"
     },
     "navSecondary": {
       "settings": "Ajustes",
@@ -342,6 +345,13 @@
       "title": "Inicia sesión en tu cuenta",
       "description": "Ingrese su correo electrónico y contraseña a continuación para iniciar sesión."
     }
+  },
+  "reports": {
+    "title": "Reportes",
+    "sales": "Ventas",
+    "expenses": "Gastos",
+    "profit-lost": "Ganancias y Pérdidas",
+    "taxes": "Impuestos"
   },
   "invoices": {
     "title": "Facturas",

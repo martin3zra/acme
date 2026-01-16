@@ -4,7 +4,17 @@ import { NavUser } from '@/components/nav-user';
 import { Sidebar, SidebarContent, SidebarFooter, SidebarHeader, SidebarMenu, SidebarMenuButton, SidebarMenuItem } from '@/components/ui/sidebar';
 import { NavItem, PageProps } from '@/types';
 import { Link, usePage } from '@inertiajs/react';
-import { ClipboardList, CreditCard, HelpCircleIcon, LayoutDashboardIcon, LayoutListIcon, SearchIcon, SettingsIcon, UsersIcon } from 'lucide-react';
+import {
+  ChartArea,
+  ClipboardList,
+  CreditCard,
+  HelpCircleIcon,
+  LayoutDashboardIcon,
+  LayoutListIcon,
+  SearchIcon,
+  SettingsIcon,
+  UsersIcon,
+} from 'lucide-react';
 import * as React from 'react';
 import AppLogoIcon from './app-logo-icon';
 
@@ -43,6 +53,13 @@ const navMain: NavItem[] = [
     icon: CreditCard,
     components: ['Payments/Index', 'Payments/Create'],
     requiredAbility: 'viewAny:payment',
+  },
+  {
+    title: 'global.navMain.reports',
+    url: '/reports/sales',
+    icon: ChartArea,
+    components: ['Reports/Sales/Index', 'Reports/ProfitLost/Index', 'Reports/Expenses/Index', 'Reports/Taxes/Index'],
+    requiredAbility: 'viewAny:reports',
   },
 ];
 

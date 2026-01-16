@@ -8,6 +8,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"time"
 
 	"codeberg.org/go-pdf/fpdf"
 	"github.com/martin3zra/acme/pkg/i18n"
@@ -187,4 +188,133 @@ func truncate(pdf *fpdf.Fpdf, text string, maxWidth float64) string {
 	}
 
 	return text + ellipsis
+}
+
+func formatDate(t time.Time) string {
+	return t.Format("2006-01-02")
+}
+
+func Today() PresetRange {
+	now := time.Now()
+	return PresetRange{
+		Label: "Today",
+		Key:   "today",
+		From:  formatDate(now),
+		To:    formatDate(now),
+	}
+}
+
+func ThisWeek() PresetRange {
+	now := time.Now()
+	weekday := int(now.Weekday())
+	// Go’s Weekday: Sunday=0, Monday=1...
+	start := now.AddDate(0, 0, -weekday)
+	return PresetRange{
+		Label: "This Week",
+		Key:   "this_week",
+		From:  formatDate(start),
+		To:    formatDate(now),
+	}
+}
+
+func ThisMonth() PresetRange {
+	now := time.Now()
+	start := time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, now.Location())
+	return PresetRange{
+		Label: "This Month",
+		Key:   "this_month",
+		From:  formatDate(start),
+		To:    formatDate(now),
+	}
+}
+
+func ThisQuarter() PresetRange {
+	now := time.Now()
+	month := (int(now.Month())-1)/3*3 + 1 // quarter start month
+	start := time.Date(now.Year(), time.Month(month), 1, 0, 0, 0, 0, now.Location())
+	return PresetRange{
+		Label: "This Quarter",
+		Key:   "this_quarter",
+		From:  formatDate(start),
+		To:    formatDate(now),
+	}
+}
+
+func ThisYear() PresetRange {
+	now := time.Now()
+	start := time.Date(now.Year(), 1, 1, 0, 0, 0, 0, now.Location())
+	return PresetRange{
+		Label: "This Year",
+		Key:   "this_year",
+		From:  formatDate(start),
+		To:    formatDate(now),
+	}
+}
+
+func PreviousWeek() PresetRange {
+	now := time.Now()
+	weekday := int(now.Weekday())
+	startOfThisWeek := now.AddDate(0, 0, -weekday)
+	startOfPrevWeek := startOfThisWeek.AddDate(0, 0, -7)
+	endOfPrevWeek := startOfThisWeek.AddDate(0, 0, -1)
+	return PresetRange{
+		Label: "Previous Week",
+		Key:   "previous_week",
+		From:  formatDate(startOfPrevWeek),
+		To:    formatDate(endOfPrevWeek),
+	}
+}
+
+func PreviousMonth() PresetRange {
+	now := time.Now()
+	firstOfThisMonth := time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, now.Location())
+	lastOfPrevMonth := firstOfThisMonth.AddDate(0, 0, -1)
+	startOfPrevMonth := time.Date(lastOfPrevMonth.Year(), lastOfPrevMonth.Month(), 1, 0, 0, 0, 0, now.Location())
+	return PresetRange{
+		Label: "Previous Month",
+		Key:   "previous_month",
+		From:  formatDate(startOfPrevMonth),
+		To:    formatDate(lastOfPrevMonth),
+	}
+}
+
+func PreviousQuarter() PresetRange {
+	now := time.Now()
+	month := (int(now.Month())-1)/3*3 + 1
+	startOfThisQuarter := time.Date(now.Year(), time.Month(month), 1, 0, 0, 0, 0, now.Location())
+	startOfPrevQuarter := startOfThisQuarter.AddDate(0, -3, 0)
+	endOfPrevQuarter := startOfThisQuarter.AddDate(0, 0, -1)
+	return PresetRange{
+		Label: "Previous Quarter",
+		Key:   "previous_quarter",
+		From:  formatDate(startOfPrevQuarter),
+		To:    formatDate(endOfPrevQuarter),
+	}
+}
+
+func PreviousYear() PresetRange {
+	now := time.Now()
+	startOfPrevYear := time.Date(now.Year()-1, 1, 1, 0, 0, 0, 0, now.Location())
+	endOfPrevYear := time.Date(now.Year()-1, 12, 31, 0, 0, 0, 0, now.Location())
+	return PresetRange{
+		Label: "Previous Year",
+		Key:   "previous_year",
+		From:  formatDate(startOfPrevYear),
+		To:    formatDate(endOfPrevYear),
+	}
+}
+
+func DateRangePresets() []PresetRange {
+	return []PresetRange{
+		Today(),
+		ThisWeek(),
+		ThisMonth(),
+		ThisQuarter(),
+		ThisYear(),
+		PreviousWeek(),
+		PreviousMonth(),
+		PreviousQuarter(),
+		PreviousYear(),
+		{Label: "Custom", Key: "custom"},
+	}
 }

@@ -69,6 +69,12 @@ func (s *Server) bootRoutes() {
 					route.GET("/payments/:id/print/:hash", s.printPaymentHandler).Middleware(Signed)
 					route.PUT("/payments/:id", s.updatePaymentHandler())
 
+					route.GET("/reports/sales", s.reportSalesHandler).Can("viewAny:reports")
+					route.POST("/reports/sales", s.generateSalesReportHandler()) // .Can("viewAny:reports")
+					route.GET("/reports/profit-lost", s.reportProfitLostHandler).Can("viewAny:reports")
+					route.GET("/reports/expenses", s.reportExpensesHandler).Can("viewAny:reports")
+					route.GET("/reports/taxes", s.reportTaxesHandler).Can("viewAny:reports")
+
 					route.GroupPrefix("/settings/:account", func(route *routing.Router) {
 						route.GET("/profile", s.accountProfileHandler)
 						route.PUT("/profile", s.updateAccountProfileHandler())

@@ -143,18 +143,18 @@ var rolePermissionsCache = map[string]map[string]bool{}
 var groupedPermissions = map[string]map[string][]string{
 	"owner": {"*": {"*"}},
 	"admin": {
-		"view":    {"dashboard", "invoice", "customer", "item", "payment", "setting"},
-		"viewAny": {"dashboard", "invoice", "customer", "item", "payment", "setting"},
-		"create":  {"dashboard", "invoice", "customer", "item", "payment", "setting"},
-		"delete":  {"dashboard", "invoice", "customer", "item", "payment", "setting"},
-		"update":  {"dashboard", "invoice", "customer", "item", "payment", "setting", "company:sequence"},
+		"view":    {"dashboard", "invoice", "customer", "item", "payment", "reports", "setting"},
+		"viewAny": {"dashboard", "invoice", "customer", "item", "payment", "reports", "setting"},
+		"create":  {"dashboard", "invoice", "customer", "item", "payment", "reports", "setting"},
+		"delete":  {"dashboard", "invoice", "customer", "item", "payment", "reports", "setting"},
+		"update":  {"dashboard", "invoice", "customer", "item", "payment", "reports", "setting", "company:sequence"},
 	},
 	"supervisor": {
-		"view":    {"dashboard", "customer", "item", "payment"},
-		"viewAny": {"dashboard", "invoice", "customer", "item", "payment"},
-		"create":  {"dashboard", "invoice", "customer", "item", "payment"},
-		"delete":  {"dashboard", "invoice", "customer", "item", "payment"},
-		"update":  {"dashboard", "invoice", "customer", "item", "payment"},
+		"view":    {"dashboard", "customer", "item", "payment", "reports"},
+		"viewAny": {"dashboard", "invoice", "customer", "item", "payment", "reports"},
+		"create":  {"dashboard", "invoice", "customer", "item", "payment", "reports"},
+		"delete":  {"dashboard", "invoice", "customer", "item", "payment", "reports"},
+		"update":  {"dashboard", "invoice", "customer", "item", "payment", "reports"},
 	},
 	"standard": {
 		"view":   {"invoice", "customer"},

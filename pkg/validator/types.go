@@ -20,6 +20,7 @@ var defaultRules = []string{
 	"date",
 	"after",
 	"before",
+	"before_or_equal",
 	"format",
 	"digits",
 	"digits_between",
@@ -31,6 +32,7 @@ var dateRules = []string{
 	"date",
 	"after",
 	"before",
+	"before_or_equal",
 	"format",
 }
 

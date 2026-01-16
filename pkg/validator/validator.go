@@ -302,9 +302,28 @@ func (v *Validator) evaluateRuleWithValues(key string, ruleComponents []string, 
 }
 
 func (v *Validator) evaluateDateRule(rule string, ruleValue string, value time.Time) bool {
-	if rule == "after" {
+	now := time.Now()
+	switch rule {
+	case "after":
 		if ruleValue == "yesterday" {
-			return value.After(time.Now().AddDate(0, 0, -1))
+			return value.After(now.AddDate(0, 0, -1))
+		}
+		if ruleValue == "today" {
+			return value.After(time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location()))
+		}
+	case "before":
+		if ruleValue == "yesterday" {
+			return value.Before(now.AddDate(0, 0, -1))
+		}
+		if ruleValue == "today" {
+			return value.Before(time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location()))
+		}
+	case "before_or_equals":
+		if ruleValue == "yesterday" {
+			return !value.After(now.AddDate(0, 0, -1))
+		}
+		if ruleValue == "today" {
+			return !value.After(time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location()))
 		}
 	}
 
