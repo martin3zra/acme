@@ -30,6 +30,7 @@ export default function Index({
 }: PageProps<{ initialRange: DateRange; initialPreset: string; initialReportType: string }>) {
   const [pdfUrl, setPdfUrl] = useState<string | undefined>(undefined);
   const [reportType, setReportType] = useState<string>(initialReportType);
+  const [processing, setProcessing] = useState<boolean>(false);
   const [showInvoices, setShowInvoices] = useState<boolean>(false);
   const initialDateRange: DateRange | undefined = initialRange
     ? { from: initialRange.from ? new Date(initialRange.from) : undefined, to: initialRange.to ? new Date(initialRange.to) : undefined }
@@ -44,28 +45,36 @@ export default function Index({
   };
 
   const generateReport = async () => {
-    const response = await fetch('/reports/sales', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Accept: 'application/json',
-        'X-CSRF-Token': csrf_token as string,
-      },
-      credentials: 'include',
-      body: JSON.stringify({
-        from: dateRange?.from?.toISOString(),
-        to: dateRange?.to?.toISOString(),
-        reportType: reportType,
-        showInvoices: showInvoices,
-      }),
-    });
-    if (response.ok) {
-      // const data = await response.json();
+    try {
+      setProcessing(true)
+      setPdfUrl(undefined);
+      const response = await fetch('/reports/sales', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Accept: 'application/json',
+          'X-CSRF-Token': csrf_token as string,
+        },
+        credentials: 'include',
+        body: JSON.stringify({
+          from: dateRange?.from?.toISOString(),
+          to: dateRange?.to?.toISOString(),
+          reportType: reportType,
+          showInvoices: showInvoices,
+        }),
+      });
+      if (!response.ok) {
+        throw new Error("Failed to generate report")
+      }
+
       const blob = await response.blob();
       const url = URL.createObjectURL(blob);
       setPdfUrl(url);
-    } else {
+    } catch (e) {
+      console.error(e)
       alert('Failed to generate report.');
+    } finally {
+      setProcessing(false)
     }
   };
   return (
@@ -97,27 +106,41 @@ export default function Index({
               </SelectContent>
             </Select>
           </div>
-          <div className="py-4">
-            <Label className="hover:bg-accent/50 flex items-start gap-3 rounded-lg border p-3 has-[[aria-checked=true]]:border-blue-600 has-[[aria-checked=true]]:bg-blue-50 dark:has-[[aria-checked=true]]:border-blue-900 dark:has-[[aria-checked=true]]:bg-blue-950">
-              <Checkbox
-                id="showInvoices"
-                checked={showInvoices}
-                onCheckedChange={(value) => {
-                  const show = value === true;
-                  setShowInvoices(show);
-                }}
-                className="data-[state=checked]:border-blue-600 data-[state=checked]:bg-blue-600 data-[state=checked]:text-white dark:data-[state=checked]:border-blue-700 dark:data-[state=checked]:bg-blue-700"
-              />
-              <div className="grid gap-1.5 font-normal">
-                <p className="text-sm leading-none font-medium">Display invoices</p>
-                <p className="text-muted-foreground text-sm">You can show or hide invoices at any time.</p>
-              </div>
-            </Label>
-          </div>
+          {reportType === 'sales_by_customer' &&
+            <div className="py-4">
+              <Label className="hover:bg-accent/50 flex items-start gap-3 rounded-lg border p-3 has-[[aria-checked=true]]:border-blue-600 has-[[aria-checked=true]]:bg-blue-50 dark:has-[[aria-checked=true]]:border-blue-900 dark:has-[[aria-checked=true]]:bg-blue-950">
+                <Checkbox
+                  id="showInvoices"
+                  checked={showInvoices}
+                  onCheckedChange={(value) => {
+                    const show = value === true;
+                    setShowInvoices(show);
+                  }}
+                  className="data-[state=checked]:border-blue-600 data-[state=checked]:bg-blue-600 data-[state=checked]:text-white dark:data-[state=checked]:border-blue-700 dark:data-[state=checked]:bg-blue-700"
+                />
+                <div className="grid gap-1.5 font-normal">
+                  <p className="text-sm leading-none font-medium">Display invoices</p>
+                  <p className="text-muted-foreground text-sm">You can show or hide invoices at any time.</p>
+                </div>
+              </Label>
+            </div>
+          }
         </div>
       </ReportLayout.ContentSection>
       <ReportLayout.ActionSection>
-        <Button onClick={generateReport}>Generate report</Button>
+        <Button onClick={generateReport} disabled={processing}>
+          {processing ? (
+            <span className="flex items-center gap-2">
+              <svg className="animate-spin h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" >
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4l3-3-3-3v4a8 8 0 00-8 8h4z" />
+              </svg>
+              Generating…
+            </span>
+          ) : (
+            "Generate report"
+          )}
+        </Button>
       </ReportLayout.ActionSection>
     </ReportLayout>
   );

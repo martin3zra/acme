@@ -1,8 +1,6 @@
 package app
 
 import (
-	"context"
-	"fmt"
 	"net/http"
 	"time"
 
@@ -40,20 +38,6 @@ func (s *Server) generateSalesReportHandler() routing.HandlerFunc {
 			})
 		}
 	})
-}
-
-func (s *Server) fetchSalesGroups(ctx context.Context, form *ReportSalesForm) (any, error) {
-	switch form.ReportType {
-	case "sales_by_customer":
-		if form.ShowInvoices {
-			return s.findCustomerWiseSalesWithInvoices(ctx, form.From, form.To)
-		}
-		return s.findCustomerWiseSales(ctx, form.From, form.To)
-	case "sales_by_item":
-		return s.findItemWiseSales(ctx, form.From, form.To)
-	default:
-		return nil, fmt.Errorf("unsupported report type: %s", form.ReportType)
-	}
 }
 
 func (s *Server) reportProfitLostHandler(ctx *routing.Context) {
