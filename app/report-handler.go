@@ -1,6 +1,8 @@
 package app
 
 import (
+	"context"
+	"fmt"
 	"net/http"
 	"time"
 
@@ -23,24 +25,14 @@ func (s *Server) reportSalesHandler(ctx *routing.Context) {
 
 func (s *Server) generateSalesReportHandler() routing.HandlerFunc {
 	return routing.WithRequest(func(ctx *routing.Context, form *ReportSalesForm) {
-		var groups []CustomerGroup
-		var err error
-		if form.ShowInvoices {
-			groups, err = s.findCustomerWiseSalesWithInvoices(ctx.Request.Context(), form.From, form.To)
-		} else {
-			groups, err = s.findCustomerWiseSales(ctx.Request.Context(), form.From, form.To)
-		}
-
+		report, _ := NewSalesReportPDF(s.translator, form)
+		groups, err := s.fetchSalesGroups(ctx.Request.Context(), form)
 		if err != nil {
-			ctx.JSON(http.StatusInternalServerError, map[string]any{
-				"status":  "error",
-				"message": err.Error(),
-			})
+			ctx.JSON(http.StatusInternalServerError, map[string]any{"status": "error", "message": err.Error()})
 			return
 		}
-		report, _ := NewSalesReportPDF(s.translator, form.From, form.To, form.ShowInvoices)
-		report.Render(groups)
 
+		report.RenderReport(ctx.Request.Context(), groups, s.config.appName)
 		if err := report.pdf.Output(ctx.Response); err != nil {
 			ctx.JSON(http.StatusInternalServerError, map[string]any{
 				"status":  "error",
@@ -48,6 +40,20 @@ func (s *Server) generateSalesReportHandler() routing.HandlerFunc {
 			})
 		}
 	})
+}
+
+func (s *Server) fetchSalesGroups(ctx context.Context, form *ReportSalesForm) (any, error) {
+	switch form.ReportType {
+	case "sales_by_customer":
+		if form.ShowInvoices {
+			return s.findCustomerWiseSalesWithInvoices(ctx, form.From, form.To)
+		}
+		return s.findCustomerWiseSales(ctx, form.From, form.To)
+	case "sales_by_item":
+		return s.findItemWiseSales(ctx, form.From, form.To)
+	default:
+		return nil, fmt.Errorf("unsupported report type: %s", form.ReportType)
+	}
 }
 
 func (s *Server) reportProfitLostHandler(ctx *routing.Context) {
@@ -87,4 +93,14 @@ func (s *Server) reportTaxesHandler(ctx *routing.Context) {
 		"dateRanges":    DateRangePresets(),
 		"initialPreset": "this_week",
 	})
+}
+
+// Generic helper to convert any slice of a type that implements ReportGroup
+// into a slice of ReportGroup interfaces.
+func toReportGroups[T ReportGroup](groups []T) []ReportGroup {
+	result := make([]ReportGroup, len(groups))
+	for i, g := range groups {
+		result[i] = g
+	}
+	return result
 }
