@@ -14,6 +14,7 @@ type ReportGroup interface {
 
 type InvoicesSales struct {
 	InvoiceID    int       `json:"invoice_id"`
+	Code         string    `json:"code"`
 	Date         time.Time `json:"date"`
 	Total        float64   ` json:"total"`
 	CustomerID   int       `json:"customer_id"`
@@ -119,7 +120,7 @@ func (s *Server) findCustomerWiseSales(ctx context.Context, From, To time.Time) 
 
 func (s *Server) findCustomerWiseSalesWithInvoices(ctx context.Context, From, To time.Time) ([]CustomerGroup, error) {
 	rows, err := s.db.Query(`
-    SELECT i.id AS invoice_id, i.date, i.total, i.customer_id, c.name AS customer_name
+    SELECT i.id AS invoice_id, i.code, i.date, i.total, i.customer_id, c.name AS customer_name
     FROM invoices i
     JOIN customers c ON (i.company_id = c.company_id AND i.customer_id = c.id)
     WHERE i.company_id = $1
@@ -134,7 +135,7 @@ func (s *Server) findCustomerWiseSalesWithInvoices(ctx context.Context, From, To
 		var cid int
 		var cname string
 		var inv InvoicesSales
-		if err := rows.Scan(&inv.InvoiceID, &inv.Date, &inv.Total, &cid, &cname); err != nil {
+		if err := rows.Scan(&inv.InvoiceID, &inv.Code, &inv.Date, &inv.Total, &cid, &cname); err != nil {
 			return nil, err
 		}
 		if groupsMap[cid] == nil {
@@ -179,7 +180,7 @@ func (s *Server) findDateWiseSales(ctx context.Context, from, to time.Time) ([]D
 // Detailed: invoices grouped by date
 func (s *Server) findDateWiseSalesWithInvoices(ctx context.Context, from, to time.Time) ([]DateGroup, error) {
 	rows, err := s.db.QueryContext(ctx, `
-        SELECT date::date, id, total
+        SELECT date::date, id, code, total
         FROM invoices
         WHERE company_id = $1
         AND date BETWEEN $2 AND $3
@@ -194,7 +195,7 @@ func (s *Server) findDateWiseSalesWithInvoices(ctx context.Context, from, to tim
 	for rows.Next() {
 		var date time.Time
 		var inv InvoicesSales
-		if err := rows.Scan(&date, &inv.InvoiceID, &inv.Total); err != nil {
+		if err := rows.Scan(&date, &inv.InvoiceID, &inv.Code, &inv.Total); err != nil {
 			return nil, err
 		}
 		g, ok := groupsMap[date]

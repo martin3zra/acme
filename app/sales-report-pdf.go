@@ -180,8 +180,8 @@ func (r *SalesReportPDF) RenderCustomerInvoices(groups []CustomerGroup) {
 		var subtotal float64
 		for _, inv := range group.Invoices {
 			r.ReserveSpace(invoiceRowHeight, r.topBuffer)
-			date := inv.Date.Format("2006-01-02")
-			left := fmt.Sprintf("%s (INV-%06d)", date, inv.InvoiceID)
+			date := inv.Date.Format("02-01-2006")
+			left := fmt.Sprintf("%s (%s)", date, inv.Code)
 			right := foundation.FormatAmount(inv.Total)
 
 			r.pdf.CellFormat(155, invoiceRowHeight, left, "", 0, "", false, 0, "")
@@ -228,13 +228,13 @@ func (r *SalesReportPDF) RenderDateInvoices(groups []DateGroup) {
 
 		r.ReserveSpace(headerHeight, r.topBuffer)
 		r.pdf.SetFont("DejaVu", "B", 12)
-		r.pdf.CellFormat(0, headerHeight, group.Date.Format("2006-01-02"), "", 1, "", false, 0, "")
+		r.pdf.CellFormat(0, headerHeight, group.Date.Format("02-Jan-2006"), "", 1, "", false, 0, "")
 
 		r.pdf.SetFont("DejaVu", "", 10)
 		var subtotal float64
 		for _, inv := range group.Invoices {
 			r.ReserveSpace(invoiceRowHeight, r.topBuffer)
-			left := fmt.Sprintf("INV-%06d", inv.InvoiceID)
+			left := inv.Code
 			right := foundation.FormatAmount(inv.Total)
 
 			r.pdf.CellFormat(155, invoiceRowHeight, left, "", 0, "", false, 0, "")
