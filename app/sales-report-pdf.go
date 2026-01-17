@@ -102,6 +102,12 @@ func (r *SalesReportPDF) RenderReport(ctx context.Context, groups any, footerTex
 	case "sales_by_item":
 		reportGroups := groups.([]ItemGroup)
 		r.RenderGroups(toReportGroups(reportGroups), "Sales Report: By Item")
+	case "sales_by_date":
+		if r.form.ShowInvoices {
+			r.RenderDateInvoices(groups.([]DateGroup))
+		} else {
+			r.RenderGroups(toReportGroups(groups.([]DateGroup)), "Sales Report: By Date")
+		}
 	default:
 		panic(fmt.Sprintf("unsupported report type: %s", r.form.ReportType))
 	}
@@ -109,6 +115,11 @@ func (r *SalesReportPDF) RenderReport(ctx context.Context, groups any, footerTex
 
 // Summary renderer (customers, items, etc.)
 func (r *SalesReportPDF) RenderGroups(groups []ReportGroup, title string) {
+	if len(groups) == 0 {
+		r.RenderEmptyReport(title)
+		return
+	}
+
 	if r.pdf.PageNo() == 0 {
 		r.pdf.AddPage()
 	}
@@ -143,6 +154,11 @@ func (r *SalesReportPDF) RenderGroups(groups []ReportGroup, title string) {
 
 // Detailed renderer (customer invoices)
 func (r *SalesReportPDF) RenderCustomerInvoices(groups []CustomerGroup) {
+	if len(groups) == 0 {
+		r.RenderEmptyReport("Sales Report: By Customer (Detailed)")
+		return
+	}
+
 	if r.pdf.PageNo() == 0 {
 		r.pdf.AddPage()
 	}
@@ -164,7 +180,7 @@ func (r *SalesReportPDF) RenderCustomerInvoices(groups []CustomerGroup) {
 		var subtotal float64
 		for _, inv := range group.Invoices {
 			r.ReserveSpace(invoiceRowHeight, r.topBuffer)
-			date := inv.Date.Format("02 Jan 2006")
+			date := inv.Date.Format("2006-01-02")
 			left := fmt.Sprintf("%s (INV-%06d)", date, inv.InvoiceID)
 			right := foundation.FormatAmount(inv.Total)
 
@@ -189,6 +205,74 @@ func (r *SalesReportPDF) RenderCustomerInvoices(groups []CustomerGroup) {
 	r.pdf.SetFont("DejaVu", "B", 12)
 	r.pdf.CellFormat(155, 10, "GRAND TOTAL", "", 0, "", false, 0, "")
 	r.pdf.CellFormat(25, 10, foundation.FormatAmount(grandTotal), "", 1, "R", false, 0, "")
+}
+
+func (r *SalesReportPDF) RenderDateInvoices(groups []DateGroup) {
+	if len(groups) == 0 {
+		r.RenderEmptyReport("Sales Report: By Date (Detailed)")
+		return
+	}
+
+	if r.pdf.PageNo() == 0 {
+		r.pdf.AddPage()
+	}
+
+	r.pdf.Ln(r.topBuffer)
+	r.pdf.SetFont("DejaVu", "B", 14)
+	r.pdf.CellFormat(0, 10, "Sales Report: By Date (Detailed)", "", 1, "", false, 0, "")
+
+	var grandTotal float64
+	for _, group := range groups {
+		headerHeight := 10.0
+		invoiceRowHeight := 8.0
+
+		r.ReserveSpace(headerHeight, r.topBuffer)
+		r.pdf.SetFont("DejaVu", "B", 12)
+		r.pdf.CellFormat(0, headerHeight, group.Date.Format("2006-01-02"), "", 1, "", false, 0, "")
+
+		r.pdf.SetFont("DejaVu", "", 10)
+		var subtotal float64
+		for _, inv := range group.Invoices {
+			r.ReserveSpace(invoiceRowHeight, r.topBuffer)
+			left := fmt.Sprintf("INV-%06d", inv.InvoiceID)
+			right := foundation.FormatAmount(inv.Total)
+
+			r.pdf.CellFormat(155, invoiceRowHeight, left, "", 0, "", false, 0, "")
+			r.pdf.CellFormat(25, invoiceRowHeight, right, "", 1, "R", false, 0, "")
+			subtotal += inv.Total
+		}
+
+		lineY := r.pdf.GetY()
+		r.pdf.SetDrawColor(200, 200, 200)
+		r.pdf.Line(15, lineY, 195, lineY)
+
+		r.pdf.SetFont("DejaVu", "B", 10)
+		r.pdf.CellFormat(155, invoiceRowHeight, "TOTAL SALES", "", 0, "", false, 0, "")
+		r.pdf.CellFormat(25, invoiceRowHeight, foundation.FormatAmount(subtotal), "", 1, "R", false, 0, "")
+		r.pdf.Ln(5)
+
+		grandTotal += subtotal
+	}
+
+	r.pdf.SetFont("DejaVu", "B", 12)
+	r.pdf.CellFormat(155, 10, "GRAND TOTAL", "", 0, "", false, 0, "")
+	r.pdf.CellFormat(25, 10, foundation.FormatAmount(grandTotal), "", 1, "R", false, 0, "")
+}
+
+func (r *SalesReportPDF) RenderEmptyReport(title string) {
+	if r.pdf.PageNo() == 0 {
+		r.pdf.AddPage()
+	}
+
+	r.pdf.Ln(4)
+	r.pdf.SetFont("DejaVu", "B", 14)
+	r.pdf.CellFormat(0, 10, title, "", 1, "C", false, 0, "")
+
+	r.pdf.Ln(10)
+	r.pdf.SetFont("DejaVu", "", 12)
+	msg := fmt.Sprintf("No data found for the selected range (%s to %s).",
+		r.form.From.Format("2006-01-02"), r.form.To.Format("2006-01-02"))
+	r.pdf.MultiCell(0, 10, msg, "", "C", false)
 }
 
 // NeedsNewPage checks if the required height fits in the remaining space.

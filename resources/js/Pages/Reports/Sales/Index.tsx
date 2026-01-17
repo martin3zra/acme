@@ -1,4 +1,3 @@
-import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -7,6 +6,7 @@ import ReportLayout from '@/layouts/reports/layout';
 import { BreadcrumbItem, defaultBreadcrumbs, PageProps } from '@/types';
 import { useState } from 'react';
 import { DateRange } from 'react-day-picker';
+import ActionButton from '../Shared/action-button';
 import DateRangePicker from '../Shared/date-range-picker';
 import { DateRangeQuickSelect } from '../Shared/date-range-quick-selector';
 export const breadcrumbs: BreadcrumbItem[] = [
@@ -20,6 +20,8 @@ export const breadcrumbs: BreadcrumbItem[] = [
     href: '/reports/sales',
   },
 ];
+
+const invoicesAllowed: string[] = ['sales_by_customer', 'sales_by_date'];
 
 export default function Index({
   auth,
@@ -44,9 +46,21 @@ export default function Index({
     }
   };
 
+  const handleDownload = () => {
+    if (!pdfUrl) {
+      return;
+    }
+    const formatDate = (d?: Date) => (d ? d.toISOString().split('T')[0] : 'unknown');
+    const filename = `sales_report_${reportType}_${formatDate(dateRange?.from)}_${formatDate(dateRange?.to)}.pdf`;
+    const link = document.createElement('a');
+    link.href = pdfUrl;
+    link.download = filename;
+    link.click();
+  };
+
   const generateReport = async () => {
     try {
-      setProcessing(true)
+      setProcessing(true);
       setPdfUrl(undefined);
       const response = await fetch('/reports/sales', {
         method: 'POST',
@@ -64,21 +78,21 @@ export default function Index({
         }),
       });
       if (!response.ok) {
-        throw new Error("Failed to generate report")
+        throw new Error('Failed to generate report');
       }
 
       const blob = await response.blob();
       const url = URL.createObjectURL(blob);
       setPdfUrl(url);
     } catch (e) {
-      console.error(e)
+      console.error(e);
       alert('Failed to generate report.');
     } finally {
-      setProcessing(false)
+      setProcessing(false);
     }
   };
   return (
-    <ReportLayout user={auth.user} breadcrumbs={breadcrumbs} trans={t} activeTab="sales" pdfUrl={pdfUrl}>
+    <ReportLayout user={auth.user} breadcrumbs={breadcrumbs} trans={t} activeTab="sales" pdfUrl={pdfUrl} handleDownloadAction={handleDownload}>
       <ReportLayout.FilterSection>
         <div className="flex flex-col space-y-4 gap-y-2">
           <div className="flex flex-col space-y-2">
@@ -96,7 +110,7 @@ export default function Index({
           <div className="flex flex-col space-y-2">
             <Label>Select Report Type</Label>
             <Select onValueChange={setReportType} defaultValue={reportType}>
-              <SelectTrigger className="w-[180px]">
+              <SelectTrigger className="w-[280px]">
                 <SelectValue placeholder="Select report type" />
               </SelectTrigger>
               <SelectContent>
@@ -106,41 +120,32 @@ export default function Index({
               </SelectContent>
             </Select>
           </div>
-          {reportType === 'sales_by_customer' &&
-            <div className="py-4">
-              <Label className="hover:bg-accent/50 flex items-start gap-3 rounded-lg border p-3 has-[[aria-checked=true]]:border-blue-600 has-[[aria-checked=true]]:bg-blue-50 dark:has-[[aria-checked=true]]:border-blue-900 dark:has-[[aria-checked=true]]:bg-blue-950">
-                <Checkbox
-                  id="showInvoices"
-                  checked={showInvoices}
-                  onCheckedChange={(value) => {
-                    const show = value === true;
-                    setShowInvoices(show);
-                  }}
-                  className="data-[state=checked]:border-blue-600 data-[state=checked]:bg-blue-600 data-[state=checked]:text-white dark:data-[state=checked]:border-blue-700 dark:data-[state=checked]:bg-blue-700"
-                />
-                <div className="grid gap-1.5 font-normal">
-                  <p className="text-sm leading-none font-medium">Display invoices</p>
+          <div className="py-4">
+            <Label className="hover:bg-accent/50 has-[[aria-checked=true]]:border-primary flex cursor-pointer items-start gap-3 rounded-lg border p-3 has-[:disabled]:cursor-not-allowed has-[[aria-checked=true]]:bg-blue-50 dark:has-[[aria-checked=true]]:border-blue-900 dark:has-[[aria-checked=true]]:bg-blue-950">
+              <Checkbox
+                id="showInvoices"
+                checked={showInvoices}
+                disabled={!invoicesAllowed.includes(reportType)}
+                onCheckedChange={(value) => {
+                  const show = value === true;
+                  setShowInvoices(show);
+                }}
+                className="data-[state=checked]:border-primary data-[state=checked]:bg-primary dark:data-[state=checked]:bg-primary dark:data-[state=checked]:border-primary disabled:cursor-not-allowed data-[state=checked]:text-white"
+              />
+              <div className="grid gap-1.5 font-normal">
+                <p className="text-sm leading-none font-medium">Display invoices</p>
+                {!invoicesAllowed.includes(reportType) ? (
+                  <p className="text-muted-foreground text-sm italic">Only available for customer/date-based reports.</p>
+                ) : (
                   <p className="text-muted-foreground text-sm">You can show or hide invoices at any time.</p>
-                </div>
-              </Label>
-            </div>
-          }
+                )}
+              </div>
+            </Label>
+          </div>
         </div>
       </ReportLayout.ContentSection>
       <ReportLayout.ActionSection>
-        <Button onClick={generateReport} disabled={processing}>
-          {processing ? (
-            <span className="flex items-center gap-2">
-              <svg className="animate-spin h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" >
-                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4l3-3-3-3v4a8 8 0 00-8 8h4z" />
-              </svg>
-              Generating…
-            </span>
-          ) : (
-            "Generate report"
-          )}
-        </Button>
+        <ActionButton processing={processing} handleOnClick={generateReport} />
       </ReportLayout.ActionSection>
     </ReportLayout>
   );
