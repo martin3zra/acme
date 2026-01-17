@@ -66,19 +66,6 @@ func (s *Server) reportExpensesHandler(ctx *routing.Context) {
 	})
 }
 
-func (s *Server) reportTaxesHandler(ctx *routing.Context) {
-	initialRange := DateRange{
-		From: time.Now().AddDate(0, 0, -7).Format("2006-01-02"), // 7 days ago
-		To:   time.Now().Format("2006-01-02"),                   // today
-	}
-	ctx.Render("Reports/Taxes/Index", map[string]any{
-		"translations":  trans("reports"),
-		"initialRange":  initialRange,
-		"dateRanges":    DateRangePresets(),
-		"initialPreset": "this_week",
-	})
-}
-
 // Generic helper to convert any slice of a type that implements ReportGroup
 // into a slice of ReportGroup interfaces.
 func toReportGroups[T ReportGroup](groups []T) []ReportGroup {

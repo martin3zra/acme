@@ -1,19 +1,32 @@
+import ActionButton from '@/Pages/Reports/Shared/action-button';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { type BreadcrumbItem as BreadcrumbItemType, Replacements, SlotProps, User } from '@/types';
 import { Link } from '@inertiajs/react';
 import { Download } from 'lucide-react';
 import React, { JSX } from 'react';
+import { DateRange } from 'react-day-picker';
 import AppLayout from '../app-layout';
+
+export type ReportRequest<T extends Record<string, unknown> = {}> = {
+  endpoint: string;
+  reportType: string;
+  dateRange: DateRange | undefined;
+  [key: string]: unknown;
+} & T;
 
 interface Props extends React.ComponentProps<'div'> {
   user: User;
   breadcrumbs?: BreadcrumbItemType[];
   activeTab: string;
-  pdfUrl?: string;
+  request: ReportRequest;
   children: React.ReactNode;
   trans: (key: string, replacements?: Replacements) => string;
-  handleDownloadAction: () => void;
+}
+
+interface State {
+  pdfUrl: string | undefined;
+  processing: boolean;
 }
 
 function FilterSection({ children }: SlotProps) {
@@ -28,12 +41,72 @@ function ActionSection({ children }: SlotProps) {
   return <>{children}</>;
 }
 
-export default class ReportLayout extends React.Component<Props> {
+export default class ReportLayout extends React.Component<Props, State> {
   static FilterSection = FilterSection;
   static ContentSection = ContentSection;
   static ActionSection = ActionSection;
+
+  constructor(props: Props) {
+    super(props);
+    this.state = {
+      pdfUrl: undefined,
+      processing: false,
+    };
+  }
+
+  handleDownload = () => {
+    const { request } = this.props;
+    const { pdfUrl } = this.state;
+    if (!pdfUrl) {
+      return;
+    }
+    const formatDate = (d?: Date) => (d ? d.toISOString().split('T')[0] : 'unknown');
+    const filename = `${request.reportType}_report_${formatDate(request.dateRange?.from)}_${formatDate(request.dateRange?.to)}.pdf`;
+    const link = document.createElement('a');
+    link.href = pdfUrl;
+    link.download = filename;
+    link.click();
+  };
+
+  generateReport = async () => {
+    try {
+      const { request } = this.props;
+      const { dateRange, endpoint, csrfToken, ...rest } = request;
+      const body = {
+        from: dateRange?.from?.toISOString(),
+        to: dateRange?.to?.toISOString(),
+        ...rest,
+      };
+
+      this.setState({ pdfUrl: undefined, processing: true });
+      const response = await fetch(`/reports/${endpoint}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Accept: 'application/json',
+          'X-CSRF-Token': csrfToken as string,
+        },
+        credentials: 'include',
+        body: JSON.stringify(body),
+      });
+      if (!response.ok) {
+        throw new Error('Failed to generate report');
+      }
+
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      this.setState({ pdfUrl: url });
+    } catch (e) {
+      console.error(e);
+      alert('Failed to generate report.');
+    } finally {
+      this.setState({ processing: false });
+    }
+  };
+
   render() {
-    const { user, breadcrumbs, children, pdfUrl, trans, activeTab, handleDownloadAction } = this.props;
+    const { user, breadcrumbs, children, trans, activeTab } = this.props;
+    const { processing, pdfUrl } = this.state;
 
     const array = React.Children.toArray(children);
     const filterSection = array.find(
@@ -44,16 +117,12 @@ export default class ReportLayout extends React.Component<Props> {
       (child): child is React.ReactElement =>
         React.isValidElement(child) && (child.type as React.JSXElementConstructor<SlotProps>) === ReportLayout.ContentSection,
     );
-    const actionSection = array.find(
-      (child): child is React.ReactElement =>
-        React.isValidElement(child) && (child.type as React.JSXElementConstructor<SlotProps>) === ReportLayout.ActionSection,
-    );
 
     return (
       <AppLayout user={user} breadcrumbs={breadcrumbs}>
         <AppLayout.Actions>
           <div className="flex justify-end">
-            <Button onClick={handleDownloadAction} disabled={!pdfUrl} className="flex cursor-pointer items-center gap-2 disabled:cursor-not-allowed">
+            <Button onClick={this.handleDownload} disabled={!pdfUrl} className="flex cursor-pointer items-center gap-2 disabled:cursor-not-allowed">
               <Download className="h-4 w-4" />
               Download PDF
             </Button>
@@ -79,7 +148,9 @@ export default class ReportLayout extends React.Component<Props> {
               <div className="py-4">{filterSection ? (filterSection as JSX.Element) : null}</div>
               <TabsContent value={activeTab}>{contentSection ? (contentSection as JSX.Element) : null}</TabsContent>
             </Tabs>
-            <div className="py-4">{actionSection ? (actionSection as JSX.Element) : null}</div>
+            <div className="py-4">
+              <ActionButton processing={processing} handleOnClick={this.generateReport} />
+            </div>
           </div>
           <div className="h-full basis-3/4 bg-gray-300">
             {pdfUrl ? (

@@ -74,6 +74,7 @@ func (s *Server) bootRoutes() {
 					route.GET("/reports/profit-lost", s.reportProfitLostHandler).Can("viewAny:reports")
 					route.GET("/reports/expenses", s.reportExpensesHandler).Can("viewAny:reports")
 					route.GET("/reports/taxes", s.reportTaxesHandler).Can("viewAny:reports")
+					route.POST("/reports/taxes", s.generateTaxesReportHandler()) // .Can("viewAny:reports")
 
 					route.GroupPrefix("/settings/:account", func(route *routing.Router) {
 						route.GET("/profile", s.accountProfileHandler)

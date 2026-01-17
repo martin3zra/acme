@@ -1046,6 +1046,19 @@ type PresetRange struct {
 	To    string `json:"to,omitempty"`
 }
 
+type ReportForm struct {
+	support.FormRequest
+	From time.Time `json:"from"`
+	To   time.Time `json:"to"`
+}
+
+func (ReportForm) Rules() map[string]any {
+	return map[string]any{
+		"from": "required|date",
+		"to":   "required|date|before_or_equals:from",
+	}
+}
+
 type ReportSalesForm struct {
 	support.FormRequest
 	From         time.Time `json:"from"`
