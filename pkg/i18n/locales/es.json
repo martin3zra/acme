@@ -30,6 +30,8 @@
     "amount": "Monto",
     "payment": "Pago",
     "discount": "Descuento",
+    "bulkDiscount": "Descuento masivo",
+    "bulkPayment": "Pago masivo",
     "tax": "Impuesto",
     "taxRate": "Tasa impositiva",
     "subTotal": "Sub-total",

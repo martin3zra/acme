@@ -21,7 +21,7 @@ import { usePersistedState } from '@/hooks/use-persisted-state';
 import { useTranslation } from '@/hooks/use-translation';
 import AppLayout from '@/layouts/app-layout';
 import { cn } from '@/lib/utils';
-import { BTForm, CardForm, CashForm, CheckForm, Customer, PageProps, PaymentForm, PaymentMethod, Receivable, ReceivableInvoiceForm } from '@/types';
+import { BTForm, CardForm, CashForm, CheckForm, Customer, FlagSet, PageProps, PaymentForm, PaymentMethod, Receivable, ReceivableInvoiceForm } from '@/types';
 import { Textarea } from '@headlessui/react';
 import { router, useForm, usePage } from '@inertiajs/react';
 import { RowSelectionState } from '@tanstack/table-core/build/lib/features/RowSelection';
@@ -33,10 +33,9 @@ import { CustomerSection } from '../Invoices/Shared/customer-section';
 import { createPaymentBreadcrumbs } from '../Payments/constants';
 import { defaultPaymentForm } from './constants';
 import { List } from './Shared/lines-payment';
-
-type FlagSet = {
-  [key: string]: boolean;
-};
+import { buildReceivableState } from './build-receivables-state';
+import { MoneyInput } from '@/components/money-input';
+import { Input } from '@/components/ui/input';
 
 export default function Create({
   auth,
@@ -50,8 +49,9 @@ export default function Create({
   const { currency } = useNumber();
   const [openCancelConfirmation, setCancelConfirmation] = React.useState(false);
   const [openCheckout, setCheckout] = React.useState(false);
-
-  const [initialized, setInitialized] = React.useState(false);
+  const [loading, setLoading] = React.useState(false);
+  const [bulkPayment, setBulkPayment] = React.useState<number>(0);
+  const [bulkDiscount, setBulkDiscount] = React.useState<number>(0);
   const [open, setOpen] = React.useState(false);
   const [search, setSearch] = React.useState('');
   const dedbouncedSearch = useDebounced(search, 500);
@@ -70,57 +70,25 @@ export default function Create({
   });
 
   useEffect(() => {
-    const _rowSelection: FlagSet = {};
-    paymentForm.lines
-      .filter((line) => line.payment > 0)
-      .map((line) => {
-        _rowSelection[`${line.id.toString()}`] = true;
-      });
+    if (!receivables) return;
 
-    if (Object.keys(_rowSelection).length > 0) {
-      setRowSelection(_rowSelection);
-    }
-    if (receivables === undefined || initialized) return;
+    const { lines, rowSelection } = buildReceivableState(receivables, invoice_uuid);
 
-    const lines: ReceivableInvoiceForm[] = [];
-    let selectedRowId = -1;
-    receivables.map((receivable: Receivable) => {
-      selectedRowId = invoice_uuid === receivable.invoice.uuid ? receivable.invoice.id : -1;
-      const line: ReceivableInvoiceForm = {
-        ...receivable.invoice,
-        payment: invoice_uuid === receivable.invoice.uuid ? receivable.invoice.amount_due : 0,
-        discount: 0,
-        balance: 0,
-        original_payment: 0,
-        action: 'unchanged',
-      };
-      lines.push(line);
-    });
-
-    // When we want to record a payment from the customer list
-    // and that customer only has one invoice pending and
-    // not record has been selected by default we set
-    // as select the existing invoice and the total
-    // received would be equal to the amount due
-    if (selectedRowId === -1 && receivables.length === 1) {
-      selectedRowId = receivables[0].invoice.id;
-      lines[0].payment = receivables[0].invoice.amount_due;
-    }
-
-    if (selectedRowId > 0) {
-      setRowSelection((prev) => ({
-        ...prev,
-        [`${selectedRowId.toString()}`]: true,
-      }));
-    }
-
+    setRowSelection(rowSelection);
     setPaymentForm((prev) => ({
       ...prev,
-      lines: [...lines],
+      lines,
     }));
+  }, [receivables, invoice_uuid, setPaymentForm]);
 
-    setInitialized(true);
-  }, [receivables, paymentForm, setPaymentForm, invoice_uuid, initialized]);
+  useEffect(() => {
+    // Reset everything when switching customers
+    setRowSelection({});
+    setPaymentForm((prev) => ({
+      ...prev,
+      lines: [],
+    }));
+  }, [customer?.uuid, setPaymentForm]);
 
   useEffect(() => {
     const searchCustomer = () => {
@@ -171,7 +139,30 @@ export default function Create({
     });
     setOpen(false);
     if (customer !== undefined) {
-      router.reload({ only: ['receivables'], data: { customer_id: customer.uuid }, preserveUrl: true });
+      router.reload({
+        only: ['receivables'],
+        data: { customer_id: customer.uuid },
+        preserveUrl: true,
+        onStart: () => setLoading(true),
+        onSuccess: (page) => {
+          const receivables = page.props.receivables as Receivable[];
+          // Reset before applying new data
+          setRowSelection({});
+          setPaymentForm((prev) => ({
+            ...prev,
+            lines: [],
+          }));
+
+          const { lines, rowSelection } = buildReceivableState(receivables, invoice_uuid);
+
+          setRowSelection(rowSelection);
+          setPaymentForm((prev) => ({
+            ...prev,
+            lines,
+          }));
+        },
+        onFinish: () => setLoading(false),
+      });
     }
   };
 
@@ -231,6 +222,48 @@ export default function Create({
     });
   };
 
+  const distributePayment = (amount: number, discount: number) => {
+    let remaining = amount;
+
+    setPaymentForm((prev) => {
+      const updatedLines = prev.lines.map((line: ReceivableInvoiceForm) => {
+        if (remaining <= 0) {
+          return { ...line, payment: 0, discount: 0 };
+        }
+
+        const discountAmount = (line.amount_due * discount) / 100;
+        const netDue = line.amount_due - discountAmount;
+
+        if (remaining >= netDue) {
+          // Fully pay this invoice
+          remaining -= netDue;
+          return { ...line, payment: netDue, discount: discountAmount };
+        } else {
+          const partialDiscount = (remaining * discount) / 100;
+          const partialPayment = remaining;
+          remaining = 0;
+          return { ...line, payment: partialPayment, discount: partialDiscount };
+        }
+      });
+
+      return {
+        ...prev,
+        lines: updatedLines,
+      };
+    });
+
+    // Update row selection for invoices that got paid
+    setRowSelection((prev) => {
+      const newSelection: FlagSet = { ...prev };
+      paymentForm.lines.forEach((line) => {
+        if (line.payment > 0) {
+          newSelection[line.id.toString()] = true;
+        }
+      });
+      return newSelection;
+    });
+  }
+
   return (
     <AppLayout user={auth.user} breadcrumbs={createPaymentBreadcrumbs}>
       <AppLayout.Actions>
@@ -260,8 +293,8 @@ export default function Create({
             open={open}
             dedbouncedSearch={dedbouncedSearch}
           />
-          <div className="grid grid-cols-12">
-            <div className="col-span-6 flex flex-col gap-y-6">
+          <div className="grid grid-cols-12 bg-yellow-200">
+            <div className="col-span-6 flex flex-col gap-y-6 bg-indigo-200">
               <div className="flex flex-col gap-y-2">
                 <Label htmlFor="date">{t('global.date')}</Label>
                 <Popover>
@@ -303,61 +336,30 @@ export default function Create({
                 </div>
               </div>
             </div>
-            <div className="col-span-6 grid place-items-end">
+            <div className="col-span-6 flex flex-col items-end space-y-4 bg-green-300">
+              <div className="flex flex-col items-end space-y-2">
+                <Label htmlFor='bulkPayment'>{t('global.bulkPayment')}</Label>
+                <MoneyInput name='bulkPayment' value={bulkPayment} onChange={(value) => setBulkPayment(value)} className='text-end' />
+              </div>
+              <div className="flex flex-col items-end space-y-2">
+                <Label htmlFor='bulkDiscount'>{t('global.bulkDiscount')}</Label>
+                <Input type='number' name='bulkDiscount' min={0} max={100} value={bulkDiscount} onChange={(event) => setBulkDiscount(event.target.valueAsNumber)} className='text-end' />
+              </div>
+              <Button onClick={() => distributePayment(bulkPayment, bulkDiscount)}>
+                Apply
+              </Button>
+            </div>
+            <div className="col-span-12 grid place-items-end">
               <div className="flex flex-col gap-x-2">
                 <Label className="text-muted-foreground block text-end text-lg">{t('global.totalReceived')}</Label>
                 <Label className="block text-end text-4xl">{currency(totalPaid())}</Label>
               </div>
-              {/* <div className="flex flex-col gap-y-2">
-                <Label htmlFor="paymentTerms">Payment terms</Label>
-                <Select
-                  name="paymentTerms"
-                  onValueChange={handlePaymentTermsChange}
-                  defaultValue={'0'}
-                  value={String(paymentForm.header.terms)}
-                  required
-                >
-                  <SelectTrigger className="w-full">
-                    <SelectValue placeholder="Select terms" />
-                  </SelectTrigger>
-                  <SelectContent className="">
-                    {paymentTerms.map((term, index) => (
-                      <SelectItem key={index.toString()} value={term.value.toString()}>
-                        {term.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <InputError className="mt-2" message={errors.terms} />
-              </div> */}
-              {/* <div className="flex flex-col gap-y-2">
-                <Label htmlFor="paymentTerms">Tax Receipt</Label>
-                <Select
-                  name="paymentTerms"
-                  onValueChange={handleTaxReceiptChange}
-                  defaultValue={'0'}
-                  value={String(paymentForm.header.taxReceipt)}
-                  required
-                >
-                  <SelectTrigger className="w-full">
-                    <SelectValue placeholder="Select terms" />
-                  </SelectTrigger>
-                  <SelectContent className="">
-                    {tax_receipts.map((receipt) => (
-                      <SelectItem key={receipt.id} value={String(receipt.id)} disabled={!receipt.available}>
-                        {receipt.name}
-                        {!receipt.available && <span className="text-red-500">Limit reached</span>}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <InputError className="mt-2" message={errors.tax_receipt} />
-              </div> */}
             </div>
           </div>
         </div>
         <div className="col-span-12">
           <List
+            loading={loading}
             data={paymentForm.lines}
             rowSelection={rowSelection}
             setRowSelection={setRowSelection}

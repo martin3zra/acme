@@ -18,17 +18,19 @@ import {
 import { ChevronDown } from 'lucide-react';
 import { FC, useState } from 'react';
 import { getColumns } from './columns-definitions';
+import { SkeletonRow } from '@/components/data-table/skeleton-row';
 
 type Props = {
   data: ReceivableInvoiceForm[];
   rowSelection: RowSelectionState;
+  loading: boolean
   setRowSelection: React.Dispatch<React.SetStateAction<RowSelectionState>>;
   onSelectPaymentLine: (receivableInvoiceForm: ReceivableInvoiceForm, action: PaymentVerb) => void;
   onValueChange?: onValueChangeType;
   onSelectionChange: (selection: RowSelectionState) => void;
 };
 
-export const List: FC<Props> = ({ data, rowSelection, setRowSelection, onSelectPaymentLine: onSelectPayment, onValueChange, onSelectionChange }) => {
+export const List: FC<Props> = ({ data, rowSelection, loading, setRowSelection, onSelectPaymentLine: onSelectPayment, onValueChange, onSelectionChange }) => {
   const t = useTranslation().trans;
   const [sorting, setSorting] = useState<SortingState>([]);
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
@@ -115,7 +117,11 @@ export const List: FC<Props> = ({ data, rowSelection, setRowSelection, onSelectP
             ))}
           </TableHeader>
           <TableBody>
-            {table.getRowModel().rows?.length ? (
+            {loading ? (
+              Array.from({ length: 5}).map((_, i) =>
+                <SkeletonRow key={i} columns={columns.length} />
+              )
+            ): table.getRowModel().rows?.length ? (
               table.getRowModel().rows.map((row) => (
                 <TableRow key={row.id} data-state={row.getIsSelected() && 'selected'}>
                   {row.getVisibleCells().map((cell) => (

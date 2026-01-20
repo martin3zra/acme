@@ -329,6 +329,8 @@ export type PaymentHeaderForm = {
   discount: number;
 };
 
+export type FlagSet = Record<string, boolean>;
+
 export type ReceivableInvoiceForm = ReceivableInvoice & {
   original_payment: number;
   payment: number;
