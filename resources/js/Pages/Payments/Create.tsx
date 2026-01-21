@@ -1,5 +1,6 @@
 import { AlertDestructive } from '@/components/alert-destructive';
 import InputError from '@/components/input-error';
+import { MoneyInput } from '@/components/money-input';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -12,6 +13,7 @@ import {
 } from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
 import { Calendar } from '@/components/ui/calendar';
+import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { useHeader } from '@/composables/use-headers';
@@ -21,7 +23,7 @@ import { usePersistedState } from '@/hooks/use-persisted-state';
 import { useTranslation } from '@/hooks/use-translation';
 import AppLayout from '@/layouts/app-layout';
 import { cn } from '@/lib/utils';
-import { BTForm, CardForm, CashForm, CheckForm, Customer, FlagSet, PageProps, PaymentForm, PaymentMethod, Receivable, ReceivableInvoiceForm } from '@/types';
+import { BTForm, CardForm, CashForm, CheckForm, Customer, PageProps, PaymentForm, PaymentMethod, Receivable, ReceivableInvoiceForm } from '@/types';
 import { Textarea } from '@headlessui/react';
 import { router, useForm, usePage } from '@inertiajs/react';
 import { RowSelectionState } from '@tanstack/table-core/build/lib/features/RowSelection';
@@ -31,11 +33,9 @@ import React, { useEffect } from 'react';
 import CheckoutForm from '../Invoices/Shared/checkout-form';
 import { CustomerSection } from '../Invoices/Shared/customer-section';
 import { createPaymentBreadcrumbs } from '../Payments/constants';
+import { buildReceivableState, buildRowSelection } from './build-receivables-state';
 import { defaultPaymentForm } from './constants';
 import { List } from './Shared/lines-payment';
-import { buildReceivableState } from './build-receivables-state';
-import { MoneyInput } from '@/components/money-input';
-import { Input } from '@/components/ui/input';
 
 export default function Create({
   auth,
@@ -86,6 +86,7 @@ export default function Create({
     setRowSelection({});
     setPaymentForm((prev) => ({
       ...prev,
+      header: { ...prev.header, customer: undefined },
       lines: [],
     }));
   }, [customer?.uuid, setPaymentForm]);
@@ -228,7 +229,7 @@ export default function Create({
     setPaymentForm((prev) => {
       const updatedLines = prev.lines.map((line: ReceivableInvoiceForm) => {
         if (remaining <= 0) {
-          return { ...line, payment: 0, discount: 0 };
+          return { ...line, payment: 0, discount: 0, remaining: line.amount_due };
         }
 
         const discountAmount = (line.amount_due * discount) / 100;
@@ -237,32 +238,22 @@ export default function Create({
         if (remaining >= netDue) {
           // Fully pay this invoice
           remaining -= netDue;
-          return { ...line, payment: netDue, discount: discountAmount };
+          return { ...line, payment: netDue, discount: discountAmount, remaining: 0 };
         } else {
           const partialDiscount = (remaining * discount) / 100;
           const partialPayment = remaining;
           remaining = 0;
-          return { ...line, payment: partialPayment, discount: partialDiscount };
+          return { ...line, payment: partialPayment, discount: partialDiscount, remaining: line.amount_due - (partialPayment + partialDiscount) };
         }
       });
 
+      setRowSelection(buildRowSelection(updatedLines));
       return {
         ...prev,
         lines: updatedLines,
       };
     });
-
-    // Update row selection for invoices that got paid
-    setRowSelection((prev) => {
-      const newSelection: FlagSet = { ...prev };
-      paymentForm.lines.forEach((line) => {
-        if (line.payment > 0) {
-          newSelection[line.id.toString()] = true;
-        }
-      });
-      return newSelection;
-    });
-  }
+  };
 
   return (
     <AppLayout user={auth.user} breadcrumbs={createPaymentBreadcrumbs}>
@@ -293,8 +284,8 @@ export default function Create({
             open={open}
             dedbouncedSearch={dedbouncedSearch}
           />
-          <div className="grid grid-cols-12 bg-yellow-200">
-            <div className="col-span-6 flex flex-col gap-y-6 bg-indigo-200">
+          <div className="grid grid-cols-12">
+            <div className="col-span-6 flex flex-col gap-y-6">
               <div className="flex flex-col gap-y-2">
                 <Label htmlFor="date">{t('global.date')}</Label>
                 <Popover>
@@ -336,17 +327,30 @@ export default function Create({
                 </div>
               </div>
             </div>
-            <div className="col-span-6 flex flex-col items-end space-y-4 bg-green-300">
+            <div className="col-span-6 flex flex-col items-end space-y-4">
               <div className="flex flex-col items-end space-y-2">
-                <Label htmlFor='bulkPayment'>{t('global.bulkPayment')}</Label>
-                <MoneyInput name='bulkPayment' value={bulkPayment} onChange={(value) => setBulkPayment(value)} className='text-end' />
+                <Label htmlFor="bulkPayment">{t('global.bulkPayment')}</Label>
+                <MoneyInput name="bulkPayment" value={bulkPayment} onChange={(value) => setBulkPayment(value)} className="text-end" />
               </div>
               <div className="flex flex-col items-end space-y-2">
-                <Label htmlFor='bulkDiscount'>{t('global.bulkDiscount')}</Label>
-                <Input type='number' name='bulkDiscount' min={0} max={100} value={bulkDiscount} onChange={(event) => setBulkDiscount(event.target.valueAsNumber)} className='text-end' />
+                <Label htmlFor="bulkDiscount">{t('global.bulkDiscount')}</Label>
+                <Input
+                  type="number"
+                  name="bulkDiscount"
+                  min={0}
+                  max={100}
+                  value={bulkDiscount}
+                  onChange={(event) => {
+                    let value = event.target.valueAsNumber;
+                    if (value < 0) value = 0;
+                    if (value > 100) value = 100; // clamp to max
+                    setBulkDiscount(value);
+                  }}
+                  className="w-45 text-end"
+                />
               </div>
-              <Button onClick={() => distributePayment(bulkPayment, bulkDiscount)}>
-                Apply
+              <Button disabled={bulkPayment === 0} onClick={() => distributePayment(bulkPayment, bulkDiscount)}>
+                {t('payments.applyBulkPayment')}
               </Button>
             </div>
             <div className="col-span-12 grid place-items-end">

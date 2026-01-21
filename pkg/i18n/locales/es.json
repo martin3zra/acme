@@ -37,6 +37,7 @@
     "subTotal": "Sub-total",
     "total": "Total",
     "balance": "Balance",
+    "remainingBalance": "Saldo restante",
     "totalPaymentApplied": "Total de pagos aplicados",
     "totalToBeCollected": "Total a cobrar",
     "totalReceived": "Total recibido",
@@ -573,6 +574,7 @@
     "title": "Pagos",
     "description": "Todos los pagos registrados se muestran aquí.",
     "paidStatus": "Pagada",
+    "applyBulkPayment": "Aplicar pago masivo",
     "line": {
       "form": {
         "placeholder": "Referencia o presione ⌘K",

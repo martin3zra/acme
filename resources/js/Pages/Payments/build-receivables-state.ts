@@ -1,8 +1,8 @@
-import { FlagSet, Receivable, ReceivableInvoiceForm } from "@/types";
+import { FlagSet, Receivable, ReceivableInvoiceForm } from '@/types';
 
 export function buildReceivableState(
   receivables: Receivable[],
-  invoice_uuid: string
+  invoice_uuid: string,
 ): {
   lines: ReceivableInvoiceForm[];
   rowSelection: FlagSet;
@@ -12,12 +12,12 @@ export function buildReceivableState(
     payment: invoice_uuid === receivable.invoice.uuid ? receivable.invoice.amount_due : 0,
     discount: 0,
     balance: 0,
+    remaining: 0,
     original_payment: 0,
     action: 'unchanged',
   }));
 
-  let selectedRowId =
-    receivables.find((r) => r.invoice.uuid === invoice_uuid)?.invoice.id ?? -1;
+  let selectedRowId = receivables.find((r) => r.invoice.uuid === invoice_uuid)?.invoice.id ?? -1;
 
   // When we want to record a payment from the customer list
   // and that customer only has one invoice pending and
@@ -35,4 +35,14 @@ export function buildReceivableState(
   }
 
   return { lines, rowSelection };
+}
+
+export function buildRowSelection(lines: ReceivableInvoiceForm[]): FlagSet {
+  const selection: FlagSet = {};
+  lines.forEach((line) => {
+    if (line.payment > 0) {
+      selection[line.id.toString()] = true;
+    }
+  });
+  return selection;
 }

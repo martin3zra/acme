@@ -336,6 +336,7 @@ export type ReceivableInvoiceForm = ReceivableInvoice & {
   payment: number;
   discount: number;
   balance: number;
+  remaining: number;
   action: LineAction;
 };
 

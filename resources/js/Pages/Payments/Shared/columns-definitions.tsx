@@ -126,14 +126,13 @@ export const getColumns = ({ onDidClick, t }: Props): ColumnDef<ReceivableInvoic
     },
     {
       accessorKey: 'remaining',
-      meta: t('global.balance'),
+      meta: t('global.remainingBalance'),
       // size: 880,
       header: (props) => {
-        return <HeaderCell title={t('global.balance')} alignment="right" columnWidth={props.column.getSize()} />;
+        return <HeaderCell title={t('global.remainingBalance')} alignment="right" columnWidth={props.column.getSize()} />;
       },
       cell: (props) => {
-        const remaining = props.row.original.amount_due - props.row.original.payment;
-        return <CurrencyCell columnWidth={props.column.getSize()} value={remaining as unknown as string} />;
+        return <CurrencyCell columnWidth={props.column.getSize()} value={props.row.original.remaining as unknown as string} />;
       },
     },
     {
