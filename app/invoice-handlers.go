@@ -17,16 +17,22 @@ func (s *Server) invoicesHandler(ctx *routing.Context) {
 		return
 	}
 
+	invoiceType := InvoiceType(ctx.Query("invoiceType"))
+	if err := invoiceType.Validate(); err != nil {
+		invoiceType = "all"
+	}
+
 	uuid := ctx.Query("id")
-	invoices, err := s.findInvoices(ctx.Request.Context())
+	invoices, err := s.findInvoices(ctx.Request.Context(), invoiceType)
 	if err != nil {
 		ctx.Error(err)
 		return
 	}
 
 	props := map[string]any{
-		"translations": trans("invoices"),
-		"invoices":     invoices,
+		"translations":             trans("invoices"),
+		"invoices":                 invoices,
+		"currentInvoiceTypeFilter": invoiceType,
 	}
 
 	if uuid != "" {

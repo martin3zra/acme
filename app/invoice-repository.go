@@ -54,7 +54,7 @@ type line struct {
 	Action LineAction `json:"action"`
 }
 
-func (s *Server) findInvoices(ctx context.Context) ([]*invoice, error) {
+func (s *Server) findInvoices(ctx context.Context, invoiceType InvoiceType) ([]*invoice, error) {
 	rows, err := s.db.Query("SELECT invoices.id, invoices.uuid, invoices.code, invoices.date, invoices.due_on, invoices.amount, invoices.discount, invoices.tax, "+
 		"invoices.total, invoices.amount_due, invoices.status, invoices.paid_status, invoices.payment, invoices.note, invoices.tax_receipt_id,"+
 		"invoices.tax_number, customers.id, customers.uuid, customers.name, customers.email, customers.phone "+
@@ -62,7 +62,7 @@ func (s *Server) findInvoices(ctx context.Context) ([]*invoice, error) {
 		"INNER JOIN companies ON (invoices.company_id = companies.id) "+
 		"INNER JOIN customers ON (invoices.company_id = customers.company_id AND invoices.customer_id = customers.id) "+
 		"INNER JOIN tax_receipts ON (invoices.company_id = tax_receipts.company_id AND invoices.tax_receipt_id = tax_receipts.id) "+
-		"WHERE invoices.company_id = $1 ORDER BY invoices.id DESC", CurrentCompany(ctx).ID)
+		"WHERE invoices.company_id = $1 AND ($2 = 'all' OR invoices.type = $2::invoice_terms) ORDER BY invoices.id DESC", CurrentCompany(ctx).ID, invoiceType)
 	if err != nil {
 		return nil, err
 	}

@@ -6,6 +6,7 @@ import (
 	"database/sql/driver"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"log"
 	"time"
 
@@ -1072,5 +1073,23 @@ func (ReportSalesForm) Rules() map[string]any {
 		"from":       "required|date",
 		"to":         "required|date|before_or_equals:from",
 		"reportType": "required|in:sales_by_item,sales_by_customer,sales_by_date",
+	}
+}
+
+type InvoiceType string
+
+const (
+	InvoiceTypeAll    InvoiceType = "all"
+	InvoiceTypeCash   InvoiceType = "cash"
+	InvoiceTypeCredit InvoiceType = "credit"
+)
+
+// Validate ensures the value is one of the allowed constants
+func (t InvoiceType) Validate() error {
+	switch t {
+	case InvoiceTypeAll, InvoiceTypeCash, InvoiceTypeCredit:
+		return nil
+	default:
+		return fmt.Errorf("invalid invoice type: %s", t)
 	}
 }

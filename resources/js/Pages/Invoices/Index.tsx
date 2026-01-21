@@ -19,7 +19,8 @@ export default function Index({
   invoices,
   invoice,
   showInvoice,
-}: PageProps<{ invoices: Invoice[]; invoice: InvoiceWithLines; showInvoice: boolean }>) {
+  currentInvoiceTypeFilter,
+}: PageProps<{ invoices: Invoice[]; invoice: InvoiceWithLines; showInvoice: boolean; currentInvoiceTypeFilter: 'all' | 'cash' | 'credit' }>) {
   const [loadingInvoice, setLoadingInvoice] = useCallbackState<boolean>(false);
   const [open, setOpen] = useCallbackState<boolean>(showInvoice);
   const [selectedInvoice, setSelectedInvoice] = useCallbackState<Invoice | undefined>(undefined);
@@ -77,6 +78,16 @@ export default function Index({
     }
   };
 
+  const onInvoiceFilterTypeChange = (value: 'all' | 'credit' | 'cash') => {
+    router.visit(page.url, {
+      data: { invoiceType: value },
+      preserveScroll: true,
+      preserveState: true,
+      onStart: () => setLoadingInvoice(true),
+      onFinish: () => setLoadingInvoice(false),
+    });
+  };
+
   const modalHandler = (open: boolean = false) => {
     onOpenChange(open);
     setDeleteDialogOpen(open);
@@ -96,7 +107,14 @@ export default function Index({
           </>
         )}
 
-        {hasInvoices && <List data={invoices} onSelectInvoice={onSelectInvoice} />}
+        {hasInvoices && (
+          <List
+            data={invoices}
+            currentInvoiceTypeFilter={currentInvoiceTypeFilter}
+            onSelectInvoice={onSelectInvoice}
+            onInvoiceTypeFilterChanges={onInvoiceFilterTypeChange}
+          />
+        )}
 
         {/* {invoice !== undefined && invoice.pdfURL && (
           <iframe src={invoice.pdfURL} width="100%" height="600" className="rounded border" title="Invoice Preview"></iframe>
@@ -139,7 +157,7 @@ export default function Index({
                   </div>
                 </div>
               </SheetHeader>
-              <div className="relative grid overflow-y-scroll gap-4 px-4 pb-4">
+              <div className="relative grid gap-4 overflow-y-scroll px-4 pb-4">
                 {invoice.header.status === 'void' && (
                   <div className="absolute inset-0 flex w-full items-center justify-center overflow-y-hidden bg-transparent">
                     <h1 className="-rotate-45 border-8 border-red-500/25 p-8 text-8xl font-extrabold text-red-500/25 uppercase">

@@ -1,6 +1,7 @@
 import { Button } from '@/components/ui/button';
 import { DropdownMenu, DropdownMenuCheckboxItem, DropdownMenuContent, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useTranslation } from '@/hooks/use-translation';
 import { Invoice, InvoiceVerb } from '@/types';
 import {
@@ -21,9 +22,11 @@ import { getColumns } from './columns-definitions';
 type Props = {
   data: Invoice[];
   onSelectInvoice: (invoice: Invoice, action: InvoiceVerb) => void;
+  currentInvoiceTypeFilter: 'all' | 'cash' | 'credit';
+  onInvoiceTypeFilterChanges: (value: 'all' | 'cash' | 'credit') => void;
 };
 
-export const List: FC<Props> = ({ data, onSelectInvoice }) => {
+export const List: FC<Props> = ({ data, currentInvoiceTypeFilter, onSelectInvoice, onInvoiceTypeFilterChanges }) => {
   const t = useTranslation().trans;
   const [sorting, setSorting] = useState<SortingState>([]);
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
@@ -62,6 +65,17 @@ export const List: FC<Props> = ({ data, onSelectInvoice }) => {
           onChange={(event) => table.getColumn('customer.name')?.setFilterValue(event.target.value)}
           className="max-w-sm"
         /> */}
+        <Tabs
+          value={currentInvoiceTypeFilter}
+          onValueChange={onInvoiceTypeFilterChanges}
+          className="[&_[data-slot=tabs-trigger]:not([data-state=active])]:cursor-pointer"
+        >
+          <TabsList>
+            <TabsTrigger value="all">{t('global.all')}</TabsTrigger>
+            <TabsTrigger value="credit">{t('global.credit')}</TabsTrigger>
+            <TabsTrigger value="cash">{t('global.cash')}</TabsTrigger>
+          </TabsList>
+        </Tabs>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button variant="outline" className="ml-auto">
