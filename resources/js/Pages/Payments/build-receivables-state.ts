@@ -46,3 +46,24 @@ export function buildRowSelection(lines: ReceivableInvoiceForm[]): FlagSet {
   });
   return selection;
 }
+
+export function calculateTotals(lines: ReceivableInvoiceForm[]) {
+  let totalPayment = 0;
+  let totalDiscount = 0;
+  let totalRemaining = 0;
+
+  lines.forEach((line) => {
+    const payment = line.payment || 0;
+    const discountAmount = line.discount || 0;
+
+    totalPayment += payment;
+    totalDiscount += discountAmount;
+    totalRemaining += line.remaining || 0;
+  });
+
+  return {
+    totalPayment,
+    totalDiscount,
+    totalRemaining,
+  };
+}

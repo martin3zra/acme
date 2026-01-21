@@ -1,6 +1,8 @@
+import { SkeletonRow } from '@/components/data-table/skeleton-row';
 import { Button } from '@/components/ui/button';
 import { DropdownMenu, DropdownMenuCheckboxItem, DropdownMenuContent, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { useNumber } from '@/composables/use-number';
 import { useTranslation } from '@/hooks/use-translation';
 import { onValueChangeType, PaymentVerb, ReceivableInvoiceForm } from '@/types';
 import {
@@ -17,25 +19,34 @@ import {
 } from '@tanstack/react-table';
 import { ChevronDown } from 'lucide-react';
 import { FC, useState } from 'react';
+import { calculateTotals } from '../build-receivables-state';
 import { getColumns } from './columns-definitions';
-import { SkeletonRow } from '@/components/data-table/skeleton-row';
 
 type Props = {
   data: ReceivableInvoiceForm[];
   rowSelection: RowSelectionState;
-  loading: boolean
+  loading: boolean;
   setRowSelection: React.Dispatch<React.SetStateAction<RowSelectionState>>;
   onSelectPaymentLine: (receivableInvoiceForm: ReceivableInvoiceForm, action: PaymentVerb) => void;
   onValueChange?: onValueChangeType;
   onSelectionChange: (selection: RowSelectionState) => void;
 };
 
-export const List: FC<Props> = ({ data, rowSelection, loading, setRowSelection, onSelectPaymentLine: onSelectPayment, onValueChange, onSelectionChange }) => {
+export const List: FC<Props> = ({
+  data,
+  rowSelection,
+  loading,
+  setRowSelection,
+  onSelectPaymentLine: onSelectPayment,
+  onValueChange,
+  onSelectionChange,
+}) => {
+  const currency = useNumber().currency;
   const t = useTranslation().trans;
   const [sorting, setSorting] = useState<SortingState>([]);
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
   const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({});
-
+  const totals = calculateTotals(data);
   const columns = getColumns({ onDidClick: onSelectPayment, t });
 
   const table = useReactTable({
@@ -70,12 +81,6 @@ export const List: FC<Props> = ({ data, rowSelection, loading, setRowSelection, 
   return (
     <div>
       <div className="flex items-center py-4">
-        {/* <Input
-          placeholder="Filter names..."
-          value={(table.getColumn('customer.name')?.getFilterValue() as string) ?? ''}
-          onChange={(event) => table.getColumn('customer.name')?.setFilterValue(event.target.value)}
-          className="max-w-sm"
-        /> */}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button variant="outline" className="ml-auto">
@@ -118,10 +123,8 @@ export const List: FC<Props> = ({ data, rowSelection, loading, setRowSelection, 
           </TableHeader>
           <TableBody>
             {loading ? (
-              Array.from({ length: 5}).map((_, i) =>
-                <SkeletonRow key={i} columns={columns.length} />
-              )
-            ): table.getRowModel().rows?.length ? (
+              Array.from({ length: 5 }).map((_, i) => <SkeletonRow key={i} columns={columns.length} />)
+            ) : table.getRowModel().rows?.length ? (
               table.getRowModel().rows.map((row) => (
                 <TableRow key={row.id} data-state={row.getIsSelected() && 'selected'}>
                   {row.getVisibleCells().map((cell) => (
@@ -137,6 +140,14 @@ export const List: FC<Props> = ({ data, rowSelection, loading, setRowSelection, 
               </TableRow>
             )}
           </TableBody>
+          <tfoot>
+            <TableRow>
+              <TableCell colSpan={columns.length - 4} />
+              <TableCell className="pr-4 text-end text-base font-semibold">{currency(totals.totalPayment)}</TableCell>
+              <TableCell className="pr-4 text-end text-base font-semibold">{currency(totals.totalDiscount)}</TableCell>
+              <TableCell className="pr-4 text-end text-base font-semibold">{currency(totals.totalRemaining)}</TableCell>
+            </TableRow>
+          </tfoot>
         </Table>
       </div>
       <div className="flex items-center justify-end space-x-2 py-4">
