@@ -2,8 +2,9 @@ import { Button } from '@/components/ui/button';
 import { DropdownMenu, DropdownMenuCheckboxItem, DropdownMenuContent, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Input } from '@/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useTranslation } from '@/hooks/use-translation';
-import { Customer, CustomerVerb } from '@/types';
+import { Customer, CustomerTypeFilter, CustomerVerb } from '@/types';
 import {
   ColumnFiltersState,
   flexRender,
@@ -22,9 +23,11 @@ import { getColumns } from './columns-definitions';
 type Props = {
   data: Customer[];
   onSelectCustomer: (customer: Customer, action: CustomerVerb) => void;
+  currentCustomerTypeFilter: CustomerTypeFilter;
+  onCustomerTypeFilterChanges: (value: CustomerTypeFilter) => void;
 };
 
-export const List: FC<Props> = ({ data, onSelectCustomer }) => {
+export const List: FC<Props> = ({ data, currentCustomerTypeFilter, onSelectCustomer, onCustomerTypeFilterChanges }) => {
   const t = useTranslation().trans;
   const [sorting, setSorting] = useState<SortingState>([]);
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
@@ -85,6 +88,19 @@ export const List: FC<Props> = ({ data, onSelectCustomer }) => {
               })}
           </DropdownMenuContent>
         </DropdownMenu>
+      </div>
+      <div className="flex items-center py-2">
+        <Tabs
+          value={currentCustomerTypeFilter}
+          onValueChange={(value: string) => onCustomerTypeFilterChanges(value as CustomerTypeFilter)}
+          className="[&_[data-slot=tabs-trigger]:not([data-state=active])]:cursor-pointer"
+        >
+          <TabsList>
+            <TabsTrigger value="all">{t('global.all')}</TabsTrigger>
+            <TabsTrigger value="individual">{t('customers.single.individual')}</TabsTrigger>
+            <TabsTrigger value="business">{t('customers.single.business')}</TabsTrigger>
+          </TabsList>
+        </Tabs>
       </div>
       <div className="rounded-md border">
         <Table>

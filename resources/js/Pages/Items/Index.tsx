@@ -5,16 +5,24 @@ import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '
 import { useVerb } from '@/composables/use-verbs';
 import { useTranslation } from '@/hooks/use-translation';
 import AppLayout from '@/layouts/app-layout';
-import { Item, PageProps, Tax, Unit, Verb } from '@/types';
+import { Item, ItemTypeFilter, PageProps, Tax, Unit, Verb } from '@/types';
+import { Deferred, router, usePage } from '@inertiajs/react';
 import { Plus } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { breadcrumbs } from './constants';
 import { List } from './List/Index';
 import CreateForm, { CreateFormParams } from './Shared/CreateForm';
-import { Deferred } from '@inertiajs/react';
 
-export default function Index({ auth, items, taxes, units }: PageProps<{ items: Item[]; taxes: Tax[]; units: Unit[] }>) {
+export default function Index({
+  auth,
+  items,
+  taxes,
+  units,
+  currentItemTypeFilter,
+}: PageProps<{ items: Item[]; taxes: Tax[]; units: Unit[]; currentItemTypeFilter: ItemTypeFilter }>) {
   const t = useTranslation().trans;
+  const page = usePage<PageProps>();
+  const [loadingItem, setLoadingItem] = useState<boolean>(false);
   const [open, setOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [selectedItem, setSelectedItem] = useState<CreateFormParams>({
@@ -50,6 +58,16 @@ export default function Index({ auth, items, taxes, units }: PageProps<{ items: 
       }
     }
   }, [selectedItem]);
+
+  const onItemFilterTypeChange = (value: ItemTypeFilter) => {
+    router.visit(page.url, {
+      data: { itemType: value },
+      preserveScroll: true,
+      preserveState: true,
+      onStart: () => setLoadingItem(true),
+      onFinish: () => setLoadingItem(false),
+    });
+  };
 
   const modalHandler = (open: boolean = false) => {
     onOpenChange(open);
@@ -87,21 +105,30 @@ export default function Index({ auth, items, taxes, units }: PageProps<{ items: 
           </>
         )}
 
-        {hasItems && <List data={items} onSelectItem={onSelectItem} />}
+        {hasItems && (
+          <List
+            data={items}
+            currentItemTypeFilter={currentItemTypeFilter}
+            onSelectItem={onSelectItem}
+            onItemTypeFilterChanges={onItemFilterTypeChange}
+          />
+        )}
 
-        <Sheet open={open} onOpenChange={onOpenChange}>
-          <SheetContent side="right" className="m-4 flex h-[calc(~'(100%-var(--spacing)*4)/3')] w-full flex-col rounded-md sm:max-w-7xl">
-            <SheetHeader>
-              <SheetTitle>
-                {t(`global.actions.${verbName}`)} {t('global.item')}
-              </SheetTitle>
-              <SheetDescription className="text-[12px]">{t(`items.newItem.description`)}</SheetDescription>
-            </SheetHeader>
-            <div className="grid gap-4 overflow-y-scroll px-4">
-              <CreateForm params={selectedItem} onFinish={() => modalHandler(false)} />
-            </div>
-          </SheetContent>
-        </Sheet>
+        {loadingItem && (
+          <Sheet open={open} onOpenChange={onOpenChange}>
+            <SheetContent side="right" className="m-4 flex h-[calc(~'(100%-var(--spacing)*4)/3')] w-full flex-col rounded-md sm:max-w-7xl">
+              <SheetHeader>
+                <SheetTitle>
+                  {t(`global.actions.${verbName}`)} {t('global.item')}
+                </SheetTitle>
+                <SheetDescription className="text-[12px]">{t(`items.newItem.description`)}</SheetDescription>
+              </SheetHeader>
+              <div className="grid gap-4 overflow-y-scroll px-4">
+                <CreateForm params={selectedItem} onFinish={() => modalHandler(false)} />
+              </div>
+            </SheetContent>
+          </Sheet>
+        )}
 
         {selectedItem.item && (
           <ConfirmsPassword

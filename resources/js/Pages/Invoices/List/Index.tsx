@@ -3,7 +3,7 @@ import { DropdownMenu, DropdownMenuCheckboxItem, DropdownMenuContent, DropdownMe
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useTranslation } from '@/hooks/use-translation';
-import { Invoice, InvoiceVerb } from '@/types';
+import { Invoice, InvoiceTypeFilter, InvoiceVerb } from '@/types';
 import {
   ColumnFiltersState,
   flexRender,
@@ -22,8 +22,8 @@ import { getColumns } from './columns-definitions';
 type Props = {
   data: Invoice[];
   onSelectInvoice: (invoice: Invoice, action: InvoiceVerb) => void;
-  currentInvoiceTypeFilter: 'all' | 'cash' | 'credit';
-  onInvoiceTypeFilterChanges: (value: 'all' | 'cash' | 'credit') => void;
+  currentInvoiceTypeFilter: InvoiceTypeFilter;
+  onInvoiceTypeFilterChanges: (value: InvoiceTypeFilter) => void;
 };
 
 export const List: FC<Props> = ({ data, currentInvoiceTypeFilter, onSelectInvoice, onInvoiceTypeFilterChanges }) => {
@@ -67,7 +67,7 @@ export const List: FC<Props> = ({ data, currentInvoiceTypeFilter, onSelectInvoic
         /> */}
         <Tabs
           value={currentInvoiceTypeFilter}
-          onValueChange={onInvoiceTypeFilterChanges}
+          onValueChange={(value: string) => onInvoiceTypeFilterChanges(value as InvoiceTypeFilter)}
           className="[&_[data-slot=tabs-trigger]:not([data-state=active])]:cursor-pointer"
         >
           <TabsList>

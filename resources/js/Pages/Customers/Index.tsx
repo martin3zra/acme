@@ -6,7 +6,7 @@ import { useVerb } from '@/composables/use-verbs';
 import useCallbackState from '@/hooks/use-callback-state';
 import { useTranslation } from '@/hooks/use-translation';
 import AppLayout from '@/layouts/app-layout';
-import { Customer, CustomerVerb, PageProps, TaxReceipt } from '@/types';
+import { Customer, CustomerTypeFilter, CustomerVerb, PageProps, TaxReceipt } from '@/types';
 import { router, usePage } from '@inertiajs/react';
 import { Plus } from 'lucide-react';
 import { useEffect, useState } from 'react';
@@ -19,9 +19,11 @@ export default function Index({
   customers,
   customer,
   tax_receipts,
-}: PageProps<{ customers: Customer[]; customer: Customer; tax_receipts: TaxReceipt[] }>) {
+  currentCustomerTypeFilter,
+}: PageProps<{ customers: Customer[]; customer: Customer; tax_receipts: TaxReceipt[]; currentCustomerTypeFilter: CustomerTypeFilter }>) {
   const t = useTranslation().trans;
   const page = usePage<PageProps>();
+  const [loadingCustomer, setLoadingCustomer] = useState<boolean>(false);
   const [open, setOpen] = useCallbackState<boolean>(customer !== undefined);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [selectedCustomer, setSelectedCustomer] = useState<CreateFormParams>({
@@ -93,6 +95,16 @@ export default function Index({
     }
   }, [selectedCustomer, setOpen]);
 
+  const onCustomerFilterTypeChange = (value: CustomerTypeFilter) => {
+    router.visit(page.url, {
+      data: { customerType: value },
+      preserveScroll: true,
+      preserveState: true,
+      onStart: () => setLoadingCustomer(true),
+      onFinish: () => setLoadingCustomer(false),
+    });
+  };
+
   const modalHandler = (open: boolean = false) => {
     onOpenChange(open);
     setDeleteDialogOpen(open);
@@ -125,22 +137,30 @@ export default function Index({
           </>
         )}
 
-        {hasCustomers && <List data={customers} onSelectCustomer={onSelectCustomer} />}
+        {hasCustomers && (
+          <List
+            data={customers}
+            currentCustomerTypeFilter={currentCustomerTypeFilter}
+            onSelectCustomer={onSelectCustomer}
+            onCustomerTypeFilterChanges={onCustomerFilterTypeChange}
+          />
+        )}
 
-        <Sheet open={open} onOpenChange={onOpenChange}>
-          <SheetContent side="right" className="m-4 flex h-[calc(~'(100%-var(--spacing)*4)/3')] w-full flex-col rounded-md sm:max-w-7xl">
-            <SheetHeader>
-              <SheetTitle>
-                {t(`global.actions.${verbName}`)} {t(`global.customer`).toLocaleLowerCase()}
-              </SheetTitle>
-              <SheetDescription className="text-[12px]">{t(`customers.newCustomer.description`)}</SheetDescription>
-            </SheetHeader>
-            <div className="no-scrollbar grid gap-4 overflow-y-scroll px-4">
-              <CreateForm params={selectedCustomer} onFinish={() => modalHandler(false)} />
-            </div>
-          </SheetContent>
-        </Sheet>
-
+        {loadingCustomer && (
+          <Sheet open={open} onOpenChange={onOpenChange}>
+            <SheetContent side="right" className="m-4 flex h-[calc(~'(100%-var(--spacing)*4)/3')] w-full flex-col rounded-md sm:max-w-7xl">
+              <SheetHeader>
+                <SheetTitle>
+                  {t(`global.actions.${verbName}`)} {t(`global.customer`).toLocaleLowerCase()}
+                </SheetTitle>
+                <SheetDescription className="text-[12px]">{t(`customers.newCustomer.description`)}</SheetDescription>
+              </SheetHeader>
+              <div className="no-scrollbar grid gap-4 overflow-y-scroll px-4">
+                <CreateForm params={selectedCustomer} onFinish={() => modalHandler(false)} />
+              </div>
+            </SheetContent>
+          </Sheet>
+        )}
         {selectedCustomer.customer && (
           <ConfirmsPassword
             title={t(`customers.confirmsPassword.title`, { customer: selectedCustomer?.customer?.name })}

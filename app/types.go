@@ -1093,3 +1093,39 @@ func (t InvoiceType) Validate() error {
 		return fmt.Errorf("invalid invoice type: %s", t)
 	}
 }
+
+type CustomerType string
+
+const (
+	CustomerTypeAll        CustomerType = "all"
+	CustomerTypeIndividual CustomerType = "individual"
+	CustomerTypeBusiness   CustomerType = "business"
+)
+
+// Validate ensures the value is one of the allowed constants
+func (t CustomerType) Validate() error {
+	switch t {
+	case CustomerTypeAll, CustomerTypeIndividual, CustomerTypeBusiness:
+		return nil
+	default:
+		return fmt.Errorf("invalid customer type: %s", t)
+	}
+}
+
+type ItemType string
+
+const (
+	ItemTypeAll     ItemType = "all"
+	ItemTypeProduct ItemType = "product"
+	ItemTypeService ItemType = "service"
+)
+
+// Validate ensures the value is one of the allowed constants
+func (t ItemType) Validate() error {
+	switch t {
+	case ItemTypeAll, ItemTypeProduct, ItemTypeService:
+		return nil
+	default:
+		return fmt.Errorf("invalid item type: %s", t)
+	}
+}

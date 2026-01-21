@@ -15,6 +15,11 @@ func (s *Server) customersHandler(ctx *routing.Context) {
 		return
 	}
 
+	customerType := CustomerType(ctx.Query("customerType"))
+	if err := customerType.Validate(); err != nil {
+		customerType = "all"
+	}
+
 	uuid := ctx.Query("id")
 	taxReceipts, err := s.findTaxesReceipts(ctx.Request.Context())
 	if err != nil {
@@ -22,14 +27,15 @@ func (s *Server) customersHandler(ctx *routing.Context) {
 		return
 	}
 
-	customers, err := s.findCustomers(ctx.Request.Context())
+	customers, err := s.findCustomers(ctx.Request.Context(), customerType)
 	if err != nil {
 		ctx.Error(err)
 		return
 	}
 	props := map[string]any{
-		"translations": trans("customers"),
-		"customers":    customers,
+		"translations":              trans("customers"),
+		"customers":                 customers,
+		"currentCustomerTypeFilter": customerType,
 		"tax_receipts": foundation.MapSlice(taxReceipts, func(receipt *taxReceipt) map[string]any {
 			return map[string]any{
 				"id":        receipt.ID,

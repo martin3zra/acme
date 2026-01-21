@@ -13,15 +13,21 @@ func (s *Server) itemsHandler(ctx *routing.Context) {
 		return
 	}
 
-	items, err := s.findItems(ctx.Request.Context())
+	itemType := ItemType(ctx.Query("itemType"))
+	if err := itemType.Validate(); err != nil {
+		itemType = "all"
+	}
+
+	items, err := s.findItems(ctx.Request.Context(), itemType)
 	if err != nil {
 		ctx.Error(err)
 		return
 	}
 
 	ctx.Render("Items/Index", inertia.Props{
-		"translations": trans("items"),
-		"items":        items,
+		"translations":          trans("items"),
+		"items":                 items,
+		"currentItemTypeFilter": itemType,
 		"units": inertia.Defer(func() (any, error) {
 			units, err := s.findUnits(ctx.Request.Context())
 			if err != nil {

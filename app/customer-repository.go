@@ -108,14 +108,14 @@ func (s *Server) findCustomeByUUID(ctx context.Context, customerID string) (*cus
 	return &c, nil
 }
 
-func (s *Server) findCustomers(ctx context.Context) ([]*customer, error) {
+func (s *Server) findCustomers(ctx context.Context, customerType CustomerType) ([]*customer, error) {
 
 	rows, err := s.db.Query("SELECT c.id, c.uuid, c.code, c.name, c.contact_name, c.phone, c.email, c.status, c.amount_due, "+
 		"c.customer_type, c.payment_method, c.credit_limited, c.credit_limit, c.payment_terms, c.tax_receipt_id, c.created_at, c.updated_at, c.deleted_at "+
 		"FROM customers c "+
 		"INNER JOIN companies ON (c.company_id = companies.id) "+
 		"WHERE c.company_id = $1 "+
-		"AND c.deleted_at IS NULL ORDER BY c.name", CurrentCompany(ctx).ID)
+		"AND c.deleted_at IS NULL AND ($2 = 'all' OR c.customer_type = $2::customer_types) ORDER BY c.name", CurrentCompany(ctx).ID, customerType)
 	if err != nil {
 		return nil, err
 	}

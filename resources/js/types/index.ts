@@ -85,6 +85,10 @@ export const CustomerTypes = ['individual', 'business'] as const;
 
 export type CustomerType = (typeof CustomerTypes)[number];
 
+export type CustomerTypeFilter = CustomerType | 'all';
+
+export type InvoiceTypeFilter = 'all' | 'cash' | 'credit';
+
 export interface OpenBalance {
   invoice_id: number;
   date: Date;
@@ -116,6 +120,8 @@ export interface Customer {
 export const ItemTypes = ['product', 'service'] as const;
 
 export type ItemType = (typeof ItemTypes)[number];
+
+export type ItemTypeFilter = ItemType | 'all';
 
 export interface ItemIdentifiers {
   reference: string;
