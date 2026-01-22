@@ -6,13 +6,13 @@ import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '
 import useCallbackState from '@/hooks/use-callback-state';
 import { useTranslation } from '@/hooks/use-translation';
 import AppLayout from '@/layouts/app-layout';
-import { Invoice, InvoiceVerb, InvoiceWithLines, PageProps } from '@/types';
+import { Invoice, InvoiceTypeFilter, InvoiceVerb, InvoiceWithLines, PageProps, TransactionKind } from '@/types';
 import { Link, router, usePage } from '@inertiajs/react';
 import { Ban, DollarSign, NotebookPen, Printer } from 'lucide-react';
-import { breadcrumbs } from './constants';
 import { List } from './List/Index';
 import { AddNewInvoice } from './Shared/AddNewInvoice';
 import Show from './Show';
+import { makeBreadcrumbs } from './constants';
 
 export default function Index({
   auth,
@@ -20,7 +20,14 @@ export default function Index({
   invoice,
   showInvoice,
   currentInvoiceTypeFilter,
-}: PageProps<{ invoices: Invoice[]; invoice: InvoiceWithLines; showInvoice: boolean; currentInvoiceTypeFilter: 'all' | 'cash' | 'credit' }>) {
+  kind,
+}: PageProps<{
+  invoices: Invoice[];
+  invoice: InvoiceWithLines;
+  showInvoice: boolean;
+  currentInvoiceTypeFilter: InvoiceTypeFilter;
+  kind: TransactionKind;
+}>) {
   const [loadingInvoice, setLoadingInvoice] = useCallbackState<boolean>(false);
   const [open, setOpen] = useCallbackState<boolean>(showInvoice);
   const [selectedInvoice, setSelectedInvoice] = useCallbackState<Invoice | undefined>(undefined);
@@ -28,6 +35,12 @@ export default function Index({
   const page = usePage<PageProps>();
   const hasInvoices = invoices.length > 0;
   const t = useTranslation().trans;
+
+  const screen = {
+    invoice: { key: 'invoices', title: t('invoices.newInvoice.title'), url: '/invoices/create' },
+    estimate: { key: 'estimates', title: t('estimates.newEstimate.title'), url: '/estimates/create' },
+    order: { key: 'orders', title: t('orders.newOrder.title'), url: '/orders/create' },
+  }[kind];
 
   const onSelectInvoice = (invoice: Invoice, action: InvoiceVerb): void => {
     setSelectedInvoice(invoice);
@@ -78,7 +91,7 @@ export default function Index({
     }
   };
 
-  const onInvoiceFilterTypeChange = (value: 'all' | 'credit' | 'cash') => {
+  const onInvoiceFilterTypeChange = (value: InvoiceTypeFilter) => {
     router.visit(page.url, {
       data: { invoiceType: value },
       preserveScroll: true,
@@ -92,23 +105,31 @@ export default function Index({
     onOpenChange(open);
     setDeleteDialogOpen(open);
   };
+
   return (
-    <AppLayout user={auth.user} breadcrumbs={breadcrumbs}>
+    <AppLayout user={auth.user} breadcrumbs={makeBreadcrumbs(kind)}>
       <div className="space-y-6">
-        {hasInvoices && <HeadingSmall title={t('invoices.title')} description={t('invoices.description')} rightPanel={<AddNewInvoice />} />}
+        {hasInvoices && (
+          <HeadingSmall
+            title={t(`${screen.key}.title`)}
+            description={t(`${screen.key}.description`)}
+            rightPanel={<AddNewInvoice title={screen.title} url={screen.url} />}
+          />
+        )}
 
         {!hasInvoices && (
           <>
             <div className="absolute top-1/2 left-1/2 flex h-[244px] min-w-3xl -translate-x-1/2 -translate-y-1/2 flex-col items-center gap-4 rounded-[16px] bg-white p-[40px] shadow-[0px_8px_12px_-4px_rgba(16,12,12,0.08),0px_0px_2px_rgba(16,12,12,0.1),0px_1px_2px_rgba(16,12,12,0.1)]">
-              <h4 className="text-2xl">{t('invoices.emptyState.title')}</h4>
-              <p className="text-sm text-gray-400">{t('invoices.emptyState.description')}</p>
-              <AddNewInvoice />
+              <h4 className="text-2xl">{t(`${screen.key}.emptyState.title`)}</h4>
+              <p className="text-sm text-gray-400">{t(`${screen.key}.emptyState.description`)}</p>
+              <AddNewInvoice title={screen.title} url={screen.url} />
             </div>
           </>
         )}
 
         {hasInvoices && (
           <List
+            kind={kind}
             data={invoices}
             currentInvoiceTypeFilter={currentInvoiceTypeFilter}
             onSelectInvoice={onSelectInvoice}

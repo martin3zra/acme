@@ -304,3 +304,20 @@ func TestCustomErrorMessage(t *testing.T) {
 		t.Errorf("validation fails:\n %v", vali.Errors())
 	}
 }
+
+func TestRequiredIfStringRule(t *testing.T) {
+	form := Contact{
+		Name: "invoice",
+		Age:  10,
+	}
+
+	var v = validator.Validator{}
+	v.Validate(context.Background(), &form, map[string]any{
+		"name": "required|in:invoice,estimate,order",
+		"age":  "required_if:name,invoice",
+	})
+
+	if len(v.Errors()) > 0 {
+		t.Errorf("expected validation to fail for missing type when transaction_kind is invoice: %v", v.Errors())
+	}
+}

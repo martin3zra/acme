@@ -200,6 +200,8 @@
     "navMain": {
       "dashboard": "Panel",
       "invoices": "Facturas",
+      "estimates": "Cotizaciones",
+      "orders": "Pedidos",
       "customers": "Clientes",
       "items": "Productos",
       "payments": "Pagos",
@@ -358,6 +360,132 @@
     "taxes": "Impuestos"
   },
   "invoices": {
+    "title": "Facturas",
+    "description": "Aquí puedes ver y gestionar todas tus facturas.",
+    "paidStatus": "Pagada",
+    "paymentTerms": "Condiciones de pago",
+    "taxReceipt": "Tipo NCF",
+    "line": {
+      "form": {
+        "placeholder": "Referencia o presione ⌘K",
+        "addNew": "Registrar nuevo artículo",
+        "search": "Escriba un nombre de artículo..."
+      }
+    },
+    "single": {
+      "title": "Factura",
+      "description": "Detalles de la factura seleccionada.",
+      "payTo": "Pagar a",
+      "invoiceTo": "Factura a",
+      "totalSummary": "Resumen total de la factura"
+    },
+    "viewInvoice": {
+      "title": "Ver factura",
+      "description": "Detalles de la factura seleccionada."
+    },
+    "newInvoice": {
+      "title": "Nueva factura",
+      "description": "Crea una nueva factura para enviar a tu cliente."
+    },
+    "editInvoice": {
+      "title": "Editar factura",
+      "description": "Edita los detalles de la factura seleccionada."
+    },
+    "voidInvoice": {
+      "title": "Anular factura",
+      "description": "Anula los detalles de la factura seleccionada."
+    },
+    "emptyState": {
+      "title": "Crea tu primera factura",
+      "description": "Una vez que cree su factura, aparecerá aquí."
+    },
+    "confirmsPassword": {
+      "title": "¿Estás seguro que deseas anular :invoice?",
+      "description": "¿Estás seguro de que deseas anular esta factura? Esta acción no se puede deshacer. Una vez que la factura quede nula pasará de :total a $0.00.",
+      "confirm": "Si, anular",
+      "cancel": "Cancelar"
+    },
+    "confirmsCancelation": {
+      "title": "¿Estás seguro que deseas cancelar?",
+      "description": "Esta acción no se puede deshacer. Eliminará permanentemente los cambios sin guardar de la factura y los datos de nuestros servidores.",
+      "confirm": "Si, continuar",
+      "cancel": "Cancelar"
+    },
+    "statuses": {
+      "open": "Abierta",
+      "draft": "Borrador",
+      "sent": "Enviada",
+      "viewed": "Vista",
+      "overdue": "Atrasada",
+      "completed": "Terminada",
+      "void": "Nula",
+      "partial": "Parcial"
+    }
+  },
+  "estimates": {
+    "title": "Cotizaciones",
+    "description": "Aquí puedes ver y gestionar todas tus cotizaciones.",
+    "paidStatus": "Pagada",
+    "paymentTerms": "Condiciones de pago",
+    "taxReceipt": "Tipo NCF",
+    "line": {
+      "form": {
+        "placeholder": "Referencia o presione ⌘K",
+        "addNew": "Registrar nuevo artículo",
+        "search": "Escriba un nombre de artículo..."
+      }
+    },
+    "single": {
+      "title": "Cotización",
+      "description": "Detalles de la Cotización seleccionada.",
+      "payTo": "Pagar a",
+      "estimateTo": "Cotizado a",
+      "totalSummary": "Resumen total de la Cotización"
+    },
+    "viewEstimate": {
+      "title": "Ver Cotización",
+      "description": "Detalles de la cotización seleccionada."
+    },
+    "newEstimate": {
+      "title": "Nueva Cotización",
+      "description": "Crea una nueva cotización para enviar a tu cliente."
+    },
+    "editEstimate": {
+      "title": "Editar Cotización",
+      "description": "Edita los detalles de la cotización seleccionada."
+    },
+    "voidEstimate": {
+      "title": "Anular Cotización",
+      "description": "Anula los detalles de la cotización seleccionada."
+    },
+    "emptyState": {
+      "title": "Crea tu primera cotización",
+      "description": "Una vez que cree su cotización, aparecerá aquí."
+    },
+    "confirmsPassword": {
+      "title": "¿Estás seguro que deseas anular :estimate?",
+      "description": "¿Estás seguro de que deseas anular esta cotización? Esta acción no se puede deshacer. Una vez que la cotización quede nula pasará de :total a $0.00.",
+      "confirm": "Si, anular",
+      "cancel": "Cancelar"
+    },
+    "confirmsCancelation": {
+      "title": "¿Estás seguro que deseas cancelar?",
+      "description": "Esta acción no se puede deshacer. Eliminará permanentemente los cambios sin guardar de la cotización y los datos de nuestros servidores.",
+      "confirm": "Si, continuar",
+      "cancel": "Cancelar"
+    },
+    "statuses": {
+      "open": "Abierta",
+      "draft": "Borrador",
+      "sent": "Enviada",
+      "viewed": "Vista",
+      "overdue": "Atrasada",
+      "completed": "Terminada",
+      "void": "Nula",
+      "partial": "Parcial"
+    }
+  },
+  "orders": {
     "title": "Facturas",
     "description": "Aquí puedes ver y gestionar todas tus facturas.",
     "paidStatus": "Pagada",

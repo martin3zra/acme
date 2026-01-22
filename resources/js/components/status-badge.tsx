@@ -1,10 +1,11 @@
 import { useTranslation } from '@/hooks/use-translation';
 import { cn } from '@/lib/utils';
-import type { StatusType } from '@/types/index';
+import type { StatusType, TransactionKind } from '@/types/index';
 import { statusConfig } from '@/types/status-config-map';
 import React from 'react';
 
 interface StatusBadgeProps {
+  kind?: TransactionKind;
   type: StatusType;
   status: string;
   className?: string;
@@ -12,7 +13,7 @@ interface StatusBadgeProps {
   prefix?: string;
 }
 
-export const StatusBadge: React.FC<StatusBadgeProps> = ({ type, status, className = '', variant = 'badge', prefix }) => {
+export const StatusBadge: React.FC<StatusBadgeProps> = ({ kind, type, status, className = '', variant = 'badge', prefix }) => {
   const t = useTranslation().trans;
   const config = statusConfig[type][status];
 
@@ -22,7 +23,7 @@ export const StatusBadge: React.FC<StatusBadgeProps> = ({ type, status, classNam
 
   const resolveLabel = (): string => {
     return {
-      invoice: t('invoices.statuses.' + status),
+      invoice: t(kind + 's.statuses.' + status),
       status: t('global.statuses.' + status),
       paid: t('global.paidStatuses.' + status),
       payment: t('global.paidStatuses.' + status),

@@ -1,10 +1,11 @@
 import * as React from 'react';
 
 import { SidebarGroup, SidebarGroupContent, SidebarMenu, SidebarMenuButton, SidebarMenuItem } from '@/components/ui/sidebar';
+import { useActiveNav } from '@/hooks/use-active-nav';
 import { useGate } from '@/hooks/use-gate';
 import { useTranslation } from '@/hooks/use-translation';
 import { NavItem, PageProps } from '@/types';
-import { usePage } from '@inertiajs/react';
+import { Link, usePage } from '@inertiajs/react';
 
 export function NavSecondary({
   items,
@@ -24,22 +25,35 @@ export function NavSecondary({
       }));
 
   const filtered = filterItems(items);
+  const menuItems = useActiveNav(filtered);
   return (
     <SidebarGroup {...props}>
       <SidebarGroupContent>
         <SidebarMenu>
-          {filtered
+          {menuItems
             .map((item) => {
               return { ...item, url: item.url.replace(/:account/i, auth.account.uuid) };
             })
             .map((item) => (
               <SidebarMenuItem key={item.title}>
-                <SidebarMenuButton asChild size="sm">
+                <Link href={item.url}>
+                  <SidebarMenuButton
+                    asChild
+                    tooltip={t(item.title)}
+                    className={`${item.isActive ? 'bg-primary text-primary-foreground hover:bg-primary/90 hover:text-primary-foreground active:text-primary-foreground duration-200 ease-linear' : ''} cursor-pointer`}
+                  >
+                    <div>
+                      {item.icon && <item.icon />}
+                      <span>{t(item.title)}</span>
+                    </div>
+                  </SidebarMenuButton>
+                </Link>
+                {/* <SidebarMenuButton asChild size="sm">
                   <a href={item.url}>
                     {item.icon && <item.icon />}
                     <span>{t(item.title)}</span>
                   </a>
-                </SidebarMenuButton>
+                </SidebarMenuButton> */}
               </SidebarMenuItem>
             ))}
         </SidebarMenu>

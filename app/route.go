@@ -61,6 +61,10 @@ func (s *Server) bootRoutes() {
 					route.GET("/invoices/:id/print/:hash", s.printInvoiceHandler).Middleware(Signed)
 					route.PUT("/invoices/:id", s.updateInvoiceHandler())
 
+					route.GET("/estimates", s.invoicesHandler).Can("viewAny:estimate")
+					route.GET("/estimates/create", s.createInvoiceHandler).Can("create:estimate")
+					route.POST("/estimates", s.storeInvoiceHandler())
+
 					route.GET("/payments", s.paymentsHandler).Can("viewAny:payment")
 					route.POST("/payments", s.storePaymentHandler())
 					route.GET("/payments/create", s.createPaymentHandler).Can("create:payment")

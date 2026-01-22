@@ -14,12 +14,12 @@ type invoice struct {
 	ID           int           `json:"id"`
 	UUID         string        `json:"uuid"`
 	Number       string        `json:"number"`
-	NCF          string        `json:"ncf"`
+	NCF          *string       `json:"ncf"`
 	Customer     customer      `json:"customer"`
 	Date         time.Time     `json:"date"`
 	DueOn        *time.Time    `json:"due_on"`
 	Terms        string        `json:"terms"`
-	TaxReceiptID int           `json:"tax_receipt_id"`
+	TaxReceiptID *int          `json:"tax_receipt_id"`
 	Amount       float64       `json:"amount"`
 	Discount     Discount      `json:"discount"`
 	Tax          float64       `json:"tax"`
@@ -54,15 +54,17 @@ type line struct {
 	Action LineAction `json:"action"`
 }
 
-func (s *Server) findInvoices(ctx context.Context, invoiceType InvoiceType) ([]*invoice, error) {
+func (s *Server) findInvoices(ctx context.Context, kind TransactionKind, invoiceType InvoiceType) ([]*invoice, error) {
 	rows, err := s.db.Query("SELECT invoices.id, invoices.uuid, invoices.code, invoices.date, invoices.due_on, invoices.amount, invoices.discount, invoices.tax, "+
 		"invoices.total, invoices.amount_due, invoices.status, invoices.paid_status, invoices.payment, invoices.note, invoices.tax_receipt_id,"+
 		"invoices.tax_number, customers.id, customers.uuid, customers.name, customers.email, customers.phone "+
 		"FROM invoices "+
 		"INNER JOIN companies ON (invoices.company_id = companies.id) "+
 		"INNER JOIN customers ON (invoices.company_id = customers.company_id AND invoices.customer_id = customers.id) "+
-		"INNER JOIN tax_receipts ON (invoices.company_id = tax_receipts.company_id AND invoices.tax_receipt_id = tax_receipts.id) "+
-		"WHERE invoices.company_id = $1 AND ($2 = 'all' OR invoices.type = $2::invoice_terms) ORDER BY invoices.id DESC", CurrentCompany(ctx).ID, invoiceType)
+		"LEFT JOIN tax_receipts ON (invoices.company_id = tax_receipts.company_id AND invoices.tax_receipt_id = tax_receipts.id) "+
+		"WHERE invoices.company_id = $1 "+
+		"AND invoices.transaction_kind = $2 "+
+		"AND ($2 != 'invoice' OR $3 = 'all' OR invoices.type = $3::invoice_terms) ORDER BY invoices.id DESC", CurrentCompany(ctx).ID, kind, invoiceType)
 	if err != nil {
 		return nil, err
 	}
@@ -202,30 +204,49 @@ func (s *Server) findInvoicesByID(ctx context.Context, invoiceId int) (*invoice,
 func (s *Server) storeInvoice(ctx context.Context, form *StoreInvoiceForm) error {
 	companyID := CurrentCompany(ctx).ID
 	return database.WithTransaction(s.db, func(tx *sql.Tx) error {
-		taxReceiptSequence, err := s.grabTaxReceiptSequence(tx, companyID, form.TaxReceipt)
+		var termType *string
+		var taxReceiptSequence *taxReceiptSeq
+		var err error
+		if form.Kind == TransactionKinds.Invoice {
+			termType = (*string)(&form.termType)
+			taxReceiptSequence, err = s.grabTaxReceiptSequence(tx, companyID, form.TaxReceipt)
+			if err != nil {
+				return err
+			}
+		}
+
+		stmt, err := tx.Prepare("INSERT INTO invoices (company_id, tax_receipt_id, tax_receipt_sequence, tax_number, date, type, due_on, customer_id, amount, discount, tax, amount_due, total, note, status, paid_status, payment, code, transaction_kind) " +
+			"VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19) RETURNING id")
 		if err != nil {
 			return err
 		}
 
-		stmt, err := tx.Prepare("INSERT INTO invoices (company_id, tax_receipt_id, tax_receipt_sequence, tax_number, date, type, due_on, customer_id, amount, discount, tax, amount_due, total, note, status, paid_status, payment, code) " +
-			"VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18) RETURNING id")
+		seqSource := string(form.Kind)
+		if form.Kind == TransactionKinds.Invoice {
+			seqSource = fmt.Sprintf("invoice.%v", form.termType)
+		}
+		seqInfo, err := GetNextSequence(tx, companyID, seqSource)
 		if err != nil {
 			return err
 		}
 
-		seqInfo, err := GetNextSequence(tx, companyID, fmt.Sprintf("invoice.%s", form.termType))
-		if err != nil {
-			return err
+		var taxID *int = nil
+		var taxSeq *int64 = nil
+		var taxNumber *string = nil
+		if taxReceiptSequence != nil {
+			taxID = &form.TaxReceipt
+			taxSeq = &taxReceiptSequence.Seq
+			taxNumber = &taxReceiptSequence.Number
 		}
 
 		var invoiceID int
 		err = stmt.QueryRow(
 			companyID,
-			form.TaxReceipt,
-			taxReceiptSequence.Seq,
-			taxReceiptSequence.Number,
+			taxID,
+			taxSeq,
+			taxNumber,
 			form.Date,
-			form.termType,
+			termType,
 			&form.dueOn,
 			form.CustomerID,
 			form.amount,
@@ -238,6 +259,7 @@ func (s *Server) storeInvoice(ctx context.Context, form *StoreInvoiceForm) error
 			form.paidStatus,
 			foundation.ToJSON(form.Payment),
 			seqInfo.Code,
+			form.Kind,
 		).Scan(&invoiceID)
 
 		if err != nil {
@@ -248,14 +270,16 @@ func (s *Server) storeInvoice(ctx context.Context, form *StoreInvoiceForm) error
 			return err
 		}
 
-		// trigger an event for this? Use pipe!!!
-		if form.Terms != "pia" {
-			if err = s.registerReceivable(tx, companyID, invoiceID, form.CustomerID); err != nil {
-				return err
-			}
+		if form.Kind == TransactionKinds.Invoice {
+			// trigger an event for this? Use pipe!!!
+			if form.Terms != "pia" {
+				if err = s.registerReceivable(tx, companyID, invoiceID, form.CustomerID); err != nil {
+					return err
+				}
 
-			if err = s.updateCustomerAmountDue(tx, companyID, form.CustomerID, form.amountDue); err != nil {
-				return err
+				if err = s.updateCustomerAmountDue(tx, companyID, form.CustomerID, form.amountDue); err != nil {
+					return err
+				}
 			}
 		}
 

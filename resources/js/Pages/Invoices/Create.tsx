@@ -37,13 +37,14 @@ import {
   PaymentMethod,
   PaymentTerm,
   TaxReceipt,
+  TransactionKind,
 } from '@/types';
 import { Textarea } from '@headlessui/react';
 import { router, useForm, usePage } from '@inertiajs/react';
 import { format } from 'date-fns';
 import { CalendarIcon } from 'lucide-react';
 import React, { useCallback, useEffect } from 'react';
-import { createBreadcrumbs, defaultDiscount, defaultInvoiceForm, paymentTerms } from './constants';
+import { defaultDiscount, defaultInvoiceForm, makeCreateBreadcrumbs, paymentTerms } from './constants';
 import CheckoutForm from './Shared/checkout-form';
 import { CustomerSection } from './Shared/customer-section';
 import { Lines } from './Shared/lines';
@@ -59,7 +60,17 @@ export default function Create({
   items,
   item,
   tax_receipts,
-}: PageProps<{ customers: Customer[]; customer: Customer; items: Item[]; item: Item; tax_receipts: TaxReceipt[] }>) {
+  kind,
+  showPaymentCTA,
+}: PageProps<{
+  customers: Customer[];
+  customer: Customer;
+  items: Item[];
+  item: Item;
+  tax_receipts: TaxReceipt[];
+  kind: TransactionKind;
+  showPaymentCTA: boolean;
+}>) {
   const t = useTranslation().trans;
   const currency = useNumber().currency;
   const [open, setOpen] = React.useState(false);
@@ -71,7 +82,7 @@ export default function Create({
   const [search, setSearch] = React.useState('');
   const dedbouncedSearch = useDebounced(search, 500);
   const [amount, setAmount] = React.useState(0);
-  const [invoiceForm, setInvoiceForm, removeInvoiceForm] = usePersistedState<InvoiceForm>('invoice', {
+  const [invoiceForm, setInvoiceForm, removeInvoiceForm] = usePersistedState<InvoiceForm>(kind, {
     ...defaultInvoiceForm,
     header: { ...defaultInvoiceForm.header, customer: customer },
   });
@@ -86,6 +97,7 @@ export default function Create({
     lines: [],
     date: new Date(),
     discount: defaultDiscount,
+    kind,
   });
 
   useEffect(() => setCurrentItem(item), [item]);
@@ -271,20 +283,31 @@ export default function Create({
   };
 
   const placedInvoice = () => {
-    transform((data) => ({
-      ...data,
-      customer_id: invoiceForm.header.customer?.id,
-      date: invoiceForm.header.date,
-      terms: invoiceForm.header.terms,
-      tax_receipt: invoiceForm.header.taxReceipt,
-      discount: invoiceForm.header.discount,
-      notes: invoiceForm.header.notes || '',
-      lines: invoiceForm.lines.map((line) => {
-        return { id: line.id, qty: line.qty, unit: line.unit.id, price: line.price, rate: line.tax.rate, action: line.action };
-      }),
-      payment: invoiceForm.payment,
-    }));
-    post('/invoices', {
+    transform((data) => {
+      const payload: Record<string, any> = {
+        ...data,
+        customer_id: invoiceForm.header.customer?.id,
+        date: invoiceForm.header.date,
+        // terms: invoiceForm.header.terms,
+        // tax_receipt: invoiceForm.header.taxReceipt,
+        discount: invoiceForm.header.discount,
+        notes: invoiceForm.header.notes || '',
+        kind: kind,
+        lines: invoiceForm.lines.map((line) => {
+          return { id: line.id, qty: line.qty, unit: line.unit.id, price: line.price, rate: line.tax.rate, action: line.action };
+        }),
+        payment: invoiceForm.payment,
+      };
+
+      if (kind === 'invoice') {
+        payload.terms = invoiceForm.header.terms;
+        payload.tax_receipt = invoiceForm.header.taxReceipt;
+        payload.discount = invoiceForm.header.discount;
+        payload.payment = invoiceForm.payment;
+      }
+      return payload;
+    });
+    post(`/${kind}s`, {
       ...headers,
       preserveState: 'errors',
       onSuccess: (event) => {
@@ -294,7 +317,7 @@ export default function Create({
           router.visit(page.props.redirectTo);
           return;
         }
-        router.visit('/invoices');
+        router.visit(`/${kind}s`);
       },
     });
   };
@@ -342,15 +365,17 @@ export default function Create({
   };
 
   return (
-    <AppLayout user={auth.user} breadcrumbs={createBreadcrumbs}>
+    <AppLayout user={auth.user} breadcrumbs={makeCreateBreadcrumbs(kind)}>
       <AppLayout.Actions>
         <div className="flex justify-end gap-x-6">
           <Button variant={'secondary'} onClick={() => setCancelConfirmation(true)}>
             {t('global.actions.cancel')}
           </Button>
-          <Button onClick={handleCheckout} disabled={processing || computeTotalAmount() === 0}>
-            {invoiceForm.header.terms === 'pia' ? t('global.actions.checkout') : t('global.actions.save')}
-          </Button>
+          {showPaymentCTA && (
+            <Button onClick={handleCheckout} disabled={processing || computeTotalAmount() === 0}>
+              {invoiceForm.header.terms === 'pia' ? t('global.actions.checkout') : t('global.actions.save')}
+            </Button>
+          )}
         </div>
       </AppLayout.Actions>
       <div className="grid h-full w-full grid-cols-12 grid-rows-[auto_1fr_auto] gap-y-4 bg-gray-50/10">
@@ -396,59 +421,71 @@ export default function Create({
                 </Popover>
                 <InputError className="mt-2" message={errors.date} />
               </div>
-              <div className="flex flex-col gap-y-2">
-                <Label htmlFor="date">{t('global.dueDate')}</Label>
-                <Label className="text-muted-foreground w-70 rounded-sm border p-2.5">
-                  {invoiceForm.header.due ? format(invoiceForm.header.due, 'PPP') : t('global.noAvailable.default')}
-                </Label>
-              </div>
+              {kind === 'invoice' && (
+                <div className="flex flex-col gap-y-2">
+                  <Label htmlFor="date">{t('global.dueDate')}</Label>
+                  <Label className="text-muted-foreground w-70 rounded-sm border p-2.5">
+                    {invoiceForm.header.due ? format(invoiceForm.header.due, 'PPP') : t('global.noAvailable.default')}
+                  </Label>
+                </div>
+              )}
             </div>
-            <div className="col-span-6 flex flex-col gap-y-6">
-              <div className="flex flex-col gap-y-2">
-                <Label htmlFor="paymentTerms">{t('invoices.paymentTerms')}</Label>
-                <Select name="paymentTerms" onValueChange={handlePaymentTermsChange} value={invoiceForm.header.terms} required>
-                  <SelectTrigger className="w-full">
-                    <SelectValue placeholder="Select terms" />
-                  </SelectTrigger>
-                  <SelectContent className="">
-                    {paymentTerms.map((term: PaymentTerm) => (
-                      <SelectItem key={term.value} value={term.value}>
-                        {term.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <InputError className="mt-2" message={errors.terms} />
+            {kind === 'invoice' ? (
+              <div className="col-span-6 flex flex-col gap-y-6">
+                <div className="flex flex-col gap-y-2">
+                  <Label htmlFor="paymentTerms">{t('invoices.paymentTerms')}</Label>
+                  <Select name="paymentTerms" onValueChange={handlePaymentTermsChange} value={invoiceForm.header.terms} required>
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="Select terms" />
+                    </SelectTrigger>
+                    <SelectContent className="">
+                      {paymentTerms.map((term: PaymentTerm) => (
+                        <SelectItem key={term.value} value={term.value}>
+                          {term.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <InputError className="mt-2" message={errors.terms} />
+                </div>
+
+                <div className="flex flex-col gap-y-2">
+                  <Label htmlFor="taxReceipt">{t('invoices.taxReceipt')}</Label>
+                  <Select
+                    name="taxReceipt"
+                    onValueChange={handleTaxReceiptChange}
+                    defaultValue={'0'}
+                    value={String(invoiceForm.header.taxReceipt)}
+                    required
+                  >
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="Select taxReceipt" />
+                    </SelectTrigger>
+                    <SelectContent className="">
+                      {tax_receipts.map((receipt) => (
+                        <SelectItem key={receipt.id} value={String(receipt.id)} disabled={!receipt.available}>
+                          {receipt.name}
+                          {!receipt.available && <span className="text-red-500">{t('global.limitReached')}</span>}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <InputError className="mt-2" message={errors.tax_receipt} />
+                </div>
               </div>
-              <div className="flex flex-col gap-y-2">
-                <Label htmlFor="taxReceipt">{t('invoices.taxReceipt')}</Label>
-                <Select
-                  name="taxReceipt"
-                  onValueChange={handleTaxReceiptChange}
-                  defaultValue={'0'}
-                  value={String(invoiceForm.header.taxReceipt)}
-                  required
-                >
-                  <SelectTrigger className="w-full">
-                    <SelectValue placeholder="Select taxReceipt" />
-                  </SelectTrigger>
-                  <SelectContent className="">
-                    {tax_receipts.map((receipt) => (
-                      <SelectItem key={receipt.id} value={String(receipt.id)} disabled={!receipt.available}>
-                        {receipt.name}
-                        {!receipt.available && <span className="text-red-500">{t('global.limitReached')}</span>}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <InputError className="mt-2" message={errors.tax_receipt} />
+            ) : (
+              <div className="col-span-12 flex flex-col place-items-end gap-y-6">
+                <Button disabled={invoiceForm.lines.length === 0} onClick={placedInvoice}>
+                  {t('global.actions.save')}
+                </Button>
               </div>
-            </div>
+            )}
           </div>
         </div>
         <div className="col-span-12">
           <div className="flex flex-col">
             <Lines
+              kind={kind}
               items={items}
               lines={invoiceForm.lines}
               lineError={errors.lines}
@@ -540,30 +577,32 @@ export default function Create({
         <AlertDialog open={openCancelConfirmation} onOpenChange={setCancelConfirmation}>
           <AlertDialogContent>
             <AlertDialogHeader>
-              <AlertDialogTitle>{t('invoices.confirmsCancelation.title')}</AlertDialogTitle>
-              <AlertDialogDescription>{t('invoices.confirmsCancelation.description')}</AlertDialogDescription>
+              <AlertDialogTitle>{t(`${kind}s.confirmsCancelation.title`)}</AlertDialogTitle>
+              <AlertDialogDescription>{t(`${kind}s.confirmsCancelation.description`)}</AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
               <AlertDialogCancel>{t('global.cancel')}</AlertDialogCancel>
-              <AlertDialogAction onClick={performInvoiceCancelation}>{t('invoices.confirmsCancelation.confirm')}</AlertDialogAction>
+              <AlertDialogAction onClick={performInvoiceCancelation}>{t(`${kind}s.confirmsCancelation.confirm`)}</AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
-        <CheckoutForm
-          action={t('global.actions.save')}
-          openCheckout={openCheckout}
-          setCheckout={setCheckout}
-          paymentForm={invoiceForm.payment}
-          defaultPaymentForm={parsePaymentMethod(invoiceForm.header.customer?.payment_method || 'cash')}
-          totalAmount={computeTotalAmount()}
-          onCompleteCheckout={placedInvoice}
-          processing={processing}
-          setCancelConfirmation={setCancelConfirmation}
-          errors={propsErrors}
-          onCheckoutChange={handleCheckoutChange}
-          currency={currency}
-          t={t}
-        />
+        {kind === 'invoice' && (
+          <CheckoutForm
+            action={t('global.actions.save')}
+            openCheckout={openCheckout}
+            setCheckout={setCheckout}
+            paymentForm={invoiceForm.payment}
+            defaultPaymentForm={parsePaymentMethod(invoiceForm.header.customer?.payment_method || 'cash')}
+            totalAmount={computeTotalAmount()}
+            onCompleteCheckout={placedInvoice}
+            processing={processing}
+            setCancelConfirmation={setCancelConfirmation}
+            errors={propsErrors}
+            onCheckoutChange={handleCheckoutChange}
+            currency={currency}
+            t={t}
+          />
+        )}
       </div>
 
       {/* Command to search for customers */}

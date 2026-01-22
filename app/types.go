@@ -289,6 +289,24 @@ var RoleMap = []map[string]any{
 	{"id": string(Roles.Standard), "label": Roles.Standard, "description": "Regular user with core feature access"},
 }
 
+type TransactionKind string
+
+const (
+	_TRANSACTION_KIND_INVOICE  TransactionKind = "invoice"
+	_TRANSACTION_KIND_ESTIMATE TransactionKind = "estimate"
+	_TRANSACTION_KIND_ORDER    TransactionKind = "order"
+)
+
+var TransactionKinds = struct {
+	Invoice  TransactionKind
+	Estimate TransactionKind
+	Order    TransactionKind
+}{
+	Invoice:  _TRANSACTION_KIND_INVOICE,
+	Estimate: _TRANSACTION_KIND_ESTIMATE,
+	Order:    _TRANSACTION_KIND_ORDER,
+}
+
 type PaidStatus string
 
 const (
@@ -480,14 +498,15 @@ type Line struct {
 
 type StoreInvoiceForm struct {
 	support.FormRequest
-	CustomerID int       `json:"customer_id"`
-	Date       time.Time `json:"date"`
-	Terms      string    `json:"terms"`
-	TaxReceipt int       `json:"tax_receipt"`
-	Discount   Discount  `json:"discount"`
-	Notes      string    `json:"notes"`
-	Lines      []*Line   `json:"lines"`
-	Payment    Payment   `json:"payment"`
+	CustomerID int             `json:"customer_id"`
+	Date       time.Time       `json:"date"`
+	Terms      string          `json:"terms"`
+	TaxReceipt int             `json:"tax_receipt"`
+	Discount   Discount        `json:"discount"`
+	Notes      string          `json:"notes"`
+	Lines      []*Line         `json:"lines"`
+	Payment    Payment         `json:"payment"`
+	Kind       TransactionKind `json:"kind"`
 	// considere these fields as protected
 	amount     float64
 	amountDue  float64
@@ -505,9 +524,10 @@ func (form StoreInvoiceForm) Authorize() bool {
 func (form StoreInvoiceForm) Rules() map[string]any {
 	return map[string]any{
 		"customer_id":    "bail|required|exists:customers,id",
+		"kind":           "bail|required|in:invoice,estimate,order",
 		"date":           "bail|required|date|after:yesterday",
-		"terms":          "bail|required|min:1",
-		"tax_receipt":    "bail|required|exists:tax_receipts,id",
+		"terms":          "bail|required_if:kind,invoice|min:1",
+		"tax_receipt":    "bail|sometimes|required_if:kind,invoice|exists:tax_receipts,id",
 		"lines":          "required|min:1",
 		"lines.*.id":     "required|exists:items,id",
 		"lines.*.unit":   "required|exists:units,id",
@@ -536,6 +556,10 @@ func (form *StoreInvoiceForm) PassedValidation() {
 	form.computeTax()
 
 	form.dueOn = nil
+	if form.Kind == TransactionKinds.Estimate || form.Kind == TransactionKinds.Order {
+		form.paidStatus = PaidStatuses.UnPaid
+		return
+	}
 	form.paidStatus = PaidStatuses.Paid
 	form.termType = InvoiceTermType.Cash
 	termInDays := getNetDays(form.Terms)

@@ -1,5 +1,6 @@
 import { defaultBTForm, defaultCardForm, defaultCashForm, defaultCheckForm } from '@/constants';
-import { BreadcrumbItem, defaultBreadcrumbs, DiscountType, HeaderForm, InvoiceForm, PaymentMethodsForm, PaymentTerm } from '@/types';
+import { capitalize } from '@/lib/utils';
+import { BreadcrumbItem, defaultBreadcrumbs, DiscountType, HeaderForm, InvoiceForm, PaymentMethodsForm, PaymentTerm, TransactionKind } from '@/types';
 
 export const paymentTerms: PaymentTerm[] = [
   { value: 'pia', label: 'Payment In Advance' },
@@ -12,24 +13,24 @@ export const paymentTerms: PaymentTerm[] = [
   { value: 'net120', label: 'Net 120' },
 ];
 
-export const breadcrumbs: BreadcrumbItem[] = [
+export const makeBreadcrumbs = (kind: TransactionKind): BreadcrumbItem[] => [
   ...defaultBreadcrumbs,
   {
-    title: 'invoices.title',
-    href: '/invoices',
+    title: `${kind}s.title`, // e.g. "invoices.title", "estimates.title"
+    href: `/${kind}s`,
   },
 ];
 
-export const createBreadcrumbs: BreadcrumbItem[] = [
-  ...breadcrumbs,
+export const makeCreateBreadcrumbs = (kind: TransactionKind): BreadcrumbItem[] => [
+  ...makeBreadcrumbs(kind),
   {
-    title: 'invoices.newInvoice.title',
-    href: '/invoices/create',
+    title: `${kind}s.new${capitalize(kind)}.title`,
+    href: `${kind}s/create`,
   },
 ];
 
 export const editBreadcrumbs: BreadcrumbItem[] = [
-  ...breadcrumbs,
+  // ...breadcrumbs,
   {
     title: 'invoices.editInvoice.title',
     href: '',

@@ -12,8 +12,21 @@ import (
 	inertia "github.com/romsar/gonertia/v2"
 )
 
+func resolveTransactionKind(ctx *routing.Context) TransactionKind {
+	path := ctx.Request.URL.Path
+	switch {
+	case strings.HasPrefix(path, "/estimates"):
+		return TransactionKinds.Estimate
+	case strings.HasPrefix(path, "/orders"):
+		return TransactionKinds.Order
+	default:
+		return TransactionKinds.Invoice
+	}
+}
+
 func (s *Server) invoicesHandler(ctx *routing.Context) {
-	if s.abortWhenPrerequisiteMissing(ctx, "invoice") {
+	kind := resolveTransactionKind(ctx)
+	if s.abortWhenPrerequisiteMissing(ctx, string(kind)) {
 		return
 	}
 
@@ -23,16 +36,17 @@ func (s *Server) invoicesHandler(ctx *routing.Context) {
 	}
 
 	uuid := ctx.Query("id")
-	invoices, err := s.findInvoices(ctx.Request.Context(), invoiceType)
+	invoices, err := s.findInvoices(ctx.Request.Context(), kind, invoiceType)
 	if err != nil {
 		ctx.Error(err)
 		return
 	}
 
 	props := map[string]any{
-		"translations":             trans("invoices"),
+		"translations":             trans(fmt.Sprintf("%ss", kind)),
 		"invoices":                 invoices,
 		"currentInvoiceTypeFilter": invoiceType,
+		"kind":                     kind,
 	}
 
 	if uuid != "" {
@@ -73,14 +87,11 @@ func (s *Server) invoicesHandler(ctx *routing.Context) {
 }
 
 func (s *Server) createInvoiceHandler(ctx *routing.Context) {
+	kind := resolveTransactionKind(ctx)
 	term := ctx.Query("search")
-	taxReceipts, err := s.findTaxesReceipts(ctx.Request.Context())
-	if err != nil {
-		ctx.Error(err)
-		return
-	}
 
 	var customer *customer
+	var err error
 	customerID := ctx.Query("customer_id")
 	if strings.TrimSpace(customerID) != "" {
 		customer, err = s.findCustomeByUUID(ctx.Request.Context(), customerID)
@@ -90,16 +101,10 @@ func (s *Server) createInvoiceHandler(ctx *routing.Context) {
 		}
 	}
 
-	ctx.Render("Invoices/Create", map[string]any{
-		"translations": trans("invoices"),
-		"tax_receipts": foundation.MapSlice(taxReceipts, func(receipt *taxReceipt) map[string]any {
-			return map[string]any{
-				"id":        receipt.ID,
-				"name":      fmt.Sprintf("%s-%s", receipt.Type, receipt.Name),
-				"available": receipt.Current < receipt.SequenceEnd,
-			}
-		}),
-		"customer": customer,
+	props := map[string]any{
+		"translations": trans(fmt.Sprintf("%ss", kind)),
+		"kind":         kind,
+		"customer":     customer,
 		"customers": inertia.Optional(func() (any, error) {
 			customers, err := s.findCustomersBySearchCriteria(ctx.Request.Context(), term)
 			if err != nil {
@@ -124,7 +129,24 @@ func (s *Server) createInvoiceHandler(ctx *routing.Context) {
 
 			return item, err
 		}),
-	})
+	}
+
+	if kind == TransactionKinds.Invoice {
+		taxReceipts, err := s.findTaxesReceipts(ctx.Request.Context())
+		if err != nil {
+			ctx.Error(err)
+			return
+		}
+		props["tax_receipts"] = foundation.MapSlice(taxReceipts, func(receipt *taxReceipt) map[string]any {
+			return map[string]any{
+				"id":        receipt.ID,
+				"name":      fmt.Sprintf("%s-%s", receipt.Type, receipt.Name),
+				"available": receipt.Current < receipt.SequenceEnd,
+			}
+		})
+		props["showPaymentCTA"] = true
+	}
+	ctx.Render("Invoices/Create", props)
 }
 
 func (s *Server) editInvoiceHandler(ctx *routing.Context) {
@@ -184,23 +206,25 @@ func (s *Server) editInvoiceHandler(ctx *routing.Context) {
 func (s *Server) storeInvoiceHandler() routing.HandlerFunc {
 	return routing.WithRequest(func(ctx *routing.Context, form *StoreInvoiceForm) {
 
-		if form.Terms == "pia" && form.total != form.paymentTotalAmount() {
-			ctx.BackWith("status", "Invoice total amount and the payment details are different.")
-			return
+		if form.Kind == TransactionKinds.Invoice {
+			if form.Terms == "pia" && form.total != form.paymentTotalAmount() {
+				ctx.BackWith("status", "Invoice total amount and the payment details are different.")
+				return
+			}
+
+			customer, err := s.findCustomeByID(ctx.Request.Context(), form.CustomerID)
+			if err != nil {
+				ctx.BackWithError(err)
+				return
+			}
+
+			if customer.CreditLimited && customer.AmountDue+form.total > customer.CreditLimit {
+				ctx.BackWith("status", "Credit limit exceeded.")
+				return
+			}
 		}
 
-		customer, err := s.findCustomeByID(ctx.Request.Context(), form.CustomerID)
-		if err != nil {
-			ctx.BackWithError(err)
-			return
-		}
-
-		if customer.CreditLimited && customer.AmountDue+form.total > customer.CreditLimit {
-			ctx.BackWith("status", "Credit limit exceeded.")
-			return
-		}
-
-		err = s.storeInvoice(ctx.Request.Context(), form)
+		err := s.storeInvoice(ctx.Request.Context(), form)
 		if err != nil {
 			log.Printf("Error creating invoice: %v", err)
 			ctx.BackWith("status", s.trans("global.wasNotCreated", i18n.Replacements{"subject": "@global.invoice"}))

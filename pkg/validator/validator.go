@@ -100,6 +100,7 @@ func (v *Validator) validateAttributes(object any, rules map[string]any, prefix 
 
 		default:
 			if rule, ok := rules[fullKey]; ok {
+				v.object = val
 				v.compileRuleSet(fullKey, field, v.resolveRuleComponents(rule))
 			}
 		}
@@ -339,16 +340,22 @@ func (v *Validator) evaluateMultipleValueRule(key, rule string, value reflect.Va
 		fieldValue = reflect.ValueOf(digits(int(value.Int())))
 	}
 
-	if !v.validateBetween(fieldValue, attributes) {
-		kind := ""
-		switch value.Kind() {
-		case reflect.Float32, reflect.Float64, reflect.Int32, reflect.Int64:
-			kind = "int"
-		default:
-			kind = "string"
+	if rule == "required_if" {
+		siblingValue, e := getFieldValueByJSONTag(v.object, attributes[0])
+		if !e {
+			return
 		}
+		if attributes[1] != siblingValue {
+			return
+		}
+		if !v.validateRuleWithoutAttributes("required", value) {
+			v.record(key, v.messages(key, "required", getDataTypeUsingReflection(value), attributes[0], attributes[1]))
+		}
+		return
+	}
 
-		v.record(key, v.messages(key, rule, kind, attributes[0], attributes[1]))
+	if !v.validateBetween(fieldValue, attributes) {
+		v.record(key, v.messages(key, rule, getDataTypeUsingReflection(value), attributes[0], attributes[1]))
 	}
 }
 
@@ -421,4 +428,37 @@ func (v *Validator) resolveMessages() map[string]any {
 	}
 
 	return locale.EnglishMessages()
+}
+
+func getFieldValueByJSONTag(v reflect.Value, tag string) (any, bool) {
+	// If v is a pointer, resolve it
+	if v.Kind() == reflect.Ptr {
+		v = v.Elem()
+	}
+
+	if v.Kind() != reflect.Struct {
+		return nil, false
+	}
+
+	t := v.Type()
+	for i := 0; i < t.NumField(); i++ {
+		field := t.Field(i)
+		jsonTag := field.Tag.Get("json")
+		// Handle omitempty etc.
+		jsonTag = strings.Split(jsonTag, ",")[0]
+
+		if jsonTag == tag {
+			return v.Field(i).Interface(), true
+		}
+	}
+	return nil, false
+}
+
+func getDataTypeUsingReflection(value reflect.Value) string {
+	switch value.Kind() {
+	case reflect.Float32, reflect.Float64, reflect.Int32, reflect.Int64:
+		return "int"
+	default:
+		return "string"
+	}
 }

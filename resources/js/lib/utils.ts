@@ -37,3 +37,5 @@ export const isPaymentMethod = (value: string): value is PaymentMethod => {
 export const parsePaymentMethod = (value: string, fallback: PaymentMethod = 'cash'): PaymentMethod => {
   return isPaymentMethod(value) ? value : fallback;
 };
+
+export const capitalize = (s: string) => (s.length ? s[0].toUpperCase() + s.substring(1) : s);

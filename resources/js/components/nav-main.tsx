@@ -1,13 +1,13 @@
 'use client';
 
 import { SidebarGroup, SidebarGroupLabel, SidebarMenu, SidebarMenuButton, SidebarMenuItem } from '@/components/ui/sidebar';
+import { useActiveNav } from '@/hooks/use-active-nav';
 import { useGate } from '@/hooks/use-gate';
 import { useTranslation } from '@/hooks/use-translation';
 import { NavItem } from '@/types';
-import { Link, usePage } from '@inertiajs/react';
+import { Link } from '@inertiajs/react';
 
 export function NavMain({ items }: { items: NavItem[] }) {
-  const { component } = usePage();
   const t = useTranslation().trans;
   const { can } = useGate();
   const filterItems = (items: NavItem[]) =>
@@ -19,18 +19,19 @@ export function NavMain({ items }: { items: NavItem[] }) {
       }));
 
   const filtered = filterItems(items);
+  const menuItems = useActiveNav(filtered);
 
   return (
     <SidebarGroup>
       <SidebarGroupLabel>{t('global.platform')}</SidebarGroupLabel>
       <SidebarMenu>
-        {filtered.map((item) => (
+        {menuItems.map((item) => (
           <SidebarMenuItem key={item.title}>
             <Link href={item.url}>
               <SidebarMenuButton
                 asChild
                 tooltip={t(item.title)}
-                className={`${item.components.includes(component) ? 'bg-primary text-primary-foreground hover:bg-primary/90 hover:text-primary-foreground active:text-primary-foreground duration-200 ease-linear' : ''} cursor-pointer`}
+                className={`${item.isActive ? 'bg-primary text-primary-foreground hover:bg-primary/90 hover:text-primary-foreground active:text-primary-foreground duration-200 ease-linear' : ''} cursor-pointer`}
               >
                 <div>
                   {item.icon && <item.icon />}

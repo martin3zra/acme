@@ -89,6 +89,8 @@ export type CustomerTypeFilter = CustomerType | 'all';
 
 export type InvoiceTypeFilter = 'all' | 'cash' | 'credit';
 
+export type TransactionKind = 'invoice' | 'estimate' | 'order';
+
 export interface OpenBalance {
   invoice_id: number;
   date: Date;
@@ -433,7 +435,8 @@ export interface NavItem {
   icon?: LucideIcon | null;
   isActive?: boolean;
   requiredAbility?: string;
-  components: string[];
+  match?: string[];
+  // components: string[];
 }
 
 export type Role = {
