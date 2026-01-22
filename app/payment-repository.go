@@ -243,7 +243,7 @@ func (s *Server) attachPaymentLines(tx *sql.Tx, ctx context.Context, paymentId i
 	companyId := CurrentCompany(ctx).ID
 	vals := []any{}
 	for _, line := range form.Lines {
-		invoice, err := s.findInvoicesByUUID(ctx, line.Uuid)
+		invoice, err := s.findInvoicesByUUID(ctx, TransactionKinds.Invoice, line.Uuid)
 		if err != nil {
 			return err
 		}
@@ -359,7 +359,7 @@ func (s *Server) processPaymentLines(tx *sql.Tx, ctx context.Context, paymentId 
 		}
 		switch line.Action {
 		case ADDED:
-			invoice, err := s.findInvoicesByUUID(ctx, line.Uuid)
+			invoice, err := s.findInvoicesByUUID(ctx, TransactionKinds.Invoice, line.Uuid)
 			if err != nil {
 				return err
 			}

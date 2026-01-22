@@ -105,7 +105,7 @@ func (s *Server) findInvoices(ctx context.Context, kind TransactionKind, invoice
 	return data, nil
 }
 
-func (s *Server) findInvoicesByUUID(ctx context.Context, uuid string) (*invoice, error) {
+func (s *Server) findInvoicesByUUID(ctx context.Context, kind TransactionKind, uuid string) (*invoice, error) {
 	i := new(invoice)
 	err := s.db.QueryRow("SELECT invoices.id, invoices.uuid, invoices.code, invoices.date, invoices.due_on, invoices.amount, invoices.amount_due, invoices.discount, invoices.tax, "+
 		"invoices.total, invoices.status, invoices.paid_status, invoices.payment, invoices.note, invoices.tax_receipt_id, "+
@@ -113,8 +113,10 @@ func (s *Server) findInvoicesByUUID(ctx context.Context, uuid string) (*invoice,
 		"FROM invoices "+
 		"INNER JOIN companies ON (invoices.company_id = companies.id) "+
 		"INNER JOIN customers ON (invoices.company_id = customers.company_id AND invoices.customer_id = customers.id) "+
-		"INNER JOIN tax_receipts ON (invoices.company_id = tax_receipts.company_id AND invoices.tax_receipt_id = tax_receipts.id) "+
-		"WHERE invoices.company_id = $1 AND invoices.uuid = $2", CurrentCompany(ctx).ID, uuid).
+		"LEFT JOIN tax_receipts ON (invoices.company_id = tax_receipts.company_id AND invoices.tax_receipt_id = tax_receipts.id) "+
+		"WHERE invoices.company_id = $1 "+
+		"AND invoices.transaction_kind = $2 "+
+		"AND invoices.uuid = $3", CurrentCompany(ctx).ID, kind, uuid).
 		Scan(
 			&i.ID,
 			&i.UUID,
@@ -289,7 +291,7 @@ func (s *Server) storeInvoice(ctx context.Context, form *StoreInvoiceForm) error
 
 func (s *Server) updateInvoice(ctx context.Context, uuid string, form *UpdateInvoiceForm) error {
 	companyID := CurrentCompany(ctx).ID
-	invoice, err := s.findInvoicesByUUID(ctx, uuid)
+	invoice, err := s.findInvoicesByUUID(ctx, TransactionKinds.Invoice, uuid)
 	if err != nil {
 		return err
 	}
@@ -359,7 +361,7 @@ func (s *Server) updateInvoice(ctx context.Context, uuid string, form *UpdateInv
 
 func (s *Server) voidInvoice(ctx context.Context, uuid string) error {
 	companyID := CurrentCompany(ctx).ID
-	invoice, err := s.findInvoicesByUUID(ctx, uuid)
+	invoice, err := s.findInvoicesByUUID(ctx, TransactionKinds.Invoice, uuid)
 	if err != nil {
 		return err
 	}

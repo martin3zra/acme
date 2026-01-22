@@ -53,7 +53,7 @@ func (s *Server) invoicesHandler(ctx *routing.Context) {
 		c := cache.NewPgCache(s.db)
 		key := fmt.Sprintf("preview:invoice:%s", uuid)
 		data, err := cache.Remember(ctx.Request.Context(), c, key, func() (map[string]any, error) {
-			invoice, err := s.findInvoicesByUUID(ctx.Request.Context(), uuid)
+			invoice, err := s.findInvoicesByUUID(ctx.Request.Context(), kind, uuid)
 			if err != nil {
 				return nil, err
 			}
@@ -150,7 +150,8 @@ func (s *Server) createInvoiceHandler(ctx *routing.Context) {
 }
 
 func (s *Server) editInvoiceHandler(ctx *routing.Context) {
-	invoice, err := s.findInvoicesByUUID(ctx.Request.Context(), ctx.Param("id"))
+	kind := resolveTransactionKind(ctx)
+	invoice, err := s.findInvoicesByUUID(ctx.Request.Context(), kind, ctx.Param("id"))
 	if err != nil {
 		ctx.Error(err)
 		return
@@ -310,7 +311,7 @@ func (s *Server) printInvoiceHandler(ctx *routing.Context) {
 	key := fmt.Sprintf("preview:invoice:%s", uuid)
 	data, err := cache.Remember(ctx.Request.Context(), c, key, func() (invoiceData, error) {
 
-		invoice, err := s.findInvoicesByUUID(ctx.Request.Context(), uuid)
+		invoice, err := s.findInvoicesByUUID(ctx.Request.Context(), TransactionKinds.Invoice, uuid)
 		if err != nil {
 			return invoiceData{}, nil
 		}

@@ -69,7 +69,7 @@ export const List: FC<Props> = ({ kind, data, currentInvoiceTypeFilter, onSelect
           onChange={(event) => table.getColumn('customer.name')?.setFilterValue(event.target.value)}
           className="max-w-sm"
         /> */}
-        {kind === 'invoice' && (
+        {isInvoice && (
           <Tabs
             value={currentInvoiceTypeFilter}
             onValueChange={(value: string) => onInvoiceTypeFilterChanges(value as InvoiceTypeFilter)}
@@ -93,7 +93,7 @@ export const List: FC<Props> = ({ kind, data, currentInvoiceTypeFilter, onSelect
               .getAllColumns()
               .filter((column) => column.getCanHide())
               .filter((column) => {
-                if (kind === 'invoice') {
+                if (isInvoice) {
                   return true;
                 }
                 return !hiddenColumns.includes(column.id);

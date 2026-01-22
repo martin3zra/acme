@@ -6,6 +6,7 @@ import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '
 import useCallbackState from '@/hooks/use-callback-state';
 import { useTranslation } from '@/hooks/use-translation';
 import AppLayout from '@/layouts/app-layout';
+import { capitalize } from '@/lib/utils';
 import { Invoice, InvoiceTypeFilter, InvoiceVerb, InvoiceWithLines, PageProps, TransactionKind } from '@/types';
 import { Link, router, usePage } from '@inertiajs/react';
 import { Ban, DollarSign, NotebookPen, Printer } from 'lucide-react';
@@ -28,6 +29,7 @@ export default function Index({
   currentInvoiceTypeFilter: InvoiceTypeFilter;
   kind: TransactionKind;
 }>) {
+  const isInvoice = kind === 'invoice';
   const [loadingInvoice, setLoadingInvoice] = useCallbackState<boolean>(false);
   const [open, setOpen] = useCallbackState<boolean>(showInvoice);
   const [selectedInvoice, setSelectedInvoice] = useCallbackState<Invoice | undefined>(undefined);
@@ -45,16 +47,16 @@ export default function Index({
   const onSelectInvoice = (invoice: Invoice, action: InvoiceVerb): void => {
     setSelectedInvoice(invoice);
 
-    if (action === 'record-payment') {
+    if (isInvoice && action === 'record-payment') {
       router.visit(`/payments/create`, { data: { customer_id: invoice.customer.uuid, invoice_id: invoice.uuid } });
       return;
     }
-    if (action === 'void') {
+    if (isInvoice && action === 'void') {
       setDeleteDialogOpen(true);
       return;
     }
     if (action === 'edit') {
-      router.visit(`/invoices/${invoice.uuid}/edit`);
+      router.visit(`/${kind}s/${invoice.uuid}/edit`);
       return;
     }
     if (action !== 'view') return;
@@ -148,21 +150,23 @@ export default function Index({
                 <div className="mr-6 flex items-start justify-between">
                   <div className="flex flex-col">
                     <SheetTitle>{page.props.auth.company.name}</SheetTitle>
-                    <SheetDescription className="text-[12px]">{t('invoices.viewInvoice.description')}</SheetDescription>
+                    <SheetDescription className="text-[12px]">{t(`${kind}s.view${capitalize(kind)}.description`)}</SheetDescription>
                   </div>
                   <div className="mx-4 flex gap-x-3">
                     {invoice.header.status !== 'void' && (
                       <>
-                        <Button variant={'destructive'} onClick={() => onSelectInvoice(invoice.header, 'void')}>
-                          <Ban /> {t('global.actions.void')}
-                        </Button>
+                        {isInvoice && (
+                          <Button variant={'destructive'} onClick={() => onSelectInvoice(invoice.header, 'void')}>
+                            <Ban /> {t('global.actions.void')}
+                          </Button>
+                        )}
                         <Separator orientation="vertical" />
                         <Button asChild disabled={invoice.header.status === 'void'}>
-                          <Link href={`/invoices/${invoice.header.uuid}/edit`} as="button">
+                          <Link href={`/${kind}s/${invoice.header.uuid}/edit`} as="button">
                             <NotebookPen /> {t('global.actions.edit')}
                           </Link>
                         </Button>
-                        {(invoice.header.paid_status === 'unpaid' || invoice.header.paid_status === 'partial') && (
+                        {isInvoice && (invoice.header.paid_status === 'unpaid' || invoice.header.paid_status === 'partial') && (
                           <Button asChild disabled={invoice.header.status === 'void'}>
                             <Link href={`/payments/create?customer_id=${invoice.header.customer.uuid}&invoice_id=${invoice.header.uuid}`} as="button">
                               <DollarSign /> {t('global.actions.recordPayment')}
@@ -186,7 +190,7 @@ export default function Index({
                     </h1>
                   </div>
                 )}
-                <Show invoice={invoice} auth={auth} />
+                <Show kind={kind} invoice={invoice} auth={auth} />
               </div>
             </SheetContent>
           </Sheet>
