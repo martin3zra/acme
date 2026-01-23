@@ -77,6 +77,29 @@ func (s *Server) findLatestDueInvoices(ctx context.Context) ([]*dueInvoice, erro
 	return data, nil
 }
 
+func (s *Server) findLatestEstimates(ctx context.Context) ([]*dueInvoice, error) {
+	rows, err := s.db.Query(`SELECT i.uuid, i.date, c.uuid as customer_uuid, c.name, i.total as amount_due
+    FROM invoices i
+    JOIN customers c ON c.id = i.customer_id
+    WHERE i.company_id = $1
+    AND i.transaction_kind = 'estimate'
+    AND i.status = 'open'::invoice_status
+    ORDER BY i.date DESC
+    LIMIT 10;`, CurrentCompany(ctx).ID)
+	if err != nil {
+		return nil, err
+	}
+	data := make([]*dueInvoice, 0)
+	for rows.Next() {
+		row := new(dueInvoice)
+		if err = rows.Scan(&row.UUID, &row.DueOn, &row.Customer.UUID, &row.Customer.Name, &row.AmountDue); err != nil {
+			return data, err
+		}
+		data = append(data, row)
+	}
+	return data, nil
+}
+
 func (s *Server) findLastProfitOfLast12Months(ctx context.Context) ([]*ChartData, error) {
 	rows, err := s.db.Query(`
     SELECT TO_CHAR(date, 'YYYY/Mon') AS year_month, SUM(CASE WHEN status = 'completed' THEN total ELSE 0 END) AS sales, SUM(0) AS expenses -- placeholder until expenses table exists 

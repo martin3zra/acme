@@ -1,8 +1,9 @@
+import { useTranslation } from '@/hooks/use-translation';
 import AppLayout from '@/layouts/app-layout';
 import { ChartPoint, DueInvoice, PageProps, StatItem, Totals } from '@/types';
 import { router } from '@inertiajs/react';
 import { useState } from 'react';
-import { DueInvoicesList } from './DueInvoicesList';
+import { RecentTransactionList } from './RecentTransactionList';
 import DashboardSummary from './Shared/dashboard-summary';
 import SalesExpensesChart from './Shared/sales-expenses-chart';
 
@@ -16,15 +17,18 @@ interface DashboardProps extends PageProps {
   stats: StatItem[];
   period: string;
   due_invoices: DueInvoice[];
+  estimates: DueInvoice[];
   chart: ChartDataPoint;
 }
 
-export default function Home({ auth, stats, period: initialPeriod, due_invoices, chart }: DashboardProps) {
+export default function Home({ auth, stats, period: initialPeriod, due_invoices, estimates, chart }: DashboardProps) {
+  const t = useTranslation().trans;
   const [period, setPeriod] = useState<string>(initialPeriod);
-  const handleOnSelectItem = (item: DueInvoice, action: 'view:customer' | 'view:invoice' | 'record:payment') => {
+  const handleOnSelectItem = (item: DueInvoice, action: 'view:customer' | 'view:invoice' | 'view:estimate' | 'record:payment') => {
     const path = {
       'view:customer': `/customers?id=${item.customer.uuid}`,
       'view:invoice': `/invoices?id=${item.uuid}`,
+      'view:estimate': `/estimates?id=${item.uuid}`,
       'record:payment': `/payments/create?customer_id=${item.customer.uuid}&invoice_id=${item.uuid}`,
     }[action];
     router.visit(path);
@@ -52,8 +56,8 @@ export default function Home({ auth, stats, period: initialPeriod, due_invoices,
           />
         </div>
         <div className="grid auto-rows-min gap-4 sm:grid-cols-1 md:grid-cols-2">
-          <DueInvoicesList data={due_invoices} onSelectItem={handleOnSelectItem} />
-          <div className="bg-muted/50 rounded-xl" />
+          <RecentTransactionList title={t('dashboard.due_invoices')} kind={'invoice'} data={due_invoices} onSelectItem={handleOnSelectItem} />
+          <RecentTransactionList title={t('dashboard.estimates')} kind={'estimate'} data={estimates} onSelectItem={handleOnSelectItem} />
         </div>
       </div>
     </AppLayout>

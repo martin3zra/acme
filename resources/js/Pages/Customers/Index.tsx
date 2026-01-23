@@ -146,7 +146,7 @@ export default function Index({
           />
         )}
 
-        {loadingCustomer && (
+        {!loadingCustomer && (
           <Sheet open={open} onOpenChange={onOpenChange}>
             <SheetContent side="right" className="m-4 flex h-[calc(~'(100%-var(--spacing)*4)/3')] w-full flex-col rounded-md sm:max-w-7xl">
               <SheetHeader>

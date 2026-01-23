@@ -11,21 +11,24 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { DueInvoice, Replacements } from '@/types';
+import { DueInvoice, Replacements, TransactionKind } from '@/types';
 import { ColumnDef } from '@tanstack/react-table';
 import { MoreHorizontal } from 'lucide-react';
 
 type Props = {
-  onDidClick: (item: DueInvoice, action: 'view:customer' | 'view:invoice' | 'record:payment') => void;
+  kind: TransactionKind;
+  onDidClick: (item: DueInvoice, action: 'view:customer' | 'view:invoice' | 'view:estimate' | 'record:payment') => void;
   t: (key: string, replacements?: Replacements) => string;
 };
 
-export const getColumns = ({ onDidClick, t }: Props): ColumnDef<DueInvoice>[] => {
+export const getColumns = ({ kind, onDidClick, t }: Props): ColumnDef<DueInvoice>[] => {
   return [
     {
       accessorKey: 'due_on',
       header: (props) => {
-        return <HeaderCell title={t('global.dueDate')} alignment="left" columnWidth={props.column.getSize()} />;
+        return (
+          <HeaderCell title={t(`${kind === 'invoice' ? 'global.dueDate' : 'global.date'}`)} alignment="left" columnWidth={props.column.getSize()} />
+        );
       },
       cell: (props) => {
         return <DateCell columnWidth={props.column.getSize()} value={props.getValue() as string} />;
@@ -65,15 +68,25 @@ export const getColumns = ({ onDidClick, t }: Props): ColumnDef<DueInvoice>[] =>
             <DropdownMenuContent align="end" className="[&_[data-slot=dropdown-menu-item]]:cursor-pointer">
               <DropdownMenuLabel>{t('global.actions.title')}</DropdownMenuLabel>
               <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={() => onDidClick(props.row.original, 'view:invoice')}>
-                {t('dashboard.viewItem.invoice.title')}
+              <DropdownMenuItem onClick={() => onDidClick(props.row.original, kind === 'invoice' ? 'view:invoice' : 'view:estimate')}>
+                {t(`dashboard.viewItem.${kind}.title`)}
               </DropdownMenuItem>
               <DropdownMenuItem onClick={() => onDidClick(props.row.original, 'view:customer')}>
                 {t('dashboard.viewItem.customer.title')}
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => onDidClick(props.row.original, 'record:payment')}>
-                {t('dashboard.viewItem.payment.title')}
-              </DropdownMenuItem>
+              {kind === 'invoice' && (
+                <DropdownMenuItem onClick={() => onDidClick(props.row.original, 'record:payment')}>
+                  {t('dashboard.viewItem.payment.title')}
+                </DropdownMenuItem>
+              )}
+              {kind === 'estimate' && (
+                <>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem>{t('dashboard.viewItem.estimate.convertToInvoice')}</DropdownMenuItem>
+                  <DropdownMenuItem>{t('dashboard.viewItem.estimate.markAsAccepted')}</DropdownMenuItem>
+                  <DropdownMenuItem>{t('dashboard.viewItem.estimate.markAsRejected')}</DropdownMenuItem>
+                </>
+              )}
             </DropdownMenuContent>
           </DropdownMenu>
         );

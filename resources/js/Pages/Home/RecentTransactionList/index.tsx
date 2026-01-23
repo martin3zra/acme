@@ -1,16 +1,18 @@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useTranslation } from '@/hooks/use-translation';
-import { DueInvoice } from '@/types';
+import { DueInvoice, TransactionKind } from '@/types';
 import { flexRender, getCoreRowModel, getSortedRowModel, useReactTable } from '@tanstack/react-table';
 import { FC } from 'react';
 import { getColumns } from './columns-definitions';
 type Props = {
+  kind: TransactionKind;
+  title: string;
   data: DueInvoice[];
-  onSelectItem: (item: DueInvoice, action: 'view:customer' | 'view:invoice' | 'record:payment') => void;
+  onSelectItem: (item: DueInvoice, action: 'view:customer' | 'view:invoice' | 'view:estimate' | 'record:payment') => void;
 };
-export const DueInvoicesList: FC<Props> = ({ data, onSelectItem }) => {
+export const RecentTransactionList: FC<Props> = ({ kind, title, data, onSelectItem }) => {
   const t = useTranslation().trans;
-  const columns = getColumns({ onDidClick: onSelectItem, t });
+  const columns = getColumns({ kind, onDidClick: onSelectItem, t });
   const table = useReactTable({
     data,
     columns,
@@ -19,7 +21,7 @@ export const DueInvoicesList: FC<Props> = ({ data, onSelectItem }) => {
   });
   return (
     <div>
-      <h1 className="py-2 text-lg">{t('dashboard.due_invoices')}</h1>
+      <h1 className="py-2 text-lg">{title}</h1>
       <div className="rounded-md border">
         <Table>
           <TableHeader>

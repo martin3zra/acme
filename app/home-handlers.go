@@ -20,6 +20,11 @@ func (s *Server) homeHandler(ctx *routing.Context) {
 		ctx.Error(err)
 		return
 	}
+	estimates, err := s.findLatestEstimates(ctx.Request.Context())
+	if err != nil {
+		ctx.Error(err)
+		return
+	}
 
 	period := ctx.Query("period")
 	// Default to "last12" if not provided
@@ -63,6 +68,7 @@ func (s *Server) homeHandler(ctx *routing.Context) {
 			map[string]any{"label": "dashboard.stats.estimates", "value": stats.TotalEstimates, "icon": "estimate", "bg": "bg-blue-200"},
 		},
 		"due_invoices": dueInvoices,
+		"estimates":    estimates,
 		"period":       period,
 		"chart": map[string]any{
 			"data":           chartData,

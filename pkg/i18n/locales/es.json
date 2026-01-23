@@ -233,6 +233,7 @@
   },
   "dashboard": {
     "due_invoices": "Facturas vencidas",
+    "estimates": "Cotizaciones recientes",
     "stats": {
       "total_amount_due": "Monto total vencido",
       "customers": "Clientes",
@@ -243,6 +244,13 @@
       "invoice": {
         "title": "Ver Factura",
         "description": "Detalles de la factura seleccionada."
+      },
+      "estimate": {
+        "title": "Ver Cotización",
+        "description": "Detalles de la cotización seleccionada.",
+        "convertToInvoice": "Convertir a factura",
+        "markAsAccepted": "Marcar como aceptada",
+        "markAsRejected": "Marcar como rechazada"
       },
       "customer": {
         "title": "Ver Cliente",
