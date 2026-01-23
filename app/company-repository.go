@@ -121,25 +121,6 @@ func (s *Server) findCompanyByUUID(ctx context.Context, uuid string) (*Company, 
 	return c, nil
 }
 
-func (s *Server) findCompanyById(id int) (*Company, error) {
-	result := s.db.QueryRow(s.qs.Q("companies_find_by_id"), id)
-	var company Company
-	err := result.Scan(
-		&company.ID,
-		&company.Name,
-		&company.Identifier,
-		&company.City,
-		&company.Address,
-		&company.CreatedAt,
-		&company.UpdatedAt,
-	)
-	if err != nil {
-		return nil, err
-	}
-
-	return &company, nil
-}
-
 func (s *Server) storeCompany(accountID, userID int, form StoreCompanyForm) error {
 	return database.WithTransaction(s.db, func(tx *sql.Tx) error {
 		var companyID int
@@ -160,30 +141,6 @@ func (s *Server) storeCompany(accountID, userID int, form StoreCompanyForm) erro
 
 		return s.linkCompanyDefaultSequences(tx, companyID)
 	})
-}
-
-func (s *Server) currentCompany(userID int) (*Company, error) {
-	result := s.db.QueryRow(`
-    SELECT id, name, identifier, city, address, created_at, updated_at
-    FROM companies
-    JOIN companies_users ON companies.id = companies_users.company_id
-    WHERE companies_users.user_id = $1 AND companies_users.current = true
-  `, userID)
-	var company Company
-	err := result.Scan(
-		&company.ID,
-		&company.Name,
-		&company.Identifier,
-		&company.City,
-		&company.Address,
-		&company.CreatedAt,
-		&company.UpdatedAt,
-	)
-	if err != nil {
-		return nil, err
-	}
-
-	return &company, nil
 }
 
 func (s *Server) linkCompanyDefaultSequences(tx *sql.Tx, companyID int) error {

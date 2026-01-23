@@ -29,10 +29,10 @@ export const makeCreateBreadcrumbs = (kind: TransactionKind): BreadcrumbItem[] =
   },
 ];
 
-export const editBreadcrumbs: BreadcrumbItem[] = [
-  // ...breadcrumbs,
+export const makeEditBreadcrumbs = (kind: TransactionKind): BreadcrumbItem[] => [
+  ...makeBreadcrumbs(kind),
   {
-    title: 'invoices.editInvoice.title',
+    title: `${kind}s.edit${capitalize(kind)}.title`,
     href: '',
   },
 ];

@@ -107,7 +107,7 @@ export interface Customer {
   address: string;
   status: string;
   payment_method: string;
-  payment_terms: string;
+  payment_terms: PaymentTermValue;
   amount_due: number;
   credit_limited: boolean;
   credit_limit: number;
@@ -197,7 +197,7 @@ export interface Invoice {
   customer: Customer;
   date: string;
   due_on?: string;
-  terms: number;
+  terms: PaymentTermValue;
   tax_receipt_id: number;
   amount: number;
   discount: DiscountType;
@@ -270,8 +270,10 @@ export type PaymentMethodType = {
   autoFocus?: boolean;
 };
 
+export type PaymentTermValue = 'pia' | 'net7' | 'net10' | 'net15' | 'net30' | 'net60' | 'net90' | 'net120';
+
 export type PaymentTerm = {
-  value: string;
+  value: PaymentTermValue;
   label: string;
 };
 
@@ -303,7 +305,7 @@ export type HeaderForm = {
   customer: Customer | undefined;
   date: Date | undefined;
   due: Date | undefined;
-  terms: string;
+  terms: PaymentTermValue;
   taxReceipt: number;
   notes: string | undefined;
   discount: DiscountType;
@@ -416,6 +418,7 @@ export function mapPaymentLineToReceivableInvoice(paymentLine: PaymentLine): Rec
     payment: paymentLine.payment,
     discount: 0,
     balance: 0,
+    remaining: 0,
     action: 'unchanged', // Placeholder, as the action is not defined in PaymentLine
   };
 }

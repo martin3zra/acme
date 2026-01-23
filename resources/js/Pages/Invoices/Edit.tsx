@@ -23,7 +23,7 @@ import { useDebounced } from '@/hooks/use-debounced';
 import { usePersistedState } from '@/hooks/use-persisted-state';
 import { useTranslation } from '@/hooks/use-translation';
 import AppLayout from '@/layouts/app-layout';
-import { addDays, cn, isNotEmpty } from '@/lib/utils';
+import { addDays, cn, getDaysFromTerm, isNotEmpty } from '@/lib/utils';
 import {
   Auth,
   BTForm,
@@ -38,13 +38,15 @@ import {
   Nameable,
   PageProps,
   PaymentMethod,
+  PaymentTermValue,
+  TransactionKind,
 } from '@/types';
 import { Textarea } from '@headlessui/react';
 import { router, useForm, usePage } from '@inertiajs/react';
 import { format } from 'date-fns';
 import { CalendarIcon } from 'lucide-react';
 import React, { useCallback, useEffect, useState } from 'react';
-import { defaultDiscount, editBreadcrumbs, paymentTerms } from './constants';
+import { defaultDiscount, makeEditBreadcrumbs, paymentTerms } from './constants';
 import CheckoutForm from './Shared/checkout-form';
 import { CustomerSection } from './Shared/customer-section';
 import { Lines } from './Shared/lines';
@@ -56,7 +58,17 @@ export default function Edit({
   items,
   item,
   tax_receipts,
-}: PageProps<{ auth: Auth; invoice: InvoiceWithLines; customers: Customer[]; items: Item[]; item: Item; tax_receipts: Nameable[] }>) {
+  kind,
+}: PageProps<{
+  auth: Auth;
+  invoice: InvoiceWithLines;
+  customers: Customer[];
+  items: Item[];
+  item: Item;
+  tax_receipts: Nameable[];
+  kind: TransactionKind;
+}>) {
+  const isInvoice = kind === 'invoice';
   const t = useTranslation().trans;
   const { errors: propsErrors } = usePage<PageProps>().props;
   const [open, setOpen] = React.useState(false);
@@ -66,11 +78,12 @@ export default function Edit({
   const { headers } = useHeader();
   const { put, transform, processing, errors } = useForm({
     customer_id: 0,
-    terms: 0,
+    terms: 'pia',
     tax_receipt: 0,
     lines: [],
     date: new Date(),
     discount: defaultDiscount,
+    kind,
   });
 
   const initialAsInvoiceForm = (): InvoiceForm => {
@@ -93,8 +106,7 @@ export default function Edit({
     return _invoice;
   };
 
-  const [invoiceForm, setInvoiceForm, removeInvoiceForm] = usePersistedState<InvoiceForm>('invoice_edit', initialAsInvoiceForm(), true);
-
+  const [invoiceForm, setInvoiceForm, removeInvoiceForm] = usePersistedState<InvoiceForm>(`${kind}_edit`, initialAsInvoiceForm(), true);
   const [currentItem, setCurrentItem] = React.useState<Item | undefined>(undefined);
   const [isEditing, setEditing] = React.useState(false);
   const [search, setSearch] = React.useState('');
@@ -152,8 +164,9 @@ export default function Edit({
   const handleDateChange = (date: unknown) => {
     invoiceForm.header.date = date as Date;
     invoiceForm.header.due = undefined;
-    if (invoiceForm.header.terms > 1) {
-      invoiceForm.header.due = addDays(invoiceForm.header.date, invoiceForm.header.terms);
+    if (invoiceForm.header.terms !== 'pia') {
+      const days = getDaysFromTerm(invoiceForm.header.terms);
+      invoiceForm.header.due = addDays(invoiceForm.header.date, days);
     }
 
     setInvoiceForm(() => {
@@ -161,41 +174,53 @@ export default function Edit({
     });
   };
 
-  const handlePaymentTermsChange = (value: string) => {
-    invoiceForm.header.terms = Number(value);
+  const handlePaymentTermsChange = (value: PaymentTermValue) => {
+    invoiceForm.header.terms = value;
 
-    if (invoiceForm.header.terms > 1 && invoiceForm.header.date) {
-      invoiceForm.header.due = addDays(invoiceForm.header.date, invoiceForm.header.terms);
+    if (invoiceForm.header.terms !== 'pia' && invoiceForm.header.date) {
+      const days = getDaysFromTerm(invoiceForm.header.terms);
+      invoiceForm.header.due = addDays(invoiceForm.header.date, days);
     } else {
       invoiceForm.header.due = undefined;
     }
 
     setInvoiceForm(() => {
-      return { ...invoiceForm, header: { ...invoiceForm.header, terms: Number(value) } };
+      return { ...invoiceForm, header: { ...invoiceForm.header, terms: value } };
     });
   };
 
   const performUpdate = () => {
-    transform((data) => ({
-      ...data,
-      customer_id: invoiceForm.header.customer?.id,
-      date: invoiceForm.header.date,
-      terms: invoiceForm.header.terms,
-      tax_receipt: invoiceForm.header.taxReceipt,
-      discount: invoiceForm.header.discount,
-      notes: invoiceForm.header.notes || '',
-      lines: invoiceForm.lines.map((line) => {
-        return { id: line.id, unit: line.unit.id, qty: line.qty, price: line.price, rate: line.tax.rate, action: line.action };
-      }),
-      payment: invoiceForm.payment,
-    }));
+    transform((data) => {
+      const payload: Record<string, any> = {
+        ...data,
+        customer_id: invoiceForm.header.customer?.id,
+        date: invoiceForm.header.date,
+        // terms: invoiceForm.header.terms,
+        // tax_receipt: invoiceForm.header.taxReceipt,
+        discount: invoiceForm.header.discount,
+        notes: invoiceForm.header.notes || '',
+        kind: kind,
+        lines: invoiceForm.lines.map((line) => {
+          return { id: line.id, unit: line.unit.id, qty: line.qty, price: line.price, rate: line.tax.rate, action: line.action };
+        }),
+        // payment: invoiceForm.payment,
+      };
 
-    put(`/invoices/${invoice.header.uuid}`, {
+      if (isInvoice) {
+        payload.terms = invoiceForm.header.terms;
+        payload.tax_receipt = invoiceForm.header.taxReceipt;
+        payload.discount = invoiceForm.header.discount;
+        payload.payment = invoiceForm.payment;
+      }
+      return payload;
+    });
+
+    put(`/${kind}s/${invoice.header.uuid}`, {
       ...headers,
       preserveState: 'errors',
       onSuccess: () => {
         removeInvoiceForm();
-        router.get('/invoices');
+        router.get(`/${kind}s`);
       },
     });
   };
@@ -316,7 +341,7 @@ export default function Edit({
   const handleCheckout = (event: React.MouseEvent<HTMLButtonElement>) => {
     event.preventDefault();
     if (computeTotalAmount() === 0) return;
-    if (invoiceForm.header.terms === 1) {
+    if (invoiceForm.header.terms === 'pia') {
       Object.keys(propsErrors).forEach((key) => delete propsErrors[key]);
       setCheckout(true);
       return;
@@ -334,19 +359,21 @@ export default function Edit({
   const performInvoiceCancelation = (event: React.MouseEvent<HTMLButtonElement>) => {
     event.preventDefault();
     removeInvoiceForm();
-    router.get('/invoices');
+    router.get(`/${kind}s`);
   };
 
   return (
-    <AppLayout user={auth.user} breadcrumbs={editBreadcrumbs}>
+    <AppLayout user={auth.user} breadcrumbs={makeEditBreadcrumbs(kind)}>
       <AppLayout.Actions>
         <div className="flex justify-end gap-x-6">
           <Button variant={'secondary'} onClick={() => setCancelConfirmation(true)}>
             {t('global.actions.cancel')}
           </Button>
-          <Button onClick={handleCheckout} disabled={processing}>
-            {invoiceForm.header.terms === 1 ? t('global.actions.checkout') : t('global.actions.update')}
-          </Button>
+          {isInvoice && (
+            <Button onClick={handleCheckout} disabled={processing}>
+              {invoiceForm.header.terms === 'pia' ? t('global.actions.checkout') : t('global.actions.update')}
+            </Button>
+          )}
         </div>
       </AppLayout.Actions>
       <div className="grid h-full w-full grid-cols-12 grid-rows-[auto_1fr_auto] gap-y-4 bg-gray-50/10">
@@ -392,64 +419,75 @@ export default function Edit({
                 </Popover>
                 <InputError className="mt-2" message={errors.date} />
               </div>
-              <div className="flex flex-col gap-y-2">
-                <Label htmlFor="date">{t('global.dueDate')}</Label>
-                <Label className="text-muted-foreground w-70 rounded-sm border p-2.5">
-                  {invoiceForm.header.due ? format(invoiceForm.header.due, 'PPP') : t('global.noAvailable.default')}
-                </Label>
-              </div>
+              {isInvoice && (
+                <div className="flex flex-col gap-y-2">
+                  <Label htmlFor="date">{t('global.dueDate')}</Label>
+                  <Label className="text-muted-foreground w-70 rounded-sm border p-2.5">
+                    {invoiceForm.header.due ? format(invoiceForm.header.due, 'PPP') : t('global.noAvailable.default')}
+                  </Label>
+                </div>
+              )}
             </div>
-            <div className="col-span-6 flex flex-col gap-y-6">
-              <div className="flex flex-col gap-y-2">
-                <Label htmlFor="paymentTerms">{t('invoices.paymentTerms')}</Label>
-                <Select
-                  name="paymentTerms"
-                  onValueChange={handlePaymentTermsChange}
-                  defaultValue={String(invoiceForm.header.terms)}
-                  value={String(invoiceForm.header.terms)}
-                >
-                  <SelectTrigger className="w-full">
-                    <SelectValue placeholder="Select terms" />
-                  </SelectTrigger>
-                  <SelectContent className="">
-                    {paymentTerms.map((term, index) => (
-                      <SelectItem key={index.toString()} value={term.value.toString()}>
-                        {term.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <InputError className="mt-2" message={errors.terms} />
+            {isInvoice ? (
+              <div className="col-span-6 flex flex-col gap-y-6">
+                <div className="flex flex-col gap-y-2">
+                  <Label htmlFor="paymentTerms">{t('invoices.paymentTerms')}</Label>
+                  <Select
+                    name="paymentTerms"
+                    onValueChange={handlePaymentTermsChange}
+                    defaultValue={String(invoiceForm.header.terms)}
+                    value={String(invoiceForm.header.terms)}
+                  >
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="Select terms" />
+                    </SelectTrigger>
+                    <SelectContent className="">
+                      {paymentTerms.map((term, index) => (
+                        <SelectItem key={index.toString()} value={term.value.toString()}>
+                          {term.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <InputError className="mt-2" message={errors.terms} />
+                </div>
+                <div className="flex flex-col gap-y-2">
+                  <Label htmlFor="paymentTerms">{t('invoices.taxReceipt')}</Label>
+                  <Select
+                    name="paymentTerms"
+                    // onValueChange={handleTaxReceiptChange}
+                    defaultValue={String(invoiceForm.header.taxReceipt)}
+                    value={String(invoiceForm.header.taxReceipt)}
+                    disabled={true}
+                  >
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="Select terms" />
+                    </SelectTrigger>
+                    <SelectContent className="">
+                      {tax_receipts.map((receipt) => (
+                        <SelectItem key={receipt.id} value={String(receipt.id)}>
+                          {receipt.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <InputError className="mt-2" message={errors.tax_receipt} />
+                </div>
               </div>
-              <div className="flex flex-col gap-y-2">
-                <Label htmlFor="paymentTerms">{t('invoices.taxReceipt')}</Label>
-                <Select
-                  name="paymentTerms"
-                  // onValueChange={handleTaxReceiptChange}
-                  defaultValue={String(invoiceForm.header.taxReceipt)}
-                  value={String(invoiceForm.header.taxReceipt)}
-                  disabled={true}
-                >
-                  <SelectTrigger className="w-full">
-                    <SelectValue placeholder="Select terms" />
-                  </SelectTrigger>
-                  <SelectContent className="">
-                    {tax_receipts.map((receipt) => (
-                      <SelectItem key={receipt.id} value={String(receipt.id)}>
-                        {receipt.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <InputError className="mt-2" message={errors.tax_receipt} />
+            ) : (
+              <div className="col-span-12 flex flex-col place-items-end gap-y-6">
+                <Button disabled={invoiceForm.lines.length === 0} onClick={performUpdate}>
+                  {t('global.actions.save')}
+                </Button>
               </div>
-            </div>
+            )}
           </div>
         </div>
 
         <div className="col-span-12">
           <div className="flex flex-col">
             <Lines
+              kind={kind}
               items={items}
               lines={invoiceForm.lines}
               lineError={errors.lines}
@@ -485,7 +523,7 @@ export default function Edit({
               <div className="col-span-2 flex flex-col gap-y-2 rounded-lg border border-gray-300/25 bg-gray-100/10">
                 <div className="grid place-content-end gap-y-4 p-2">
                   {/* Add red border as the customer card, using data attributes */}
-                  <InputError message={errors['discount.value']} />
+                  <InputError message={errors['discount']} />
                   <div className="flex w-60 items-center justify-between">
                     <span className="block text-base">{t('global.subTotal')}</span>
                     <span className="block text-base">{currency(composeSubTotal)}</span>
@@ -536,29 +574,31 @@ export default function Edit({
         <AlertDialog open={openCancelConfirmation} onOpenChange={setCancelConfirmation}>
           <AlertDialogContent>
             <AlertDialogHeader>
-              <AlertDialogTitle>{t('invoices.confirmsCancelation.title')}</AlertDialogTitle>
-              <AlertDialogDescription>{t('invoices.confirmsCancelation.description')}</AlertDialogDescription>
+              <AlertDialogTitle>{t(`${kind}s.confirmsCancelation.title`)}</AlertDialogTitle>
+              <AlertDialogDescription>{t(`${kind}s.confirmsCancelation.description`)}</AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
-              <AlertDialogCancel>{t('invoices.confirmsCancelation.cancel')}</AlertDialogCancel>
-              <AlertDialogAction onClick={performInvoiceCancelation}>{t('invoices.confirmsCancelation.confirm')}</AlertDialogAction>
+              <AlertDialogCancel>{t(`${kind}s.confirmsCancelation.cancel`)}</AlertDialogCancel>
+              <AlertDialogAction onClick={performInvoiceCancelation}>{t(`${kind}s.confirmsCancelation.confirm`)}</AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
-        <CheckoutForm
-          action={t('global.actions.update')}
-          openCheckout={openCheckout}
-          setCheckout={setCheckout}
-          paymentForm={invoiceForm.payment}
-          totalAmount={computeTotalAmount()}
-          onCompleteCheckout={performUpdate}
-          processing={processing}
-          setCancelConfirmation={setCancelConfirmation}
-          errors={propsErrors}
-          onCheckoutChange={handleCheckoutChange}
-          currency={currency}
-          t={t}
-        />
+        {isInvoice && (
+          <CheckoutForm
+            action={t('global.actions.update')}
+            openCheckout={openCheckout}
+            setCheckout={setCheckout}
+            paymentForm={invoiceForm.payment}
+            totalAmount={computeTotalAmount()}
+            onCompleteCheckout={performUpdate}
+            processing={processing}
+            setCancelConfirmation={setCancelConfirmation}
+            errors={propsErrors}
+            onCheckoutChange={handleCheckoutChange}
+            currency={currency}
+            t={t}
+          />
+        )}
       </div>
     </AppLayout>
   );

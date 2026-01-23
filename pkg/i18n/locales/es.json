@@ -47,10 +47,12 @@
     "user": "Usuario",
     "company": "Compañia",
     "invoice": "Factura",
+    "estimate": "Cotización",
     "receiptOfPayment": "Recibo de Ingreso",
     "weHaveReceivedFrom": "Hemos recibido de",
     "address": "Dirección",
-    "billTo": "Facturado A",
+    "invoiceTo": "Facturado A",
+    "estimateTo": "Cotizado A",
     "item": "Producto",
     "contact": "Contacto",
     "profile": "Perfil",
@@ -234,7 +236,8 @@
     "stats": {
       "total_amount_due": "Monto total vencido",
       "customers": "Clientes",
-      "invoices": "Facturas"
+      "invoices": "Facturas",
+      "estimates": "Cotizaciones"
     },
     "viewItem": {
       "invoice": {

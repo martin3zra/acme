@@ -9,6 +9,7 @@ type stats struct {
 	TotalDueAmount float64 `json:"total_due_amount"`
 	TotalCustomers int     `json:"total_customers"`
 	TotalInvoices  int     `json:"total_invoices"`
+	TotalEstimates int     `json:"total_estimates"`
 }
 
 type dueInvoice struct {
@@ -42,10 +43,11 @@ type DashboardData struct {
 func (s *Server) findStats(ctx context.Context) (*stats, error) {
 	var data stats
 	err := s.db.QueryRow(`SELECT
-    (SELECT COALESCE(SUM(amount_due), 0) FROM invoices WHERE company_id = $1 AND due_on <= CURRENT_DATE AND paid_status IN ('unpaid','partial') ) AS total_due_amount,
+    (SELECT COALESCE(SUM(amount_due), 0) FROM invoices WHERE company_id = $1 AND transaction_kind = 'invoice' AND due_on <= CURRENT_DATE AND paid_status IN ('unpaid','partial') ) AS total_due_amount,
     (SELECT COUNT(*) FROM customers WHERE company_id = $1) AS total_customers,
-    (SELECT COUNT(*) FROM invoices WHERE company_id = $1) AS total_invoices;
-  `, CurrentCompany(ctx).ID).Scan(&data.TotalDueAmount, &data.TotalCustomers, &data.TotalInvoices)
+    (SELECT COUNT(*) FROM invoices WHERE company_id = $1 AND transaction_kind = 'invoice') AS total_invoices,
+    (SELECT COUNT(*) FROM invoices WHERE company_id = $1 AND transaction_kind = 'estimate') AS total_estimates;
+  `, CurrentCompany(ctx).ID).Scan(&data.TotalDueAmount, &data.TotalCustomers, &data.TotalInvoices, &data.TotalEstimates)
 
 	return &data, err
 }
@@ -55,6 +57,7 @@ func (s *Server) findLatestDueInvoices(ctx context.Context) ([]*dueInvoice, erro
     FROM invoices i
     JOIN customers c ON c.id = i.customer_id
     WHERE i.company_id = $1
+    AND i.transaction_kind = 'invoice'
     AND i.due_on <= CURRENT_DATE
     AND i.paid_status IN ('partial', 'unpaid')
     AND i.status IN ('open', 'partial')
@@ -79,6 +82,7 @@ func (s *Server) findLastProfitOfLast12Months(ctx context.Context) ([]*ChartData
     SELECT TO_CHAR(date, 'YYYY/Mon') AS year_month, SUM(CASE WHEN status = 'completed' THEN total ELSE 0 END) AS sales, SUM(0) AS expenses -- placeholder until expenses table exists 
     FROM invoices 
     WHERE company_id = $1
+    AND transaction_kind = 'invoice'
     AND date >= (CURRENT_DATE - INTERVAL '12 months') 
     GROUP BY TO_CHAR(date, 'YYYY/Mon')
     ORDER BY MIN(date);
@@ -107,6 +111,7 @@ func (s *Server) findTotalsProfitOfLast12Months(ctx context.Context) (*Totals, e
       COALESCE(SUM(CASE WHEN status = 'completed' THEN total ELSE 0 END), 0) - COALESCE(SUM(0), 0) AS net_income
     FROM invoices 
     WHERE company_id = $1
+    AND transaction_kind = 'invoice'
     AND date >= (CURRENT_DATE - INTERVAL '12 months');`, CurrentCompany(ctx).ID).
 		Scan(&data.TotalSales, &data.TotalReceipts, &data.TotalExpenses, &data.NetIncome)
 	return &data, err
@@ -120,6 +125,7 @@ func (s *Server) findLastProfitOfYear(ctx context.Context, year int) ([]*ChartDa
       SUM(0) AS expenses
     FROM invoices
     WHERE company_id = $1
+    AND transaction_kind = 'invoice'
     AND EXTRACT(YEAR FROM date) = $2
     GROUP BY TO_CHAR(date, 'YYYY/Mon')
     ORDER BY MIN(date);
@@ -148,6 +154,7 @@ func (s *Server) findTotalsProfitOfYear(ctx context.Context, year int) (*Totals,
       COALESCE(SUM(CASE WHEN status = 'completed' THEN total ELSE 0 END), 0) - COALESCE(SUM(0), 0) AS net_income
     FROM invoices
     WHERE company_id = $1
+    AND transaction_kind = 'invoice'
     AND EXTRACT(YEAR FROM date) = $2;
   `, CurrentCompany(ctx).ID, year).
 		Scan(&data.TotalSales, &data.TotalReceipts, &data.TotalExpenses, &data.NetIncome)

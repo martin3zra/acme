@@ -60,7 +60,7 @@ func (s *Server) homeHandler(ctx *routing.Context) {
 			map[string]any{"label": "dashboard.stats.total_amount_due", "value": foundation.FormatAmount(stats.TotalDueAmount), "icon": "dollar", "bg": "bg-pink-100"},
 			map[string]any{"label": "dashboard.stats.customers", "value": stats.TotalCustomers, "icon": "users", "bg": "bg-blue-100"},
 			map[string]any{"label": "dashboard.stats.invoices", "value": stats.TotalInvoices, "icon": "invoice", "bg": "bg-blue-200"},
-			map[string]any{"label": "", "value": "", "icon": "", "bg": ""},
+			map[string]any{"label": "dashboard.stats.estimates", "value": stats.TotalEstimates, "icon": "estimate", "bg": "bg-blue-200"},
 		},
 		"due_invoices": dueInvoices,
 		"period":       period,

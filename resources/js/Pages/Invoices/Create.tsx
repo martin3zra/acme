@@ -23,7 +23,7 @@ import { useDebounced } from '@/hooks/use-debounced';
 import { usePersistedState } from '@/hooks/use-persisted-state';
 import { useTranslation } from '@/hooks/use-translation';
 import AppLayout from '@/layouts/app-layout';
-import { addDays, cn, getNetDays, isNotEmpty, parsePaymentMethod } from '@/lib/utils';
+import { addDays, cn, getDaysFromTerm, isNotEmpty, parsePaymentMethod } from '@/lib/utils';
 import {
   BTForm,
   CardForm,
@@ -36,6 +36,7 @@ import {
   PageProps,
   PaymentMethod,
   PaymentTerm,
+  PaymentTermValue,
   TaxReceipt,
   TransactionKind,
 } from '@/types';
@@ -71,6 +72,7 @@ export default function Create({
   kind: TransactionKind;
   showPaymentCTA: boolean;
 }>) {
+  const isInvoice = kind === 'invoice';
   const t = useTranslation().trans;
   const currency = useNumber().currency;
   const [open, setOpen] = React.useState(false);
@@ -205,8 +207,8 @@ export default function Create({
   const handleDateChange = (date: unknown) => {
     invoiceForm.header.date = date as Date;
     invoiceForm.header.due = undefined;
-    if (getNetDays(invoiceForm.header.terms) > 0) {
-      invoiceForm.header.due = addDays(invoiceForm.header.date, getNetDays(invoiceForm.header.terms));
+    if (invoiceForm.header.terms !== 'pia') {
+      invoiceForm.header.due = addDays(invoiceForm.header.date, getDaysFromTerm(invoiceForm.header.terms));
     }
 
     setInvoiceForm(() => {
@@ -214,11 +216,11 @@ export default function Create({
     });
   };
 
-  const handlePaymentTermsChange = (value: string) => {
+  const handlePaymentTermsChange = (value: PaymentTermValue) => {
     invoiceForm.header.terms = value;
 
-    if (getNetDays(invoiceForm.header.terms) > 0 && invoiceForm.header.date) {
-      invoiceForm.header.due = addDays(invoiceForm.header.date, getNetDays(invoiceForm.header.terms));
+    if (invoiceForm.header.terms !== 'pia' && invoiceForm.header.date) {
+      invoiceForm.header.due = addDays(invoiceForm.header.date, getDaysFromTerm(invoiceForm.header.terms));
     } else {
       invoiceForm.header.due = undefined;
     }
@@ -267,7 +269,7 @@ export default function Create({
   const performInvoiceCancelation = (event: React.MouseEvent<HTMLButtonElement>) => {
     event.preventDefault();
     removeInvoiceForm();
-    router.get('/invoices');
+    router.get(`/${kind}s`);
   };
 
   const handleCheckout = (event: React.MouseEvent<HTMLButtonElement>) => {
@@ -296,10 +298,10 @@ export default function Create({
         lines: invoiceForm.lines.map((line) => {
           return { id: line.id, qty: line.qty, unit: line.unit.id, price: line.price, rate: line.tax.rate, action: line.action };
         }),
-        payment: invoiceForm.payment,
+        // payment: invoiceForm.payment,
       };
 
-      if (kind === 'invoice') {
+      if (isInvoice) {
         payload.terms = invoiceForm.header.terms;
         payload.tax_receipt = invoiceForm.header.taxReceipt;
         payload.discount = invoiceForm.header.discount;
@@ -421,7 +423,7 @@ export default function Create({
                 </Popover>
                 <InputError className="mt-2" message={errors.date} />
               </div>
-              {kind === 'invoice' && (
+              {isInvoice && (
                 <div className="flex flex-col gap-y-2">
                   <Label htmlFor="date">{t('global.dueDate')}</Label>
                   <Label className="text-muted-foreground w-70 rounded-sm border p-2.5">
@@ -430,7 +432,7 @@ export default function Create({
                 </div>
               )}
             </div>
-            {kind === 'invoice' ? (
+            {isInvoice ? (
               <div className="col-span-6 flex flex-col gap-y-6">
                 <div className="flex flex-col gap-y-2">
                   <Label htmlFor="paymentTerms">{t('invoices.paymentTerms')}</Label>

@@ -30,7 +30,8 @@ func WithRequest[T any](handler func(ctx *Context, body *T)) HandlerFunc {
 				return
 			}
 
-			ctx.Errors("status", err.Error())
+			// Review this, it was duplicating the errors
+			// ctx.Errors("status", err.Error())
 			ctx.Back()
 			return
 		}

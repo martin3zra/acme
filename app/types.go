@@ -612,15 +612,15 @@ type UpdateInvoiceForm struct {
 }
 
 func (form UpdateInvoiceForm) Authorize() bool {
-	return Can(form.User(), "update:invoice")
+	return Can(form.User(), fmt.Sprintf("update:%s", form.Kind))
 }
 
 func (form UpdateInvoiceForm) Rules() map[string]any {
 	return map[string]any{
 		"customer_id":    "bail|required|exists:customers,id",
 		"date":           "bail|required|date",
-		"terms":          "bail|required|min:1",
-		"tax_receipt":    "bail|required|exists:tax_receipts,id",
+		"terms":          "bail|sometimes|required_if:kind,invoice|min:1",
+		"tax_receipt":    "bail|sometimes|required_if:kind,invoice|exists:tax_receipts,id",
 		"lines":          "required|min:1",
 		"lines.*.id":     "required|exists:items,id",
 		"lines.*.unit":   "required|exists:units,id",

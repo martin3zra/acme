@@ -67,25 +67,37 @@ func (i *InvoicePDF) Header(ctx context.Context) {
 
 	// Invoice Info (top right)
 	i.pdf.SetXY(150, 10)
-	i.pdf.CellFormat(0, 6, fmt.Sprintf("%s: %s", i.t("global.invoice"), i.invoice.Number), "", 1, "R", false, 0, "")
-	i.pdf.CellFormat(0, 6, fmt.Sprintf("NCF: %s", i.invoice.NCF), "", 1, "R", false, 0, "")
+	i.pdf.CellFormat(0, 6, fmt.Sprintf("%s: %s", i.t(fmt.Sprintf("global.%s", i.invoice.Kind)), i.invoice.Number), "", 1, "R", false, 0, "")
+	if i.invoice.Kind == TransactionKinds.Invoice {
+		i.pdf.CellFormat(0, 6, fmt.Sprintf("NCF: %s", *i.invoice.NCF), "", 1, "R", false, 0, "")
+	}
 	i.pdf.CellFormat(0, 6, fmt.Sprintf("%s: %s", i.t("global.date"), i.invoice.Date.Format("2006-01-02")), "", 1, "R", false, 0, "")
-
+	if i.invoice.Kind != TransactionKinds.Invoice {
+		i.pdf.Ln(6)
+	}
 	i.pdf.Ln(10)
 	i.pdf.Line(15, i.pdf.GetY(), 195, i.pdf.GetY())
 	i.pdf.Ln(10)
 
 	// BILL TO & PAYMENT
 	i.pdf.SetFont("DejaVu", "B", 10)
-	i.pdf.CellFormat(90, 6, strings.ToUpper(i.t("global.billTo")), "", 0, "", false, 0, "")
-	i.pdf.CellFormat(90, 6, strings.ToUpper(i.t("global.paymentTerms")), "", 1, "", false, 0, "")
+	i.pdf.CellFormat(90, 6, strings.ToUpper(i.t(fmt.Sprintf("global.%sTo", i.invoice.Kind))), "", 0, "", false, 0, "")
+	if i.invoice.Kind == TransactionKinds.Invoice {
+		i.pdf.CellFormat(90, 6, strings.ToUpper(i.t("global.paymentTerms")), "", 1, "", false, 0, "")
+	} else {
+		i.pdf.Ln(6)
+	}
 	i.pdf.SetFont("DejaVu", "", 10)
 
 	i.pdf.CellFormat(90, 6, i.invoice.Customer.Name, "", 0, "", false, 0, "")
 	if i.invoice.DueOn != nil {
 		i.pdf.CellFormat(90, 6, fmt.Sprintf("%s %s", i.t("global.dueDate"), i.invoice.DueOn.Format("2006-01-02")), "", 1, "", false, 0, "")
 	} else {
-		i.pdf.CellFormat(90, 6, strings.ToUpper(i.invoice.Terms), "", 1, "", false, 0, "")
+		if i.invoice.Kind == TransactionKinds.Invoice {
+			i.pdf.CellFormat(90, 6, strings.ToUpper(i.invoice.Terms), "", 1, "", false, 0, "")
+		} else {
+			i.pdf.Ln(6)
+		}
 	}
 	i.pdf.CellFormat(90, 6, fmt.Sprintf("%s: %s", i.t("global.email"), i.invoice.Customer.Email), "", 0, "", false, 0, "")
 	if i.invoice.DueOn != nil {
@@ -160,7 +172,9 @@ func (i *InvoicePDF) Lines() {
 	i.pdf.Ln(10)
 
 	i.Totals(subtotal, totalTax)
-	i.watermark()
+	if i.invoice.Kind == TransactionKinds.Invoice {
+		i.watermark()
+	}
 }
 
 func (i *InvoicePDF) Totals(subtotal, totalTax float64) {

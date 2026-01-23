@@ -51,7 +51,7 @@ func (s *Server) invoicesHandler(ctx *routing.Context) {
 
 	if uuid != "" {
 		c := cache.NewPgCache(s.db)
-		key := fmt.Sprintf("preview:invoice:%s", uuid)
+		key := fmt.Sprintf("preview:%s:%s", kind, uuid)
 		data, err := cache.Remember(ctx.Request.Context(), c, key, func() (map[string]any, error) {
 			invoice, err := s.findInvoicesByUUID(ctx.Request.Context(), kind, uuid)
 			if err != nil {
@@ -63,7 +63,7 @@ func (s *Server) invoicesHandler(ctx *routing.Context) {
 				return nil, err
 			}
 
-			uri := fmt.Sprintf("%s/invoices/%s/print/%s", s.config.host, uuid, foundation.NewHashable().Sha1(uuid))
+			uri := fmt.Sprintf("%s/%ss/%s/print/%s", s.config.host, kind, uuid, foundation.NewHashable().Sha1(uuid))
 			pdfURL, err := routing.PermanentSignedURL(uri, map[string]string{}, string(s.config.secretKey))
 			if err != nil {
 				return nil, nil
@@ -162,21 +162,14 @@ func (s *Server) editInvoiceHandler(ctx *routing.Context) {
 		ctx.Error(err)
 	}
 
-	taxReceipts, err := s.findTaxesReceipts(ctx.Request.Context())
-	if err != nil {
-		ctx.Error(err)
-		return
-	}
 	term := ctx.Query("search")
-	ctx.Render("Invoices/Edit", map[string]any{
-		"translations": trans("invoices"),
+	props := map[string]any{
+		"translations": trans(fmt.Sprintf("%ss", kind)),
+		"kind":         kind,
 		"invoice": map[string]any{
 			"header": invoice,
 			"lines":  lines,
 		},
-		"tax_receipts": foundation.MapSlice(taxReceipts, func(receipt *taxReceipt) map[string]any {
-			return map[string]any{"id": receipt.ID, "name": fmt.Sprintf("%s-%s", receipt.Type, receipt.Name)}
-		}),
 		"customers": inertia.Optional(func() (any, error) {
 			customers, err := s.findCustomersBySearchCriteria(ctx.Request.Context(), term)
 			if err != nil {
@@ -201,7 +194,19 @@ func (s *Server) editInvoiceHandler(ctx *routing.Context) {
 
 			return item, err
 		}),
-	})
+	}
+
+	if kind == TransactionKinds.Invoice {
+		taxReceipts, err := s.findTaxesReceipts(ctx.Request.Context())
+		if err != nil {
+			ctx.Error(err)
+			return
+		}
+		props["tax_receipts"] = foundation.MapSlice(taxReceipts, func(receipt *taxReceipt) map[string]any {
+			return map[string]any{"id": receipt.ID, "name": fmt.Sprintf("%s-%s", receipt.Type, receipt.Name)}
+		})
+	}
+	ctx.Render("Invoices/Edit", props)
 }
 
 func (s *Server) storeInvoiceHandler() routing.HandlerFunc {
@@ -250,27 +255,36 @@ func (s *Server) storeInvoiceHandler() routing.HandlerFunc {
 func (s *Server) updateInvoiceHandler() routing.HandlerFunc {
 	return routing.WithRequest(func(ctx *routing.Context, form *UpdateInvoiceForm) {
 
-		if form.Terms == "pia" && form.total != form.paymentTotalAmount() {
-			ctx.BackWith("status", "Invoice total amount and the payment details are different.")
-			return
+		if form.Kind == TransactionKinds.Invoice {
+			if form.Terms == "pia" && form.total != form.paymentTotalAmount() {
+				ctx.BackWith("status", "Invoice total amount and the payment details are different.")
+				return
+			}
+
+			customer, err := s.findCustomeByID(ctx.Request.Context(), form.CustomerID)
+			if err != nil {
+				ctx.BackWithError(err)
+				return
+			}
+
+			if customer.CreditLimited && customer.AmountDue+form.total > customer.CreditLimit {
+				ctx.BackWith("status", "Credit limit exceeded.")
+				return
+			}
 		}
 
-		customer, err := s.findCustomeByID(ctx.Request.Context(), form.CustomerID)
+		uuid := ctx.Param("id")
+		err := s.updateInvoice(ctx.Request.Context(), uuid, form)
 		if err != nil {
-			ctx.BackWithError(err)
-			return
-		}
-
-		if customer.CreditLimited && customer.AmountDue+form.total > customer.CreditLimit {
-			ctx.BackWith("status", "Credit limit exceeded.")
-			return
-		}
-
-		err = s.updateInvoice(ctx.Request.Context(), ctx.Param("id"), form)
-		if err != nil {
-			log.Printf("Error updating invoice: %v", err)
+			log.Printf("Error updating %s: %v", form.Kind, err)
 			ctx.BackWith("status", s.trans("global.wasNotUpdated", i18n.Replacements{"subject": "@global.invoice"}))
 			return
+		}
+
+		c := cache.NewPgCache(s.db)
+		key := fmt.Sprintf("preview:%s:%s", form.Kind, uuid)
+		if err = c.Delete(ctx.Request.Context(), key); err != nil {
+			log.Printf("Error deleting cache: %v", err)
 		}
 
 		ctx.Flash("success", s.trans("global.wasUpdated", i18n.Replacements{"subject": "@global.invoice"}))
@@ -295,6 +309,7 @@ func (s *Server) voidInvoiceHandler() routing.HandlerFunc {
 }
 
 func (s *Server) printInvoiceHandler(ctx *routing.Context) {
+	kind := resolveTransactionKind(ctx)
 
 	uuid := ctx.Param("id")
 	hash := ctx.Param("hash")
@@ -308,10 +323,9 @@ func (s *Server) printInvoiceHandler(ctx *routing.Context) {
 		Lines  []*line  `json:"lines"`
 	}
 	c := cache.NewPgCache(s.db)
-	key := fmt.Sprintf("preview:invoice:%s", uuid)
+	key := fmt.Sprintf("preview:%s:%s", kind, uuid)
 	data, err := cache.Remember(ctx.Request.Context(), c, key, func() (invoiceData, error) {
-
-		invoice, err := s.findInvoicesByUUID(ctx.Request.Context(), TransactionKinds.Invoice, uuid)
+		invoice, err := s.findInvoicesByUUID(ctx.Request.Context(), kind, uuid)
 		if err != nil {
 			return invoiceData{}, nil
 		}

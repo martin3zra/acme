@@ -64,24 +64,6 @@ func (a account) GetEmailAddressForAccountVerification() string {
 	return a.Owner.Email
 }
 
-func (s *Server) findAccountByID(accountID int) (*account, error) {
-	var a account
-
-	if err := s.db.QueryRow(`
-    SELECT accounts.id, accounts.uuid, accounts.verified_at, accounts.status, accounts.created_at, accounts.updated_at, accounts.deleted_at,
-    users.id, users.email
-    FROM accounts
-    INNER JOIN users ON (accounts.owner_id = users.id)
-    WHERE accounts.id = $1
-  `, accountID).Scan(
-		a.ID, a.UUID, a.VerifiedAt, &a.Status, a.CreatedAt, a.UpdatedAt, a.DeletedAt, a.Owner.ID, a.Owner.Email,
-	); err != nil {
-		return nil, err
-	}
-
-	return &a, nil
-}
-
 func (s *Server) findAccountByIDUsingTx(tx *sql.Tx, accountID int) (*account, error) {
 	var a account
 
