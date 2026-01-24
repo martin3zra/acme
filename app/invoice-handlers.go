@@ -274,11 +274,11 @@ func (s *Server) storeInvoiceHandler() routing.HandlerFunc {
 		err := s.storeInvoice(ctx.Request.Context(), form)
 		if err != nil {
 			log.Printf("Error creating invoice: %v", err)
-			ctx.BackWith("status", s.trans("global.wasNotCreated", i18n.Replacements{"subject": "@global.invoice"}))
+			ctx.BackWith("status", s.trans("global.wasNotCreated", i18n.Replacements{"subject": fmt.Sprintf("@global.%s", form.Kind)}))
 			return
 		}
-		ctx.Flash("success", s.trans("global.wasCreated", i18n.Replacements{"subject": "@global.invoice"}))
-		ctx.Flash("redirectTo", "/invoices")
+		ctx.Flash("success", s.trans("global.wasCreated", i18n.Replacements{"subject": fmt.Sprintf("@global.%s", form.Kind)}))
+		ctx.Flash("redirectTo", fmt.Sprintf("/%ss", form.Kind))
 
 		preferences, err := s.findRedirectPreferences(ctx.Request.Context(), CurrentCompany(ctx.Request.Context()).UUID)
 		if err != nil {
@@ -287,7 +287,11 @@ func (s *Server) storeInvoiceHandler() routing.HandlerFunc {
 			return
 		}
 
-		ctx.Flash("redirectTo", preferences.Redirect.Invoice)
+		if form.Kind == TransactionKinds.Invoice {
+			ctx.Flash("redirectTo", preferences.Redirect.Invoice)
+		} else {
+			ctx.Flash("redirectTo", preferences.Redirect.Estimate)
+		}
 
 		ctx.Back()
 	})

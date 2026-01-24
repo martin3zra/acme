@@ -412,6 +412,7 @@ var PaymentStatuses = struct {
 
 type RedirectPreferences struct {
 	Invoice  string `json:"invoice"`
+	Estimate string `json:"estimate"`
 	Customer string `json:"customer"`
 	Product  string `json:"product"`
 	Payment  string `json:"payment"`
