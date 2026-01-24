@@ -3,6 +3,7 @@ package app
 import (
 	"fmt"
 	"log"
+	"net/http"
 	"strings"
 
 	"github.com/martin3zra/acme/pkg/cache"
@@ -84,6 +85,45 @@ func (s *Server) invoicesHandler(ctx *routing.Context) {
 	}
 
 	ctx.Render("Invoices/Index", props)
+}
+
+func (s *Server) showInvoiceHandler(ctx *routing.Context) {
+	kind := resolveTransactionKind(ctx)
+	uuid := ctx.Param("id")
+	if uuid == "" {
+		ctx.JSON(http.StatusBadRequest, map[string]any{
+			"status": fmt.Sprintf("The %s given ID is not valid.", kind),
+		})
+		return
+	}
+
+	c := cache.NewPgCache(s.db)
+	key := fmt.Sprintf("preview:%s:%s", kind, uuid)
+	data, err := cache.Remember(ctx.Request.Context(), c, key, func() (map[string]any, error) {
+		invoice, err := s.findInvoicesByUUID(ctx.Request.Context(), kind, uuid)
+		if err != nil {
+			return nil, err
+		}
+
+		lines, err := s.findInvoiceLines(ctx.Request.Context(), invoice.ID)
+		if err != nil {
+			return nil, err
+		}
+
+		return map[string]any{
+			"header": invoice,
+			"lines":  lines,
+		}, nil
+	})
+	if err != nil {
+		ctx.JSON(http.StatusInternalServerError, map[string]any{
+			"status": fmt.Sprintf("An error retrieving the %s.", kind),
+			"data":   err,
+		})
+		return
+	}
+
+	ctx.JSON(http.StatusOK, data)
 }
 
 func (s *Server) createInvoiceHandler(ctx *routing.Context) {
@@ -217,16 +257,17 @@ func (s *Server) storeInvoiceHandler() routing.HandlerFunc {
 				ctx.BackWith("status", "Invoice total amount and the payment details are different.")
 				return
 			}
+			if form.Terms != "pia" {
+				customer, err := s.findCustomeByID(ctx.Request.Context(), form.CustomerID)
+				if err != nil {
+					ctx.BackWithError(err)
+					return
+				}
 
-			customer, err := s.findCustomeByID(ctx.Request.Context(), form.CustomerID)
-			if err != nil {
-				ctx.BackWithError(err)
-				return
-			}
-
-			if customer.CreditLimited && customer.AmountDue+form.total > customer.CreditLimit {
-				ctx.BackWith("status", "Credit limit exceeded.")
-				return
+				if customer.CreditLimited && customer.AmountDue+form.total > customer.CreditLimit {
+					ctx.BackWith("status", "Credit limit exceeded.")
+					return
+				}
 			}
 		}
 

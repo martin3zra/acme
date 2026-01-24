@@ -22,8 +22,12 @@ export const StatusBadge: React.FC<StatusBadgeProps> = ({ kind, type, status, cl
   const { Icon, bg, border, text } = config;
 
   const resolveLabel = (): string => {
+    let path = 'invoice';
+    if (kind) {
+      path = kind;
+    }
     return {
-      invoice: t(kind + 's.statuses.' + status),
+      invoice: t(path + 's.statuses.' + status),
       status: t('global.statuses.' + status),
       paid: t('global.paidStatuses.' + status),
       payment: t('global.paidStatuses.' + status),

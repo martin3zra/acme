@@ -101,6 +101,8 @@ export default function Edit({
         return { ...line };
       }),
       payment: invoice.header.payment,
+      kind: kind,
+      source: { type: kind, id: 0 },
     };
 
     return _invoice;

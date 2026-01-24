@@ -60,7 +60,7 @@ func (s *Server) findLatestDueInvoices(ctx context.Context) ([]*dueInvoice, erro
     AND i.transaction_kind = 'invoice'
     AND i.due_on <= CURRENT_DATE
     AND i.paid_status IN ('partial', 'unpaid')
-    AND i.status IN ('open', 'partial')
+    AND i.status = 'overdue'
     ORDER BY i.due_on DESC
     LIMIT 10;`, CurrentCompany(ctx).ID)
 	if err != nil {
@@ -83,7 +83,7 @@ func (s *Server) findLatestEstimates(ctx context.Context) ([]*dueInvoice, error)
     JOIN customers c ON c.id = i.customer_id
     WHERE i.company_id = $1
     AND i.transaction_kind = 'estimate'
-    AND i.status = 'open'::invoice_status
+    AND i.status = 'sent'::invoice_status
     ORDER BY i.date DESC
     LIMIT 10;`, CurrentCompany(ctx).ID)
 	if err != nil {
@@ -102,7 +102,7 @@ func (s *Server) findLatestEstimates(ctx context.Context) ([]*dueInvoice, error)
 
 func (s *Server) findLastProfitOfLast12Months(ctx context.Context) ([]*ChartData, error) {
 	rows, err := s.db.Query(`
-    SELECT TO_CHAR(date, 'YYYY/Mon') AS year_month, SUM(CASE WHEN status = 'completed' THEN total ELSE 0 END) AS sales, SUM(0) AS expenses -- placeholder until expenses table exists 
+    SELECT TO_CHAR(date, 'YYYY/Mon') AS year_month, SUM(CASE WHEN status = 'closed' THEN total ELSE 0 END) AS sales, SUM(0) AS expenses -- placeholder until expenses table exists 
     FROM invoices 
     WHERE company_id = $1
     AND transaction_kind = 'invoice'
@@ -128,10 +128,10 @@ func (s *Server) findTotalsProfitOfLast12Months(ctx context.Context) (*Totals, e
 	var data Totals
 	err := s.db.QueryRow(`
     SELECT
-      COALESCE(SUM(CASE WHEN status = 'completed' THEN total ELSE 0 END), 0) AS total_sales,
+      COALESCE(SUM(CASE WHEN status = 'closed' THEN total ELSE 0 END), 0) AS total_sales,
       SUM(0) AS total_receipts, -- placeholder until receipts logic/table exists 
       SUM(0) AS total_expenses, -- placeholder until expenses table exists
-      COALESCE(SUM(CASE WHEN status = 'completed' THEN total ELSE 0 END), 0) - COALESCE(SUM(0), 0) AS net_income
+      COALESCE(SUM(CASE WHEN status = 'closed' THEN total ELSE 0 END), 0) - COALESCE(SUM(0), 0) AS net_income
     FROM invoices 
     WHERE company_id = $1
     AND transaction_kind = 'invoice'
@@ -144,7 +144,7 @@ func (s *Server) findLastProfitOfYear(ctx context.Context, year int) ([]*ChartDa
 	rows, err := s.db.Query(`
     SELECT
       TO_CHAR(date, 'YYYY/Mon') AS year_month,
-      COALESCE(SUM(CASE WHEN status = 'completed' THEN total ELSE 0 END), 0) AS sales,
+      COALESCE(SUM(CASE WHEN status = 'closed' THEN total ELSE 0 END), 0) AS sales,
       SUM(0) AS expenses
     FROM invoices
     WHERE company_id = $1
@@ -171,10 +171,10 @@ func (s *Server) findTotalsProfitOfYear(ctx context.Context, year int) (*Totals,
 	var data Totals
 	err := s.db.QueryRow(`
     SELECT
-      COALESCE(SUM(CASE WHEN status = 'completed' THEN total ELSE 0 END), 0) AS total_sales,
+      COALESCE(SUM(CASE WHEN status = 'closed' THEN total ELSE 0 END), 0) AS total_sales,
       COALESCE(SUM(0), 0) AS total_receipts,
       COALESCE(SUM(0), 0) AS total_expenses,
-      COALESCE(SUM(CASE WHEN status = 'completed' THEN total ELSE 0 END), 0) - COALESCE(SUM(0), 0) AS net_income
+      COALESCE(SUM(CASE WHEN status = 'closed' THEN total ELSE 0 END), 0) - COALESCE(SUM(0), 0) AS net_income
     FROM invoices
     WHERE company_id = $1
     AND transaction_kind = 'invoice'

@@ -10,10 +10,11 @@ import { capitalize } from '@/lib/utils';
 import { Invoice, InvoiceTypeFilter, InvoiceVerb, InvoiceWithLines, PageProps, TransactionKind } from '@/types';
 import { Link, router, usePage } from '@inertiajs/react';
 import { Ban, DollarSign, NotebookPen, Printer } from 'lucide-react';
+import { makeBreadcrumbs } from './constants';
 import { List } from './List/Index';
 import { AddNewInvoice } from './Shared/AddNewInvoice';
+import { ConvertToInvoiceAction } from './Shared/convert-to-invoice-action';
 import Show from './Show';
-import { makeBreadcrumbs } from './constants';
 
 export default function Index({
   auth,
@@ -46,14 +47,15 @@ export default function Index({
 
   const onSelectInvoice = (invoice: Invoice, action: InvoiceVerb): void => {
     setSelectedInvoice(invoice);
-
-    if (isInvoice && action === 'record-payment') {
-      router.visit(`/payments/create`, { data: { customer_id: invoice.customer.uuid, invoice_id: invoice.uuid } });
-      return;
-    }
-    if (isInvoice && action === 'void') {
-      setDeleteDialogOpen(true);
-      return;
+    if (isInvoice) {
+      if (action === 'record-payment') {
+        router.visit(`/payments/create`, { data: { customer_id: invoice.customer.uuid, invoice_id: invoice.uuid } });
+        return;
+      }
+      if (action === 'void') {
+        setDeleteDialogOpen(true);
+        return;
+      }
     }
     if (action === 'edit') {
       router.visit(`/${kind}s/${invoice.uuid}/edit`);
@@ -139,10 +141,6 @@ export default function Index({
           />
         )}
 
-        {/* {invoice !== undefined && invoice.pdfURL && (
-          <iframe src={invoice.pdfURL} width="100%" height="600" className="rounded border" title="Invoice Preview"></iframe>
-        )} */}
-
         {invoice && !loadingInvoice && (
           <Sheet open={open} onOpenChange={onOpenChange}>
             <SheetContent side="right" className="m-4 flex h-[calc(~'(100%-var(--spacing)*4)/3')] w-full flex-col rounded-md sm:max-w-[1380px]">
@@ -176,7 +174,12 @@ export default function Index({
                       </>
                     )}
 
-                    <a href={invoice.pdfURL} className="bg-primary flex items-center gap-x-3 rounded-sm px-4 text-white" target="_blank">
+                    {kind === 'estimate' && <ConvertToInvoiceAction kind={kind} source={invoice} />}
+                    <a
+                      href={invoice.pdfURL}
+                      className="flex items-center gap-x-3 rounded-sm bg-indigo-600 px-4 text-white hover:bg-indigo-700"
+                      target="_blank"
+                    >
                       <Printer className="size-4" /> {t('global.actions.print')}
                     </a>
                   </div>

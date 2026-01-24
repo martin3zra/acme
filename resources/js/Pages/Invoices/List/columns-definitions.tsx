@@ -17,8 +17,10 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { capitalize } from '@/lib/utils';
 import { DiscountType, Invoice, InvoiceVerb, Replacements, TransactionKind } from '@/types';
+import { Link } from '@inertiajs/react';
 import { ColumnDef } from '@tanstack/react-table';
-import { MoreHorizontal } from 'lucide-react';
+import { ExternalLink, MoreHorizontal } from 'lucide-react';
+import { ConvertToInvoiceAction } from '../Shared/convert-to-invoice-action';
 
 type Props = {
   kind: TransactionKind;
@@ -151,6 +153,26 @@ export const getColumns = ({ kind, onDidClick, t }: Props): ColumnDef<Invoice>[]
       },
     },
     {
+      id: 'sourceType',
+      meta: t('global.invoiced'),
+      accessorFn: (row) => row.source?.type ?? null,
+      size: 70,
+      header: (props) => {
+        return <HeaderCell title={t('global.invoiced')} alignment="center" columnWidth={props.column.getSize()} />;
+      },
+      cell: ({ row }) => {
+        const path = kind === 'estimate' ? 'invoices' : 'estimates';
+        const uuid = row.original.source?.id;
+        return uuid ? (
+          <div className="flex items-center justify-center">
+            <Link href={`/${path}?id=${uuid}`} title="View Invoice" className="cursor-pointer">
+              <ExternalLink className="size-6 text-blue-600" />{' '}
+            </Link>
+          </div>
+        ) : null;
+      },
+    },
+    {
       accessorKey: 'status',
       size: 70,
       header: (props) => {
@@ -190,7 +212,6 @@ export const getColumns = ({ kind, onDidClick, t }: Props): ColumnDef<Invoice>[]
               <DropdownMenuLabel>{t('global.actions.title')}</DropdownMenuLabel>
               <DropdownMenuSeparator />
               <DropdownMenuItem onClick={() => onDidClick(props.row.original, 'view')}>
-                {' '}
                 {t(`${kind}s.view${capitalize(kind)}.title`)}
               </DropdownMenuItem>
               <DropdownMenuItem onClick={() => onDidClick(props.row.original, 'edit')} disabled={disabled}>
@@ -210,6 +231,12 @@ export const getColumns = ({ kind, onDidClick, t }: Props): ColumnDef<Invoice>[]
                   <DropdownMenuItem onClick={() => onDidClick(props.row.original, 'void')} disabled={disabled}>
                     {t(`${kind}s.void${capitalize(kind)}.title`)}
                   </DropdownMenuItem>
+                </>
+              )}
+              {kind === 'estimate' && (
+                <>
+                  <DropdownMenuSeparator />
+                  <ConvertToInvoiceAction id={props.row.original.uuid} renderedAs="dropdown-item" kind="estimate" />
                 </>
               )}
             </DropdownMenuContent>

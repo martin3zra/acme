@@ -227,7 +227,7 @@ func (s *Server) storeCustomer(ctx context.Context, form *StoreCustomerForm) err
 		}
 
 		var invoiceID int
-		err = stmt.QueryRow(companyID, form.OpenBalanceAsOf, InvoiceTermType.Opening, form.OpenBalanceAsOf, customerID, form.OpenBalance, form.OpenBalance, form.OpenBalance, "Saldo inicial", InvoiceStatuses.Open, PaidStatuses.UnPaid).
+		err = stmt.QueryRow(companyID, form.OpenBalanceAsOf, InvoiceTermType.Opening, form.OpenBalanceAsOf, customerID, form.OpenBalance, form.OpenBalance, form.OpenBalance, "Saldo inicial", InvoiceStatuses.Sent, PaidStatuses.UnPaid).
 			Scan(&invoiceID)
 		if err != nil {
 			return err

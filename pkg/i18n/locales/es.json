@@ -47,6 +47,7 @@
     "user": "Usuario",
     "company": "Compañia",
     "invoice": "Factura",
+    "invoiced": "Facturado",
     "estimate": "Cotización",
     "receiptOfPayment": "Recibo de Ingreso",
     "weHaveReceivedFrom": "Hemos recibido de",
@@ -91,6 +92,7 @@
     "taxReceipt": "Tipo NCF",
     "days": "días",
     "type": "Tipo",
+    "convertToInvoice": "Convertir a Factura",
     "nouns": {
       "customer": {
         "gender":"m"
@@ -105,13 +107,10 @@
       "yet": "No disponible aún"
     },
     "paidStatuses": {
-      "paid": "Pagada",
       "unpaid": "No pagada",
       "partial": "Parcialmente",
-      "overpaid": "Pagado en exceso",
-      "pending": "Pendiente",
-      "removed": "Eliminado",
-      "completed": "Completo"
+      "paid": "Pagada",
+      "refund": "Reembolsado"
     },
     "paymentLinesPaidStatuses": {
       "paid": "Saldo",
@@ -423,14 +422,12 @@
       "cancel": "Cancelar"
     },
     "statuses": {
-      "open": "Abierta",
       "draft": "Borrador",
       "sent": "Enviada",
-      "viewed": "Vista",
       "overdue": "Atrasada",
-      "completed": "Terminada",
       "void": "Nula",
-      "partial": "Parcial"
+      "closed": "Cerrada",
+      "uncollectible": "Incobrable"
     }
   },
   "estimates": {
@@ -486,14 +483,11 @@
       "cancel": "Cancelar"
     },
     "statuses": {
-      "open": "Abierta",
       "draft": "Borrador",
       "sent": "Enviada",
-      "viewed": "Vista",
-      "overdue": "Atrasada",
-      "completed": "Terminada",
-      "void": "Nula",
-      "partial": "Parcial"
+      "accepted": "Aceptada",
+      "rejected": "Rechazada",
+      "closed": "Terminada"
     }
   },
   "orders": {

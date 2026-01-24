@@ -11,6 +11,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { ConvertToInvoiceAction } from '@/Pages/Invoices/Shared/convert-to-invoice-action';
 import { DueInvoice, Replacements, TransactionKind } from '@/types';
 import { ColumnDef } from '@tanstack/react-table';
 import { MoreHorizontal } from 'lucide-react';
@@ -82,7 +83,7 @@ export const getColumns = ({ kind, onDidClick, t }: Props): ColumnDef<DueInvoice
               {kind === 'estimate' && (
                 <>
                   <DropdownMenuSeparator />
-                  <DropdownMenuItem>{t('dashboard.viewItem.estimate.convertToInvoice')}</DropdownMenuItem>
+                  <ConvertToInvoiceAction id={props.row.original.uuid} renderedAs="dropdown-item" kind="estimate" />
                   <DropdownMenuItem>{t('dashboard.viewItem.estimate.markAsAccepted')}</DropdownMenuItem>
                   <DropdownMenuItem>{t('dashboard.viewItem.estimate.markAsRejected')}</DropdownMenuItem>
                 </>

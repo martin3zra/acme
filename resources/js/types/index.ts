@@ -1,6 +1,11 @@
 import { LucideIcon } from 'lucide-react';
 import { IconName } from './icons';
 
+export interface ErrorResponse {
+  status: string;
+  data?: any;
+}
+
 export interface LinkedCompany {
   uuid: string;
   role: string;
@@ -208,6 +213,8 @@ export interface Invoice {
   status: string;
   paid_status: PaidStatus;
   notes: string;
+  kind: TransactionKind;
+  source: InvoiceSource;
 }
 
 export interface InvoiceWithLines {
@@ -311,10 +318,17 @@ export type HeaderForm = {
   discount: DiscountType;
 };
 
+export type InvoiceSource = {
+  type: TransactionKind;
+  id: string | number;
+};
+
 export type InvoiceForm = {
   header: HeaderForm;
   lines: LineForm[];
   payment: PaymentMethodsForm;
+  kind: TransactionKind;
+  source: InvoiceSource;
 };
 
 export type Payment = {

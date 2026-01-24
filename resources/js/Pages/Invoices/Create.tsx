@@ -306,6 +306,7 @@ export default function Create({
         payload.tax_receipt = invoiceForm.header.taxReceipt;
         payload.discount = invoiceForm.header.discount;
         payload.payment = invoiceForm.payment;
+        payload.source = invoiceForm.source;
       }
       return payload;
     });

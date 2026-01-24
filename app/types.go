@@ -307,58 +307,86 @@ var TransactionKinds = struct {
 	Order:    _TRANSACTION_KIND_ORDER,
 }
 
+type TransactionSource struct {
+	Type TransactionKind `json:"type,omitempty"`
+	ID   string          `json:"id,omitempty"`
+}
+
+func (d *TransactionSource) Value() (driver.Value, error) {
+	return json.Marshal(d)
+}
+
+func (d *TransactionSource) Scan(value any) error {
+	if value == nil {
+		return nil
+	}
+
+	b, ok := value.([]byte)
+	if !ok {
+		return errors.New("type assertion to []byte failed")
+	}
+
+	return json.Unmarshal(b, &d)
+}
+
+// Paid Status (Financial Settlement)
+// Unpaid → no payment received.
+// Partially Paid → some payment received, balance remains.
+// Paid → fully settled.
+// Refunded → money returned to customer.
 type PaidStatus string
 
 const (
-	_PAID_UNPAID  PaidStatus = "unpaid"
-	_PAID_PARTIAL PaidStatus = "partial"
-	_PAID_PAID    PaidStatus = "paid"
-	_PAID_REMOVED PaidStatus = "removed"
+	_PAID_UNPAID   PaidStatus = "unpaid"
+	_PAID_PARTIAL  PaidStatus = "partial"
+	_PAID_PAID     PaidStatus = "paid"
+	_PAID_REFUNDED PaidStatus = "refunded"
 )
 
 var PaidStatuses = struct {
-	UnPaid  PaidStatus
-	Partial PaidStatus
-	Paid    PaidStatus
-	Removed PaidStatus
+	UnPaid   PaidStatus
+	Partial  PaidStatus
+	Paid     PaidStatus
+	Refunded PaidStatus
 }{
-	UnPaid:  _PAID_UNPAID,
-	Partial: _PAID_PARTIAL,
-	Paid:    _PAID_PAID,
-	Removed: _PAID_REMOVED,
+	UnPaid:   _PAID_UNPAID,
+	Partial:  _PAID_PARTIAL,
+	Paid:     _PAID_PAID,
+	Refunded: _PAID_REFUNDED,
 }
 
+// Document Status (Lifecycle)
+// Draft → invoice is being prepared, editable.
+// Sent/Open → finalized and delivered to customer, awaiting payment.
+// Overdue → past due date, still unpaid.
+// Void → canceled, no longer valid.
+// Uncollectible → written off as bad debt.
+// Closed → invoice has reached its end state (usually after payment or cancellation).
 type InvoiceStatus string
 
 const (
-	_INVOICE_DRAFT     InvoiceStatus = "draft"
-	_INVOICE_OPEN      InvoiceStatus = "open"
-	_INVOICE_SENT      InvoiceStatus = "sent"
-	_INVOICE_VIEWED    InvoiceStatus = "viewed"
-	_INVOICE_OVERDUE   InvoiceStatus = "overdue"
-	_INVOICE_COMPLETED InvoiceStatus = "completed"
-	_INVOICE_VOID      InvoiceStatus = "void"
-	_INVOICE_PARTIAL   InvoiceStatus = "partial"
+	_INVOICE_DRAFT         InvoiceStatus = "draft"
+	_INVOICE_SENT          InvoiceStatus = "sent"
+	_INVOICE_OVERDUE       InvoiceStatus = "overdue"
+	_INVOICE_VOID          InvoiceStatus = "void"
+	_INVOICE_UNCOLLECTIBLE InvoiceStatus = "uncollectible"
+	_INVOICE_CLOSED        InvoiceStatus = "closed"
 )
 
 var InvoiceStatuses = struct {
-	Open      InvoiceStatus
-	Draft     InvoiceStatus
-	Sent      InvoiceStatus
-	Viewed    InvoiceStatus
-	Overdue   InvoiceStatus
-	Completed InvoiceStatus
-	Void      InvoiceStatus
-	Partial   InvoiceStatus
+	Draft         InvoiceStatus
+	Sent          InvoiceStatus
+	Overdue       InvoiceStatus
+	Void          InvoiceStatus
+	Uncollectible InvoiceStatus
+	Closed        InvoiceStatus
 }{
-	Open:      _INVOICE_OPEN,
-	Draft:     _INVOICE_DRAFT,
-	Sent:      _INVOICE_SENT,
-	Viewed:    _INVOICE_VIEWED,
-	Overdue:   _INVOICE_OVERDUE,
-	Completed: _INVOICE_COMPLETED,
-	Void:      _INVOICE_VOID,
-	Partial:   _INVOICE_PARTIAL,
+	Draft:         _INVOICE_DRAFT,
+	Sent:          _INVOICE_SENT,
+	Overdue:       _INVOICE_OVERDUE,
+	Void:          _INVOICE_VOID,
+	Uncollectible: _INVOICE_UNCOLLECTIBLE,
+	Closed:        _INVOICE_CLOSED,
 }
 
 type PaymentStatus string
@@ -498,15 +526,16 @@ type Line struct {
 
 type StoreInvoiceForm struct {
 	support.FormRequest
-	CustomerID int             `json:"customer_id"`
-	Date       time.Time       `json:"date"`
-	Terms      string          `json:"terms"`
-	TaxReceipt int             `json:"tax_receipt"`
-	Discount   Discount        `json:"discount"`
-	Notes      string          `json:"notes"`
-	Lines      []*Line         `json:"lines"`
-	Payment    Payment         `json:"payment"`
-	Kind       TransactionKind `json:"kind"`
+	CustomerID int                `json:"customer_id"`
+	Date       time.Time          `json:"date"`
+	Terms      string             `json:"terms"`
+	TaxReceipt int                `json:"tax_receipt"`
+	Discount   Discount           `json:"discount"`
+	Notes      string             `json:"notes"`
+	Lines      []*Line            `json:"lines"`
+	Payment    Payment            `json:"payment"`
+	Kind       TransactionKind    `json:"kind"`
+	Source     *TransactionSource `json:"source"`
 	// considere these fields as protected
 	amount     float64
 	amountDue  float64
@@ -525,6 +554,8 @@ func (form StoreInvoiceForm) Rules() map[string]any {
 	return map[string]any{
 		"customer_id":    "bail|required|exists:customers,id",
 		"kind":           "bail|required|in:invoice,estimate,order",
+		"source":         "sometimes",
+		"source.type":    "bail|sometimes|in:estimate,order",
 		"date":           "bail|required|date|after:yesterday",
 		"terms":          "bail|required_if:kind,invoice|min:1",
 		"tax_receipt":    "bail|sometimes|required_if:kind,invoice|exists:tax_receipts,id",
@@ -593,7 +624,7 @@ func (form *StoreInvoiceForm) computeTax() {
 		if line.Action == LineActions.Deleted {
 			continue
 		}
-		// We can store the line discoun on the database
+		// We can store the line discount on the database
 		// We can add a discount value amount to the invoice.
 		line.amount = round(line.Price*float64(line.Qty), 2)
 		line.discount = round(line.amount*(discountPercentage/100), 2)

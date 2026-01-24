@@ -11,25 +11,26 @@ import (
 )
 
 type invoice struct {
-	ID           int             `json:"id"`
-	UUID         string          `json:"uuid"`
-	Number       string          `json:"number"`
-	NCF          *string         `json:"ncf"`
-	Customer     customer        `json:"customer"`
-	Date         time.Time       `json:"date"`
-	DueOn        *time.Time      `json:"due_on"`
-	Terms        string          `json:"terms"`
-	TaxReceiptID *int            `json:"tax_receipt_id"`
-	Amount       float64         `json:"amount"`
-	Discount     Discount        `json:"discount"`
-	Tax          float64         `json:"tax"`
-	Total        float64         `json:"total"`
-	AmountDue    float64         `json:"amount_due"`
-	Status       InvoiceStatus   `json:"status"`
-	PaidStatus   PaidStatus      `json:"paid_status"`
-	Payment      Payment         `json:"payment"`
-	Notes        string          `json:"notes"`
-	Kind         TransactionKind `json:"transaction_kind"`
+	ID           int                `json:"id"`
+	UUID         string             `json:"uuid"`
+	Number       string             `json:"number"`
+	NCF          *string            `json:"ncf"`
+	Customer     customer           `json:"customer"`
+	Date         time.Time          `json:"date"`
+	DueOn        *time.Time         `json:"due_on"`
+	Terms        string             `json:"terms"`
+	TaxReceiptID *int               `json:"tax_receipt_id"`
+	Amount       float64            `json:"amount"`
+	Discount     Discount           `json:"discount"`
+	Tax          float64            `json:"tax"`
+	Total        float64            `json:"total"`
+	AmountDue    float64            `json:"amount_due"`
+	Status       InvoiceStatus      `json:"status"`
+	PaidStatus   PaidStatus         `json:"paid_status"`
+	Payment      Payment            `json:"payment"`
+	Notes        string             `json:"notes"`
+	Kind         TransactionKind    `json:"transaction_kind"`
+	Source       *TransactionSource `json:"source,omitempty"`
 }
 
 type line struct {
@@ -58,7 +59,7 @@ type line struct {
 func (s *Server) findInvoices(ctx context.Context, kind TransactionKind, invoiceType InvoiceType) ([]*invoice, error) {
 	rows, err := s.db.Query("SELECT invoices.id, invoices.uuid, invoices.code, invoices.date, invoices.due_on, invoices.amount, invoices.discount, invoices.tax, "+
 		"invoices.total, invoices.amount_due, invoices.status, invoices.paid_status, invoices.payment, invoices.note, invoices.tax_receipt_id, invoices.transaction_kind, "+
-		"invoices.tax_number, customers.id, customers.uuid, customers.name, customers.email, customers.phone "+
+		"invoices.source, invoices.tax_number, customers.id, customers.uuid, customers.name, customers.email, customers.phone "+
 		"FROM invoices "+
 		"INNER JOIN companies ON (invoices.company_id = companies.id) "+
 		"INNER JOIN customers ON (invoices.company_id = customers.company_id AND invoices.customer_id = customers.id) "+
@@ -90,6 +91,7 @@ func (s *Server) findInvoices(ctx context.Context, kind TransactionKind, invoice
 			&i.Notes,
 			&i.TaxReceiptID,
 			&i.Kind,
+			&i.Source,
 			&i.NCF,
 			&i.Customer.ID,
 			&i.Customer.UUID,
@@ -111,7 +113,7 @@ func (s *Server) findInvoicesByUUID(ctx context.Context, kind TransactionKind, u
 	i := new(invoice)
 	err := s.db.QueryRow("SELECT invoices.id, invoices.uuid, invoices.code, invoices.date, invoices.due_on, invoices.amount, invoices.amount_due, invoices.discount, invoices.tax, "+
 		"invoices.total, invoices.status, invoices.paid_status, invoices.payment, invoices.note, invoices.tax_receipt_id, invoices.transaction_kind, "+
-		"invoices.tax_number, invoices.note, customers.id, customers.uuid, customers.name, customers.email, customers.phone "+
+		"invoices.source, invoices.tax_number, invoices.note, customers.id, customers.uuid, customers.name, customers.email, customers.phone "+
 		"FROM invoices "+
 		"INNER JOIN companies ON (invoices.company_id = companies.id) "+
 		"INNER JOIN customers ON (invoices.company_id = customers.company_id AND invoices.customer_id = customers.id) "+
@@ -136,6 +138,7 @@ func (s *Server) findInvoicesByUUID(ctx context.Context, kind TransactionKind, u
 			&i.Notes,
 			&i.TaxReceiptID,
 			&i.Kind,
+			&i.Source,
 			&i.NCF,
 			&i.Notes,
 			&i.Customer.ID,
@@ -162,7 +165,7 @@ func (s *Server) findInvoicesByID(ctx context.Context, invoiceId int) (*invoice,
 	i := new(invoice)
 	err := s.db.QueryRow("SELECT invoices.id, invoices.uuid, invoices.code, invoices.date, invoices.due_on, invoices.amount, invoices.amount_due, invoices.discount, invoices.tax, "+
 		"invoices.total, invoices.status, invoices.paid_status, invoices.payment, invoices.note, invoices.tax_receipt_id, invoices.transaction_kind, "+
-		"invoices.tax_number, invoices.note, customers.id, customers.uuid, customers.name, customers.email, customers.phone "+
+		"invoices.source, invoices.tax_number, invoices.note, customers.id, customers.uuid, customers.name, customers.email, customers.phone "+
 		"FROM invoices "+
 		"INNER JOIN companies ON (invoices.company_id = companies.id) "+
 		"INNER JOIN customers ON (invoices.company_id = customers.company_id AND invoices.customer_id = customers.id) "+
@@ -185,6 +188,7 @@ func (s *Server) findInvoicesByID(ctx context.Context, invoiceId int) (*invoice,
 			&i.Notes,
 			&i.TaxReceiptID,
 			&i.Kind,
+			&i.Source,
 			&i.NCF,
 			&i.Notes,
 			&i.Customer.ID,
@@ -221,8 +225,8 @@ func (s *Server) storeInvoice(ctx context.Context, form *StoreInvoiceForm) error
 			}
 		}
 
-		stmt, err := tx.Prepare("INSERT INTO invoices (company_id, tax_receipt_id, tax_receipt_sequence, tax_number, date, type, due_on, customer_id, amount, discount, tax, amount_due, total, note, status, paid_status, payment, code, transaction_kind) " +
-			"VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19) RETURNING id")
+		stmt, err := tx.Prepare("INSERT INTO invoices (company_id, tax_receipt_id, tax_receipt_sequence, tax_number, date, type, due_on, customer_id, amount, discount, tax, amount_due, total, note, status, paid_status, payment, code, transaction_kind, source) " +
+			"VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20) RETURNING id, uuid")
 		if err != nil {
 			return err
 		}
@@ -245,7 +249,14 @@ func (s *Server) storeInvoice(ctx context.Context, form *StoreInvoiceForm) error
 			taxNumber = &taxReceiptSequence.Number
 		}
 
+		var source *string
+		if form.Source != nil {
+			j := foundation.ToJSON(form.Source)
+			source = &j
+		}
+
 		var invoiceID int
+		var invoiceUUID string
 		err = stmt.QueryRow(
 			companyID,
 			taxID,
@@ -261,12 +272,13 @@ func (s *Server) storeInvoice(ctx context.Context, form *StoreInvoiceForm) error
 			form.amountDue,
 			form.total,
 			form.Notes,
-			InvoiceStatuses.Open,
+			InvoiceStatuses.Sent,
 			form.paidStatus,
 			foundation.ToJSON(form.Payment),
 			seqInfo.Code,
 			form.Kind,
-		).Scan(&invoiceID)
+			source,
+		).Scan(&invoiceID, &invoiceUUID)
 
 		if err != nil {
 			return err
@@ -274,6 +286,20 @@ func (s *Server) storeInvoice(ctx context.Context, form *StoreInvoiceForm) error
 
 		if err = s.attachInvoiceLines(tx, companyID, invoiceID, form); err != nil {
 			return err
+		}
+
+		if form.Source != nil {
+			_, err := tx.Exec(
+				"UPDATE invoices SET status = 'closed', source = $4 "+
+					"WHERE company_id = $1 "+
+					"AND id = $2 AND transaction_kind = $3",
+				companyID, form.Source.ID, form.Source.Type, foundation.ToJSON(map[string]any{
+					"type": form.Kind,
+					"id":   invoiceUUID,
+				}))
+			if err != nil {
+				return err
+			}
 		}
 
 		if form.Kind == TransactionKinds.Invoice {
@@ -385,7 +411,7 @@ func (s *Server) voidInvoice(ctx context.Context, uuid string) error {
     amount_due = 0, payment = NULL, status = $3, paid_status = $4
     WHERE company_id = $1 AND id = $2
   `,
-			companyID, invoice.ID, InvoiceStatuses.Void, PaidStatuses.Removed,
+			companyID, invoice.ID, InvoiceStatuses.Void, PaidStatuses.Refunded,
 		)
 		if err != nil {
 			return err
