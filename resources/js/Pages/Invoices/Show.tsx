@@ -7,7 +7,7 @@ import { useTranslation } from '@/hooks/use-translation';
 import { capitalize, cn, isNotEmpty } from '@/lib/utils';
 import { Auth, InvoiceWithLines, PaidStatuses, TransactionKind } from '@/types';
 import { format } from 'date-fns';
-import { Calendar1, CircleCheckIcon, CircleDollarSignIcon, CreditCardIcon, UserPen } from 'lucide-react';
+import { Calendar1, CircleCheckIcon, CircleDollarSignIcon, CreditCardIcon, FileText, UserPen } from 'lucide-react';
 import PaymentSummary from './Shared/payment-summary';
 
 type Props = {
@@ -39,6 +39,12 @@ export default function Show({ kind, invoice, auth }: Props) {
             )}
           </div>
           <div className="col-span-6 flex items-center gap-x-2 [&_[data-slot=label]]:font-normal">
+            {!isInvoice && invoice.header.status === 'closed' && (
+              <div className="flex items-center space-x-2 rounded bg-red-200 px-2 py-1 text-xs text-red-500">
+                <FileText className="mr-2 size-4" />
+                {t(`${kind}s.single.closed`)}
+              </div>
+            )}
             <Label>{t('global.date')}</Label>
             <Label className="">{format(invoice.header.date, 'dd-MM-yyyy')}</Label>
           </div>

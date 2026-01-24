@@ -166,7 +166,7 @@ export const getColumns = ({ kind, onDidClick, t }: Props): ColumnDef<Invoice>[]
         return uuid ? (
           <div className="flex items-center justify-center">
             <Link href={`/${path}?id=${uuid}`} title="View Invoice" className="cursor-pointer">
-              <ExternalLink className="size-6 text-blue-600" />{' '}
+              <ExternalLink className="size-6 text-blue-600" />
             </Link>
           </div>
         ) : null;
@@ -233,7 +233,7 @@ export const getColumns = ({ kind, onDidClick, t }: Props): ColumnDef<Invoice>[]
                   </DropdownMenuItem>
                 </>
               )}
-              {kind === 'estimate' && (
+              {kind === 'estimate' && props.row.original.status !== 'closed' && (
                 <>
                   <DropdownMenuSeparator />
                   <ConvertToInvoiceAction id={props.row.original.uuid} renderedAs="dropdown-item" kind="estimate" />

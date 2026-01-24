@@ -192,7 +192,7 @@ export type PaidStatus = (typeof PaidStatuses)[number];
 export const Statuses = ['enabled', 'disabled'] as const;
 export type Status = (typeof Statuses)[number];
 
-export type StatusType = 'paid' | 'invoice' | 'status' | 'payment';
+export type StatusType = 'paid' | 'invoice' | 'status' | 'payment' | 'dashboard';
 
 export interface Invoice {
   id: number;
@@ -477,6 +477,7 @@ export interface StatItem {
 
 export interface DueInvoice {
   uuid: string;
+  status: string;
   due_on: string;
   customer: {
     uuid: string;

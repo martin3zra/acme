@@ -12,7 +12,10 @@ type Props = {
 };
 export const RecentTransactionList: FC<Props> = ({ kind, title, data, onSelectItem }) => {
   const t = useTranslation().trans;
-  const columns = getColumns({ kind, onDidClick: onSelectItem, t });
+  let columns = getColumns({ kind, onDidClick: onSelectItem, t });
+  if (kind === 'invoice') {
+    columns = columns.filter((f) => f.id !== 'status');
+  }
   const table = useReactTable({
     data,
     columns,

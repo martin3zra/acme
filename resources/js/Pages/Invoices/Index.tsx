@@ -151,7 +151,7 @@ export default function Index({
                     <SheetDescription className="text-[12px]">{t(`${kind}s.view${capitalize(kind)}.description`)}</SheetDescription>
                   </div>
                   <div className="mx-4 flex gap-x-3">
-                    {invoice.header.status !== 'void' && (
+                    {invoice.header.status !== 'void' && invoice.header.status !== 'closed' && (
                       <>
                         {isInvoice && (
                           <Button variant={'destructive'} onClick={() => onSelectInvoice(invoice.header, 'void')}>
@@ -174,7 +174,7 @@ export default function Index({
                       </>
                     )}
 
-                    {kind === 'estimate' && <ConvertToInvoiceAction kind={kind} source={invoice} />}
+                    {kind === 'estimate' && <ConvertToInvoiceAction renderedAs="button" kind={kind} source={invoice} />}
                     <a
                       href={invoice.pdfURL}
                       className="flex items-center gap-x-3 rounded-sm bg-indigo-600 px-4 text-white hover:bg-indigo-700"

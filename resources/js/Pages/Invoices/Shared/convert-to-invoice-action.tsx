@@ -4,7 +4,7 @@ import { useLocalStorage } from '@/hooks/use-local-storage';
 import { useTranslation } from '@/hooks/use-translation';
 import { ErrorResponse, InvoiceWithLines, TransactionKind } from '@/types';
 import { router } from '@inertiajs/react';
-import { FileDiffIcon } from 'lucide-react';
+import { ExternalLink, FileDiffIcon } from 'lucide-react';
 import { toast } from 'sonner';
 import { convertToInvoice } from '../convert-to-invoice';
 
@@ -55,6 +55,19 @@ export function ConvertToInvoiceAction({
     const data: InvoiceWithLines = await response.json();
     processConvertion(data);
   };
+
+  const handleRedirection = () => {
+    router.visit(`/invoices?id=${source?.header?.source?.id}`);
+  };
+
+  if (source?.header?.source) {
+    return (
+      <Button onClick={handleRedirection} className="bg-blue-600 hover:bg-blue-700">
+        <ExternalLink />
+        {t('global.invoiced')}
+      </Button>
+    );
+  }
 
   if (renderedAs === 'dropdown-item') {
     return <DropdownMenuItem onClick={handleFetching}>{t('global.convertToInvoice')}</DropdownMenuItem>;

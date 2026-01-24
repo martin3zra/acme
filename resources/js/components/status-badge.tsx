@@ -31,6 +31,7 @@ export const StatusBadge: React.FC<StatusBadgeProps> = ({ kind, type, status, cl
       status: t('global.statuses.' + status),
       paid: t('global.paidStatuses.' + status),
       payment: t('global.paidStatuses.' + status),
+      dashboard: t('dashboard.statuses.' + status),
     }[type];
   };
 

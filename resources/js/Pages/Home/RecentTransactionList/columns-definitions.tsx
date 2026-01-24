@@ -2,6 +2,7 @@ import { CurrencyCell } from '@/components/data-table/currency-cell';
 import { DateCell } from '@/components/data-table/date-cell';
 import { HeaderCell } from '@/components/data-table/header-cell';
 import { TextCell } from '@/components/data-table/text-cell';
+import { StatusBadge } from '@/components/status-badge';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -52,6 +53,20 @@ export const getColumns = ({ kind, onDidClick, t }: Props): ColumnDef<DueInvoice
       },
       cell: (props) => {
         return <CurrencyCell columnWidth={props.column.getSize()} value={props.getValue() as string} />;
+      },
+    },
+    {
+      accessorKey: 'status',
+      id: 'status',
+      header: (props) => {
+        return <HeaderCell title={t('global.status')} alignment="center" columnWidth={props.column.getSize()} />;
+      },
+      cell: (props) => {
+        return (
+          <div className="flex items-center justify-center">
+            <StatusBadge type="dashboard" status={props.row.original.status} />
+          </div>
+        );
       },
     },
     {

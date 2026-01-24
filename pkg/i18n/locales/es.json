@@ -239,6 +239,11 @@
       "invoices": "Facturas",
       "estimates": "Cotizaciones"
     },
+    "statuses": {
+      "draft": "Borrador",
+      "sent": "Enviada",
+      "closed": "Cerrada"
+    },
     "viewItem": {
       "invoice": {
         "title": "Ver Factura",
@@ -448,7 +453,8 @@
       "description": "Detalles de la Cotización seleccionada.",
       "payTo": "Pagar a",
       "estimateTo": "Cotizado a",
-      "totalSummary": "Resumen total de la Cotización"
+      "totalSummary": "Resumen total de la Cotización",
+      "closed": "Cotización convertido: ahora puedes rastrearlo como factura."
     },
     "viewEstimate": {
       "title": "Ver Cotización",

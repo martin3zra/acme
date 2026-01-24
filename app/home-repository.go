@@ -14,6 +14,7 @@ type stats struct {
 
 type dueInvoice struct {
 	UUID     string    `json:"uuid"`
+	Status   string    `json:"status"`
 	DueOn    time.Time `json:"due_on"`
 	Customer struct {
 		UUID string `json:"uuid"`
@@ -53,7 +54,7 @@ func (s *Server) findStats(ctx context.Context) (*stats, error) {
 }
 
 func (s *Server) findLatestDueInvoices(ctx context.Context) ([]*dueInvoice, error) {
-	rows, err := s.db.Query(`SELECT i.uuid, i.due_on, c.uuid as customer_uuid, c.name, i.amount_due
+	rows, err := s.db.Query(`SELECT i.uuid, i.status, i.due_on, c.uuid as customer_uuid, c.name, i.amount_due
     FROM invoices i
     JOIN customers c ON c.id = i.customer_id
     WHERE i.company_id = $1
@@ -69,7 +70,7 @@ func (s *Server) findLatestDueInvoices(ctx context.Context) ([]*dueInvoice, erro
 	data := make([]*dueInvoice, 0)
 	for rows.Next() {
 		row := new(dueInvoice)
-		if err = rows.Scan(&row.UUID, &row.DueOn, &row.Customer.UUID, &row.Customer.Name, &row.AmountDue); err != nil {
+		if err = rows.Scan(&row.UUID, &row.Status, &row.DueOn, &row.Customer.UUID, &row.Customer.Name, &row.AmountDue); err != nil {
 			return data, err
 		}
 		data = append(data, row)
@@ -78,7 +79,7 @@ func (s *Server) findLatestDueInvoices(ctx context.Context) ([]*dueInvoice, erro
 }
 
 func (s *Server) findLatestEstimates(ctx context.Context) ([]*dueInvoice, error) {
-	rows, err := s.db.Query(`SELECT i.uuid, i.date, c.uuid as customer_uuid, c.name, i.total as amount_due
+	rows, err := s.db.Query(`SELECT i.uuid, i.status, i.date, c.uuid as customer_uuid, c.name, i.total as amount_due
     FROM invoices i
     JOIN customers c ON c.id = i.customer_id
     WHERE i.company_id = $1
@@ -92,7 +93,7 @@ func (s *Server) findLatestEstimates(ctx context.Context) ([]*dueInvoice, error)
 	data := make([]*dueInvoice, 0)
 	for rows.Next() {
 		row := new(dueInvoice)
-		if err = rows.Scan(&row.UUID, &row.DueOn, &row.Customer.UUID, &row.Customer.Name, &row.AmountDue); err != nil {
+		if err = rows.Scan(&row.UUID, &row.Status, &row.DueOn, &row.Customer.UUID, &row.Customer.Name, &row.AmountDue); err != nil {
 			return data, err
 		}
 		data = append(data, row)

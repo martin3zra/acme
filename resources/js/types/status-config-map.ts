@@ -147,4 +147,27 @@ export const statusConfig: Record<StatusType, Record<string, StatusConfig>> = {
       Icon: CircleSlash,
     },
   },
+  dashboard: {
+    draft: {
+      label: 'Draft',
+      bg: 'bg-gray-100',
+      border: 'border-gray-500',
+      text: 'text-gray-700',
+      Icon: FileText,
+    },
+    sent: {
+      label: 'Sent',
+      bg: 'bg-blue-100',
+      border: 'border-blue-500',
+      text: 'text-blue-800',
+      Icon: Send,
+    },
+    closed: {
+      label: 'Closed',
+      bg: 'bg-green-100',
+      border: 'border-green-500',
+      text: 'text-green-800',
+      Icon: CheckCircle2,
+    },
+  },
 };
