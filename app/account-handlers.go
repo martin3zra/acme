@@ -307,8 +307,15 @@ func (s *Server) accountProfileHandler(ctx *routing.Context) {
 			return
 		}
 
+		taxes, err := s.findTaxes(ctx.Request.Context())
+		if err != nil {
+			ctx.Error(err)
+			return
+		}
+
 		company.Sequences = &sequences.Sequence
 		company.SeqLastUpdatedAt = &sequences.UpdatedAt
+		company.Taxes = taxes
 		props["company"] = company
 
 		props["initialState"] = true

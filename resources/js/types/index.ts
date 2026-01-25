@@ -65,6 +65,7 @@ export interface Company {
   address: string;
   identifier: string;
   city: string;
+  taxes: Tax[];
   sequences: Sequences;
   created_at: string;
   updated_at: string;
@@ -163,8 +164,10 @@ export interface InvoiceLine extends Item {
 
 export interface Tax {
   id: number;
+  uuid: string;
   name: string;
   rate: number;
+  created_at: string;
 }
 
 export interface TaxWithAmount extends Tax {

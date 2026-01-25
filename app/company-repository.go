@@ -21,6 +21,7 @@ type Company struct {
 	Identifier       string           `json:"identifier"`
 	City             string           `json:"city"`
 	Address          string           `json:"address"`
+	Taxes            []*tax           `json:"taxes"`
 	Sequences        *CompanySequence `json:"sequences"`
 	SeqLastUpdatedAt *time.Time       `json:"seq_last_updated_at"`
 	UserRole         string           `json:"_"`
@@ -147,28 +148,41 @@ func (s *Server) linkCompanyDefaultSequences(tx *sql.Tx, companyID int) error {
 	defaultSequences := map[string]any{
 		"invoice": map[string]any{
 			"cash": map[string]any{
-				"prefix":  "INV",
+				"prefix":  "INV-CO-",
 				"next":    1,
 				"padding": 4,
 				"format":  "{prefix}-{year}-{seq}",
 			},
 			"credit": map[string]any{
-				"prefix":  "CRE",
+				"prefix":  "INV-CRE-",
 				"next":    1,
 				"padding": 4,
 				"format":  "{prefix}-{year}-{seq}",
 			},
 		},
 		"payment": map[string]any{
-			"prefix":  "PAY",
+			"prefix":  "PAY-",
 			"next":    1,
 			"padding": 4,
+			"format":  "{prefix}-{year}-{seq}",
+		},
+		"customer": map[string]any{
+			"prefix":  "CUST-",
+			"next":    1,
+			"padding": 6,
+			"format":  "{prefix}-{year}-{seq}",
+		},
+		"estimate": map[string]any{
+			"prefix":  "EST-",
+			"next":    1,
+			"padding": 6,
 			"format":  "{prefix}-{year}-{seq}",
 		},
 	}
 
 	defaultRedirectPreferences := RedirectPreferences{
 		Invoice:  "create",
+		Estimate: "create",
 		Customer: "list",
 		Product:  "list",
 		Payment:  "list",
@@ -204,6 +218,10 @@ func (s *Server) findRedirectPreferences(ctx context.Context, uuid string) (*Com
 		Scan(&crp.Redirect, &crp.UpdatedAt)
 	return &crp, err
 }
+
+// func (s *Server) findTaxes(ctx context.Context) (error, error) {
+//   return nil, nil
+// }
 
 func (s *Server) updateSequences(ctx context.Context, uuid string, form *SequenceForm) error {
 	_, err := s.db.Exec(`

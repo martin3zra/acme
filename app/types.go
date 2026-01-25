@@ -1036,8 +1036,8 @@ type InvoiceSequence struct {
 type CompanySequence struct {
 	Invoice  InvoiceSequence `json:"invoice"`
 	Customer SequenceConfig  `json:"customer"`
-	// Estimate SequenceConfig  `json:"estimate"`
-	Payment SequenceConfig `json:"payment"`
+	Estimate SequenceConfig  `json:"estimate"`
+	Payment  SequenceConfig  `json:"payment"`
 }
 
 type SequenceForm struct {
@@ -1183,5 +1183,18 @@ func (t ItemType) Validate() error {
 		return nil
 	default:
 		return fmt.Errorf("invalid item type: %s", t)
+	}
+}
+
+type StoreTaxForm struct {
+	support.FormRequest
+	Name string `json:"name"`
+	Rate int64  `json:"rate"`
+}
+
+func (StoreTaxForm) Rules() map[string]any {
+	return map[string]any{
+		"name": "required|min:2",
+		"rate": "required|min:0|max:99",
 	}
 }

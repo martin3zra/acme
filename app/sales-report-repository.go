@@ -71,6 +71,7 @@ func (s *Server) findItemWiseSales(ctx context.Context, From, To time.Time) ([]I
 		JOIN invoices_items s ON (s.company_id = i.company_id AND s.item_id = i.id)
 		JOIN invoices h ON (h.company_id = s.company_id AND h.id = s.invoice_id)
 		WHERE s.company_id = $1
+    AND h.transaction_kind = 'invoice'
 		AND h.date BETWEEN $2 AND $3
 		GROUP BY i.id, i.name
 		ORDER BY i.name;
@@ -97,6 +98,7 @@ func (s *Server) findCustomerWiseSales(ctx context.Context, From, To time.Time) 
     FROM invoices i
     JOIN customers c ON (i.company_id = c.company_id AND i.customer_id = c.id)
     WHERE i.company_id = $1
+    AND i.transaction_kind = 'invoice'
     AND i.date BETWEEN $2 AND $3
     GROUP BY c.id, c.name
     ORDER BY total_sales DESC;`, CurrentCompany(ctx).ID, From, To)
@@ -124,6 +126,7 @@ func (s *Server) findCustomerWiseSalesWithInvoices(ctx context.Context, From, To
     FROM invoices i
     JOIN customers c ON (i.company_id = c.company_id AND i.customer_id = c.id)
     WHERE i.company_id = $1
+    AND i.transaction_kind = 'invoice'
     AND i.date BETWEEN $2 AND $3
     ORDER BY customer_name DESC;`, CurrentCompany(ctx).ID, From, To)
 	if err != nil {
@@ -157,6 +160,7 @@ func (s *Server) findDateWiseSales(ctx context.Context, from, to time.Time) ([]D
         SELECT date::date, SUM(total) 
         FROM invoices 
         WHERE company_id = $1
+        AND transaction_kind = 'invoice'
         AND date BETWEEN $2 AND $3
         GROUP BY date::date
         ORDER BY date::date ASC
@@ -183,6 +187,7 @@ func (s *Server) findDateWiseSalesWithInvoices(ctx context.Context, from, to tim
         SELECT date::date, id, code, total
         FROM invoices
         WHERE company_id = $1
+        AND transaction_kind = 'invoice'
         AND date BETWEEN $2 AND $3
         ORDER BY date::date ASC, id ASC
     `, CurrentCompany(ctx).ID, from, to)
