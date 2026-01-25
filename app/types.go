@@ -1188,8 +1188,8 @@ func (t ItemType) Validate() error {
 
 type StoreTaxForm struct {
 	support.FormRequest
-	Name string `json:"name"`
-	Rate int64  `json:"rate"`
+	Name string  `json:"name"`
+	Rate float64 `json:"rate"`
 }
 
 func (StoreTaxForm) Rules() map[string]any {
