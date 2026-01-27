@@ -10,6 +10,7 @@ export interface LinkedCompany {
   uuid: string;
   role: string;
 }
+
 export interface User {
   id: number;
   uuid: string;
@@ -67,6 +68,7 @@ export interface Company {
   city: string;
   taxes: Tax[];
   sequences: Sequences;
+  redirect_preferences: RedirectPreference;
   created_at: string;
   updated_at: string;
 }
@@ -500,4 +502,15 @@ export interface Totals {
   totalReceipts: number;
   totalExpenses: number;
   netIncome: number;
+}
+
+export type RedirectPreferenceValue = 'detail' | 'list' | 'stay';
+
+export interface RedirectPreference {
+  invoice: RedirectPreferenceValue;
+  payment: RedirectPreferenceValue;
+  estimate: RedirectPreferenceValue;
+  order: RedirectPreferenceValue;
+  customer: RedirectPreferenceValue;
+  item: RedirectPreferenceValue;
 }

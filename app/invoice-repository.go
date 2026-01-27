@@ -211,9 +211,11 @@ func (s *Server) findInvoicesByID(ctx context.Context, invoiceId int) (*invoice,
 	return i, nil
 }
 
-func (s *Server) storeInvoice(ctx context.Context, form *StoreInvoiceForm) error {
+func (s *Server) storeInvoice(ctx context.Context, form *StoreInvoiceForm) (string, error) {
 	companyID := CurrentCompany(ctx).ID
-	return database.WithTransaction(s.db, func(tx *sql.Tx) error {
+	var invoiceUUID string
+
+	err := database.WithTransaction(s.db, func(tx *sql.Tx) error {
 		var termType *string
 		var taxReceiptSequence *taxReceiptSeq
 		var err error
@@ -256,7 +258,6 @@ func (s *Server) storeInvoice(ctx context.Context, form *StoreInvoiceForm) error
 		}
 
 		var invoiceID int
-		var invoiceUUID string
 		err = stmt.QueryRow(
 			companyID,
 			taxID,
@@ -317,6 +318,8 @@ func (s *Server) storeInvoice(ctx context.Context, form *StoreInvoiceForm) error
 
 		return nil
 	})
+
+	return invoiceUUID, err
 }
 
 func (s *Server) updateInvoice(ctx context.Context, uuid string, form *UpdateInvoiceForm) error {

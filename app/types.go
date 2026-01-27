@@ -410,12 +410,31 @@ var PaymentStatuses = struct {
 	Failed:    _PAYMENT_FAILED,
 }
 
+type RedirectPreferencesValue string
+
+const (
+	_STAY   RedirectPreferencesValue = "stay"
+	_LIST   RedirectPreferencesValue = "list"
+	_DETAIL RedirectPreferencesValue = "detail"
+)
+
 type RedirectPreferences struct {
-	Invoice  string `json:"invoice"`
-	Estimate string `json:"estimate"`
-	Customer string `json:"customer"`
-	Product  string `json:"product"`
-	Payment  string `json:"payment"`
+	Invoice  RedirectPreferencesValue `json:"invoice"`
+	Estimate RedirectPreferencesValue `json:"estimate"`
+	Customer RedirectPreferencesValue `json:"customer"`
+	Item     RedirectPreferencesValue `json:"item"`
+	Payment  RedirectPreferencesValue `json:"payment"`
+	Order    RedirectPreferencesValue `json:"order"`
+}
+
+var RedirectPreference = struct {
+	Stay   RedirectPreferencesValue
+	List   RedirectPreferencesValue
+	Detail RedirectPreferencesValue
+}{
+	Stay:   _STAY,
+	List:   _LIST,
+	Detail: _DETAIL,
 }
 
 type LineAction string
@@ -1057,17 +1076,38 @@ func (SequenceForm) Rules() map[string]any {
 		"customer":                "required",
 		"customer.padding":        "required|min:3",
 		"customer.next":           "required|min:1",
-		// "estimate":                "required",
-		// "estimate.padding":        "required|min:3",
-		// "estimate.next":           "required|min:1",
-		"payment":         "required",
-		"payment.padding": "required|min:3",
-		"payment.next":    "required|min:1",
+		"estimate":                "required",
+		"estimate.padding":        "required|min:3",
+		"estimate.next":           "required|min:1",
+		"payment":                 "required",
+		"payment.padding":         "required|min:3",
+		"payment.next":            "required|min:1",
 	}
 }
 
 func (form SequenceForm) Authorize() bool {
 	return Can(form.User(), "update:company:sequence")
+}
+
+type RedirectPreferencesForm struct {
+	support.FormRequest
+	Invoice  string `json:"invoice"`
+	Estimate string `json:"estimate"`
+	Customer string `json:"customer"`
+	Order    string `json:"order"`
+	Item     string `json:"item"`
+	Payment  string `json:"payment"`
+}
+
+func (RedirectPreferencesForm) Rules() map[string]any {
+	return map[string]any{
+		"invoice":  "required|in:list,detail,stay",
+		"estimate": "required|in:list,detail,stay",
+		"customer": "required|in:list,detail,stay",
+		"order":    "required|in:list,detail,stay",
+		"item":     "required|in:list,detail,stay",
+		"payment":  "required|in:list,detail,stay",
+	}
 }
 
 type PrerequisiteResult struct {

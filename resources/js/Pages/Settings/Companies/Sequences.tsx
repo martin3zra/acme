@@ -54,7 +54,7 @@ export default function SequenceView({ uuid, sequences }: SeqProps) {
       return {
         invoice: data.sequences.invoice,
         customer: data.sequences.customer,
-        // estimate: data.sequences.estimate,
+        estimate: data.sequences.estimate,
         payment: data.sequences.payment,
       };
     });

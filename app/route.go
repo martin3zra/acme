@@ -84,8 +84,8 @@ func (s *Server) bootRoutes() {
 					route.GET("/reports/taxes", s.reportTaxesHandler).Can("viewAny:reports")
 					route.POST("/reports/taxes", s.generateTaxesReportHandler()) // .Can("viewAny:reports")
 
-          route.POST("/taxes", s.storeTaxes())
-          route.PUT("/taxes/:id", s.updateTaxes())
+					route.POST("/taxes", s.storeTaxes())
+					route.PUT("/taxes/:id", s.updateTaxes())
 
 					route.GroupPrefix("/settings/:account", func(route *routing.Router) {
 						route.GET("/profile", s.accountProfileHandler)
@@ -93,6 +93,7 @@ func (s *Server) bootRoutes() {
 
 						route.GET("/companies", s.companyHandler).Can("viewAny:company")
 						route.PUT("/companies/:id/sequences", s.companyUpdateSequences())
+						route.PUT("/companies/:id/redirect-preferences", s.companyUpdateRedirectPreferences())
 						route.POST("/users", s.storeUserHandler())
 						route.PUT("/users/:id", s.updateUserHandler())
 					})

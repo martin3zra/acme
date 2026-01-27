@@ -81,3 +81,17 @@ func (s *Server) companyUpdateSequences() routing.HandlerFunc {
 		ctx.Redirect(fmt.Sprintf("/settings/%s/profile", ctx.Param("account")))
 	})
 }
+
+func (s *Server) companyUpdateRedirectPreferences() routing.HandlerFunc {
+	return routing.WithRequest(func(ctx *routing.Context, form *RedirectPreferencesForm) {
+
+		if err := s.updateRedirectPreferences(ctx.Request.Context(), ctx.Param("id"), form); err != nil {
+			ctx.Error(err)
+			return
+		}
+
+		ctx.Flash("success", "Redirect Preferences updated successfully!")
+
+		ctx.Redirect(fmt.Sprintf("/settings/%s/profile", ctx.Param("account")))
+	})
+}

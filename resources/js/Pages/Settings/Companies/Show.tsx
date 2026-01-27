@@ -2,6 +2,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Company } from '@/types';
 import { useEffect, useState } from 'react';
 import Overview from '../Shared/overview';
+import { RedirectPreferences } from '../Shared/redirect-preferences';
 import TaxList from '../Shared/tax-list';
 import SequenceView from './Sequences';
 
@@ -31,6 +32,7 @@ export default function Show({ company }: Props) {
         <TabsTrigger value="overview">Overview</TabsTrigger>
         <TabsTrigger value="sequences">Sequences</TabsTrigger>
         <TabsTrigger value="taxes">Taxes</TabsTrigger>
+        <TabsTrigger value="redirectPreferences">Redirect Preferences</TabsTrigger>
       </TabsList>
       <TabsContent value="overview">
         <Overview company={company} />
@@ -40,6 +42,9 @@ export default function Show({ company }: Props) {
       </TabsContent>
       <TabsContent value="taxes">
         <TaxList taxes={company.taxes} />
+      </TabsContent>
+      <TabsContent value="redirectPreferences">
+        <RedirectPreferences uuid={company.uuid} preferences={company.redirect_preferences} />
       </TabsContent>
     </Tabs>
   );

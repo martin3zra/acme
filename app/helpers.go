@@ -318,3 +318,18 @@ func DateRangePresets() []PresetRange {
 		{Label: "Custom", Key: "custom"},
 	}
 }
+
+// redirectAfterCreate builds the redirect URL based on kind, entity ID, and user preference.
+func redirectAfterCreate(kind string, id string, pref RedirectPreferencesValue) string {
+	switch pref {
+	case RedirectPreference.List:
+		return fmt.Sprintf("/%ss", kind) // e.g. /invoices
+	case RedirectPreference.Detail:
+		return fmt.Sprintf("/%ss?id=%s", kind, id) // e.g. /invoices?id=123
+	case RedirectPreference.Stay:
+		return fmt.Sprintf("/%ss/create", kind) // e.g. /invoices/create
+	default:
+		// fallback to list
+		return fmt.Sprintf("/%ss", kind)
+	}
+}

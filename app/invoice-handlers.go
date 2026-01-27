@@ -271,7 +271,7 @@ func (s *Server) storeInvoiceHandler() routing.HandlerFunc {
 			}
 		}
 
-		err := s.storeInvoice(ctx.Request.Context(), form)
+		id, err := s.storeInvoice(ctx.Request.Context(), form)
 		if err != nil {
 			log.Printf("Error creating invoice: %v", err)
 			ctx.BackWith("status", s.trans("global.wasNotCreated", i18n.Replacements{"subject": fmt.Sprintf("@global.%s", form.Kind)}))
@@ -288,9 +288,9 @@ func (s *Server) storeInvoiceHandler() routing.HandlerFunc {
 		}
 
 		if form.Kind == TransactionKinds.Invoice {
-			ctx.Flash("redirectTo", preferences.Redirect.Invoice)
+			ctx.Flash("redirectTo", redirectAfterCreate(string(form.Kind), id, preferences.Redirect.Invoice))
 		} else {
-			ctx.Flash("redirectTo", preferences.Redirect.Estimate)
+			ctx.Flash("redirectTo", redirectAfterCreate(string(form.Kind), id, preferences.Redirect.Estimate))
 		}
 
 		ctx.Back()

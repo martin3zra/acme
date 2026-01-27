@@ -15,16 +15,17 @@ import (
 )
 
 type Company struct {
-	ID               int              `json:"id"`
-	UUID             string           `json:"uuid"`
-	Name             string           `json:"name"`
-	Identifier       string           `json:"identifier"`
-	City             string           `json:"city"`
-	Address          string           `json:"address"`
-	Taxes            []*tax           `json:"taxes"`
-	Sequences        *CompanySequence `json:"sequences"`
-	SeqLastUpdatedAt *time.Time       `json:"seq_last_updated_at"`
-	UserRole         string           `json:"_"`
+	ID                  int                 `json:"id"`
+	UUID                string              `json:"uuid"`
+	Name                string              `json:"name"`
+	Identifier          string              `json:"identifier"`
+	City                string              `json:"city"`
+	Address             string              `json:"address"`
+	Taxes               []*tax              `json:"taxes"`
+	Sequences           *CompanySequence    `json:"sequences"`
+	SeqLastUpdatedAt    *time.Time          `json:"seq_last_updated_at"`
+	RedirectPreferences RedirectPreferences `json:"redirect_preferences"`
+	UserRole            string              `json:"_"`
 	foundation.Timestamps
 }
 
@@ -181,11 +182,12 @@ func (s *Server) linkCompanyDefaultSequences(tx *sql.Tx, companyID int) error {
 	}
 
 	defaultRedirectPreferences := RedirectPreferences{
-		Invoice:  "create",
-		Estimate: "create",
-		Customer: "list",
-		Product:  "list",
-		Payment:  "list",
+		Invoice:  RedirectPreference.Stay,
+		Estimate: RedirectPreference.Stay,
+		Customer: RedirectPreference.List,
+		Item:     RedirectPreference.List,
+		Payment:  RedirectPreference.List,
+		Order:    RedirectPreference.List,
 	}
 
 	_, err := tx.Exec(`
@@ -219,15 +221,19 @@ func (s *Server) findRedirectPreferences(ctx context.Context, uuid string) (*Com
 	return &crp, err
 }
 
-// func (s *Server) findTaxes(ctx context.Context) (error, error) {
-//   return nil, nil
-// }
-
 func (s *Server) updateSequences(ctx context.Context, uuid string, form *SequenceForm) error {
 	_, err := s.db.Exec(`
     UPDATE companies_settings
     SET sequences = $3, updated_at = now()
     WHERE company_id = (SELECT id FROM companies WHERE account_id = $1 AND uuid = $2)`, CurrentAccount(ctx), uuid, foundation.ToJSON(form.CompanySequence))
+	return err
+}
+
+func (s *Server) updateRedirectPreferences(ctx context.Context, uuid string, form *RedirectPreferencesForm) error {
+	_, err := s.db.Exec(`
+    UPDATE companies_settings
+    SET redirect_preferences = $3, updated_at = now()
+    WHERE company_id = (SELECT id FROM companies WHERE account_id = $1 AND uuid = $2)`, CurrentAccount(ctx), uuid, foundation.ToJSON(form))
 	return err
 }
 

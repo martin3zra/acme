@@ -313,9 +313,17 @@ func (s *Server) accountProfileHandler(ctx *routing.Context) {
 			return
 		}
 
+		preferences, err := s.findRedirectPreferences(ctx.Request.Context(), CurrentCompany(ctx.Request.Context()).UUID)
+		if err != nil {
+			log.Printf("Error fetching redirect preferences: %v", err)
+			ctx.Back()
+			return
+		}
+
 		company.Sequences = &sequences.Sequence
 		company.SeqLastUpdatedAt = &sequences.UpdatedAt
 		company.Taxes = taxes
+		company.RedirectPreferences = preferences.Redirect
 		props["company"] = company
 
 		props["initialState"] = true
