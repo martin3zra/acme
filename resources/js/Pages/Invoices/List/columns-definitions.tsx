@@ -217,6 +217,9 @@ export const getColumns = ({ kind, onDidClick, t }: Props): ColumnDef<Invoice>[]
               <DropdownMenuItem onClick={() => onDidClick(props.row.original, 'edit')} disabled={disabled}>
                 {t(`${kind}s.edit${capitalize(kind)}.title`)}
               </DropdownMenuItem>
+              {kind === 'invoice' && (
+                <ConvertToInvoiceAction mode="duplicate" id={props.row.original.uuid} title={t('global.duplicateInvoice')} kind={kind} />
+              )}
               {canRecordPayment && (
                 <>
                   <DropdownMenuSeparator />
@@ -236,7 +239,7 @@ export const getColumns = ({ kind, onDidClick, t }: Props): ColumnDef<Invoice>[]
               {kind === 'estimate' && props.row.original.status !== 'closed' && (
                 <>
                   <DropdownMenuSeparator />
-                  <ConvertToInvoiceAction id={props.row.original.uuid} renderedAs="dropdown-item" kind="estimate" />
+                  <ConvertToInvoiceAction id={props.row.original.uuid} title={t('global.convertToInvoice')} kind="estimate" />
                 </>
               )}
             </DropdownMenuContent>

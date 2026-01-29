@@ -382,6 +382,11 @@ export default function Create({
         </div>
       </AppLayout.Actions>
       <div className="grid h-full w-full grid-cols-12 grid-rows-[auto_1fr_auto] gap-y-4 bg-gray-50/10">
+        {invoiceForm.clonedFrom && (
+          <div className="col-span-12">
+            <AlertDestructive title={t('global.duplicateAlert.title')} description={t('global.duplicateAlert.description')} destroyable={false} />
+          </div>
+        )}
         {!openCheckout && propsErrors.status && (
           <div className="col-span-12">
             <AlertDestructive description={propsErrors.status} onDestroy={() => delete propsErrors.status} />

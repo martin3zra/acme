@@ -98,9 +98,9 @@ export const getColumns = ({ kind, onDidClick, t }: Props): ColumnDef<DueInvoice
               {kind === 'estimate' && (
                 <>
                   <DropdownMenuSeparator />
-                  <ConvertToInvoiceAction id={props.row.original.uuid} renderedAs="dropdown-item" kind="estimate" />
-                  <DropdownMenuItem>{t('dashboard.viewItem.estimate.markAsAccepted')}</DropdownMenuItem>
-                  <DropdownMenuItem>{t('dashboard.viewItem.estimate.markAsRejected')}</DropdownMenuItem>
+                  <ConvertToInvoiceAction id={props.row.original.uuid} title={t('global.convertToInvoice')} kind="estimate" />
+                  {/* <DropdownMenuItem>{t('dashboard.viewItem.estimate.markAsAccepted')}</DropdownMenuItem>
+                  <DropdownMenuItem>{t('dashboard.viewItem.estimate.markAsRejected')}</DropdownMenuItem> */}
                 </>
               )}
             </DropdownMenuContent>

@@ -2,23 +2,23 @@ import { Button } from '@/components/ui/button';
 import { DropdownMenuItem } from '@/components/ui/dropdown-menu';
 import { useLocalStorage } from '@/hooks/use-local-storage';
 import { useTranslation } from '@/hooks/use-translation';
-import { ErrorResponse, InvoiceWithLines, TransactionKind } from '@/types';
+import { cn } from '@/lib/utils';
+import { ErrorResponse, InvoiceWithLines, PaymentTermValue, TransactionKind } from '@/types';
 import { router } from '@inertiajs/react';
-import { ExternalLink, FileDiffIcon } from 'lucide-react';
+import { Copy, ExternalLink, FileDiffIcon } from 'lucide-react';
 import { toast } from 'sonner';
 import { convertToInvoice } from '../convert-to-invoice';
 
-export function ConvertToInvoiceAction({
-  renderedAs,
-  kind,
-  id,
-  source,
-}: {
-  renderedAs: 'button' | 'dropdown-item';
+type Props = {
+  mode?: 'convert' | 'duplicate';
+  title: string;
+  renderedAs?: 'button' | 'dropdown-item';
   kind: TransactionKind;
   source?: InvoiceWithLines;
   id?: string;
-}) {
+};
+
+export function ConvertToInvoiceAction({ mode = 'convert', title, renderedAs = 'dropdown-item', kind, id, source }: Props) {
   const t = useTranslation().trans;
   const handleConvertion = () => {
     if (!source) {
@@ -28,7 +28,10 @@ export function ConvertToInvoiceAction({
   };
 
   const processConvertion = (data: InvoiceWithLines) => {
-    const converted = convertToInvoice(kind, data, { terms: 'pia', taxReceipt: 0, ncf: '' });
+    const terms: PaymentTermValue = mode === 'convert' ? 'pia' : data.header.terms;
+    const clonedFrom: number | undefined = mode === 'duplicate' ? data.header.id : undefined;
+    const taxReceipt: number = mode === 'duplicate' ? data.header.tax_receipt_id : 0;
+    const converted = convertToInvoice(kind, data, { terms, taxReceipt, ncf: '' }, clonedFrom);
     const { setItem } = useLocalStorage('invoice');
     setItem(converted);
 
@@ -40,7 +43,7 @@ export function ConvertToInvoiceAction({
       return;
     }
 
-    const response = await fetch(`/${kind}s/${id}`, {
+    const response = await fetch(`/invoices/${id}`, {
       headers: {
         'Content-Type': 'application/json',
         Accept: 'application/json',
@@ -60,7 +63,7 @@ export function ConvertToInvoiceAction({
     router.visit(`/invoices?id=${source?.header?.source?.id}`);
   };
 
-  if (source?.header?.source) {
+  if (source?.header?.source && mode === 'convert') {
     return (
       <Button onClick={handleRedirection} className="bg-blue-600 hover:bg-blue-700">
         <ExternalLink />
@@ -70,13 +73,19 @@ export function ConvertToInvoiceAction({
   }
 
   if (renderedAs === 'dropdown-item') {
-    return <DropdownMenuItem onClick={handleFetching}>{t('global.convertToInvoice')}</DropdownMenuItem>;
+    return <DropdownMenuItem onClick={handleFetching}>{title}</DropdownMenuItem>;
   }
 
   return (
-    <Button onClick={handleConvertion} className="bg-green-600 hover:bg-green-700">
-      <FileDiffIcon />
-      {t('global.convertToInvoice')}
+    <Button
+      onClick={handleConvertion}
+      className={cn([
+        mode === 'convert' && 'bg-green-600 hover:bg-green-700',
+        mode === 'duplicate' && 'bg-indigo-50 text-indigo-600 hover:bg-indigo-100',
+      ])}
+    >
+      {mode === 'convert' ? <FileDiffIcon /> : <Copy />}
+      {title}
     </Button>
   );
 }

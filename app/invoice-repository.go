@@ -290,16 +290,35 @@ func (s *Server) storeInvoice(ctx context.Context, form *StoreInvoiceForm) (stri
 		}
 
 		if form.Source != nil {
-			_, err := tx.Exec(
-				"UPDATE invoices SET status = 'closed', source = $4 "+
-					"WHERE company_id = $1 "+
-					"AND id = $2 AND transaction_kind = $3",
-				companyID, form.Source.ID, form.Source.Type, foundation.ToJSON(map[string]any{
-					"type": form.Kind,
-					"id":   invoiceUUID,
-				}))
-			if err != nil {
-				return err
+			// When we are duplicating an existing invoice, we set
+			// a relationshipt bewteen both invoice using the
+			// source column to keep track of them.
+			if form.Source.Type == TransactionKinds.Invoice {
+				_, err := tx.Exec(
+					"UPDATE invoices SET source = $4 "+
+						"WHERE company_id = $1 "+
+						"AND uuid = $2 AND transaction_kind = $3",
+					companyID, form.Source.ID, form.Source.Type, foundation.ToJSON(map[string]any{
+						"type": form.Kind,
+						"id":   invoiceUUID,
+					}))
+				if err != nil {
+					return err
+				}
+			}
+
+			if form.Source.Type == TransactionKinds.Estimate {
+				_, err := tx.Exec(
+					"UPDATE invoices SET status = 'closed', source = $4 "+
+						"WHERE company_id = $1 "+
+						"AND uuid = $2 AND transaction_kind = $3",
+					companyID, form.Source.ID, form.Source.Type, foundation.ToJSON(map[string]any{
+						"type": form.Kind,
+						"id":   invoiceUUID,
+					}))
+				if err != nil {
+					return err
+				}
 			}
 		}
 

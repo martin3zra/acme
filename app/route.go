@@ -60,6 +60,7 @@ func (s *Server) bootRoutes() {
 					route.PUT("/invoices/:id/void", s.voidInvoiceHandler())
 					route.GET("/invoices/:id/print/:hash", s.printInvoiceHandler).Middleware(Signed)
 					route.PUT("/invoices/:id", s.updateInvoiceHandler())
+					route.GET("/invoices/:id", s.showInvoiceHandler)
 
 					route.GET("/estimates", s.invoicesHandler).Can("viewAny:estimate")
 					route.GET("/estimates/create", s.createInvoiceHandler).Can("create:estimate")
@@ -67,7 +68,6 @@ func (s *Server) bootRoutes() {
 					route.GET("/estimates/:id/edit", s.editInvoiceHandler).Can("update:estimate")
 					route.GET("/estimates/:id/print/:hash", s.printInvoiceHandler).Middleware(Signed)
 					route.PUT("/estimates/:id", s.updateInvoiceHandler())
-					route.GET("/estimates/:id", s.showInvoiceHandler)
 
 					route.GET("/payments", s.paymentsHandler).Can("viewAny:payment")
 					route.POST("/payments", s.storePaymentHandler())

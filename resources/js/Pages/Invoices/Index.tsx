@@ -174,7 +174,18 @@ export default function Index({
                       </>
                     )}
 
-                    {kind === 'estimate' && <ConvertToInvoiceAction renderedAs="button" kind={kind} source={invoice} />}
+                    {kind === 'estimate' && (
+                      <ConvertToInvoiceAction title={t('global.convertToInvoice')} renderedAs="button" kind={kind} source={invoice} />
+                    )}
+                    {kind === 'invoice' && (
+                      <ConvertToInvoiceAction
+                        mode="duplicate"
+                        title={t('global.duplicateInvoice')}
+                        renderedAs="button"
+                        kind={kind}
+                        source={invoice}
+                      />
+                    )}
                     <a
                       href={invoice.pdfURL}
                       className="flex items-center gap-x-3 rounded-sm bg-indigo-600 px-4 text-white hover:bg-indigo-700"

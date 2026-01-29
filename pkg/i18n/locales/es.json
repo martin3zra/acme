@@ -92,7 +92,12 @@
     "taxReceipt": "Tipo NCF",
     "days": "días",
     "type": "Tipo",
-    "convertToInvoice": "Convertir a Factura",
+    "convertToInvoice": "Convertir a factura",
+    "duplicateInvoice": "Duplicar factura",
+    "duplicateAlert": {
+      "title": "Esta es una copia",
+      "description": "Esta es una copia de una factura. Revísela según sea necesario y guárdela."
+    },
     "nouns": {
       "customer": {
         "gender":"m"

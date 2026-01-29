@@ -37,3 +37,22 @@ export function getDaysFromTerm(term: PaymentTermValue): number {
   const match = term.match(/^net(\d+)$/);
   return match ? parseInt(match[1], 10) : 0;
 }
+
+export function calculateDueDate(terms: PaymentTermValue, issueDate: Date = new Date()): Date | undefined {
+  switch (terms) {
+    case 'pia': // Payable Immediately After
+      return issueDate; // same day
+    case 'net7':
+      return addDays(issueDate, 7);
+    case 'net15':
+      return addDays(issueDate, 15);
+    case 'net30':
+      return addDays(issueDate, 30);
+    case 'net60':
+      return addDays(issueDate, 60);
+    case 'net90':
+      return addDays(issueDate, 90);
+    default:
+      return undefined; // no due date
+  }
+}

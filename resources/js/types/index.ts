@@ -328,12 +328,23 @@ export type InvoiceSource = {
   id: string | number;
 };
 
+export type Recurrent = {
+  enabled: boolean;
+  frequency: 'weekly' | 'monthly' | 'quarterly' | 'yearly';
+  interval: number;
+  until?: string;
+  nextIssueDate?: string;
+  timezone?: string;
+};
+
 export type InvoiceForm = {
   header: HeaderForm;
   lines: LineForm[];
   payment: PaymentMethodsForm;
   kind: TransactionKind;
   source: InvoiceSource;
+  clonedFrom?: number;
+  recurrence?: Recurrent;
 };
 
 export type Payment = {
