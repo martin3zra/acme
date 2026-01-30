@@ -295,16 +295,19 @@ const (
 	_TRANSACTION_KIND_INVOICE  TransactionKind = "invoice"
 	_TRANSACTION_KIND_ESTIMATE TransactionKind = "estimate"
 	_TRANSACTION_KIND_ORDER    TransactionKind = "order"
+	_TRANSACTION_KIND_TEMPLATE TransactionKind = "template"
 )
 
 var TransactionKinds = struct {
 	Invoice  TransactionKind
 	Estimate TransactionKind
 	Order    TransactionKind
+	Template TransactionKind
 }{
 	Invoice:  _TRANSACTION_KIND_INVOICE,
 	Estimate: _TRANSACTION_KIND_ESTIMATE,
 	Order:    _TRANSACTION_KIND_ORDER,
+	Template: _TRANSACTION_KIND_TEMPLATE,
 }
 
 type TransactionSource struct {
@@ -317,6 +320,69 @@ func (d *TransactionSource) Value() (driver.Value, error) {
 }
 
 func (d *TransactionSource) Scan(value any) error {
+	if value == nil {
+		return nil
+	}
+
+	b, ok := value.([]byte)
+	if !ok {
+		return errors.New("type assertion to []byte failed")
+	}
+
+	return json.Unmarshal(b, &d)
+}
+
+type FrequencyType string
+
+const (
+	_FREQUENCY_WEEKLY   FrequencyType = "weekly"
+	_FREQUENCY_MONTHLY  FrequencyType = "monthly"
+	_FREQUENCY_QUARTELY FrequencyType = "quarterly"
+	_FREQUENCY_YEARLY   FrequencyType = "yearly"
+)
+
+var Frequency = struct {
+	Weekly    FrequencyType
+	Monthly   FrequencyType
+	Quarterly FrequencyType
+	Yearly    FrequencyType
+}{
+	Weekly:    _FREQUENCY_WEEKLY,
+	Monthly:   _FREQUENCY_MONTHLY,
+	Quarterly: _FREQUENCY_QUARTELY,
+	Yearly:    _FREQUENCY_YEARLY,
+}
+
+//	type Recurrence struct {
+//		Enabled       bool          `json:"enabled"`
+//		Frequency     FrequencyType `json:"frequency"` // weekly, monthly, quarterly, yearly
+//		Interval      int           `json:"interval"`
+//		Until         string        `json:"until,omitempty"`
+//		NextIssueDate string        `json:"next_issue_date"`
+//		Timezone      string        `json:"timezone"`
+//	}
+type Recurrence struct {
+	Enabled   bool       `json:"enabled"`
+	Name      string     `json:"name"`
+	Type      string     `json:"type"` // schedule, reminder
+	SendEmail bool       `json:"send_email"`
+	Frequency string     `json:"frequency"` // daily, weekly, monthly, quarterly, yearly
+	Interval  int        `json:"interval"`
+	Timezone  string     `json:"timezone,omitempty"`
+	StartDate *time.Time `json:"start_date,omitempty"`
+	Until     *time.Time `json:"until,omitempty"`
+
+	// Optional fields depending on frequency
+	DayOfMonth int      `json:"day_of_month,omitempty"`
+	Weekdays   []string `json:"weekdays,omitempty"`
+	Month      int      `json:"month,omitempty"`
+}
+
+func (d *Recurrence) Value() (driver.Value, error) {
+	return json.Marshal(d)
+}
+
+func (d *Recurrence) Scan(value any) error {
 	if value == nil {
 		return nil
 	}
@@ -556,6 +622,7 @@ type StoreInvoiceForm struct {
 	Payment    Payment            `json:"payment"`
 	Kind       TransactionKind    `json:"kind"`
 	Source     *TransactionSource `json:"source"`
+	Recurrence *Recurrence        `json:"recurrence"`
 	// considere these fields as protected
 	amount     float64
 	amountDue  float64
@@ -572,21 +639,31 @@ func (form StoreInvoiceForm) Authorize() bool {
 
 func (form StoreInvoiceForm) Rules() map[string]any {
 	return map[string]any{
-		"customer_id":    "bail|required|exists:customers,id",
-		"kind":           "bail|required|in:invoice,estimate,order",
-		"source":         "sometimes",
-		"source.type":    "bail|sometimes|in:estimate,order",
-		"date":           "bail|required|date|after:yesterday",
-		"terms":          "bail|required_if:kind,invoice|min:1",
-		"tax_receipt":    "bail|sometimes|required_if:kind,invoice|exists:tax_receipts,id",
-		"lines":          "required|min:1",
-		"lines.*.id":     "required|exists:items,id",
-		"lines.*.unit":   "required|exists:units,id",
-		"lines.*.qty":    "required|min:1",
-		"lines.*.price":  "required",
-		"lines.*.rate":   "required",
-		"lines.*.action": "required|in:added",
-		"discount":       "required",
+		"customer_id":             "bail|required|exists:customers,id",
+		"kind":                    "bail|required|in:invoice,estimate,order,template",
+		"recurrence":              "bail|sometimes",
+		"recurrence.enabled":      "bail|sometimes",
+		"recurrence.name":         "required|string|max:100",
+		"recurrence.start_date":   "nullable|date",
+		"recurrence.until":        "nullable|date|after_or_equal:start_date",
+		"recurrence.frequency":    "required|in:daily,weekly,monthly,quarterly,yearly",
+		"recurrence.interval":     "required|integer|min:1",
+		"recurrence.weekdays":     "required_if:frequency,weekly|array|min:1",
+		"recurrence.day_of_month": "required_if:frequency,monthly,quarterly,yearly|integer|min:1|max:31",
+		"recurrence.month":        "required_if:frequency,yearly|integer|min:1|max:12",
+		"source":                  "sometimes",
+		"source.type":             "bail|sometimes|in:estimate,order",
+		"date":                    "bail|required|date|after:yesterday",
+		"terms":                   "bail|required_if:kind,invoice|min:1",
+		"tax_receipt":             "bail|sometimes|required_if:kind,invoice|exists:tax_receipts,id",
+		"lines":                   "required|min:1",
+		"lines.*.id":              "required|exists:items,id",
+		"lines.*.unit":            "required|exists:units,id",
+		"lines.*.qty":             "required|min:1",
+		"lines.*.price":           "required",
+		"lines.*.rate":            "required",
+		"lines.*.action":          "required|in:added",
+		"discount":                "required",
 		"discount.value": []any{
 			"sometimes",
 			validator.Rule{}.When(form.Discount.Type == "percentage", "between:0,100", "min:0"),
@@ -1054,6 +1131,7 @@ type InvoiceSequence struct {
 
 type CompanySequence struct {
 	Invoice  InvoiceSequence `json:"invoice"`
+	Template SequenceConfig  `json:"template"`
 	Customer SequenceConfig  `json:"customer"`
 	Estimate SequenceConfig  `json:"estimate"`
 	Payment  SequenceConfig  `json:"payment"`
@@ -1082,6 +1160,9 @@ func (SequenceForm) Rules() map[string]any {
 		"payment":                 "required",
 		"payment.padding":         "required|min:3",
 		"payment.next":            "required|min:1",
+		"template":                "sometimes",
+		"template.padding":        "sometimes|min:3",
+		"template.next":           "sometimes|min:1",
 	}
 }
 

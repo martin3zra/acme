@@ -227,8 +227,8 @@ func (s *Server) storeInvoice(ctx context.Context, form *StoreInvoiceForm) (stri
 			}
 		}
 
-		stmt, err := tx.Prepare("INSERT INTO invoices (company_id, tax_receipt_id, tax_receipt_sequence, tax_number, date, type, due_on, customer_id, amount, discount, tax, amount_due, total, note, status, paid_status, payment, code, transaction_kind, source) " +
-			"VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20) RETURNING id, uuid")
+		stmt, err := tx.Prepare("INSERT INTO invoices (company_id, tax_receipt_id, tax_receipt_sequence, tax_number, date, type, due_on, customer_id, amount, discount, tax, amount_due, total, note, status, paid_status, payment, code, transaction_kind, source, recurrence) " +
+			"VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21) RETURNING id, uuid")
 		if err != nil {
 			return err
 		}
@@ -257,6 +257,12 @@ func (s *Server) storeInvoice(ctx context.Context, form *StoreInvoiceForm) (stri
 			source = &j
 		}
 
+		var recurrence *string
+		if form.Recurrence != nil {
+			_recurrence := foundation.ToJSON(form.Recurrence)
+			recurrence = &_recurrence
+		}
+
 		var invoiceID int
 		err = stmt.QueryRow(
 			companyID,
@@ -279,6 +285,7 @@ func (s *Server) storeInvoice(ctx context.Context, form *StoreInvoiceForm) (stri
 			seqInfo.Code,
 			form.Kind,
 			source,
+			recurrence,
 		).Scan(&invoiceID, &invoiceUUID)
 
 		if err != nil {

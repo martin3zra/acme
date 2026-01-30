@@ -287,7 +287,7 @@ func (s *Server) storeInvoiceHandler() routing.HandlerFunc {
 			return
 		}
 
-		if form.Kind == TransactionKinds.Invoice {
+		if form.Kind == TransactionKinds.Invoice || form.Kind == TransactionKinds.Template {
 			ctx.Flash("redirectTo", redirectAfterCreate(string(form.Kind), id, preferences.Redirect.Invoice))
 		} else {
 			ctx.Flash("redirectTo", redirectAfterCreate(string(form.Kind), id, preferences.Redirect.Estimate))

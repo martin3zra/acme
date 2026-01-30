@@ -148,7 +148,8 @@
       "cancel": "Cancelar",
       "save": "Salvar",
       "checkout": "Metodo de pago",
-      "create": "Crear"
+      "create": "Crear",
+      "markAsRecurrent": "Marcar como recurrente"
     },
     "paymentMethods": {
       "primary": "Método primario",

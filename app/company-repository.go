@@ -179,6 +179,12 @@ func (s *Server) linkCompanyDefaultSequences(tx *sql.Tx, companyID int) error {
 			"padding": 6,
 			"format":  "{prefix}-{year}-{seq}",
 		},
+		"template": map[string]any{
+			"prefix":  "TPL",
+			"next":    1,
+			"padding": 6,
+			"format":  "{prefix}-{year}-{seq}",
+		},
 	}
 
 	defaultRedirectPreferences := RedirectPreferences{

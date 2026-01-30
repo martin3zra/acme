@@ -328,13 +328,43 @@ export type InvoiceSource = {
   id: string | number;
 };
 
+export const Months = [
+  'January',
+  'February',
+  'March',
+  'April',
+  'May',
+  'June',
+  'July',
+  'August',
+  'September',
+  'October',
+  'November',
+  'December',
+] as const;
+
+export type Month = (typeof Months)[number];
+
+export const WeekDays = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+export type WeekDay = (typeof WeekDays)[number];
+export type Frequency = 'daily' | 'weekly' | 'monthly' | 'quarterly' | 'yearly';
+export type RecurrentType = 'schedule' | 'reminder';
+
 export type Recurrent = {
   enabled: boolean;
-  frequency: 'weekly' | 'monthly' | 'quarterly' | 'yearly';
+  name: string;
+  type: RecurrentType;
+  send_email: boolean;
+  frequency: Frequency;
   interval: number;
-  until?: string;
-  nextIssueDate?: string;
   timezone?: string;
+  start_date?: Date; // ISO date
+  until?: Date; // optional ISO date
+
+  // Optional fields depending on frequency
+  day_of_month?: number; // 1–31
+  weekdays?: WeekDay[];
+  month?: number; // 1–12 (for yearly)
 };
 
 export type InvoiceForm = {

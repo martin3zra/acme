@@ -1,5 +1,6 @@
-import { PaymentMethod, PaymentMethods, PaymentTermValue } from '@/types';
+import { Months, PaymentMethod, PaymentMethods, PaymentTermValue, Recurrent } from '@/types';
 import { clsx, type ClassValue } from 'clsx';
+import { formatDate } from 'date-fns';
 import { twMerge } from 'tailwind-merge';
 
 export function cn(...inputs: ClassValue[]) {
@@ -55,4 +56,136 @@ export function calculateDueDate(terms: PaymentTermValue, issueDate: Date = new 
     default:
       return undefined; // no due date
   }
+}
+
+export function validateRecurrence(data: Recurrent): Recurrent {
+  const base: Recurrent = {
+    enabled: data.enabled,
+    name: data.name,
+    type: data.type,
+    frequency: data.frequency,
+    interval: Math.max(1, data.interval), // always >= 1
+    start_date: data.start_date,
+    until: data.until,
+    timezone: data.timezone,
+    send_email: data.send_email,
+  };
+
+  if (data.start_date && data.until) {
+    const start = new Date(data.start_date);
+    const until = new Date(data.until);
+    if (start > until) {
+      throw new Error('Start date cannot be greater than until date.');
+    }
+  }
+  switch (data.frequency) {
+    case 'daily':
+      if (base.interval < 1) {
+        throw new Error('Daily recurrence requires an interval of at least 1 day.');
+      }
+      return base;
+    case 'weekly':
+      if (!data.weekdays || data.weekdays.length === 0) {
+        throw new Error('Weekly recurrence requires at least one weekday selected.');
+      }
+      if (base.interval > 52) {
+        throw new Error('Weekly recurrence interval cannot exceed 52 weeks.');
+      }
+      return { ...base, weekdays: data.weekdays };
+    case 'monthly':
+      if (!data.day_of_month) {
+        throw new Error('Monthly recurrence requires a valid day of the month.');
+      }
+      if (base.interval > 12) {
+        throw new Error('Monthly recurrence interval cannot exceed 12 months.');
+      }
+      return { ...base, day_of_month: clampDay(data.day_of_month) };
+    case 'quarterly':
+      if (!data.day_of_month) {
+        throw new Error('Quarterly recurrence requires a valid day of the month.');
+      }
+      if (base.interval > 4) {
+        throw new Error('Quarterly recurrence interval cannot exceed 4 quarters.');
+      }
+      return { ...base, day_of_month: clampDay(data.day_of_month) };
+    case 'yearly':
+      if (!data.month) {
+        throw new Error('Yearly recurrence requires a month to be selected.');
+      }
+      if (!data.day_of_month) {
+        throw new Error('Yearly recurrence requires a valid day of the month.');
+      }
+      if (base.interval > 10) {
+        throw new Error('Yearly recurrence interval cannot exceed 10 years.');
+      }
+      return { ...base, month: clampMonth(data.month), day_of_month: clampDay(data.day_of_month) };
+  }
+}
+
+// Helpers
+function clampDay(day: number): number {
+  if (day < 1) return 1;
+  if (day > 31) return 31;
+  return day;
+}
+
+function clampMonth(month: number): number {
+  if (month < 1) return 1;
+  if (month > 12) return 12;
+  return month;
+}
+
+export function formatOrdinal(n: number): string {
+  const s = ['th', 'st', 'nd', 'rd'];
+  const v = n % 100;
+  return n + (s[(v - 20) % 10] || s[v] || s[0]);
+}
+
+export function formatWeekdays(weekdays: string[]): string {
+  if (!weekdays || weekdays.length === 0) return '';
+  if (weekdays.length === 1) return weekdays[0];
+  return weekdays.slice(0, -1).join(', ') + ' and ' + weekdays[weekdays.length - 1];
+}
+
+export function recurrenceCaption(data: Recurrent): string {
+  let caption = 'Repeat ';
+
+  switch (data.frequency) {
+    case 'daily':
+      caption += `every ${data.interval} day${data.interval > 1 ? 's' : ''}`;
+      break;
+
+    case 'weekly':
+      caption += `every ${data.interval} week${data.interval > 1 ? 's' : ''}`;
+      if (data.weekdays && data.weekdays.length > 0) {
+        caption += ` on ${formatWeekdays(data.weekdays)}`;
+      }
+      break;
+
+    case 'monthly':
+      caption += `on ${formatOrdinal(data.day_of_month || 0)} day of every ${data.interval} month${data.interval > 1 ? 's' : ''}`;
+      break;
+
+    case 'quarterly':
+      caption += `on ${formatOrdinal(data.day_of_month || 0)} day of every ${data.interval} quarter${data.interval > 1 ? 's' : ''}`;
+      break;
+
+    case 'yearly':
+      if (data.month && data.day_of_month) {
+        caption += `on ${formatOrdinal(data.day_of_month || 0)} day of ${Months[data.month - 1]} every ${data.interval} year${data.interval > 1 ? 's' : ''}`;
+      } else {
+        caption += `every ${data.interval} year${data.interval > 1 ? 's' : ''}`;
+      }
+      break;
+  }
+
+  if (data.start_date) {
+    caption += ` starting ${formatDate(data.start_date, 'dd-MM-yyyy')}`;
+  }
+
+  if (data.until) {
+    caption += ` until ${formatDate(data.until, 'dd-MM-yyyy')}`;
+  }
+
+  return caption;
 }

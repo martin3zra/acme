@@ -17,6 +17,7 @@ import { Label } from '@/components/ui/label';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Separator } from '@/components/ui/separator';
+import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { useHeader } from '@/composables/use-headers';
 import { useNumber } from '@/composables/use-number';
 import { useDebounced } from '@/hooks/use-debounced';
@@ -30,6 +31,7 @@ import {
   CashForm,
   CheckForm,
   Customer,
+  DiscountType,
   InvoiceForm,
   Item,
   LineForm,
@@ -37,21 +39,35 @@ import {
   PaymentMethod,
   PaymentTerm,
   PaymentTermValue,
+  Recurrent,
   TaxReceipt,
   TransactionKind,
 } from '@/types';
 import { Textarea } from '@headlessui/react';
 import { router, useForm, usePage } from '@inertiajs/react';
 import { format } from 'date-fns';
-import { CalendarIcon } from 'lucide-react';
+import { CalendarIcon, RefreshCwIcon } from 'lucide-react';
 import React, { useCallback, useEffect } from 'react';
-import { defaultDiscount, defaultInvoiceForm, makeCreateBreadcrumbs, paymentTerms } from './constants';
+import { defaultDiscount, defaultInvoiceForm, defaultReccurence, makeCreateBreadcrumbs, paymentTerms } from './constants';
 import CheckoutForm from './Shared/checkout-form';
 import { CustomerSection } from './Shared/customer-section';
 import { Lines } from './Shared/lines';
+import { RecurrenceForm } from './Shared/recurrence-form';
 
 interface InvoiceRedirectProps {
   redirectTo: string;
+}
+
+export interface InvoiceFormData {
+  customer_id: number;
+  terms: string;
+  tax_receipt: number;
+  lines: any[];
+  date: Date;
+  discount: DiscountType;
+  kind: string;
+  recurrence: Recurrent;
+  [key: string]: any;
 }
 
 export default function Create({
@@ -76,6 +92,7 @@ export default function Create({
   const t = useTranslation().trans;
   const currency = useNumber().currency;
   const [open, setOpen] = React.useState(false);
+  const [markAsRecurrent, setMarkAsRecurrent] = React.useState(false);
   const [openCancelConfirmation, setCancelConfirmation] = React.useState(false);
   const [openCheckout, setCheckout] = React.useState(false);
   const [isEditing, setEditing] = React.useState(false);
@@ -92,7 +109,7 @@ export default function Create({
 
   const { headers } = useHeader();
   const { errors: propsErrors } = usePage<PageProps>().props;
-  const { post, transform, processing, errors } = useForm({
+  const { data, setData, post, transform, processing, errors } = useForm<InvoiceFormData>({
     customer_id: 0,
     terms: 'pia',
     tax_receipt: 0,
@@ -100,7 +117,9 @@ export default function Create({
     date: new Date(),
     discount: defaultDiscount,
     kind,
+    recurrence: defaultReccurence,
   });
+  const canEnableRecurrence = invoiceForm.header.customer !== undefined && invoiceForm.lines.length > 0 && !!invoiceForm.header.date;
 
   useEffect(() => setCurrentItem(item), [item]);
 
@@ -367,6 +386,11 @@ export default function Create({
     });
   };
 
+  const handleMarkAsRecurrent = (event: React.MouseEvent<HTMLButtonElement>) => {
+    setData('recurrence', { ...data.recurrence, enabled: true });
+    setMarkAsRecurrent(true);
+  };
+
   return (
     <AppLayout user={auth.user} breadcrumbs={makeCreateBreadcrumbs(kind)}>
       <AppLayout.Actions>
@@ -375,9 +399,15 @@ export default function Create({
             {t('global.actions.cancel')}
           </Button>
           {showPaymentCTA && (
-            <Button onClick={handleCheckout} disabled={processing || computeTotalAmount() === 0}>
-              {invoiceForm.header.terms === 'pia' ? t('global.actions.checkout') : t('global.actions.save')}
-            </Button>
+            <>
+              <Button onClick={handleMarkAsRecurrent} disabled={processing || !canEnableRecurrence}>
+                <RefreshCwIcon />
+                {t('global.actions.markAsRecurrent')}
+              </Button>
+              <Button onClick={handleCheckout} disabled={processing || computeTotalAmount() === 0}>
+                {invoiceForm.header.terms === 'pia' ? t('global.actions.checkout') : t('global.actions.save')}
+              </Button>
+            </>
           )}
         </div>
       </AppLayout.Actions>
@@ -418,13 +448,7 @@ export default function Create({
                     </Button>
                   </PopoverTrigger>
                   <PopoverContent className="w-auto p-0">
-                    <Calendar
-                      mode="single"
-                      defaultMonth={invoiceForm.header.date}
-                      selected={invoiceForm.header.date}
-                      onSelect={handleDateChange}
-                      initialFocus
-                    />
+                    <Calendar mode="single" defaultMonth={invoiceForm.header.date} selected={invoiceForm.header.date} onSelect={handleDateChange} />
                   </PopoverContent>
                 </Popover>
                 <InputError className="mt-2" message={errors.date} />
@@ -610,6 +634,19 @@ export default function Create({
             currency={currency}
             t={t}
           />
+        )}
+        {kind === 'invoice' && (
+          <Sheet open={markAsRecurrent} onOpenChange={setMarkAsRecurrent}>
+            <SheetContent className="m-4 flex h-[calc(~'(100%-var(--spacing)*4)/3')] w-full flex-col rounded-md sm:max-w-7xl">
+              <SheetHeader>
+                <SheetTitle>Recurrence Invoice</SheetTitle>
+                <SheetDescription className="text-[12px]">
+                  Save time by letting invoices generate automatically on the schedule you choose.
+                </SheetDescription>
+              </SheetHeader>
+              <RecurrenceForm data={data} setData={setData} />
+            </SheetContent>
+          </Sheet>
         )}
       </div>
 

@@ -27,7 +27,7 @@ class SectionTitle extends React.PureComponent<SlotProps> {
       <div className="flex justify-between md:col-span-1">
         <div className="px-4 sm:px-0">
           <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100">{title ? (title as JSX.Element) : null}</h3>
-          <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">{description ? (description as JSX.Element) : null}</p>
+          <div className="mt-1 text-sm text-gray-600 dark:text-gray-400">{description ? (description as JSX.Element) : null}</div>
         </div>
         <div className="px-4 sm:px-0">{aside ? (aside as JSX.Element) : null}</div>
       </div>

@@ -1,6 +1,16 @@
 import { defaultBTForm, defaultCardForm, defaultCashForm, defaultCheckForm } from '@/constants';
 import { capitalize } from '@/lib/utils';
-import { BreadcrumbItem, defaultBreadcrumbs, DiscountType, HeaderForm, InvoiceForm, PaymentMethodsForm, PaymentTerm, TransactionKind } from '@/types';
+import {
+  BreadcrumbItem,
+  defaultBreadcrumbs,
+  DiscountType,
+  HeaderForm,
+  InvoiceForm,
+  PaymentMethodsForm,
+  PaymentTerm,
+  Recurrent,
+  TransactionKind,
+} from '@/types';
 
 export const paymentTerms: PaymentTerm[] = [
   { value: 'pia', label: 'Payment In Advance' },
@@ -43,6 +53,16 @@ export const defaultPaymentMethodsForm: PaymentMethodsForm = {
   card: defaultCardForm,
   bt: defaultBTForm,
 };
+export const defaultReccurence: Recurrent = {
+  enabled: false,
+  name: '',
+  type: 'schedule',
+  frequency: 'monthly',
+  send_email: true,
+  interval: 1,
+  day_of_month: 1,
+  timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+};
 export const defaultDiscount: DiscountType = { value: 0, type: 'fixed' };
 export const defaultHeaderForm: HeaderForm = {
   customer: undefined,
@@ -54,4 +74,10 @@ export const defaultHeaderForm: HeaderForm = {
   discount: defaultDiscount,
 };
 
-export const defaultInvoiceForm: InvoiceForm = { header: defaultHeaderForm, lines: [], payment: defaultPaymentMethodsForm };
+export const defaultInvoiceForm: InvoiceForm = {
+  header: defaultHeaderForm,
+  lines: [],
+  payment: defaultPaymentMethodsForm,
+  kind: 'invoice',
+  source: { id: 0, type: 'invoice' },
+};
