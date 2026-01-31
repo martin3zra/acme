@@ -19,7 +19,13 @@ export default function Line({ line, index, currency, handleRemoveLine }: Props)
       <td className="border border-gray-300 px-1 text-end">{currency(line.price || 0)}</td>
       <td className="border border-gray-300 px-1 text-end">{currency(line.amount || 0)}</td>
       <td className="border border-gray-300 px-1 text-end">
-        <Button variant={'link'} size={'icon'} className="h-8 w-8 rounded-full p-0" data-index={index} onClick={handleRemoveLine}>
+        <Button
+          variant={'link'}
+          size={'icon'}
+          className="text-destructive h-8 w-8 cursor-pointer rounded-full p-0"
+          data-index={index}
+          onClick={handleRemoveLine}
+        >
           <XCircleIcon />
         </Button>
       </td>

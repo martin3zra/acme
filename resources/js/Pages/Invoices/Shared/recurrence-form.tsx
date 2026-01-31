@@ -1,18 +1,28 @@
+import { DatePickerField } from '@/components/date-picker';
 import FormSection from '@/components/form-section';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
-import { Calendar } from '@/components/ui/calendar';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
+import { usePersistedState } from '@/hooks/use-persisted-state';
 import { useTranslation } from '@/hooks/use-translation';
-import { cn, recurrenceCaption, validateRecurrence } from '@/lib/utils';
+import { recurrenceCaption, validateRecurrence } from '@/lib/utils';
 import { Frequency, Months, Recurrent, RecurrentType, WeekDay } from '@/types';
-import { format } from 'date-fns';
-import { CalendarIcon, RefreshCwIcon } from 'lucide-react';
-import { useState } from 'react';
-import { InvoiceFormData } from '../Create';
+import { RefreshCwIcon } from 'lucide-react';
+import React, { JSX, useState } from 'react';
+import { defaultReccurence } from '../constants';
 
 const recurrenceIntervals: Record<Frequency, { min: number; max: number }> = {
   daily: { min: 1, max: 7 }, // every 1–7 days
@@ -23,34 +33,39 @@ const recurrenceIntervals: Record<Frequency, { min: number; max: number }> = {
 };
 
 interface Props {
-  data: InvoiceFormData;
-  setData: <K extends keyof InvoiceFormData>(key: K, value: InvoiceFormData[K]) => void;
+  name?: string;
+  onSubmit: (recurrence: Recurrent) => void;
+  onCancel: () => void;
 }
-export function RecurrenceForm({ data, setData }: Props) {
+export function RecurrenceForm({ name, onSubmit, onCancel }: Props) {
+  const [recurrenceForm, setRecurrenceForm, removeRecurrenceForm] = usePersistedState<Recurrent>('recurrence', {
+    ...defaultReccurence,
+    enabled: true,
+    name: name ?? '',
+  });
   const [error, setError] = useState<string | null>(null);
-  const [openStartDate, setOpenStartDate] = useState(false);
-  const [openUntilDate, setOpenUntilDate] = useState(false);
-  const startDate = data.recurrence.start_date ? new Date(data.recurrence.start_date) : undefined;
-  const until = data.recurrence.until ? new Date(data.recurrence.until) : undefined;
+  const [openCancelConfirmation, setCancelConfirmation] = useState<boolean>(false);
+  const startDate = recurrenceForm.start_date ? new Date(recurrenceForm.start_date) : undefined;
+  const until = recurrenceForm.until ? new Date(recurrenceForm.until) : undefined;
   const t = useTranslation().trans;
   const handleSubmit = (): void => {
     try {
       setError(null);
-      const payload = validateRecurrenceForm(data);
-      console.log('Validated recurrence:', payload);
+      const recurrence = validateRecurrenceForm(recurrenceForm);
+      setRecurrenceForm(() => {
+        return { ...recurrence };
+      });
+      onSubmit(recurrence);
     } catch (err) {
       setError((err as Error).message);
     }
   };
-  const handleStartDateChange = (date: unknown) => {
-    setData('recurrence', { ...data.recurrence, start_date: date as Date });
+  const performRecurrenceCancelation = (event: React.MouseEvent<HTMLButtonElement>) => {
+    removeRecurrenceForm();
+    onCancel();
   };
-  const handleUntilDateChange = (date: unknown) => {
-    setData('recurrence', { ...data.recurrence, until: date as Date });
-  };
-
   const handleFrequencyChange = (val: Recurrent['frequency']) => {
-    const recurrence = { ...data.recurrence, interval: 1, frequency: val };
+    const recurrence = { ...recurrenceForm, interval: 1, frequency: val };
 
     switch (val) {
       case 'yearly':
@@ -69,21 +84,28 @@ export function RecurrenceForm({ data, setData }: Props) {
         break;
     }
 
-    setData('recurrence', recurrence);
+    setRecurrenceForm(() => {
+      return { ...recurrence };
+    });
   };
-  const validateRecurrenceForm = (data: InvoiceFormData): Recurrent => {
+  const handleInputChange = <K extends keyof Recurrent>(key: K, value: number | string | string[] | Date | boolean | undefined) => {
+    setRecurrenceForm(() => {
+      return { ...recurrenceForm, [key]: value };
+    });
+  };
+  const validateRecurrenceForm = (data: Recurrent): Recurrent => {
     // Validate name
-    if (!data.recurrence.name || data.recurrence.name.trim().length === 0) {
+    if (!data.name || data.name.trim().length === 0) {
       throw new Error('Name is required.');
     }
-    if (data.recurrence.name.length > 100) {
+    if (data.name.length > 100) {
       throw new Error('Name cannot exceed 100 characters.');
     }
 
     // Validate date range
-    if (data.recurrence.start_date && data.recurrence.until) {
-      const start = new Date(data.recurrence.start_date);
-      const until = new Date(data.recurrence.until);
+    if (data.start_date && data.until) {
+      const start = new Date(data.start_date);
+      const until = new Date(data.until);
 
       if (start > until) {
         throw new Error('Start date must be before or equal to the until date.');
@@ -91,7 +113,7 @@ export function RecurrenceForm({ data, setData }: Props) {
     }
 
     // Delegate to recurrence-specific validation
-    return validateRecurrence(data.recurrence);
+    return validateRecurrence(data);
   };
 
   return (
@@ -99,46 +121,7 @@ export function RecurrenceForm({ data, setData }: Props) {
       <FormSection onSubmit={handleSubmit}>
         <FormSection.Title>Recurrence</FormSection.Title>
         <FormSection.Description>
-          <p>Manage your recurrent invoices by setting a template name, and recurrency type with the frequency, interval and optional end date.</p>
-          <div className="my-4 space-y-2 rounded bg-gray-50 px-2 py-4 [&_li]:mb-1 [&_span]:font-bold">
-            <ul>
-              <li>
-                <span>Daily</span> → “Every X days”
-                <ul className="list-circle text-muted-foreground mt-2 space-y-1 pl-6 text-sm">
-                  <li>“Every 1 day”</li>
-                  <li>“Every 3 days”</li>
-                </ul>
-              </li>
-              <li>
-                <span>Weekly</span> → “Every X weeks on [weekday(s)]”
-                <ul className="list-circle text-muted-foreground mt-2 space-y-1 pl-6 text-sm">
-                  <li>“Every 1 week on Monday”</li>
-                  <li>“Every 2 weeks on Tuesday and Thursday”</li>
-                </ul>
-              </li>
-              <li>
-                <span>Monthly</span> → “Every X months on day [N]”
-                <ul className="list-circle text-muted-foreground mt-2 space-y-1 pl-6 text-sm">
-                  <li>“Every 1 month on day 15”</li>
-                  <li>“Every 2 month on day 31 (clamped if shorter month)”</li>
-                </ul>
-              </li>
-              <li>
-                <span>Quarterly</span> → “Every X quarters on day [N]”
-                <ul className="list-circle text-muted-foreground mt-2 space-y-1 pl-6 text-sm">
-                  <li>“Every 1 quarter on day 15” → generates invoices every 3 months on the 15th</li>
-                  <li>“Every 2 quarters on day 1” → generates invoices every 6 months on the 1st</li>
-                </ul>
-              </li>
-              <li>
-                <span>Yearly</span> → “Every X years on [Month] [Day]”
-                <ul className="list-circle text-muted-foreground mt-2 space-y-1 pl-6 text-sm">
-                  <li>“Every 1 year on February 15”</li>
-                  <li>“Every 2 years on December 31”</li>
-                </ul>
-              </li>
-            </ul>
-          </div>
+          <RecurrenceDescriptionView />
         </FormSection.Description>
         <FormSection.Form>
           <div className="recurrence-form">{error && <div className="mt-2 text-red-600">{error}</div>}</div>
@@ -148,13 +131,13 @@ export function RecurrenceForm({ data, setData }: Props) {
               <Label>Name</Label>
               <Input
                 name="name"
-                value={data.recurrence.name}
-                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setData('recurrence', { ...data.recurrence, name: e.target.value })}
+                value={recurrenceForm.name}
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleInputChange('name', e.target.value)}
               />
             </div>
             <div className="flex flex-col gap-y-2">
               <Label>Type</Label>
-              <Select value={data.recurrence.type} onValueChange={(val: RecurrentType) => setData('recurrence', { ...data.recurrence, type: val })}>
+              <Select value={recurrenceForm.type} onValueChange={(val: RecurrentType) => handleInputChange('type', val)}>
                 <SelectTrigger className="w-40">
                   <SelectValue />
                 </SelectTrigger>
@@ -168,7 +151,7 @@ export function RecurrenceForm({ data, setData }: Props) {
           <div className="flex items-end space-x-2">
             <div className="flex flex-col gap-y-2">
               <Label>Frequency</Label>
-              <Select value={data.recurrence.frequency} onValueChange={handleFrequencyChange}>
+              <Select value={recurrenceForm.frequency} onValueChange={handleFrequencyChange}>
                 <SelectTrigger className="w-32">
                   <SelectValue />
                 </SelectTrigger>
@@ -186,28 +169,25 @@ export function RecurrenceForm({ data, setData }: Props) {
               <Label>Interval</Label>
               <Input
                 type="number"
-                min={recurrenceIntervals[data.recurrence.frequency].min}
-                max={recurrenceIntervals[data.recurrence.frequency].max}
-                value={data.recurrence.interval}
+                min={recurrenceIntervals[recurrenceForm.frequency].min}
+                max={recurrenceIntervals[recurrenceForm.frequency].max}
+                value={recurrenceForm.interval}
                 onChange={(e) => {
-                  const min = recurrenceIntervals[data.recurrence.frequency].min;
-                  const max = recurrenceIntervals[data.recurrence.frequency].max;
+                  const min = recurrenceIntervals[recurrenceForm.frequency].min;
+                  const max = recurrenceIntervals[recurrenceForm.frequency].max;
                   let value = e.target.valueAsNumber;
                   if (value <= 0) value = min;
                   if (value > max) value = max; // clamp to max
-                  setData('recurrence', { ...data.recurrence, interval: value });
+                  handleInputChange('interval', value);
                 }}
                 className="w-20"
               />
             </div>
 
-            {data.recurrence.frequency === 'yearly' && (
+            {recurrenceForm.frequency === 'yearly' && (
               <div className="flex flex-col gap-y-2">
                 <Label>Month</Label>
-                <Select
-                  value={String(data.recurrence.month ?? 1)}
-                  onValueChange={(val) => setData('recurrence', { ...data.recurrence, month: Number(val) })}
-                >
+                <Select value={String(recurrenceForm.month ?? 1)} onValueChange={(val) => handleInputChange('month', Number(val))}>
                   <SelectTrigger className="w-36">
                     <SelectValue />
                   </SelectTrigger>
@@ -222,13 +202,10 @@ export function RecurrenceForm({ data, setData }: Props) {
               </div>
             )}
 
-            {['monthly', 'quarterly', 'yearly'].includes(data.recurrence.frequency) && (
+            {['monthly', 'quarterly', 'yearly'].includes(recurrenceForm.frequency) && (
               <div className="flex flex-col gap-y-2">
                 <Label>Day of Month</Label>
-                <Select
-                  value={String(data.recurrence.day_of_month ?? 1)}
-                  onValueChange={(val) => setData('recurrence', { ...data.recurrence, day_of_month: Number(val) })}
-                >
+                <Select value={String(recurrenceForm.day_of_month ?? 1)} onValueChange={(val) => handleInputChange('day_of_month', Number(val))}>
                   <SelectTrigger className="w-22">
                     <SelectValue />
                   </SelectTrigger>
@@ -243,13 +220,13 @@ export function RecurrenceForm({ data, setData }: Props) {
               </div>
             )}
 
-            {data.recurrence.frequency === 'weekly' && (
+            {recurrenceForm.frequency === 'weekly' && (
               <div className="flex">
                 <ToggleGroup
                   type="multiple"
                   size={'sm'}
-                  value={data.recurrence.weekdays}
-                  onValueChange={(weeks: WeekDay[]) => setData('recurrence', { ...data.recurrence, weekdays: weeks })}
+                  value={recurrenceForm.weekdays}
+                  onValueChange={(weeks: WeekDay[]) => handleInputChange('weekdays', weeks)}
                 >
                   {['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'].map((w, index) => (
                     <ToggleGroupItem value={w} key={index} className="data-[state=on]:bg-primary data-[state=on]:text-primary-foreground capitalize">
@@ -263,76 +240,103 @@ export function RecurrenceForm({ data, setData }: Props) {
 
           <div className="flex space-x-2">
             <div className="flex flex-col gap-y-2">
-              <Label>Start Date</Label>
-              <Button
-                variant="outline"
-                className={cn('w-[260px] justify-start text-left font-normal', !startDate && 'text-muted-foreground')}
-                onClick={() => setOpenStartDate((v) => !v)}
-              >
-                <CalendarIcon className="mr-2 h-4 w-4" />
-                {startDate ? format(startDate, 'PPP') : <span>{t('global.datePlaceholder')}</span>}
-              </Button>
-
-              <div className="relative">
-                {openStartDate && (
-                  <div className="bg-popover absolute z-50 mt-2 rounded-md border shadow-md">
-                    <Calendar
-                      mode="single"
-                      selected={startDate}
-                      onSelect={(date) => {
-                        if (!date) return;
-                        handleStartDateChange(date);
-                        setOpenStartDate(false); // close after select
-                      }}
-                    />
-                  </div>
-                )}
-              </div>
+              <DatePickerField
+                id="startDate"
+                label={t('global.date')}
+                placeholder={t('global.datePlaceholder')}
+                value={startDate}
+                onChange={(date: Date | undefined) => handleInputChange('start_date', date)}
+              />
             </div>
             <div className="flex flex-col gap-y-2">
-              <Label>Until Date</Label>
-              <Button
-                variant="outline"
-                className={cn('w-[260px] justify-start text-left font-normal', !until && 'text-muted-foreground')}
-                onClick={() => setOpenUntilDate((v) => !v)}
-              >
-                <CalendarIcon className="mr-2 h-4 w-4" />
-                {until ? format(until, 'PPP') : <span>{t('global.datePlaceholder')}</span>}
-              </Button>
-
-              <div className="relative">
-                {openUntilDate && (
-                  <div className="bg-popover absolute z-50 mt-2 rounded-md border shadow-md">
-                    <Calendar
-                      mode="single"
-                      selected={until}
-                      onSelect={(date) => {
-                        if (!date) return;
-                        handleUntilDateChange(date);
-                        setOpenUntilDate(false); // close after select
-                      }}
-                    />
-                  </div>
-                )}
-              </div>
+              <DatePickerField
+                id="until"
+                label={t('global.date')}
+                placeholder={t('global.datePlaceholder')}
+                value={until}
+                onChange={(date: Date | undefined) => handleInputChange('until', date)}
+              />
             </div>
           </div>
 
           <div className="flex items-center space-x-2">
-            <Switch id="send_email" />
+            <Switch id="send_email" onCheckedChange={(checked: boolean) => handleInputChange('send_email', checked)} />
             <Label htmlFor="send_email">Enviar correos electrónicos automáticamente</Label>
           </div>
           <div className="flex items-center space-x-2 rounded bg-gray-50 py-2 ps-4">
             <RefreshCwIcon className="size-4 text-gray-400" />
             <div>
-              <div>{recurrenceCaption(data.recurrence)}</div>
+              <div>{recurrenceCaption(recurrenceForm)}</div>
             </div>
           </div>
         </FormSection.Form>
         <FormSection.Actions>
+          <Button type="button" variant={'ghost'} onClick={() => setCancelConfirmation(true)}>
+            {t('global.cancel')}
+          </Button>
           <Button>{t('global.save')}</Button>
         </FormSection.Actions>
       </FormSection>
+
+      <AlertDialog open={openCancelConfirmation} onOpenChange={setCancelConfirmation}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{t('invoices.confirmsCancelation.title')}</AlertDialogTitle>
+            <AlertDialogDescription>{t('invoices.confirmsCancelation.description')}</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>{t('global.cancel')}</AlertDialogCancel>
+            <AlertDialogAction onClick={performRecurrenceCancelation}>{t('invoices.confirmsCancelation.confirm')}</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
+
+const RecurrenceDescriptionView = (): JSX.Element => {
+  return (
+    <>
+      <p>Manage your recurrent invoices by setting a template name, and recurrency type with the frequency, interval and optional end date.</p>
+      <div className="my-4 space-y-2 rounded bg-gray-50 px-2 py-4 [&_li]:mb-1 [&_span]:font-bold">
+        <ul>
+          <li>
+            <span>Daily</span> → “Every X days”
+            <ul className="list-circle text-muted-foreground mt-2 space-y-1 pl-6 text-sm">
+              <li>“Every 1 day”</li>
+              <li>“Every 3 days”</li>
+            </ul>
+          </li>
+          <li>
+            <span>Weekly</span> → “Every X weeks on [weekday(s)]”
+            <ul className="list-circle text-muted-foreground mt-2 space-y-1 pl-6 text-sm">
+              <li>“Every 1 week on Monday”</li>
+              <li>“Every 2 weeks on Tuesday and Thursday”</li>
+            </ul>
+          </li>
+          <li>
+            <span>Monthly</span> → “Every X months on day [N]”
+            <ul className="list-circle text-muted-foreground mt-2 space-y-1 pl-6 text-sm">
+              <li>“Every 1 month on day 15”</li>
+              <li>“Every 2 month on day 31 (clamped if shorter month)”</li>
+            </ul>
+          </li>
+          <li>
+            <span>Quarterly</span> → “Every X quarters on day [N]”
+            <ul className="list-circle text-muted-foreground mt-2 space-y-1 pl-6 text-sm">
+              <li>“Every 1 quarter on day 15” → generates invoices every 3 months on the 15th</li>
+              <li>“Every 2 quarters on day 1” → generates invoices every 6 months on the 1st</li>
+            </ul>
+          </li>
+          <li>
+            <span>Yearly</span> → “Every X years on [Month] [Day]”
+            <ul className="list-circle text-muted-foreground mt-2 space-y-1 pl-6 text-sm">
+              <li>“Every 1 year on February 15”</li>
+              <li>“Every 2 years on December 31”</li>
+            </ul>
+          </li>
+        </ul>
+      </div>
+    </>
+  );
+};

@@ -251,15 +251,15 @@ func (s *Server) storeInvoice(ctx context.Context, form *StoreInvoiceForm) (stri
 			taxNumber = &taxReceiptSequence.Number
 		}
 
-		var source *string
-		if form.Source != nil {
-			j := foundation.ToJSON(form.Source)
+		var source *[]byte
+		if form.Source != nil && form.Source.ID != "" {
+			j := foundation.AsJSON(form.Source)
 			source = &j
 		}
 
-		var recurrence *string
+		var recurrence *[]byte
 		if form.Recurrence != nil {
-			_recurrence := foundation.ToJSON(form.Recurrence)
+			_recurrence := foundation.AsJSON(form.Recurrence)
 			recurrence = &_recurrence
 		}
 
@@ -296,7 +296,7 @@ func (s *Server) storeInvoice(ctx context.Context, form *StoreInvoiceForm) (stri
 			return err
 		}
 
-		if form.Source != nil {
+		if form.Source != nil && form.Source.ID != "" {
 			// When we are duplicating an existing invoice, we set
 			// a relationshipt bewteen both invoice using the
 			// source column to keep track of them.

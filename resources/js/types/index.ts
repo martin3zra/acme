@@ -97,7 +97,7 @@ export type CustomerTypeFilter = CustomerType | 'all';
 
 export type InvoiceTypeFilter = 'all' | 'cash' | 'credit';
 
-export type TransactionKind = 'invoice' | 'estimate' | 'order';
+export type TransactionKind = 'invoice' | 'estimate' | 'order' | 'template';
 
 export interface OpenBalance {
   invoice_id: number;

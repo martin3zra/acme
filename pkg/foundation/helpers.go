@@ -75,6 +75,15 @@ func ToJSON(m any) string {
 	return strings.ReplaceAll(string(js), ",", ", ")
 }
 
+func AsJSON(m any) []byte {
+	js, err := json.Marshal(m)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	return js
+}
+
 func MapSlice[T, U any](s []T, f func(T) U) []U {
 	result := make([]U, len(s))
 	for i, v := range s {

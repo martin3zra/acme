@@ -41,6 +41,7 @@ export default function Index({
 
   const screen = {
     invoice: { key: 'invoices', title: t('invoices.newInvoice.title'), url: '/invoices/create' },
+    template: { key: 'invoices', title: t('invoices.newInvoice.title'), url: '/invoices/create' },
     estimate: { key: 'estimates', title: t('estimates.newEstimate.title'), url: '/estimates/create' },
     order: { key: 'orders', title: t('orders.newOrder.title'), url: '/orders/create' },
   }[kind];

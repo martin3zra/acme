@@ -1,4 +1,5 @@
 import { AlertDestructive } from '@/components/alert-destructive';
+import { DatePickerField } from '@/components/date-picker';
 import InputError from '@/components/input-error';
 import {
   AlertDialog,
@@ -11,10 +12,8 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
-import { Calendar } from '@/components/ui/calendar';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Separator } from '@/components/ui/separator';
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet';
@@ -24,7 +23,7 @@ import { useDebounced } from '@/hooks/use-debounced';
 import { usePersistedState } from '@/hooks/use-persisted-state';
 import { useTranslation } from '@/hooks/use-translation';
 import AppLayout from '@/layouts/app-layout';
-import { addDays, cn, getDaysFromTerm, isNotEmpty, parsePaymentMethod } from '@/lib/utils';
+import { addDays, getDaysFromTerm, isNotEmpty, parsePaymentMethod } from '@/lib/utils';
 import {
   BTForm,
   CardForm,
@@ -46,7 +45,7 @@ import {
 import { Textarea } from '@headlessui/react';
 import { router, useForm, usePage } from '@inertiajs/react';
 import { format } from 'date-fns';
-import { CalendarIcon, RefreshCwIcon } from 'lucide-react';
+import { RefreshCwIcon } from 'lucide-react';
 import React, { useCallback, useEffect } from 'react';
 import { defaultDiscount, defaultInvoiceForm, defaultReccurence, makeCreateBreadcrumbs, paymentTerms } from './constants';
 import CheckoutForm from './Shared/checkout-form';
@@ -119,7 +118,7 @@ export default function Create({
     kind,
     recurrence: defaultReccurence,
   });
-  const canEnableRecurrence = invoiceForm.header.customer !== undefined && invoiceForm.lines.length > 0 && !!invoiceForm.header.date;
+  const canEnableRecurrence = invoiceForm.header.customer !== undefined && invoiceForm.lines.length > 0;
 
   useEffect(() => setCurrentItem(item), [item]);
 
@@ -138,6 +137,7 @@ export default function Create({
   useEffect(() => {
     if (currentItem) {
       findCurrentItem();
+      qtyInputRef.current!.value = '1';
       qtyInputRef.current?.focus();
     }
   }, [currentItem, findCurrentItem]);
@@ -178,6 +178,10 @@ export default function Create({
         return;
       }
       if (event.currentTarget.name === 'qty' && currentItem != undefined) {
+        if (isNaN(event.currentTarget.valueAsNumber)) {
+          qtyInputRef.current!.value = '1';
+          setAmount(currentItem.price);
+        }
         processCurrentItem();
       }
     }
@@ -194,8 +198,12 @@ export default function Create({
       }
       setEditing(false);
     } else {
+      let amountValue = amount;
+      if (isNaN(amount)) {
+        amountValue = line.price * (qtyInputRef.current?.valueAsNumber || 0);
+      }
       // When searching for the current item, if exists on the invoice, then display current values, and update the qty
-      invoiceForm.lines.push({ ...line, qty: qtyInputRef.current?.valueAsNumber || 0, amount, action: 'added' });
+      invoiceForm.lines.push({ ...line, qty: qtyInputRef.current?.valueAsNumber || 0, amount: amountValue, action: 'added' });
     }
     setInvoiceForm(() => {
       return { ...invoiceForm, lines: [...invoiceForm.lines] };
@@ -303,6 +311,20 @@ export default function Create({
     placedInvoice();
   };
 
+  const handleCancelRecurrence = () => {
+    setMarkAsRecurrent(false);
+  };
+
+  const handleRecurrenceSubmission = (recurrence: Recurrent) => {
+    setData('recurrence', { ...recurrence });
+    setInvoiceForm(() => {
+      return { ...invoiceForm, kind: 'template' };
+    });
+
+    handleCancelRecurrence();
+    placedInvoice();
+  };
+
   const placedInvoice = () => {
     transform((data) => {
       const payload: Record<string, any> = {
@@ -313,7 +335,7 @@ export default function Create({
         // tax_receipt: invoiceForm.header.taxReceipt,
         discount: invoiceForm.header.discount,
         notes: invoiceForm.header.notes || '',
-        kind: kind,
+        kind: invoiceForm.kind,
         lines: invoiceForm.lines.map((line) => {
           return { id: line.id, qty: line.qty, unit: line.unit.id, price: line.price, rate: line.tax.rate, action: line.action };
         }),
@@ -326,6 +348,13 @@ export default function Create({
         payload.discount = invoiceForm.header.discount;
         payload.payment = invoiceForm.payment;
         payload.source = invoiceForm.source;
+      }
+
+      if (invoiceForm.kind === 'template') {
+        payload.source = { type: 'template', id: '' };
+        payload.terms = invoiceForm.header.terms;
+        payload.tax_receipt = invoiceForm.header.taxReceipt;
+        payload.discount = invoiceForm.header.discount;
       }
       return payload;
     });
@@ -387,7 +416,6 @@ export default function Create({
   };
 
   const handleMarkAsRecurrent = (event: React.MouseEvent<HTMLButtonElement>) => {
-    setData('recurrence', { ...data.recurrence, enabled: true });
     setMarkAsRecurrent(true);
   };
 
@@ -400,7 +428,7 @@ export default function Create({
           </Button>
           {showPaymentCTA && (
             <>
-              <Button onClick={handleMarkAsRecurrent} disabled={processing || !canEnableRecurrence}>
+              <Button onClick={handleMarkAsRecurrent} disabled={processing || !canEnableRecurrence} className="bg-green-600 hover:bg-green-700">
                 <RefreshCwIcon />
                 {t('global.actions.markAsRecurrent')}
               </Button>
@@ -435,24 +463,15 @@ export default function Create({
           />
           <div className="grid grid-cols-12">
             <div className="col-span-6 flex flex-col gap-y-6">
-              <div className="flex flex-col gap-y-2">
-                <Label htmlFor="date">{t('global.date')}</Label>
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button
-                      variant={'outline'}
-                      className={cn('w-[280px] justify-start text-left font-normal', !invoiceForm.header.date && 'text-muted-foreground')}
-                    >
-                      <CalendarIcon />
-                      {invoiceForm.header.date ? format(invoiceForm.header.date, 'PPP') : <span>{t('global.datePlaceholder')}</span>}
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0">
-                    <Calendar mode="single" defaultMonth={invoiceForm.header.date} selected={invoiceForm.header.date} onSelect={handleDateChange} />
-                  </PopoverContent>
-                </Popover>
-                <InputError className="mt-2" message={errors.date} />
-              </div>
+              <DatePickerField
+                id="date"
+                label={t('global.date')}
+                placeholder={t('global.datePlaceholder')}
+                value={invoiceForm.header.date}
+                onChange={handleDateChange}
+                error={errors.date}
+              />
+
               {isInvoice && (
                 <div className="flex flex-col gap-y-2">
                   <Label htmlFor="date">{t('global.dueDate')}</Label>
@@ -535,7 +554,7 @@ export default function Create({
         <div className="col-span-12 min-h-48">
           <div className="flex flex-col gap-y-2">
             <div className="grid grid-cols-12">
-              <div className="col-span-10 flex flex-col gap-y-2 p-2">
+              <div className="col-span-10 flex flex-col gap-y-2 py-2">
                 <Label className="text-sm/6 font-medium">{t('global.notes')}</Label>
                 <Textarea
                   name="notes"
@@ -635,16 +654,21 @@ export default function Create({
             t={t}
           />
         )}
-        {kind === 'invoice' && (
+        {kind === 'invoice' && markAsRecurrent && (
           <Sheet open={markAsRecurrent} onOpenChange={setMarkAsRecurrent}>
-            <SheetContent className="m-4 flex h-[calc(~'(100%-var(--spacing)*4)/3')] w-full flex-col rounded-md sm:max-w-7xl">
+            <SheetContent
+              onInteractOutside={(e) => e.preventDefault()}
+              onPointerDownOutside={(e) => e.preventDefault()}
+              onEscapeKeyDown={(e) => e.preventDefault()}
+              className="m-4 flex h-[calc(~'(100%-var(--spacing)*4)/3')] w-full flex-col rounded-md sm:max-w-7xl [&>button]:hidden"
+            >
               <SheetHeader>
                 <SheetTitle>Recurrence Invoice</SheetTitle>
                 <SheetDescription className="text-[12px]">
                   Save time by letting invoices generate automatically on the schedule you choose.
                 </SheetDescription>
               </SheetHeader>
-              <RecurrenceForm data={data} setData={setData} />
+              <RecurrenceForm name={invoiceForm.header.customer?.name} onSubmit={handleRecurrenceSubmission} onCancel={handleCancelRecurrence} />
             </SheetContent>
           </Sheet>
         )}

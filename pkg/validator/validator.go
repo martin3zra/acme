@@ -345,7 +345,7 @@ func (v *Validator) evaluateMultipleValueRule(key, rule string, value reflect.Va
 		if !e {
 			return
 		}
-		if attributes[1] != siblingValue {
+		if !slices.Contains(attributes[1:], siblingValue) {
 			return
 		}
 		if !v.validateRuleWithoutAttributes("required", value) {
@@ -430,14 +430,14 @@ func (v *Validator) resolveMessages() map[string]any {
 	return locale.EnglishMessages()
 }
 
-func getFieldValueByJSONTag(v reflect.Value, tag string) (any, bool) {
+func getFieldValueByJSONTag(v reflect.Value, tag string) (string, bool) {
 	// If v is a pointer, resolve it
 	if v.Kind() == reflect.Ptr {
 		v = v.Elem()
 	}
 
 	if v.Kind() != reflect.Struct {
-		return nil, false
+		return "", false
 	}
 
 	t := v.Type()
@@ -448,10 +448,10 @@ func getFieldValueByJSONTag(v reflect.Value, tag string) (any, bool) {
 		jsonTag = strings.Split(jsonTag, ",")[0]
 
 		if jsonTag == tag {
-			return v.Field(i).Interface(), true
+			return v.Field(i).String(), true
 		}
 	}
-	return nil, false
+	return "", false
 }
 
 func getDataTypeUsingReflection(value reflect.Value) string {

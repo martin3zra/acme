@@ -47,6 +47,7 @@
     "user": "Usuario",
     "company": "Compañia",
     "invoice": "Factura",
+    "template": "Factura currente",
     "invoiced": "Facturado",
     "estimate": "Cotización",
     "receiptOfPayment": "Recibo de Ingreso",

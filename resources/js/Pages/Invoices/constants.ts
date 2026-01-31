@@ -58,7 +58,7 @@ export const defaultReccurence: Recurrent = {
   name: '',
   type: 'schedule',
   frequency: 'monthly',
-  send_email: true,
+  send_email: false,
   interval: 1,
   day_of_month: 1,
   timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
@@ -79,5 +79,5 @@ export const defaultInvoiceForm: InvoiceForm = {
   lines: [],
   payment: defaultPaymentMethodsForm,
   kind: 'invoice',
-  source: { id: 0, type: 'invoice' },
+  source: { id: '', type: 'invoice' },
 };

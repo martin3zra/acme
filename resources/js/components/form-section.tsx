@@ -1,5 +1,5 @@
 import { SlotProps } from '@/types';
-import React, { FormEvent } from 'react';
+import React from 'react';
 import SectionTitle from './section-title';
 
 function Title({ children }: SlotProps) {
@@ -29,7 +29,7 @@ class FormSection extends React.Component<Props> {
   static Form = Form;
   static Actions = Actions;
 
-  onSubmit = (event: FormEvent<HTMLFormElement>) => {
+  onSubmit = (event: React.SubmitEvent<HTMLFormElement>) => {
     event.preventDefault();
     this.props.onSubmit();
   };

@@ -307,14 +307,14 @@ func TestCustomErrorMessage(t *testing.T) {
 
 func TestRequiredIfStringRule(t *testing.T) {
 	form := Contact{
-		Name: "invoice",
-		Age:  10,
+		Name: "estimate",
+		// Age:  10,
 	}
 
 	var v = validator.Validator{}
 	v.Validate(context.Background(), &form, map[string]any{
 		"name": "required|in:invoice,estimate,order",
-		"age":  "required_if:name,invoice",
+		"age":  "required_if:name,invoice,template",
 	})
 
 	if len(v.Errors()) > 0 {

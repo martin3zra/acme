@@ -102,7 +102,7 @@ export default function Edit({
       }),
       payment: invoice.header.payment,
       kind: kind,
-      source: { type: kind, id: 0 },
+      source: { type: kind, id: '' },
     };
 
     return _invoice;

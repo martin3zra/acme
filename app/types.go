@@ -370,7 +370,7 @@ type Recurrence struct {
 	Interval  int        `json:"interval"`
 	Timezone  string     `json:"timezone,omitempty"`
 	StartDate *time.Time `json:"start_date,omitempty"`
-	Until     *time.Time `json:"until,omitempty"`
+	Until     *time.Time `json:"until"`
 
 	// Optional fields depending on frequency
 	DayOfMonth int      `json:"day_of_month,omitempty"`
@@ -643,18 +643,18 @@ func (form StoreInvoiceForm) Rules() map[string]any {
 		"kind":                    "bail|required|in:invoice,estimate,order,template",
 		"recurrence":              "bail|sometimes",
 		"recurrence.enabled":      "bail|sometimes",
-		"recurrence.name":         "required|string|max:100",
+		"recurrence.name":         "required|max:100",
 		"recurrence.start_date":   "nullable|date",
 		"recurrence.until":        "nullable|date|after_or_equal:start_date",
 		"recurrence.frequency":    "required|in:daily,weekly,monthly,quarterly,yearly",
 		"recurrence.interval":     "required|integer|min:1",
-		"recurrence.weekdays":     "required_if:frequency,weekly|array|min:1",
-		"recurrence.day_of_month": "required_if:frequency,monthly,quarterly,yearly|integer|min:1|max:31",
-		"recurrence.month":        "required_if:frequency,yearly|integer|min:1|max:12",
+		"recurrence.weekdays":     "required_if:frequency,weekly|min:1",
+		"recurrence.day_of_month": "required_if:frequency,monthly,quarterly,yearly|min:1|max:31",
+		"recurrence.month":        "required_if:frequency,yearly|min:1|max:12",
 		"source":                  "sometimes",
-		"source.type":             "bail|sometimes|in:estimate,order",
-		"date":                    "bail|required|date|after:yesterday",
-		"terms":                   "bail|required_if:kind,invoice|min:1",
+		"source.type":             "bail|sometimes|in:estimate,order,template",
+		"date":                    "bail|sometimes|required_if:kind,invoice,estimate|date|after:yesterday",
+		"terms":                   "bail|required_if:kind,invoice,template|min:1",
 		"tax_receipt":             "bail|sometimes|required_if:kind,invoice|exists:tax_receipts,id",
 		"lines":                   "required|min:1",
 		"lines.*.id":              "required|exists:items,id",
