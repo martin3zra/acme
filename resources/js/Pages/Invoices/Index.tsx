@@ -3,17 +3,20 @@ import HeadingSmall from '@/components/heading-small';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet';
+import { useHeader } from '@/composables/use-headers';
 import useCallbackState from '@/hooks/use-callback-state';
 import { useTranslation } from '@/hooks/use-translation';
 import AppLayout from '@/layouts/app-layout';
 import { capitalize } from '@/lib/utils';
-import { Invoice, InvoiceTypeFilter, InvoiceVerb, InvoiceWithLines, PageProps, TransactionKind } from '@/types';
+import { ErrorResponse, Invoice, InvoiceTypeFilter, InvoiceVerb, InvoiceWithLines, PageProps, Recurrent, TransactionKind } from '@/types';
 import { Link, router, usePage } from '@inertiajs/react';
-import { Ban, DollarSign, NotebookPen, Printer } from 'lucide-react';
+import { Ban, DollarSign, NotebookPen, Printer, RefreshCwIcon } from 'lucide-react';
+import { toast } from 'sonner';
 import { makeBreadcrumbs } from './constants';
 import { List } from './List/Index';
 import { AddNewInvoice } from './Shared/AddNewInvoice';
 import { ConvertToInvoiceAction } from './Shared/convert-to-invoice-action';
+import { RecurrenceForm } from './Shared/recurrence-form';
 import Show from './Show';
 
 export default function Index({
@@ -30,7 +33,9 @@ export default function Index({
   currentInvoiceTypeFilter: InvoiceTypeFilter;
   kind: TransactionKind;
 }>) {
+  const { headers } = useHeader();
   const isInvoice = kind === 'invoice';
+  const [markAsRecurrent, setMarkAsRecurrent] = useCallbackState<boolean>(false);
   const [loadingInvoice, setLoadingInvoice] = useCallbackState<boolean>(false);
   const [open, setOpen] = useCallbackState<boolean>(showInvoice);
   const [selectedInvoice, setSelectedInvoice] = useCallbackState<Invoice | undefined>(undefined);
@@ -55,6 +60,10 @@ export default function Index({
       }
       if (action === 'void') {
         setDeleteDialogOpen(true);
+        return;
+      }
+      if (action === 'mark-as-recurrent') {
+        setMarkAsRecurrent(true);
         return;
       }
     }
@@ -109,6 +118,36 @@ export default function Index({
   const modalHandler = (open: boolean = false) => {
     onOpenChange(open);
     setDeleteDialogOpen(open);
+  };
+
+  const handleMarkAsRecurrent = () => {
+    setMarkAsRecurrent(true);
+  };
+
+  const handleCancelRecurrence = () => {
+    setMarkAsRecurrent(false);
+    localStorage.removeItem('recurrence');
+  };
+
+  const handleRecurrenceSubmission = async (recurrence: Recurrent) => {
+    const response = await fetch(`/invoices/${selectedInvoice?.uuid}/recurrence`, {
+      method: 'POST',
+      headers: {
+        ...headers.headers,
+        'Content-Type': 'application/json',
+        Accept: 'application/json',
+      },
+      credentials: 'include',
+      body: JSON.stringify(recurrence),
+    });
+    if (!response.ok) {
+      const error: ErrorResponse = await response.json();
+      toast.error(error.status);
+      throw new Error('Failed marking invoice as recurrent.', error.data);
+    }
+    handleCancelRecurrence();
+    const data = await response.json();
+    toast.success(data.message);
   };
 
   return (
@@ -176,16 +215,28 @@ export default function Index({
                     )}
 
                     {kind === 'estimate' && (
-                      <ConvertToInvoiceAction title={t('global.convertToInvoice')} renderedAs="button" kind={kind} source={invoice} />
-                    )}
-                    {kind === 'invoice' && (
                       <ConvertToInvoiceAction
-                        mode="duplicate"
-                        title={t('global.duplicateInvoice')}
+                        id={invoice.header.uuid}
+                        title={t('global.convertToInvoice')}
                         renderedAs="button"
                         kind={kind}
                         source={invoice}
                       />
+                    )}
+                    {kind === 'invoice' && invoice.header.status !== 'void' && (
+                      <>
+                        <Button onClick={handleMarkAsRecurrent} className="bg-green-600 hover:bg-green-700">
+                          <RefreshCwIcon />
+                          {t('global.actions.markAsRecurrent')}
+                        </Button>
+                        <ConvertToInvoiceAction
+                          mode="duplicate"
+                          title={t('global.duplicateInvoice')}
+                          renderedAs="button"
+                          kind={kind}
+                          source={invoice}
+                        />
+                      </>
                     )}
                     <a
                       href={invoice.pdfURL}
@@ -221,6 +272,25 @@ export default function Index({
             open={deleteDialogOpen}
             onOpenChange={modalHandler}
           />
+        )}
+
+        {kind === 'invoice' && selectedInvoice && markAsRecurrent && (
+          <Sheet open={markAsRecurrent} onOpenChange={setMarkAsRecurrent}>
+            <SheetContent
+              onInteractOutside={(e) => e.preventDefault()}
+              onPointerDownOutside={(e) => e.preventDefault()}
+              onEscapeKeyDown={(e) => e.preventDefault()}
+              className="m-4 flex h-[calc(~'(100%-var(--spacing)*4)/3')] w-full flex-col rounded-md sm:max-w-7xl [&>button]:hidden"
+            >
+              <SheetHeader>
+                <SheetTitle>Recurrence Invoice</SheetTitle>
+                <SheetDescription className="text-[12px]">
+                  Save time by letting invoices generate automatically on the schedule you choose.
+                </SheetDescription>
+              </SheetHeader>
+              <RecurrenceForm name={selectedInvoice.customer.name} onSubmit={handleRecurrenceSubmission} onCancel={handleCancelRecurrence} />
+            </SheetContent>
+          </Sheet>
         )}
       </div>
     </AppLayout>

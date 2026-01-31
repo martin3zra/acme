@@ -133,6 +133,26 @@ func (form UpdateCustomerForm) Rules() map[string]any {
 	}
 }
 
+type StoreRecurrenceForm struct {
+	support.FormRequest
+	Recurrence
+}
+
+func (form StoreRecurrenceForm) Rules() map[string]any {
+	return map[string]any{
+		"recurrence":              "bail|required",
+		"recurrence.enabled":      "bail|sometimes",
+		"recurrence.name":         "required|max:100",
+		"recurrence.start_date":   "nullable|date",
+		"recurrence.until":        "nullable|date|after_or_equal:start_date",
+		"recurrence.frequency":    "required|in:daily,weekly,monthly,quarterly,yearly",
+		"recurrence.interval":     "required|integer|min:1",
+		"recurrence.weekdays":     "required_if:frequency,weekly|min:1",
+		"recurrence.day_of_month": "required_if:frequency,monthly,quarterly,yearly|min:1|max:31",
+		"recurrence.month":        "required_if:frequency,yearly|min:1|max:12",
+	}
+}
+
 type ConfirmsPasswords struct {
 	support.FormRequest
 	Password string `json:"current_password"`
@@ -353,14 +373,6 @@ var Frequency = struct {
 	Yearly:    _FREQUENCY_YEARLY,
 }
 
-//	type Recurrence struct {
-//		Enabled       bool          `json:"enabled"`
-//		Frequency     FrequencyType `json:"frequency"` // weekly, monthly, quarterly, yearly
-//		Interval      int           `json:"interval"`
-//		Until         string        `json:"until,omitempty"`
-//		NextIssueDate string        `json:"next_issue_date"`
-//		Timezone      string        `json:"timezone"`
-//	}
 type Recurrence struct {
 	Enabled   bool       `json:"enabled"`
 	Name      string     `json:"name"`

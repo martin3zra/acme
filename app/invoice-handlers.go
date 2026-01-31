@@ -353,6 +353,88 @@ func (s *Server) voidInvoiceHandler() routing.HandlerFunc {
 	})
 }
 
+func (s *Server) markInvoiceAsRecurrentHandler() routing.HandlerFunc {
+	return routing.WithRequest(func(ctx *routing.Context, form *StoreRecurrenceForm) {
+
+		invoice, err := s.findInvoicesByUUID(ctx.Request.Context(), TransactionKinds.Invoice, ctx.Param("id"))
+		if err != nil {
+			ctx.JSON(http.StatusInternalServerError, map[string]any{
+				"status": err.Error(),
+			})
+			return
+		}
+
+		lines, err := s.findInvoiceLines(ctx.Request.Context(), invoice.ID)
+		if err != nil {
+			ctx.JSON(http.StatusInternalServerError, map[string]any{
+				"status": err.Error(),
+			})
+			return
+		}
+		formLines := make([]*Line, 0)
+		for _, line := range lines {
+			var l Line
+			l.ID = int(line.ID)
+			l.Unit = int(line.Unit.ID)
+			l.Qty = int(line.Qty)
+			l.Price = line.Price
+			l.Rate = line.Tax.Rate
+			l.Action = "added"
+			l.tax = line.Tax.Amount
+			l.amount = line.Amount
+			l.discount = 0
+			l.total = line.Total
+			formLines = append(formLines, &l)
+		}
+
+		var invoiceForm = &StoreInvoiceForm{
+			Kind:       TransactionKinds.Template,
+			termType:   TermType(invoice.Terms),
+			CustomerID: invoice.Customer.ID,
+			amount:     invoice.Amount,
+			amountDue:  0,
+			Discount:   invoice.Discount,
+			tax:        invoice.Tax,
+			total:      invoice.Total,
+			Notes:      invoice.Notes,
+			paidStatus: PaidStatuses.UnPaid,
+			Payment:    invoice.Payment,
+			Source: &TransactionSource{
+				ID:   invoice.UUID,
+				Type: TransactionKinds.Invoice,
+			},
+			Recurrence: &Recurrence{
+				Enabled:    form.Enabled,
+				Name:       form.Name,
+				Type:       form.Type,
+				SendEmail:  form.SendEmail,
+				Frequency:  form.Frequency,
+				Interval:   form.Interval,
+				Timezone:   form.Timezone,
+				StartDate:  form.StartDate,
+				Until:      form.Until,
+				DayOfMonth: form.DayOfMonth,
+				Weekdays:   form.Weekdays,
+				Month:      form.Month,
+			},
+			Lines: formLines,
+		}
+
+		_, err = s.storeInvoice(ctx.Request.Context(), invoiceForm)
+		if err != nil {
+			log.Printf("Error creating recurring invoice: %v", err)
+			ctx.JSON(http.StatusInternalServerError, map[string]any{
+				"status": s.trans("global.wasNotCreated", i18n.Replacements{"subject": "@global.template"}),
+			})
+			return
+		}
+		ctx.JSON(http.StatusOK, map[string]any{
+			"message": s.trans("global.wasCreated", i18n.Replacements{"subject": "@global.template"}),
+		})
+
+	})
+}
+
 func (s *Server) printInvoiceHandler(ctx *routing.Context) {
 	kind := resolveTransactionKind(ctx)
 

@@ -235,7 +235,7 @@ export interface BreadcrumbItem {
 
 export type Verb = 'create' | 'view' | 'edit' | 'trash';
 
-export type InvoiceVerb = Exclude<Verb, 'trash'> | 'void' | 'record-payment';
+export type InvoiceVerb = Exclude<Verb, 'trash'> | 'void' | 'record-payment' | 'mark-as-recurrent';
 
 export type PaymentVerb = Verb | 'void';
 
@@ -351,18 +351,18 @@ export type Frequency = 'daily' | 'weekly' | 'monthly' | 'quarterly' | 'yearly';
 export type RecurrentType = 'schedule' | 'reminder';
 
 export type Recurrent = {
-  enabled: boolean;
-  name: string;
-  type: RecurrentType;
-  send_email: boolean;
-  frequency: Frequency;
-  interval: number;
-  timezone?: string;
+  enabled: boolean; // toggle
+  name: string; // e.g. "Maintenance"
+  type: RecurrentType; // "schedule" | "reminder"
+  send_email: boolean; // notify user
+  frequency: Frequency; // "daily" | "weekly" | "monthly" | "yearly";
+  interval: number; // e.g. every 2 weeks
+  timezone?: string; // IANA TZ string
   start_date?: Date; // ISO date
   until?: Date; // optional ISO date
 
   // Optional fields depending on frequency
-  day_of_month?: number; // 1–31
+  day_of_month?: number; // 1–31 only for monthly
   weekdays?: WeekDay[];
   month?: number; // 1–12 (for yearly)
 };

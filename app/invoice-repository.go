@@ -305,7 +305,7 @@ func (s *Server) storeInvoice(ctx context.Context, form *StoreInvoiceForm) (stri
 					"UPDATE invoices SET source = $4 "+
 						"WHERE company_id = $1 "+
 						"AND uuid = $2 AND transaction_kind = $3",
-					companyID, form.Source.ID, form.Source.Type, foundation.ToJSON(map[string]any{
+					companyID, form.Source.ID, form.Source.Type, foundation.AsJSON(map[string]any{
 						"type": form.Kind,
 						"id":   invoiceUUID,
 					}))

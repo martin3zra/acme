@@ -58,6 +58,7 @@ func (s *Server) bootRoutes() {
 					route.GET("/invoices/create", s.createInvoiceHandler).Can("create:invoice")
 					route.GET("/invoices/:id/edit", s.editInvoiceHandler).Can("update:invoice")
 					route.PUT("/invoices/:id/void", s.voidInvoiceHandler())
+					route.POST("/invoices/:id/recurrence", s.markInvoiceAsRecurrentHandler())
 					route.GET("/invoices/:id/print/:hash", s.printInvoiceHandler).Middleware(Signed)
 					route.PUT("/invoices/:id", s.updateInvoiceHandler())
 					route.GET("/invoices/:id", s.showInvoiceHandler)

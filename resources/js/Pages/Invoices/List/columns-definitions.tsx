@@ -217,8 +217,13 @@ export const getColumns = ({ kind, onDidClick, t }: Props): ColumnDef<Invoice>[]
               <DropdownMenuItem onClick={() => onDidClick(props.row.original, 'edit')} disabled={disabled}>
                 {t(`${kind}s.edit${capitalize(kind)}.title`)}
               </DropdownMenuItem>
-              {kind === 'invoice' && (
-                <ConvertToInvoiceAction mode="duplicate" id={props.row.original.uuid} title={t('global.duplicateInvoice')} kind={kind} />
+              {kind === 'invoice' && props.row.original.status !== 'void' && (
+                <>
+                  <ConvertToInvoiceAction mode="duplicate" id={props.row.original.uuid} title={t('global.duplicateInvoice')} kind={kind} />
+                  <DropdownMenuItem onClick={() => onDidClick(props.row.original, 'mark-as-recurrent')}>
+                    {t('global.actions.markAsRecurrent')}
+                  </DropdownMenuItem>
+                </>
               )}
               {canRecordPayment && (
                 <>
