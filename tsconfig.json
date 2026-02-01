@@ -15,7 +15,8 @@
         "target": "esnext",
         "module": "esnext",
         "lib": ["ESNext", "DOM", "DOM.Iterable"],
-        "moduleResolution": "node"
+        "moduleResolution": "node",
+        "ignoreDeprecations": "6.0"
     },
     "include": [
         "resources/js/**/*.ts",

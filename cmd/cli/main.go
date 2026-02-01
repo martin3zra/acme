@@ -1,12 +1,14 @@
 package main
 
 import (
+	"context"
 	"embed"
 	"fmt"
 	"io"
 	"log"
 	"os"
 	"path/filepath"
+	"time"
 
 	"github.com/joho/godotenv"
 	"github.com/martin3zra/acme/app"
@@ -80,10 +82,13 @@ func run(args []string, stdout io.Writer) error {
 	server := app.NewServer(assets, resources.Views)
 	server.Boot()
 
-	defer func() {
-		server.Shutdown()
-		log.Println("Stopping the server")
-	}()
+	// Create a root context with cancel
+	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer shutdownCancel()
+
+	if err := server.Shutdown(shutdownCtx); err != nil {
+		log.Printf("server shutdown error: %v", err)
+	}
 
 	log.Println("Starting the server")
 

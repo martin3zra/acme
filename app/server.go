@@ -1,16 +1,15 @@
 package app
 
 import (
+	"context"
 	"database/sql"
 	"embed"
 	"fmt"
 	"log"
 	"net/http"
 	"os"
-	"strings"
 	"time"
 
-	"github.com/martin3zra/acme/pkg/foundation"
 	"github.com/martin3zra/acme/pkg/i18n"
 	"github.com/martin3zra/acme/pkg/inertia"
 	"github.com/martin3zra/acme/pkg/mailer"
@@ -34,6 +33,7 @@ type Server struct {
 	resources  embed.FS
 	translator *i18n.Translator
 	route      *routing.Router
+	httpServer *http.Server
 }
 
 func NewServer(assets, resources embed.FS) *Server {
@@ -83,18 +83,30 @@ func (s *Server) configureRouting() {
 	s.bootRoutes()
 }
 
-func (s *Server) Start() {
+func (s *Server) Start() error {
 
-	server := &http.Server{
+	s.httpServer = &http.Server{
 		Addr:    fmt.Sprintf(":%s", s.config.port),
 		Handler: s.sessionManager.Handle(s.BindMiddleware(s.route)),
 	}
-
-	server.ListenAndServe()
+	return s.httpServer.ListenAndServe()
 }
 
-func (s *Server) Shutdown() {
+func (s *Server) Shutdown(ctx context.Context) error {
 	log.Print("Shutting down server")
+	// Stop accepting new connections
+	s.httpServer.SetKeepAlivesEnabled(false)
+
+	// Attempt graceful shutdown
+	if err := s.httpServer.Shutdown(ctx); err != nil {
+		return fmt.Errorf("http shutdown: %w", err)
+	}
+
+	if err := s.db.Close(); err != nil {
+		return fmt.Errorf("db close: %w", err)
+	}
+
+	return nil
 }
 
 func (s *Server) configureSessionManager() {
@@ -138,89 +150,25 @@ func (s *Server) abortWhenPrerequisiteMissing(ctx *routing.Context, resource str
 	return true
 }
 
-var rolePermissionsCache = map[string]map[string]bool{}
+func (s *Server) StartScheduler(ctx context.Context, interval time.Duration) {
+	ticker := time.NewTicker(interval)
+	defer ticker.Stop()
 
-var groupedPermissions = map[string]map[string][]string{
-	"owner": {"*": {"*"}},
-	"admin": {
-		"view":    {"dashboard", "invoice", "estimate", "customer", "item", "payment", "reports", "setting"},
-		"viewAny": {"dashboard", "invoice", "estimate", "customer", "item", "payment", "reports", "setting"},
-		"create":  {"dashboard", "invoice", "estimate", "customer", "item", "payment", "reports", "setting"},
-		"delete":  {"dashboard", "invoice", "estimate", "customer", "item", "payment", "reports", "setting"},
-		"update":  {"dashboard", "invoice", "estimate", "customer", "item", "payment", "reports", "setting", "company:sequence"},
-	},
-	"supervisor": {
-		"view":    {"dashboard", "customer", "item", "payment", "reports"},
-		"viewAny": {"dashboard", "invoice", "estimate", "customer", "item", "payment", "reports"},
-		"create":  {"dashboard", "invoice", "estimate", "customer", "item", "payment", "reports"},
-		"delete":  {"dashboard", "invoice", "estimate", "customer", "item", "payment", "reports"},
-		"update":  {"dashboard", "invoice", "estimate", "customer", "item", "payment", "reports"},
-	},
-	"standard": {
-		"view":   {"invoice", "customer"},
-		"create": {"invoice"},
-	},
-}
-
-func permissions(role string) map[string]bool {
-	if cached, exists := rolePermissionsCache[role]; exists {
-		return cached
-	}
-
-	flatPermissions := make(map[string]bool)
-
-	if rolePermissions, exists := groupedPermissions[role]; exists {
-		for action, modules := range rolePermissions {
-			for _, module := range modules {
-				flatPermissions[action+":"+module] = true
-
-				// If role has full module access ("view:*"), create general key
-				if module == "*" {
-					flatPermissions[action+":*"] = true
+	go func() {
+		for {
+			select {
+			case <-ticker.C:
+				if err := s.runRecurrenceScheduler(); err != nil {
+					log.Printf("Scheduler error: %v", err)
 				}
-
-				// If role has full action access ("*:invoice"), create wildcard key
-				if action == "*" {
-					flatPermissions["*:"+module] = true
-				}
+			case <-ctx.Done():
+				log.Println("scheduler shutting down...")
+				return
 			}
 		}
-
-		// If role has full access ("*:*"), create a general wildcard key
-		if _, exists := rolePermissions["*"]; exists {
-			flatPermissions["*"] = true
-		}
-	}
-
-	rolePermissionsCache[role] = flatPermissions
-	return flatPermissions
+	}()
 }
 
-func Can(user *foundation.User, actionModule string) bool {
-	permissions := permissions(user.Role)
-
-	// If the user requests "*" (full access check), return true if full access exists
-	if actionModule == "*" {
-		return permissions["*"]
-	}
-
-	// Standard permission checks
-	if permissions[actionModule] {
-		return true
-	}
-
-	// Action-wide wildcard (e.g., "view:*")
-	action := actionModule[:strings.Index(actionModule, ":")]
-	if permissions[action+":*"] {
-		return true
-	}
-
-	// Module-wide wildcard (e.g., "*:invoice")
-	module := actionModule[strings.Index(actionModule, ":")+1:]
-	if permissions["*:"+module] {
-		return true
-	}
-
-	// Check for complete wildcard "*:*"
-	return permissions["*"]
+func (s *Server) enqueueInvoiceEmail(invoiceUUID string) {
+	log.Printf("Need to send an email with attached PDF of this invoice :%s", invoiceUUID)
 }

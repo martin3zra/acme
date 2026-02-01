@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"embed"
 	"fmt"
 	"io"
@@ -8,6 +9,7 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
 	"github.com/joho/godotenv"
 	"github.com/martin3zra/acme/app"
@@ -57,13 +59,18 @@ func run(args []string, stdout io.Writer) error {
 	server := app.NewServer(assets, resources)
 	server.Boot()
 
-	defer func() {
-		server.Shutdown()
-		log.Println("Stopping the server")
-	}()
+	// Create a root context with cancel
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	// Start scheduler every 5 minutes
+	server.StartScheduler(ctx, 5*time.Minute)
 
 	go func() {
-		server.Start()
+		if err := server.Start(); err != nil {
+			log.Printf("server error %v", err)
+			cancel() // trigger shutdown
+		}
 		log.Println("Starting the server")
 	}()
 
@@ -72,6 +79,16 @@ func run(args []string, stdout io.Writer) error {
 	signal.Notify(quit, os.Interrupt)
 	signal.Notify(quit, syscall.SIGTERM)
 	<-quit
+	log.Printf("shutting down gracefully")
+
+	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer shutdownCancel()
+
+	cancel() // stop scheduler
+
+	if err := server.Shutdown(shutdownCtx); err != nil {
+		log.Printf("server shutdown error: %v", err)
+	}
 
 	return nil
 }

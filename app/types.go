@@ -153,6 +153,23 @@ func (form StoreRecurrenceForm) Rules() map[string]any {
 	}
 }
 
+func (form StoreRecurrenceForm) AsRecurrence() *Recurrence {
+	return &Recurrence{
+		Enabled:    form.Enabled,
+		Name:       form.Name,
+		Type:       form.Type,
+		SendEmail:  form.SendEmail,
+		Frequency:  form.Frequency,
+		Interval:   form.Interval,
+		Timezone:   form.Timezone,
+		StartDate:  form.StartDate,
+		Until:      form.Until,
+		DayOfMonth: form.DayOfMonth,
+		Weekdays:   form.Weekdays,
+		Month:      form.Month,
+	}
+}
+
 type ConfirmsPasswords struct {
 	support.FormRequest
 	Password string `json:"current_password"`
@@ -385,9 +402,10 @@ type Recurrence struct {
 	Until     *time.Time `json:"until"`
 
 	// Optional fields depending on frequency
-	DayOfMonth int      `json:"day_of_month,omitempty"`
-	Weekdays   []string `json:"weekdays,omitempty"`
-	Month      int      `json:"month,omitempty"`
+	DayOfMonth      int        `json:"day_of_month,omitempty"`
+	Weekdays        []string   `json:"weekdays,omitempty"`
+	Month           int        `json:"month,omitempty"`
+	LastGeneratedAt *time.Time `json:"last_generated_at"`
 }
 
 func (d *Recurrence) Value() (driver.Value, error) {
@@ -691,7 +709,7 @@ func (StoreInvoiceForm) Messages() map[string]string {
 	}
 }
 
-func (form *StoreInvoiceForm) PassedValidation() {
+func (form *StoreInvoiceForm) Compute() {
 	// compute tax for each line
 	form.computeTax()
 
@@ -711,6 +729,10 @@ func (form *StoreInvoiceForm) PassedValidation() {
 		dueDate := form.Date.AddDate(0, 0, termInDays)
 		form.dueOn = &dueDate
 	}
+}
+
+func (form *StoreInvoiceForm) PassedValidation() {
+	form.Compute()
 }
 
 func (form *StoreInvoiceForm) paymentTotalAmount() float64 {
