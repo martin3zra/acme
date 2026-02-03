@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"embed"
+	"errors"
 	"fmt"
 	"log"
 	"net/http"
@@ -89,7 +90,15 @@ func (s *Server) Start() error {
 		Addr:    fmt.Sprintf(":%s", s.config.port),
 		Handler: s.sessionManager.Handle(s.BindMiddleware(s.route)),
 	}
-	return s.httpServer.ListenAndServe()
+
+	log.Printf("HTTP server listening on %s", s.httpServer.Addr)
+
+	err := s.httpServer.ListenAndServe()
+	if errors.Is(err, http.ErrServerClosed) {
+		return nil
+	}
+
+	return err
 }
 
 func (s *Server) Shutdown(ctx context.Context) error {
@@ -151,16 +160,27 @@ func (s *Server) abortWhenPrerequisiteMissing(ctx *routing.Context, resource str
 }
 
 func (s *Server) StartScheduler(ctx context.Context, interval time.Duration) {
-	ticker := time.NewTicker(interval)
-	defer ticker.Stop()
 
 	go func() {
+		ticker := time.NewTicker(interval)
+		defer ticker.Stop()
+		log.Println("scheduler started")
+		running := false
+
 		for {
 			select {
 			case <-ticker.C:
+				if running {
+					log.Println("scheduler already running, skipping tick")
+					continue
+				}
+
+				running = true
 				if err := s.runRecurrenceScheduler(); err != nil {
 					log.Printf("Scheduler error: %v", err)
 				}
+				running = false
+
 			case <-ctx.Done():
 				log.Println("scheduler shutting down...")
 				return

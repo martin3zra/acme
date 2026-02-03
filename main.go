@@ -68,10 +68,9 @@ func run(args []string, stdout io.Writer) error {
 
 	go func() {
 		if err := server.Start(); err != nil {
-			log.Printf("server error %v", err)
+			log.Printf("something wrong happens starting the server error: %v", err)
 			cancel() // trigger shutdown
 		}
-		log.Println("Starting the server")
 	}()
 
 	// Wait for interrupt signal to gracefully shut down the server with a timeout of 10 seconds.

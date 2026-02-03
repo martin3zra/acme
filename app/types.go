@@ -406,6 +406,7 @@ type Recurrence struct {
 	Weekdays        []string   `json:"weekdays,omitempty"`
 	Month           int        `json:"month,omitempty"`
 	LastGeneratedAt *time.Time `json:"last_generated_at"`
+	NextRunAt       *time.Time `json:"next_run_at"`
 }
 
 func (d *Recurrence) Value() (driver.Value, error) {
@@ -714,7 +715,9 @@ func (form *StoreInvoiceForm) Compute() {
 	form.computeTax()
 
 	form.dueOn = nil
-	if form.Kind == TransactionKinds.Estimate || form.Kind == TransactionKinds.Order {
+	if form.Kind == TransactionKinds.Estimate ||
+		form.Kind == TransactionKinds.Order ||
+		form.Kind == TransactionKinds.Template {
 		form.paidStatus = PaidStatuses.UnPaid
 		return
 	}

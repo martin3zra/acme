@@ -4,7 +4,6 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"log"
 	"time"
 
 	"github.com/martin3zra/acme/pkg/database"
@@ -493,144 +492,6 @@ func (s *Server) updateInvoiceBalance(tx *sql.Tx, companyID, invoiceID int, bala
 	return err
 }
 
-func (s *Server) runRecurrenceScheduler() error {
-	ctx := context.Background()
-	rows, err := s.db.QueryContext(ctx, `
-    SELECT id, company_id, recurrence
-    FROM invoices
-    WHERE transaction_kind = 'template'
-      AND recurrence IS NOT NULL
-      AND (recurrence->>'enabled')::boolean = TRUE
-  `)
-	if err != nil {
-		return err
-	}
-	defer rows.Close()
-
-	for rows.Next() {
-		var invoiceID int
-		var companyID int
-		var recurrenceData *Recurrence
-
-		if err := rows.Scan(&invoiceID, &companyID, &recurrenceData); err != nil {
-			return err
-		}
-
-		if err := s.processRecurrence(companyID, invoiceID, recurrenceData); err != nil {
-			log.Printf("recurrence error for invoice %d: %v", invoiceID, err)
-		}
-	}
-	return nil
-}
-
-func (s *Server) processRecurrence(companyID, invoiceID int, r *Recurrence) error {
-
-	if !r.Enabled {
-		return nil
-	}
-
-	loc, err := time.LoadLocation(r.Timezone)
-	if err != nil {
-		return err
-	}
-
-	now := time.Now().In(loc)
-
-	// Stop if until date passed
-	if r.Until != nil && now.After(*r.Until) {
-		return nil
-	}
-
-	// Determine next occurrence
-	next := s.nextOccurrence(r, loc)
-
-	// Idempotency: don’t generate twice
-	if r.LastGeneratedAt != nil && !now.After(*r.LastGeneratedAt) {
-		return nil
-	}
-
-	if now.After(next) || now.Equal(next) {
-		return s.generateInvoice(companyID, invoiceID, r, now)
-	}
-
-	return nil
-}
-
-func (s *Server) nextOccurrence(r *Recurrence, loc *time.Location) time.Time {
-	current := r.StartDate.In(loc)
-	if r.LastGeneratedAt != nil {
-		current = r.LastGeneratedAt.In(loc)
-	}
-
-	switch r.Frequency {
-	case "daily":
-		return current.AddDate(0, 0, r.Interval)
-	case "weekly":
-		return current.AddDate(0, 0, 7*r.Interval)
-	case "monthly":
-		year, month, _ := current.Date()
-		nextMonth := month + time.Month(r.Interval)
-		daysInMonth := daysIn(nextMonth, year)
-		day := min(r.DayOfMonth, daysInMonth)
-		return time.Date(year, nextMonth, day,
-			current.Hour(), current.Minute(), current.Second(), 0, loc)
-	case "yearly":
-		return current.AddDate(r.Interval, 0, 0)
-	default:
-		return current // fallback
-	}
-}
-
-func daysIn(month time.Month, year int) int {
-	return time.Date(year, month+1, 0, 0, 0, 0, 0, time.UTC).Day()
-}
-
-func (s *Server) generateInvoice(companyID, invoiceID int, r *Recurrence, now time.Time) error {
-
-	invoice, err := s.findInvoicesByID(companyID, invoiceID)
-	if err != nil {
-		return err
-	}
-
-	lines, err := s.findInvoiceLines(context.Background(), companyID, invoiceID)
-	if err != nil {
-		return err
-	}
-
-	invoiceForm := mapInvoiceToStoreForm(invoice, lines)
-	invoiceForm.Date = now
-	invoiceForm.Terms = "net30" // do we need to take this from the invoice or customer?
-	invoiceForm.Kind = TransactionKinds.Invoice
-	invoiceForm.Compute()
-	invoiceForm.Source = &TransactionSource{
-		ID:   invoice.UUID,
-		Type: TransactionKinds.Template,
-	}
-	invoiceForm.Recurrence = r
-	// Merge notes: recurrence can append a tag
-	if r.Name != "" {
-		invoiceForm.Notes = fmt.Sprintf("%s (recurrence: %s)", invoiceForm.Notes, r.Name)
-	}
-
-	invoiceUUID, err := s.storeInvoiceBackground(companyID, invoiceForm)
-	if err != nil {
-		return err
-	}
-
-	if r.SendEmail {
-		s.enqueueInvoiceEmail(invoiceUUID)
-	}
-
-	_, err = s.db.Exec(`
-    UPDATE invoices
-    SET recurrence = jsonb_set(recurrence, '{last_generated_at}', to_jsonb($2::timestamptz))
-    WHERE id = $1 
-    AND transaction_kind = 'template'
-  `, invoiceID, now)
-
-	return err
-}
-
 func (s *Server) storeInvoiceBackground(companyID int, form *StoreInvoiceForm) (string, error) {
 	return s.storeInvoiceInternal(context.Background(), companyID, form)
 }
@@ -681,6 +542,8 @@ func (s *Server) storeInvoiceInternal(ctx context.Context, companyID int, form *
 
 		var recurrence *[]byte
 		if form.Recurrence != nil {
+			// set next run until scheduler pick the template up
+			form.Recurrence.NextRunAt = form.Recurrence.StartDate
 			_recurrence := foundation.AsJSON(form.Recurrence)
 			recurrence = &_recurrence
 		}
