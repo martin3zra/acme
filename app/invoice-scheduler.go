@@ -2,68 +2,99 @@ package app
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
-	"log"
 	"strings"
 	"time"
+
+	"github.com/google/uuid"
+	"github.com/martin3zra/acme/pkg/database"
+	"github.com/martin3zra/acme/pkg/foundation"
 )
 
 func (s *Server) runRecurrenceScheduler() error {
-
 	ctx := context.Background()
-	rows, err := s.db.QueryContext(ctx, `
-    SELECT id, company_id, recurrence
-    FROM invoices
-    WHERE transaction_kind = 'template'
-      AND recurrence IS NOT NULL
-      AND (recurrence->>'enabled')::boolean = TRUE
-      AND (recurrence->>'next_run_at')::timestamptz <= now()
-      AND (
-        NOT (recurrence ? 'until')
-        OR (recurrence->>'until') IS NULL
-        OR (recurrence->>'until')::timestamptz >= now()
-      );
-  `)
-	if err != nil {
-		return err
-	}
-	defer rows.Close()
+	var (
+		companyID   int
+		invoiceUUID uuid.UUID
+	)
 
-	for rows.Next() {
-		var invoiceID int
-		var companyID int
-		var recurrenceData *Recurrence
+	err := database.WithTransaction(s.db, func(tx *sql.Tx) error {
 
-		if err := rows.Scan(&invoiceID, &companyID, &recurrenceData); err != nil {
+		var (
+			invoiceID      int
+			recurrenceData *Recurrence
+		)
+
+		err := tx.QueryRowContext(ctx, `
+      SELECT id, company_id, recurrence
+      FROM invoices
+      WHERE transaction_kind = 'template'
+        AND recurrence_next_run_at <= now()
+        AND recurrence IS NOT NULL
+        AND (recurrence->>'enabled')::boolean = TRUE
+        AND (
+          NOT (recurrence ? 'until')
+          OR (recurrence->>'until') IS NULL
+          OR (recurrence->>'until')::timestamptz >= now()
+        )
+      ORDER BY recurrence_next_run_at
+      LIMIT 1
+      FOR UPDATE SKIP LOCKED;
+  `).Scan(&invoiceID, &companyID, &recurrenceData)
+		if err == sql.ErrNoRows {
+			return nil
+		}
+
+		if err != nil {
 			return err
 		}
 
-		if err := s.ProcessRecurrenceAt(time.Now(), companyID, invoiceID, recurrenceData); err != nil {
-			log.Printf("recurrence error for invoice %d: %v", invoiceID, err)
+		invoiceUUID, err = s.ProcessRecurrenceAt(tx, time.Now(), companyID, invoiceID, recurrenceData)
+		if err != nil {
+			return err
 		}
+
+		if !recurrenceData.SendEmail {
+			invoiceUUID = uuid.Nil
+		}
+
+		return nil
+	})
+
+	if err != nil {
+		return err
 	}
+
+	if invoiceUUID != uuid.Nil {
+		go func() {
+			s.enqueueInvoiceEmail(companyID, invoiceUUID.String())
+		}()
+	}
+
 	return nil
 }
 
-func (s *Server) ProcessRecurrenceAt(now time.Time, companyID, invoiceID int, r *Recurrence) error {
+func (s *Server) ProcessRecurrenceAt(tx *sql.Tx, now time.Time, companyID, invoiceID int, r *Recurrence) (uuid.UUID, error) {
 	if !r.Enabled {
-		return nil
+		return uuid.Nil, nil
 	}
 
 	loc, err := time.LoadLocation(r.Timezone)
 	if err != nil {
-		return err
+		return uuid.Nil, err
 	}
 
 	now = now.In(loc)
 
 	// Initialize NextRunAt if missing (first run or legacy data)
 	if r.NextRunAt == nil {
-		return fmt.Errorf("recurrence missing next_run_at (invoice_id=%d)", invoiceID)
+		return uuid.Nil, fmt.Errorf("recurrence missing next_run_at (invoice_id=%d)", invoiceID)
 	}
 
-	if err := s.generateInvoice(companyID, invoiceID, r, *r.NextRunAt); err != nil {
-		return err
+	invoiceUUID, err := s.generateInvoice(tx, companyID, invoiceID, r, *r.NextRunAt)
+	if err != nil {
+		return uuid.Nil, err
 	}
 
 	r.LastGeneratedAt = r.NextRunAt
@@ -72,12 +103,12 @@ func (s *Server) ProcessRecurrenceAt(now time.Time, companyID, invoiceID int, r 
 	next := s.NextOccurrence(r, loc)
 
 	if r.Until != nil && !next.Before(*r.Until) {
-		return s.clearNextRunAt(companyID, invoiceID)
+		return invoiceUUID, s.clearNextRunAt(tx, companyID, invoiceID)
 	}
 
 	r.NextRunAt = &next
 
-	return s.updateNextRunAt(companyID, invoiceID, r)
+	return invoiceUUID, s.updateNextRunAt(tx, companyID, invoiceID, r)
 }
 
 // NextOccurrence calculates the next valid occurrence for a recurrence
@@ -105,10 +136,12 @@ func (s *Server) NextOccurrenceFrom(r *Recurrence, anchor time.Time, loc *time.L
 	case "daily":
 		return anchor.AddDate(0, 0, r.Interval)
 	case "weekly":
-		// Always strictly after anchor
+		// Step 1: move forward at least one day
 		searchStart := anchor.AddDate(0, 0, 1)
 
-		// Skip full recurrence cycles
+		// Step 2: compute the start of the interval window
+		// interval=1 → same week
+		// interval=2 → skip one full week
 		if r.Interval > 1 {
 			searchStart = searchStart.AddDate(0, 0, 7*(r.Interval-1))
 		}
@@ -121,7 +154,7 @@ func (s *Server) NextOccurrenceFrom(r *Recurrence, anchor time.Time, loc *time.L
 			return searchStart
 		}
 
-		// Find earliest allowed weekday
+		// Step 3: Find earliest allowed weekday
 		for i := 0; i < 7; i++ {
 			candidate := searchStart.AddDate(0, 0, i)
 			wd := strings.ToLower(candidate.Weekday().String())
@@ -176,16 +209,16 @@ func daysIn(month time.Month, year int) int {
 	return time.Date(year, month+1, 0, 0, 0, 0, 0, time.UTC).Day()
 }
 
-func (s *Server) generateInvoice(companyID, invoiceID int, r *Recurrence, now time.Time) error {
+func (s *Server) generateInvoice(tx *sql.Tx, companyID, invoiceID int, r *Recurrence, now time.Time) (uuid.UUID, error) {
 
 	invoice, err := s.findInvoicesByID(companyID, invoiceID)
 	if err != nil {
-		return err
+		return uuid.Nil, err
 	}
 
 	lines, err := s.findInvoiceLines(context.Background(), companyID, invoiceID)
 	if err != nil {
-		return err
+		return uuid.Nil, err
 	}
 
 	invoiceForm := mapInvoiceToStoreForm(invoice, lines)
@@ -203,29 +236,25 @@ func (s *Server) generateInvoice(companyID, invoiceID int, r *Recurrence, now ti
 		invoiceForm.Notes = fmt.Sprintf("%s (recurrence: %s)", invoiceForm.Notes, r.Name)
 	}
 
-	invoiceUUID, err := s.storeInvoiceBackground(companyID, invoiceForm)
+	invoiceUUID, err := s.storeInvoiceBackground(tx, companyID, invoiceForm)
 	if err != nil {
-		return err
+		return uuid.Nil, err
 	}
 
-	if r.SendEmail {
-		s.enqueueInvoiceEmail(invoiceUUID)
-	}
-
-	return nil
+	return foundation.AsUUID(invoiceUUID)
 }
 
-func (s *Server) updateNextRunAt(companyID, invoiceID int, r *Recurrence) error {
+func (s *Server) updateNextRunAt(tx *sql.Tx, companyID, invoiceID int, r *Recurrence) error {
 
-	_, err := s.db.Exec(`
+	_, err := tx.Exec(`
     UPDATE invoices
     SET recurrence = 
       jsonb_set(
         jsonb_set(
           COALESCE(recurrence, '{}'::jsonb),
-          '{last_generated_at}', to_jsonb($3::timestamptz)
+          '{last_generated_at}', to_jsonb($3::timestamptz), true
         ),
-        '{next_run_at}', to_jsonb($4::timestamptz), false
+        '{next_run_at}', to_jsonb($4::timestamptz), true
       )
     WHERE company_id = $1
       AND id = $2 
@@ -235,8 +264,8 @@ func (s *Server) updateNextRunAt(companyID, invoiceID int, r *Recurrence) error 
 	return err
 }
 
-func (s *Server) clearNextRunAt(companyID, invoiceID int) error {
-	_, err := s.db.Exec(`
+func (s *Server) clearNextRunAt(tx *sql.Tx, companyID, invoiceID int) error {
+	_, err := tx.Exec(`
 		UPDATE invoices
 		SET recurrence = recurrence - 'next_run_at'
 		WHERE company_id = $1

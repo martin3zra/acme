@@ -10,6 +10,7 @@ import (
 	"reflect"
 	"strings"
 
+	"github.com/google/uuid"
 	"golang.org/x/text/language"
 	"golang.org/x/text/message"
 )
@@ -114,4 +115,15 @@ func FormatAmount(amount float64, options ...string) string {
 		symbol = options[0]
 	}
 	return p.Sprintf("%s%.2f", symbol, amount) // "$1,234,567.89"
+}
+
+func AsUUID(s string) (uuid.UUID, error) {
+	if s == "" {
+		return uuid.Nil, nil
+	}
+	u, err := uuid.Parse(s)
+	if err != nil {
+		return uuid.Nil, err
+	}
+	return u, nil
 }

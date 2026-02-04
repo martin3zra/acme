@@ -19,7 +19,7 @@ import { capitalize } from '@/lib/utils';
 import { DiscountType, Invoice, InvoiceVerb, Replacements, TransactionKind } from '@/types';
 import { Link } from '@inertiajs/react';
 import { ColumnDef } from '@tanstack/react-table';
-import { ExternalLink, MoreHorizontal } from 'lucide-react';
+import { ExternalLink, MoreHorizontal, RefreshCwIcon } from 'lucide-react';
 import { ConvertToInvoiceAction } from '../Shared/convert-to-invoice-action';
 
 type Props = {
@@ -39,7 +39,12 @@ export const getColumns = ({ kind, onDidClick, t }: Props): ColumnDef<Invoice>[]
           aria-label="Select all"
         />
       ),
-      cell: ({ row }) => <Checkbox checked={row.getIsSelected()} onCheckedChange={(value) => row.toggleSelected(!!value)} aria-label="Select row" />,
+      cell: ({ row }) => (
+        <div className="flex space-x-3">
+          <Checkbox checked={row.getIsSelected()} onCheckedChange={(value) => row.toggleSelected(!!value)} aria-label="Select row" />{' '}
+          {row.original.source && row.original.source.type === 'template' && <RefreshCwIcon className="size-4" />}
+        </div>
+      ),
       enableSorting: false,
       enableHiding: false,
     },

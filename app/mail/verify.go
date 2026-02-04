@@ -36,3 +36,7 @@ func (w Verify) Data() map[string]any {
 		"Year":    2025,
 	}
 }
+
+func (i Verify) Attachments() []mailer.Attachment {
+	return make([]mailer.Attachment, 0)
+}

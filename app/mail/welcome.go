@@ -33,3 +33,7 @@ func (w Welcome) Data() map[string]any {
 		"Year":    2025,
 	}
 }
+
+func (i Welcome) Attachments() []mailer.Attachment {
+	return make([]mailer.Attachment, 0)
+}

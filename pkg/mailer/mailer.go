@@ -2,7 +2,10 @@ package mailer
 
 import (
 	"bytes"
+	"crypto/rand"
 	"embed"
+	"encoding/base64"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"html/template"
@@ -35,12 +38,19 @@ type Individual struct {
 	Email string
 }
 
+type Attachment struct {
+	Filename string
+	Content  []byte
+	MIMEType string
+}
+
 type Mailable interface {
 	Subject() string
 	From() Individual
 	To() []Individual
 	Content() string
 	Data() map[string]any
+	Attachments() []Attachment
 }
 
 type Mailer struct {
@@ -68,45 +78,44 @@ func (m Mailer) Send(mailable Mailable) {
 }
 
 func (m Mailer) sendViaAPI(mailable Mailable) {
-
 	to := []map[string]string{{"email": m.to.Email, "name": m.to.Name}}
 	for _, t := range mailable.To() {
 		to = append(to, map[string]string{"email": t.Email, "name": t.Name})
 	}
 
-	emailData := map[string]any{
-		"from":    map[string]string{"email": m.cfg.From, "name": "Alfredo"},
-		"to":      to,
-		"subject": mailable.Subject(),
-		"html":    m.composeHTML(mailable.Content(), mailable.Data()),
+	attachments := []map[string]string{}
+	for _, att := range mailable.Attachments() {
+		encoded := base64.StdEncoding.EncodeToString(att.Content)
+		attachments = append(attachments, map[string]string{
+			"content":     encoded,
+			"filename":    att.Filename,
+			"type":        att.MIMEType,
+			"disposition": "attachment",
+		})
 	}
-	jsonData, err := json.Marshal(emailData)
-	if err != nil {
-		fmt.Printf("Error marshaling JSON: %v\n", err)
-		return
-	}
-	client := &http.Client{}
-	req, err := http.NewRequest("POST", m.cfg.Host, bytes.NewBuffer(jsonData))
 
-	if err != nil {
-		log.Println(err)
-		return
+	emailData := map[string]any{
+		"from":        map[string]string{"email": m.cfg.From, "name": "Alfredo"},
+		"to":          to,
+		"subject":     mailable.Subject(),
+		"html":        m.composeHTML(mailable.Content(), mailable.Data()),
+		"attachments": attachments,
 	}
+
+	jsonData, _ := json.Marshal(emailData)
+	client := &http.Client{}
+	req, _ := http.NewRequest("POST", m.cfg.Host, bytes.NewBuffer(jsonData))
 	req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", m.cfg.Password))
 	req.Header.Add("Content-Type", "application/json")
 
 	res, err := client.Do(req)
 	if err != nil {
-		fmt.Println(err)
+		log.Println(err)
 		return
 	}
 	defer res.Body.Close()
 
-	body, err := io.ReadAll(res.Body)
-	if err != nil {
-		log.Println(err)
-		return
-	}
+	body, _ := io.ReadAll(res.Body)
 	log.Println(string(body))
 }
 
@@ -117,22 +126,57 @@ func (m Mailer) sendViaSMTP(mailable Mailable) {
 		to = append(to, fmt.Sprintf("%s <%s>", t.Name, t.Email))
 	}
 
+	boundary := generateBoundary()
 	subject := mailable.Subject()
 
-	msg := []byte("To: " + strings.Join(to, ", ") + "\r\n" +
-		"From: " + from + "\r\n" +
-		"Subject: " + subject + "\r\n" +
-		"MIME-Version: 1.0\r\n" +
-		"Content-Type: text/html; charset=\"UTF-8\"\r\n" +
-		"\r\n" +
-		m.composeHTML(mailable.Content(), mailable.Data()) + "\r\n")
+	// Headers
+	headers := []string{
+		"To: " + strings.Join(to, ", "),
+		"From: " + from,
+		"Subject: " + subject,
+		"MIME-Version: 1.0",
+		"Content-Type: multipart/mixed; boundary=" + boundary,
+	}
+
+	var msg bytes.Buffer
+	msg.WriteString(strings.Join(headers, "\r\n") + "\r\n\r\n")
+
+	// Body part
+	msg.WriteString("--" + boundary + "\r\n")
+	msg.WriteString("Content-Type: text/html; charset=\"UTF-8\"\r\n\r\n")
+	msg.WriteString(m.composeHTML(mailable.Content(), mailable.Data()) + "\r\n")
+
+	// Attachments
+	for _, att := range mailable.Attachments() {
+		encoded := make([]byte, base64.StdEncoding.EncodedLen(len(att.Content)))
+		base64.StdEncoding.Encode(encoded, att.Content)
+
+		msg.WriteString("--" + boundary + "\r\n")
+		msg.WriteString(fmt.Sprintf("Content-Type: %s\r\n", att.MIMEType))
+		msg.WriteString("Content-Transfer-Encoding: base64\r\n")
+		msg.WriteString(fmt.Sprintf("Content-Disposition: attachment; filename=\"%s\"\r\n\r\n", att.Filename))
+		msg.WriteString(splitBase64(string(encoded)) + "\r\n")
+	}
+
+	msg.WriteString("--" + boundary + "--")
 
 	addr := fmt.Sprintf("%s:%s", m.cfg.Host, m.cfg.Port)
-
-	err := smtp.SendMail(addr, smtp.PlainAuth("", m.cfg.Username, m.cfg.Password, m.cfg.Host), from, to, msg)
+	err := smtp.SendMail(addr, smtp.PlainAuth("", m.cfg.Username, m.cfg.Password, m.cfg.Host), m.cfg.From, []string{m.to.Email}, msg.Bytes())
 	if err != nil {
 		log.Fatalf("failed to send email: %v", err)
 	}
+}
+
+func splitBase64(s string) string {
+	var lines []string
+	for len(s) > 76 {
+		lines = append(lines, s[:76])
+		s = s[76:]
+	}
+	if len(s) > 0 {
+		lines = append(lines, s)
+	}
+	return strings.Join(lines, "\r\n")
 }
 
 func (m Mailer) composeHTML(view string, data map[string]any) string {
@@ -150,4 +194,10 @@ func (m Mailer) composeHTML(view string, data map[string]any) string {
 	}
 
 	return body.String()
+}
+
+func generateBoundary() string {
+	b := make([]byte, 16)
+	_, _ = rand.Read(b)
+	return "----=_Boundary_" + hex.EncodeToString(b)
 }

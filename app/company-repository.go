@@ -123,6 +123,29 @@ func (s *Server) findCompanyByUUID(ctx context.Context, uuid string) (*Company, 
 	return c, nil
 }
 
+func (s *Server) findCompanyByID(ctx context.Context, id int) (*Company, error) {
+	c := new(Company)
+	if err := s.db.QueryRow(`
+  SELECT id, uuid, name, identifier, city, address, created_at, updated_at, deleted_at
+  FROM companies
+  WHERE id = $1
+  `, id).Scan(
+		&c.ID,
+		&c.UUID,
+		&c.Name,
+		&c.Identifier,
+		&c.City,
+		&c.Address,
+		&c.CreatedAt,
+		&c.UpdatedAt,
+		&c.DeletedAt,
+	); err != nil {
+		return nil, err
+	}
+
+	return c, nil
+}
+
 func (s *Server) storeCompany(accountID, userID int, form StoreCompanyForm) error {
 	return database.WithTransaction(s.db, func(tx *sql.Tx) error {
 		var companyID int

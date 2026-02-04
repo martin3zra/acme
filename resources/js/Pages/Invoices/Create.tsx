@@ -295,8 +295,10 @@ export default function Create({
 
   const performInvoiceCancelation = (event: React.MouseEvent<HTMLButtonElement>) => {
     event.preventDefault();
-    removeInvoiceForm();
     router.get(`/${kind}s`);
+    setTimeout(() => {
+      removeInvoiceForm();
+    }, 300);
   };
 
   const handleCheckout = (event: React.MouseEvent<HTMLButtonElement>) => {

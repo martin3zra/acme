@@ -110,7 +110,7 @@ func (s *Server) findInvoices(ctx context.Context, kind TransactionKind, invoice
 	return data, nil
 }
 
-func (s *Server) findInvoicesByUUID(ctx context.Context, kind TransactionKind, uuid string) (*invoice, error) {
+func (s *Server) findInvoicesByUUID(ctx context.Context, kind TransactionKind, companyID int, uuid string) (*invoice, error) {
 	i := new(invoice)
 	err := s.db.QueryRow("SELECT invoices.company_id, invoices.id, invoices.uuid, invoices.code, invoices.date, invoices.due_on, invoices.amount, invoices.amount_due, invoices.discount, invoices.tax, "+
 		"invoices.total, invoices.status, invoices.paid_status, invoices.payment, invoices.note, invoices.tax_receipt_id, invoices.transaction_kind, "+
@@ -121,7 +121,7 @@ func (s *Server) findInvoicesByUUID(ctx context.Context, kind TransactionKind, u
 		"LEFT JOIN tax_receipts ON (invoices.company_id = tax_receipts.company_id AND invoices.tax_receipt_id = tax_receipts.id) "+
 		"WHERE invoices.company_id = $1 "+
 		"AND invoices.transaction_kind = $2 "+
-		"AND invoices.uuid = $3", CurrentCompany(ctx).ID, kind, uuid).
+		"AND invoices.uuid = $3", companyID, kind, uuid).
 		Scan(
 			&i.CompanyID,
 			&i.ID,
@@ -215,13 +215,21 @@ func (s *Server) findInvoicesByID(companyID, invoiceId int) (*invoice, error) {
 }
 
 func (s *Server) storeInvoice(ctx context.Context, form *StoreInvoiceForm) (string, error) {
+	var invoiceUUID string
 	companyID := CurrentCompany(ctx).ID
-	return s.storeInvoiceInternal(ctx, companyID, form)
+
+	err := database.WithTransaction(s.db, func(tx *sql.Tx) error {
+		var err error
+		invoiceUUID, err = s.storeInvoiceInternal(tx, companyID, form)
+		return err
+	})
+
+	return invoiceUUID, err
 }
 
 func (s *Server) updateInvoice(ctx context.Context, uuid string, form *UpdateInvoiceForm) error {
 	companyID := CurrentCompany(ctx).ID
-	invoice, err := s.findInvoicesByUUID(ctx, form.Kind, uuid)
+	invoice, err := s.findInvoicesByUUID(ctx, form.Kind, companyID, uuid)
 	if err != nil {
 		return err
 	}
@@ -299,7 +307,7 @@ func (s *Server) updateInvoice(ctx context.Context, uuid string, form *UpdateInv
 
 func (s *Server) voidInvoice(ctx context.Context, uuid string) error {
 	companyID := CurrentCompany(ctx).ID
-	invoice, err := s.findInvoicesByUUID(ctx, TransactionKinds.Invoice, uuid)
+	invoice, err := s.findInvoicesByUUID(ctx, TransactionKinds.Invoice, companyID, uuid)
 	if err != nil {
 		return err
 	}
@@ -492,143 +500,139 @@ func (s *Server) updateInvoiceBalance(tx *sql.Tx, companyID, invoiceID int, bala
 	return err
 }
 
-func (s *Server) storeInvoiceBackground(companyID int, form *StoreInvoiceForm) (string, error) {
-	return s.storeInvoiceInternal(context.Background(), companyID, form)
+func (s *Server) storeInvoiceBackground(tx *sql.Tx, companyID int, form *StoreInvoiceForm) (string, error) {
+	return s.storeInvoiceInternal(tx, companyID, form)
 }
 
-func (s *Server) storeInvoiceInternal(ctx context.Context, companyID int, form *StoreInvoiceForm) (string, error) {
+func (s *Server) storeInvoiceInternal(tx *sql.Tx, companyID int, form *StoreInvoiceForm) (string, error) {
 	var invoiceUUID string
-	err := database.WithTransaction(s.db, func(tx *sql.Tx) error {
-		var termType *string
-		var taxReceiptSequence *taxReceiptSeq
-		var err error
-		if form.Kind == TransactionKinds.Invoice {
-			termType = (*string)(&form.termType)
-			taxReceiptSequence, err = s.grabTaxReceiptSequence(tx, companyID, form.TaxReceipt)
+	var termType *string
+	var taxReceiptSequence *taxReceiptSeq
+	var err error
+	if form.Kind == TransactionKinds.Invoice {
+		termType = (*string)(&form.termType)
+		taxReceiptSequence, err = s.grabTaxReceiptSequence(tx, companyID, form.TaxReceipt)
+		if err != nil {
+			return invoiceUUID, err
+		}
+	}
+
+	stmt, err := tx.Prepare("INSERT INTO invoices (company_id, tax_receipt_id, tax_receipt_sequence, tax_number, date, type, due_on, customer_id, amount, discount, tax, amount_due, total, note, status, paid_status, payment, code, transaction_kind, source, recurrence) " +
+		"VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21) RETURNING id, uuid")
+	if err != nil {
+		return invoiceUUID, err
+	}
+
+	seqSource := string(form.Kind)
+	if form.Kind == TransactionKinds.Invoice {
+		seqSource = fmt.Sprintf("invoice.%v", form.termType)
+	}
+	seqInfo, err := GetNextSequence(tx, companyID, seqSource)
+	if err != nil {
+		return invoiceUUID, err
+	}
+
+	var taxID *int = nil
+	var taxSeq *int64 = nil
+	var taxNumber *string = nil
+	if taxReceiptSequence != nil {
+		taxID = &form.TaxReceipt
+		taxSeq = &taxReceiptSequence.Seq
+		taxNumber = &taxReceiptSequence.Number
+	}
+
+	var source *[]byte
+	if form.Source != nil && form.Source.ID != "" {
+		j := foundation.AsJSON(form.Source)
+		source = &j
+	}
+
+	var recurrence *[]byte
+	if form.Recurrence != nil {
+		// set next run until scheduler pick the template up
+		form.Recurrence.NextRunAt = form.Recurrence.StartDate
+		_recurrence := foundation.AsJSON(form.Recurrence)
+		recurrence = &_recurrence
+	}
+
+	var invoiceID int
+	err = stmt.QueryRow(
+		companyID,
+		taxID,
+		taxSeq,
+		taxNumber,
+		form.Date,
+		termType,
+		&form.dueOn,
+		form.CustomerID,
+		form.amount,
+		foundation.ToJSON(form.Discount),
+		form.tax,
+		form.amountDue,
+		form.total,
+		form.Notes,
+		InvoiceStatuses.Sent,
+		form.paidStatus,
+		foundation.ToJSON(form.Payment),
+		seqInfo.Code,
+		form.Kind,
+		source,
+		recurrence,
+	).Scan(&invoiceID, &invoiceUUID)
+
+	if err != nil {
+		return invoiceUUID, err
+	}
+
+	if err = s.attachInvoiceLines(tx, companyID, invoiceID, form); err != nil {
+		return invoiceUUID, err
+	}
+
+	if form.Source != nil && form.Source.ID != "" {
+		// When we are duplicating an existing invoice, we set
+		// a relationshipt bewteen both invoice using the
+		// source column to keep track of them.
+		if form.Source.Type == TransactionKinds.Invoice {
+			_, err := tx.Exec(
+				"UPDATE invoices SET source = $4 "+
+					"WHERE company_id = $1 "+
+					"AND uuid = $2 AND transaction_kind = $3",
+				companyID, form.Source.ID, form.Source.Type, foundation.AsJSON(map[string]any{
+					"type": form.Kind,
+					"id":   invoiceUUID,
+				}))
 			if err != nil {
-				return err
+				return invoiceUUID, err
 			}
 		}
 
-		stmt, err := tx.Prepare("INSERT INTO invoices (company_id, tax_receipt_id, tax_receipt_sequence, tax_number, date, type, due_on, customer_id, amount, discount, tax, amount_due, total, note, status, paid_status, payment, code, transaction_kind, source, recurrence) " +
-			"VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21) RETURNING id, uuid")
-		if err != nil {
-			return err
-		}
-
-		seqSource := string(form.Kind)
-		if form.Kind == TransactionKinds.Invoice {
-			seqSource = fmt.Sprintf("invoice.%v", form.termType)
-		}
-		seqInfo, err := GetNextSequence(tx, companyID, seqSource)
-		if err != nil {
-			return err
-		}
-
-		var taxID *int = nil
-		var taxSeq *int64 = nil
-		var taxNumber *string = nil
-		if taxReceiptSequence != nil {
-			taxID = &form.TaxReceipt
-			taxSeq = &taxReceiptSequence.Seq
-			taxNumber = &taxReceiptSequence.Number
-		}
-
-		var source *[]byte
-		if form.Source != nil && form.Source.ID != "" {
-			j := foundation.AsJSON(form.Source)
-			source = &j
-		}
-
-		var recurrence *[]byte
-		if form.Recurrence != nil {
-			// set next run until scheduler pick the template up
-			form.Recurrence.NextRunAt = form.Recurrence.StartDate
-			_recurrence := foundation.AsJSON(form.Recurrence)
-			recurrence = &_recurrence
-		}
-
-		var invoiceID int
-		err = stmt.QueryRow(
-			companyID,
-			taxID,
-			taxSeq,
-			taxNumber,
-			form.Date,
-			termType,
-			&form.dueOn,
-			form.CustomerID,
-			form.amount,
-			foundation.ToJSON(form.Discount),
-			form.tax,
-			form.amountDue,
-			form.total,
-			form.Notes,
-			InvoiceStatuses.Sent,
-			form.paidStatus,
-			foundation.ToJSON(form.Payment),
-			seqInfo.Code,
-			form.Kind,
-			source,
-			recurrence,
-		).Scan(&invoiceID, &invoiceUUID)
-
-		if err != nil {
-			return err
-		}
-
-		if err = s.attachInvoiceLines(tx, companyID, invoiceID, form); err != nil {
-			return err
-		}
-
-		if form.Source != nil && form.Source.ID != "" {
-			// When we are duplicating an existing invoice, we set
-			// a relationshipt bewteen both invoice using the
-			// source column to keep track of them.
-			if form.Source.Type == TransactionKinds.Invoice {
-				_, err := tx.Exec(
-					"UPDATE invoices SET source = $4 "+
-						"WHERE company_id = $1 "+
-						"AND uuid = $2 AND transaction_kind = $3",
-					companyID, form.Source.ID, form.Source.Type, foundation.AsJSON(map[string]any{
-						"type": form.Kind,
-						"id":   invoiceUUID,
-					}))
-				if err != nil {
-					return err
-				}
-			}
-
-			if form.Source.Type == TransactionKinds.Estimate {
-				_, err := tx.Exec(
-					"UPDATE invoices SET status = 'closed', source = $4 "+
-						"WHERE company_id = $1 "+
-						"AND uuid = $2 AND transaction_kind = $3",
-					companyID, form.Source.ID, form.Source.Type, foundation.ToJSON(map[string]any{
-						"type": form.Kind,
-						"id":   invoiceUUID,
-					}))
-				if err != nil {
-					return err
-				}
+		if form.Source.Type == TransactionKinds.Estimate {
+			_, err := tx.Exec(
+				"UPDATE invoices SET status = 'closed', source = $4 "+
+					"WHERE company_id = $1 "+
+					"AND uuid = $2 AND transaction_kind = $3",
+				companyID, form.Source.ID, form.Source.Type, foundation.ToJSON(map[string]any{
+					"type": form.Kind,
+					"id":   invoiceUUID,
+				}))
+			if err != nil {
+				return invoiceUUID, err
 			}
 		}
+	}
 
-		if form.Kind == TransactionKinds.Invoice {
-			// trigger an event for this? Use pipe!!!
-			if form.Terms != "pia" {
-				if err = s.registerReceivable(tx, companyID, invoiceID, form.CustomerID); err != nil {
-					return err
-				}
+	if form.Kind == TransactionKinds.Invoice {
+		// trigger an event for this? Use pipe!!!
+		if form.Terms != "pia" {
+			if err = s.registerReceivable(tx, companyID, invoiceID, form.CustomerID); err != nil {
+				return invoiceUUID, err
+			}
 
-				if err = s.updateCustomerAmountDue(tx, companyID, form.CustomerID, form.amountDue); err != nil {
-					return err
-				}
+			if err = s.updateCustomerAmountDue(tx, companyID, form.CustomerID, form.amountDue); err != nil {
+				return invoiceUUID, err
 			}
 		}
-
-		return nil
-	})
+	}
 
 	return invoiceUUID, err
 }

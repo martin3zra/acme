@@ -1,6 +1,7 @@
 package app
 
 import (
+	"bytes"
 	"context"
 	"database/sql"
 	"embed"
@@ -11,6 +12,7 @@ import (
 	"os"
 	"time"
 
+	"github.com/martin3zra/acme/app/mail"
 	"github.com/martin3zra/acme/pkg/i18n"
 	"github.com/martin3zra/acme/pkg/inertia"
 	"github.com/martin3zra/acme/pkg/mailer"
@@ -189,6 +191,61 @@ func (s *Server) StartScheduler(ctx context.Context, interval time.Duration) {
 	}()
 }
 
-func (s *Server) enqueueInvoiceEmail(invoiceUUID string) {
-	log.Printf("Need to send an email with attached PDF of this invoice :%s", invoiceUUID)
+func (s *Server) enqueueInvoiceEmail(companyID int, invoiceUUID string) {
+	// We need to log those invoices as sent or not?
+
+	type invoiceData struct {
+		Header *invoice `json:"header"`
+		Lines  []*line  `json:"lines"`
+	}
+	ctx := context.Background()
+	invoice, err := s.findInvoicesByUUID(ctx, TransactionKinds.Invoice, companyID, invoiceUUID)
+	if err != nil {
+		log.Println("error fetching invoice: ", invoiceUUID, err)
+		return
+	}
+
+	lines, err := s.findInvoiceLines(ctx, companyID, invoice.ID)
+	if err != nil {
+		log.Println("error fetching invoice lines: ", invoiceUUID)
+		return
+	}
+
+	data := invoiceData{
+		Header: invoice,
+		Lines:  lines,
+	}
+
+	invoicePDF, err := NewInvoicePDF(s.translator, data.Header, data.Lines)
+	if err != nil {
+		log.Println("error generating invoice PDF", invoiceUUID)
+		return
+	}
+
+	company, err := s.findCompanyByID(ctx, invoice.CompanyID)
+	if err != nil {
+		log.Println("error fetching company while generating invoice PDF", invoiceUUID)
+		return
+	}
+	invoicePDF.Header(company)
+	invoicePDF.Lines()
+	invoicePDF.Footer(s.config.appName)
+
+	var buf bytes.Buffer
+	err = invoicePDF.pdf.Output(&buf)
+	if err != nil {
+		log.Println("error sending PDF document to the writer ", err)
+		return
+	}
+
+	s.mailer.
+		To(
+			invoice.Customer.Email,
+			invoice.Customer.Name,
+		).Send(mail.NewInvoiceMail(
+		map[string]any{
+			"header": invoice,
+			"lines":  lines,
+		}, buf.Bytes()))
+
 }

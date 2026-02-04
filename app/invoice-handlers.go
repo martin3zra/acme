@@ -51,10 +51,11 @@ func (s *Server) invoicesHandler(ctx *routing.Context) {
 	}
 
 	if uuid != "" {
+		company := CurrentCompany(ctx.Request.Context())
 		c := cache.NewPgCache(s.db)
 		key := fmt.Sprintf("preview:%s:%s", kind, uuid)
 		data, err := cache.Remember(ctx.Request.Context(), c, key, func() (map[string]any, error) {
-			invoice, err := s.findInvoicesByUUID(ctx.Request.Context(), kind, uuid)
+			invoice, err := s.findInvoicesByUUID(ctx.Request.Context(), kind, company.ID, uuid)
 			if err != nil {
 				return nil, err
 			}
@@ -96,11 +97,11 @@ func (s *Server) showInvoiceHandler(ctx *routing.Context) {
 		})
 		return
 	}
-
+	company := CurrentCompany(ctx.Request.Context())
 	c := cache.NewPgCache(s.db)
 	key := fmt.Sprintf("preview:%s:%s", kind, uuid)
 	data, err := cache.Remember(ctx.Request.Context(), c, key, func() (map[string]any, error) {
-		invoice, err := s.findInvoicesByUUID(ctx.Request.Context(), kind, uuid)
+		invoice, err := s.findInvoicesByUUID(ctx.Request.Context(), kind, company.ID, uuid)
 		if err != nil {
 			return nil, err
 		}
@@ -191,7 +192,8 @@ func (s *Server) createInvoiceHandler(ctx *routing.Context) {
 
 func (s *Server) editInvoiceHandler(ctx *routing.Context) {
 	kind := resolveTransactionKind(ctx)
-	invoice, err := s.findInvoicesByUUID(ctx.Request.Context(), kind, ctx.Param("id"))
+	company := CurrentCompany(ctx.Request.Context())
+	invoice, err := s.findInvoicesByUUID(ctx.Request.Context(), kind, company.ID, ctx.Param("id"))
 	if err != nil {
 		ctx.Error(err)
 		return
@@ -355,8 +357,8 @@ func (s *Server) voidInvoiceHandler() routing.HandlerFunc {
 
 func (s *Server) markInvoiceAsRecurrentHandler() routing.HandlerFunc {
 	return routing.WithRequest(func(ctx *routing.Context, form *StoreRecurrenceForm) {
-
-		invoice, err := s.findInvoicesByUUID(ctx.Request.Context(), TransactionKinds.Invoice, ctx.Param("id"))
+		company := CurrentCompany(ctx.Request.Context())
+		invoice, err := s.findInvoicesByUUID(ctx.Request.Context(), TransactionKinds.Invoice, company.ID, ctx.Param("id"))
 		if err != nil {
 			ctx.JSON(http.StatusInternalServerError, map[string]any{
 				"status": err.Error(),
@@ -404,10 +406,11 @@ func (s *Server) printInvoiceHandler(ctx *routing.Context) {
 		Header *invoice `json:"header"`
 		Lines  []*line  `json:"lines"`
 	}
+	company := CurrentCompany(ctx.Request.Context())
 	c := cache.NewPgCache(s.db)
 	key := fmt.Sprintf("preview:%s:%s", kind, uuid)
 	data, err := cache.Remember(ctx.Request.Context(), c, key, func() (invoiceData, error) {
-		invoice, err := s.findInvoicesByUUID(ctx.Request.Context(), kind, uuid)
+		invoice, err := s.findInvoicesByUUID(ctx.Request.Context(), kind, company.ID, uuid)
 		if err != nil {
 			return invoiceData{}, nil
 		}
@@ -427,7 +430,7 @@ func (s *Server) printInvoiceHandler(ctx *routing.Context) {
 		ctx.Error(err)
 	}
 
-	invoice.Header(ctx.Request.Context())
+	invoice.Header(company)
 	invoice.Lines()
 	invoice.Footer(s.config.appName)
 

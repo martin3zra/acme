@@ -64,7 +64,7 @@ func run(args []string, stdout io.Writer) error {
 	defer cancel()
 
 	// Start scheduler every 5 minutes
-	server.StartScheduler(ctx, 5*time.Minute)
+	server.StartScheduler(ctx, 10*time.Second)
 
 	go func() {
 		if err := server.Start(); err != nil {

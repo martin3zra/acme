@@ -2,7 +2,6 @@ package app
 
 import (
 	"bytes"
-	"context"
 	"encoding/base64"
 	"fmt"
 	"net/http"
@@ -54,10 +53,9 @@ func (i *InvoicePDF) AddLogo() {
 	}
 }
 
-func (i *InvoicePDF) Header(ctx context.Context) {
+func (i *InvoicePDF) Header(company *Company) {
 	i.AddLogo()
 
-	company := CurrentCompany(ctx)
 	// Company Info (top left)
 	i.pdf.SetFont("DejaVu", "", 10)
 	i.pdf.SetXY(50, 10)
@@ -123,15 +121,6 @@ func (i *InvoicePDF) Footer(text string) {
 			0, 10, footer, "", 0, "C", false, 0, "",
 		)
 	})
-
-	if strings.TrimSpace(i.invoice.Notes) != "" {
-		i.pdf.SetY(i.pdf.GetY() + 20)
-		i.pdf.SetFont("DejaVu", "B", 10)
-		i.pdf.CellFormat(30, 8, i.t("global.notes"), "", 0, "L", false, 0, "")
-		i.pdf.Ln(6)
-		i.pdf.SetFont("DejaVu", "", 10)
-		i.pdf.CellFormat(100, 8, i.invoice.Notes, "", 0, "L", false, 0, "")
-	}
 }
 
 func (i *InvoicePDF) Lines() {
