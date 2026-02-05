@@ -24,7 +24,7 @@ export function convertToInvoice(
       return { ...line, total: 0, tax: { ...line.tax, amount: 0 } };
     }),
     payment: source.header.payment,
-    source: { type: kind, id: source.header.uuid },
+    source: { type: kind, id: source.header.uuid, code: source.header.number },
     clonedFrom,
   };
 }

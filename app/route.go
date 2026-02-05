@@ -67,8 +67,17 @@ func (s *Server) bootRoutes() {
 					route.GET("/estimates/create", s.createInvoiceHandler).Can("create:estimate")
 					route.POST("/estimates", s.storeInvoiceHandler())
 					route.GET("/estimates/:id/edit", s.editInvoiceHandler).Can("update:estimate")
+					route.PUT("/estimates/:id/void", s.voidInvoiceHandler())
 					route.GET("/estimates/:id/print/:hash", s.printInvoiceHandler).Middleware(Signed)
 					route.PUT("/estimates/:id", s.updateInvoiceHandler())
+
+					route.GET("/orders", s.invoicesHandler).Can("viewAny:order")
+					route.GET("/orders/create", s.createInvoiceHandler).Can("create:order")
+					route.POST("/orders", s.storeInvoiceHandler())
+					route.GET("/orders/:id/edit", s.editInvoiceHandler).Can("update:order")
+					route.PUT("/orders/:id/void", s.voidInvoiceHandler())
+					route.GET("/orders/:id/print/:hash", s.printInvoiceHandler).Middleware(Signed)
+					route.PUT("/orders/:id", s.updateInvoiceHandler())
 
 					route.GET("/payments", s.paymentsHandler).Can("viewAny:payment")
 					route.POST("/payments", s.storePaymentHandler())

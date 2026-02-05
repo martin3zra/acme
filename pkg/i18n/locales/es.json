@@ -50,11 +50,13 @@
     "template": "Factura currente",
     "invoiced": "Facturado",
     "estimate": "Cotización",
+    "order": "Pedido",
     "receiptOfPayment": "Recibo de Ingreso",
     "weHaveReceivedFrom": "Hemos recibido de",
     "address": "Dirección",
     "invoiceTo": "Facturado A",
     "estimateTo": "Cotizado A",
+    "orderTo": "Pedido A",
     "item": "Producto",
     "contact": "Contacto",
     "profile": "Perfil",
@@ -116,7 +118,8 @@
       "unpaid": "No pagada",
       "partial": "Parcialmente",
       "paid": "Pagada",
-      "refund": "Reembolsado"
+      "refund": "Reembolsado",
+      "completed": "Completo"
     },
     "paymentLinesPaidStatuses": {
       "paid": "Saldo",
@@ -440,6 +443,12 @@
       "void": "Nula",
       "closed": "Cerrada",
       "uncollectible": "Incobrable"
+    },
+    "source": {
+      "order": "Creada desde el pedido :order",
+      "estimate": "Convertido a partir de la cotización :estimate",
+      "template": "Generado automáticamente a partir de una programación recurrente",
+      "invoice": "Duplicado de la factura :invoice"
     }
   },
   "estimates": {
@@ -461,7 +470,7 @@
       "payTo": "Pagar a",
       "estimateTo": "Cotizado a",
       "totalSummary": "Resumen total de la Cotización",
-      "closed": "Cotización convertido: ahora puedes rastrearlo como factura."
+      "closed": "Cotización convertido a :invoice ahora puedes rastrearlo como factura."
     },
     "viewEstimate": {
       "title": "Ver Cotización",
@@ -500,12 +509,16 @@
       "sent": "Enviada",
       "accepted": "Aceptada",
       "rejected": "Rechazada",
-      "closed": "Terminada"
+      "closed": "Terminada",
+      "void": "Nula"
+    },
+    "source": {
+      "invoice": "Convertida en factura :invoice"
     }
   },
   "orders": {
-    "title": "Facturas",
-    "description": "Aquí puedes ver y gestionar todas tus facturas.",
+    "title": "Pedidos",
+    "description": "Aquí puedes ver y gestionar todos tus pedidos.",
     "paidStatus": "Pagada",
     "paymentTerms": "Condiciones de pago",
     "taxReceipt": "Tipo NCF",
@@ -517,53 +530,58 @@
       }
     },
     "single": {
-      "title": "Factura",
-      "description": "Detalles de la factura seleccionada.",
+      "title": "Pedido",
+      "description": "Detalles de la pedido seleccionada.",
       "payTo": "Pagar a",
-      "invoiceTo": "Factura a",
-      "totalSummary": "Resumen total de la factura"
+      "invoiceTo": "Pedido a",
+      "totalSummary": "Resumen total de la pedido",
+      "closed": "Pedido facturado como :invoice ahora puedes rastrearlo como factura."
     },
-    "viewInvoice": {
-      "title": "Ver factura",
-      "description": "Detalles de la factura seleccionada."
+    "viewOrder": {
+      "title": "Ver pedido",
+      "description": "Detalles de la pedido seleccionada."
     },
-    "newInvoice": {
-      "title": "Nueva factura",
-      "description": "Crea una nueva factura para enviar a tu cliente."
+    "newOrder": {
+      "title": "Nuevo pedido",
+      "description": "Crea una nuevo pedido para enviar a tu cliente."
     },
-    "editInvoice": {
-      "title": "Editar factura",
-      "description": "Edita los detalles de la factura seleccionada."
+    "editOrder": {
+      "title": "Editar pedido",
+      "description": "Edita los detalles de la pedido seleccionada."
     },
-    "voidInvoice": {
-      "title": "Anular factura",
-      "description": "Anula los detalles de la factura seleccionada."
+    "voidOrder": {
+      "title": "Anular pedido",
+      "description": "Anula los detalles del pedido seleccionada."
     },
     "emptyState": {
-      "title": "Crea tu primera factura",
-      "description": "Una vez que cree su factura, aparecerá aquí."
+      "title": "Crea tu primera pedido",
+      "description": "Una vez que cree su pedido, aparecerá aquí."
     },
     "confirmsPassword": {
-      "title": "¿Estás seguro que deseas anular :invoice?",
-      "description": "¿Estás seguro de que deseas anular esta factura? Esta acción no se puede deshacer. Una vez que la factura quede nula pasará de :total a $0.00.",
+      "title": "¿Estás seguro que deseas anular :order?",
+      "description": "¿Estás seguro de que deseas anular este pedido? Esta acción no se puede deshacer. Una vez que la pedido quede nulo pasará de :total a $0.00.",
       "confirm": "Si, anular",
       "cancel": "Cancelar"
     },
     "confirmsCancelation": {
       "title": "¿Estás seguro que deseas cancelar?",
-      "description": "Esta acción no se puede deshacer. Eliminará permanentemente los cambios sin guardar de la factura y los datos de nuestros servidores.",
+      "description": "Esta acción no se puede deshacer. Eliminará permanentemente los cambios sin guardar de la pedido y los datos de nuestros servidores.",
       "confirm": "Si, continuar",
       "cancel": "Cancelar"
     },
     "statuses": {
-      "open": "Abierta",
+      "open": "Abierto",
       "draft": "Borrador",
-      "sent": "Enviada",
-      "viewed": "Vista",
-      "overdue": "Atrasada",
-      "completed": "Terminada",
-      "void": "Nula",
-      "partial": "Parcial"
+      "sent": "Enviado",
+      "viewed": "Visto",
+      "overdue": "Atrasado",
+      "completed": "Terminado",
+      "void": "Nulo",
+      "partial": "Parcial",
+      "closed": "Cerrado"
+    },
+    "source": {
+      "invoice": "Este pedido fue facturado como :invoice"
     }
   },
   "customers": {

@@ -350,6 +350,7 @@ var TransactionKinds = struct {
 type TransactionSource struct {
 	Type TransactionKind `json:"type,omitempty"`
 	ID   string          `json:"id,omitempty"`
+	Code string          `json:"code,omitempty"`
 }
 
 func (d *TransactionSource) Value() (driver.Value, error) {
@@ -685,7 +686,7 @@ func (form StoreInvoiceForm) Rules() map[string]any {
 		"source":                  "sometimes",
 		"source.type":             "bail|sometimes|in:estimate,order,template",
 		"date":                    "bail|sometimes|required_if:kind,invoice,estimate|date|after:yesterday",
-		"terms":                   "bail|required_if:kind,invoice,template|min:1",
+		"terms":                   "bail|required_if:kind,invoice,order,template|min:1",
 		"tax_receipt":             "bail|sometimes|required_if:kind,invoice|exists:tax_receipts,id",
 		"lines":                   "required|min:1",
 		"lines.*.id":              "required|exists:items,id",
@@ -715,16 +716,14 @@ func (form *StoreInvoiceForm) Compute() {
 	form.computeTax()
 
 	form.dueOn = nil
-	if form.Kind == TransactionKinds.Estimate ||
-		form.Kind == TransactionKinds.Order ||
-		form.Kind == TransactionKinds.Template {
+	if form.Kind == TransactionKinds.Estimate || form.Kind == TransactionKinds.Template {
 		form.paidStatus = PaidStatuses.UnPaid
 		return
 	}
 	form.paidStatus = PaidStatuses.Paid
 	form.termType = InvoiceTermType.Cash
 	termInDays := getNetDays(form.Terms)
-	if termInDays > 1 {
+	if termInDays >= 0 {
 		form.amountDue = form.total
 		form.paidStatus = PaidStatuses.UnPaid
 		form.termType = InvoiceTermType.Credit
@@ -736,6 +735,12 @@ func (form *StoreInvoiceForm) Compute() {
 
 func (form *StoreInvoiceForm) PassedValidation() {
 	form.Compute()
+}
+
+func (form *StoreInvoiceForm) PrepareForValidation() {
+	if form.Kind != TransactionKinds.Template {
+		form.Recurrence = nil
+	}
 }
 
 func (form *StoreInvoiceForm) paymentTotalAmount() float64 {
@@ -784,7 +789,7 @@ func (form UpdateInvoiceForm) Rules() map[string]any {
 	return map[string]any{
 		"customer_id":    "bail|required|exists:customers,id",
 		"date":           "bail|required|date",
-		"terms":          "bail|sometimes|required_if:kind,invoice|min:1",
+		"terms":          "bail|sometimes|required_if:kind,invoice,order|min:1",
 		"tax_receipt":    "bail|sometimes|required_if:kind,invoice|exists:tax_receipts,id",
 		"lines":          "required|min:1",
 		"lines.*.id":     "required|exists:items,id",

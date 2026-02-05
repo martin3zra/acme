@@ -3,7 +3,7 @@ import { DropdownMenuItem } from '@/components/ui/dropdown-menu';
 import { useLocalStorage } from '@/hooks/use-local-storage';
 import { useTranslation } from '@/hooks/use-translation';
 import { cn } from '@/lib/utils';
-import { ErrorResponse, InvoiceWithLines, PaymentTermValue, TransactionKind } from '@/types';
+import { ErrorResponse, InvoiceWithLines, TransactionKind } from '@/types';
 import { router } from '@inertiajs/react';
 import { Copy, ExternalLink, FileDiffIcon } from 'lucide-react';
 import { toast } from 'sonner';
@@ -28,10 +28,10 @@ export function ConvertToInvoiceAction({ mode = 'convert', title, renderedAs = '
   };
 
   const processConvertion = (data: InvoiceWithLines) => {
-    const terms: PaymentTermValue = mode === 'convert' ? 'pia' : data.header.terms;
+    // const terms: PaymentTermValue = mode === 'convert' ? 'pia' : data.header.terms;
     const clonedFrom: number | undefined = mode === 'duplicate' ? data.header.id : undefined;
     const taxReceipt: number = mode === 'duplicate' ? data.header.tax_receipt_id : 0;
-    const converted = convertToInvoice(kind, data, { terms, taxReceipt, ncf: '' }, clonedFrom);
+    const converted = convertToInvoice(kind, data, { terms: data.header.terms, taxReceipt, ncf: '' }, clonedFrom);
     const { setItem } = useLocalStorage('invoice');
     setItem(converted);
 
@@ -47,6 +47,7 @@ export function ConvertToInvoiceAction({ mode = 'convert', title, renderedAs = '
       headers: {
         'Content-Type': 'application/json',
         Accept: 'application/json',
+        'X-Transaction-Kind': kind,
       },
       credentials: 'include',
     });

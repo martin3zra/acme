@@ -17,10 +17,10 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { capitalize } from '@/lib/utils';
 import { DiscountType, Invoice, InvoiceVerb, Replacements, TransactionKind } from '@/types';
-import { Link } from '@inertiajs/react';
 import { ColumnDef } from '@tanstack/react-table';
-import { ExternalLink, MoreHorizontal, RefreshCwIcon } from 'lucide-react';
+import { MoreHorizontal } from 'lucide-react';
 import { ConvertToInvoiceAction } from '../Shared/convert-to-invoice-action';
+import { SourceIcon } from '../Shared/source-icon';
 
 type Props = {
   kind: TransactionKind;
@@ -39,12 +39,15 @@ export const getColumns = ({ kind, onDidClick, t }: Props): ColumnDef<Invoice>[]
           aria-label="Select all"
         />
       ),
-      cell: ({ row }) => (
-        <div className="flex space-x-3">
-          <Checkbox checked={row.getIsSelected()} onCheckedChange={(value) => row.toggleSelected(!!value)} aria-label="Select row" />{' '}
-          {row.original.source && row.original.source.type === 'template' && <RefreshCwIcon className="size-4" />}
-        </div>
-      ),
+      cell: ({ row }) => {
+        const source = row.original.source;
+        return (
+          <div className="flex space-x-3">
+            <Checkbox checked={row.getIsSelected()} onCheckedChange={(value) => row.toggleSelected(!!value)} aria-label="Select row" />
+            {source && <SourceIcon source={source} kind={kind} />}
+          </div>
+        );
+      },
       enableSorting: false,
       enableHiding: false,
     },
@@ -158,26 +161,6 @@ export const getColumns = ({ kind, onDidClick, t }: Props): ColumnDef<Invoice>[]
       },
     },
     {
-      id: 'sourceType',
-      meta: t('global.invoiced'),
-      accessorFn: (row) => row.source?.type ?? null,
-      size: 70,
-      header: (props) => {
-        return <HeaderCell title={t('global.invoiced')} alignment="center" columnWidth={props.column.getSize()} />;
-      },
-      cell: ({ row }) => {
-        const path = kind === 'estimate' ? 'invoices' : 'estimates';
-        const uuid = row.original.source?.id;
-        return uuid ? (
-          <div className="flex items-center justify-center">
-            <Link href={`/${path}?id=${uuid}`} title="View Invoice" className="cursor-pointer">
-              <ExternalLink className="size-6 text-blue-600" />
-            </Link>
-          </div>
-        ) : null;
-      },
-    },
-    {
       accessorKey: 'status',
       size: 70,
       header: (props) => {
@@ -202,7 +185,7 @@ export const getColumns = ({ kind, onDidClick, t }: Props): ColumnDef<Invoice>[]
       id: 'actions',
       enableHiding: false,
       cell: (props) => {
-        const disabled = props.row.original.status === 'void';
+        const disabled = props.row.original.status === 'void' || props.row.original.status === 'closed';
         const canRecordPayment = (kind === 'invoice' && props.row.original.paid_status === 'unpaid') || props.row.original.paid_status === 'partial';
         const canBeVoid = kind === 'invoice';
         return (
@@ -246,10 +229,10 @@ export const getColumns = ({ kind, onDidClick, t }: Props): ColumnDef<Invoice>[]
                   </DropdownMenuItem>
                 </>
               )}
-              {kind === 'estimate' && props.row.original.status !== 'closed' && (
+              {(kind === 'estimate' || kind === 'order') && props.row.original.status !== 'closed' && props.row.original.status !== 'void' && (
                 <>
                   <DropdownMenuSeparator />
-                  <ConvertToInvoiceAction id={props.row.original.uuid} title={t('global.convertToInvoice')} kind="estimate" />
+                  <ConvertToInvoiceAction id={props.row.original.uuid} title={t('global.convertToInvoice')} kind={kind} />
                 </>
               )}
             </DropdownMenuContent>

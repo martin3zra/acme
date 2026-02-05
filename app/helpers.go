@@ -78,7 +78,7 @@ func getNetDays(term string) int {
 		}
 	}
 
-	return 0 // Not a recognized "Net" term
+	return -1 // Not a recognized "Net" term
 }
 
 type WatermarkOpt struct {

@@ -103,12 +103,13 @@ export default function Create({
   const [invoiceForm, setInvoiceForm, removeInvoiceForm] = usePersistedState<InvoiceForm>(kind, {
     ...defaultInvoiceForm,
     header: { ...defaultInvoiceForm.header, customer: customer },
+    kind: kind,
   });
   const [currentItem, setCurrentItem] = React.useState<Item | undefined>(undefined);
 
   const { headers } = useHeader();
   const { errors: propsErrors } = usePage<PageProps>().props;
-  const { data, setData, post, transform, processing, errors } = useForm<InvoiceFormData>({
+  const { setData, post, transform, processing, errors } = useForm<InvoiceFormData>({
     customer_id: 0,
     terms: 'pia',
     tax_receipt: 0,
@@ -333,7 +334,7 @@ export default function Create({
         ...data,
         customer_id: invoiceForm.header.customer?.id,
         date: invoiceForm.header.date,
-        // terms: invoiceForm.header.terms,
+        terms: invoiceForm.header.terms,
         // tax_receipt: invoiceForm.header.taxReceipt,
         discount: invoiceForm.header.discount,
         notes: invoiceForm.header.notes || '',
@@ -345,18 +346,23 @@ export default function Create({
       };
 
       if (isInvoice) {
-        payload.terms = invoiceForm.header.terms;
+        // payload.terms = invoiceForm.header.terms;
         payload.tax_receipt = invoiceForm.header.taxReceipt;
         payload.discount = invoiceForm.header.discount;
         payload.payment = invoiceForm.payment;
         payload.source = invoiceForm.source;
+      } else {
+        payload.source = { type: 'template', id: '' };
       }
 
       if (invoiceForm.kind === 'template') {
-        payload.source = { type: 'template', id: '' };
         payload.terms = invoiceForm.header.terms;
         payload.tax_receipt = invoiceForm.header.taxReceipt;
         payload.discount = invoiceForm.header.discount;
+      }
+
+      if (invoiceForm.kind !== 'template') {
+        payload.recurrence = null;
       }
       return payload;
     });
@@ -430,10 +436,12 @@ export default function Create({
           </Button>
           {showPaymentCTA && (
             <>
-              <Button onClick={handleMarkAsRecurrent} disabled={processing || !canEnableRecurrence} className="bg-green-600 hover:bg-green-700">
-                <RefreshCwIcon />
-                {t('global.actions.markAsRecurrent')}
-              </Button>
+              {isInvoice && (
+                <Button onClick={handleMarkAsRecurrent} disabled={processing || !canEnableRecurrence} className="bg-green-600 hover:bg-green-700">
+                  <RefreshCwIcon />
+                  {t('global.actions.markAsRecurrent')}
+                </Button>
+              )}
               <Button onClick={handleCheckout} disabled={processing || computeTotalAmount() === 0}>
                 {invoiceForm.header.terms === 'pia' ? t('global.actions.checkout') : t('global.actions.save')}
               </Button>
@@ -483,10 +491,10 @@ export default function Create({
                 </div>
               )}
             </div>
-            {isInvoice ? (
+            {(isInvoice || kind === 'order') && (
               <div className="col-span-6 flex flex-col gap-y-6">
                 <div className="flex flex-col gap-y-2">
-                  <Label htmlFor="paymentTerms">{t('invoices.paymentTerms')}</Label>
+                  <Label htmlFor="paymentTerms">{t(`${kind}s.paymentTerms`)}</Label>
                   <Select name="paymentTerms" onValueChange={handlePaymentTermsChange} value={invoiceForm.header.terms} required>
                     <SelectTrigger className="w-full">
                       <SelectValue placeholder="Select terms" />
@@ -501,32 +509,34 @@ export default function Create({
                   </Select>
                   <InputError className="mt-2" message={errors.terms} />
                 </div>
-
-                <div className="flex flex-col gap-y-2">
-                  <Label htmlFor="taxReceipt">{t('invoices.taxReceipt')}</Label>
-                  <Select
-                    name="taxReceipt"
-                    onValueChange={handleTaxReceiptChange}
-                    defaultValue={'0'}
-                    value={String(invoiceForm.header.taxReceipt)}
-                    required
-                  >
-                    <SelectTrigger className="w-full">
-                      <SelectValue placeholder="Select taxReceipt" />
-                    </SelectTrigger>
-                    <SelectContent className="">
-                      {tax_receipts.map((receipt) => (
-                        <SelectItem key={receipt.id} value={String(receipt.id)} disabled={!receipt.available}>
-                          {receipt.name}
-                          {!receipt.available && <span className="text-red-500">{t('global.limitReached')}</span>}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <InputError className="mt-2" message={errors.tax_receipt} />
-                </div>
+                {isInvoice && (
+                  <div className="flex flex-col gap-y-2">
+                    <Label htmlFor="taxReceipt">{t('invoices.taxReceipt')}</Label>
+                    <Select
+                      name="taxReceipt"
+                      onValueChange={handleTaxReceiptChange}
+                      defaultValue={'0'}
+                      value={String(invoiceForm.header.taxReceipt)}
+                      required
+                    >
+                      <SelectTrigger className="w-full">
+                        <SelectValue placeholder="Select taxReceipt" />
+                      </SelectTrigger>
+                      <SelectContent className="">
+                        {tax_receipts.map((receipt) => (
+                          <SelectItem key={receipt.id} value={String(receipt.id)} disabled={!receipt.available}>
+                            {receipt.name}
+                            {!receipt.available && <span className="text-red-500">{t('global.limitReached')}</span>}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <InputError className="mt-2" message={errors.tax_receipt} />
+                  </div>
+                )}
               </div>
-            ) : (
+            )}
+            {!isInvoice && (
               <div className="col-span-12 flex flex-col place-items-end gap-y-6">
                 <Button disabled={invoiceForm.lines.length === 0} onClick={placedInvoice}>
                   {t('global.actions.save')}

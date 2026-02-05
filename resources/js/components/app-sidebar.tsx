@@ -38,13 +38,12 @@ const navMain: NavItem[] = [
     icon: ClipboardPenLineIcon,
     requiredAbility: 'viewAny:estimate',
   },
-  // {
-  //   title: 'global.navMain.orders',
-  //   url: '/orders',
-  //   icon: ClipboardList,
-  //   components: ['Invoices/Index', 'Invoices/Create'],
-  //   requiredAbility: 'viewAny:order',
-  // },
+  {
+    title: 'global.navMain.orders',
+    url: '/orders',
+    icon: ClipboardList,
+    requiredAbility: 'viewAny:order',
+  },
   {
     title: 'global.navMain.customers',
     url: '/customers',

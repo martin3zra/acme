@@ -58,15 +58,17 @@ export default function Index({
         router.visit(`/payments/create`, { data: { customer_id: invoice.customer.uuid, invoice_id: invoice.uuid } });
         return;
       }
-      if (action === 'void') {
-        setDeleteDialogOpen(true);
-        return;
-      }
       if (action === 'mark-as-recurrent') {
         setMarkAsRecurrent(true);
         return;
       }
     }
+
+    if (action === 'void') {
+      setDeleteDialogOpen(true);
+      return;
+    }
+
     if (action === 'edit') {
       router.visit(`/${kind}s/${invoice.uuid}/edit`);
       return;
@@ -193,11 +195,9 @@ export default function Index({
                   <div className="mx-4 flex gap-x-3">
                     {invoice.header.status !== 'void' && invoice.header.status !== 'closed' && (
                       <>
-                        {isInvoice && (
-                          <Button variant={'destructive'} onClick={() => onSelectInvoice(invoice.header, 'void')}>
-                            <Ban /> {t('global.actions.void')}
-                          </Button>
-                        )}
+                        <Button variant={'destructive'} onClick={() => onSelectInvoice(invoice.header, 'void')}>
+                          <Ban /> {t('global.actions.void')}
+                        </Button>
                         <Separator orientation="vertical" />
                         <Button asChild disabled={invoice.header.status === 'void'}>
                           <Link href={`/${kind}s/${invoice.header.uuid}/edit`} as="button">
@@ -214,16 +214,17 @@ export default function Index({
                       </>
                     )}
 
-                    {kind === 'estimate' && (
-                      <ConvertToInvoiceAction
-                        id={invoice.header.uuid}
-                        title={t('global.convertToInvoice')}
-                        renderedAs="button"
-                        kind={kind}
-                        source={invoice}
-                      />
-                    )}
-                    {kind === 'invoice' && invoice.header.status !== 'void' && (
+                    {kind === 'estimate' ||
+                      (kind === 'order' && invoice.header.status !== 'void' && invoice.header.status !== 'closed' && (
+                        <ConvertToInvoiceAction
+                          id={invoice.header.uuid}
+                          title={t('global.convertToInvoice')}
+                          renderedAs="button"
+                          kind={kind}
+                          source={invoice}
+                        />
+                      ))}
+                    {isInvoice && invoice.header.status !== 'void' && (
                       <>
                         <Button onClick={handleMarkAsRecurrent} className="bg-green-600 hover:bg-green-700">
                           <RefreshCwIcon />
@@ -238,13 +239,14 @@ export default function Index({
                         />
                       </>
                     )}
-                    <a
+                    <Link
+                      as="button"
                       href={invoice.pdfURL}
-                      className="flex items-center gap-x-3 rounded-sm bg-indigo-600 px-4 text-white hover:bg-indigo-700"
+                      className="flex items-center gap-x-3 rounded-sm bg-indigo-600 px-4 py-1 text-white hover:bg-indigo-700"
                       target="_blank"
                     >
                       <Printer className="size-4" /> {t('global.actions.print')}
-                    </a>
+                    </Link>
                   </div>
                 </div>
               </SheetHeader>
@@ -264,11 +266,11 @@ export default function Index({
 
         {selectedInvoice && (
           <ConfirmsPassword
-            title={t('invoices.confirmsPassword.title', { invoice: selectedInvoice.number })}
-            description={t('invoices.confirmsPassword.description', { total: selectedInvoice.total })}
-            action={t('invoices.confirmsPassword.confirm')}
+            title={t(`${kind}s.confirmsPassword.title`, { [kind]: selectedInvoice.number })}
+            description={t(`${kind}s.confirmsPassword.description`, { total: selectedInvoice.total })}
+            action={t(`${kind}s.confirmsPassword.confirm`)}
             verb={'update'}
-            path={`/invoices/${selectedInvoice.uuid}/void`}
+            path={`/${kind}s/${selectedInvoice.uuid}/void`}
             open={deleteDialogOpen}
             onOpenChange={modalHandler}
           />

@@ -197,7 +197,7 @@ export default function Edit({
         ...data,
         customer_id: invoiceForm.header.customer?.id,
         date: invoiceForm.header.date,
-        // terms: invoiceForm.header.terms,
+        terms: invoiceForm.header.terms,
         // tax_receipt: invoiceForm.header.taxReceipt,
         discount: invoiceForm.header.discount,
         notes: invoiceForm.header.notes || '',
@@ -209,11 +209,25 @@ export default function Edit({
       };
 
       if (isInvoice) {
-        payload.terms = invoiceForm.header.terms;
+        // payload.terms = invoiceForm.header.terms;
         payload.tax_receipt = invoiceForm.header.taxReceipt;
         payload.discount = invoiceForm.header.discount;
         payload.payment = invoiceForm.payment;
+        payload.source = invoiceForm.source;
+      } else {
+        payload.source = { type: 'template', id: '' };
       }
+
+      if (invoiceForm.kind === 'template') {
+        payload.terms = invoiceForm.header.terms;
+        payload.tax_receipt = invoiceForm.header.taxReceipt;
+        payload.discount = invoiceForm.header.discount;
+      }
+
+      if (invoiceForm.kind !== 'template') {
+        payload.recurrence = null;
+      }
+
       return payload;
     });
 
@@ -360,8 +374,10 @@ export default function Edit({
 
   const performInvoiceCancelation = (event: React.MouseEvent<HTMLButtonElement>) => {
     event.preventDefault();
-    removeInvoiceForm();
     router.get(`/${kind}s`);
+    setTimeout(() => {
+      removeInvoiceForm();
+    }, 200);
   };
 
   return (
@@ -430,53 +446,58 @@ export default function Edit({
                 </div>
               )}
             </div>
-            {isInvoice ? (
-              <div className="col-span-6 flex flex-col gap-y-6">
-                <div className="flex flex-col gap-y-2">
-                  <Label htmlFor="paymentTerms">{t('invoices.paymentTerms')}</Label>
-                  <Select
-                    name="paymentTerms"
-                    onValueChange={handlePaymentTermsChange}
-                    defaultValue={String(invoiceForm.header.terms)}
-                    value={String(invoiceForm.header.terms)}
-                  >
-                    <SelectTrigger className="w-full">
-                      <SelectValue placeholder="Select terms" />
-                    </SelectTrigger>
-                    <SelectContent className="">
-                      {paymentTerms.map((term, index) => (
-                        <SelectItem key={index.toString()} value={term.value.toString()}>
-                          {term.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <InputError className="mt-2" message={errors.terms} />
+            {/* Check here, what data do we need to display */}
+            {isInvoice ||
+              (kind === 'order' && (
+                <div className="col-span-6 flex flex-col gap-y-6">
+                  <div className="flex flex-col gap-y-2">
+                    <Label htmlFor="paymentTerms">{t(`${kind}s.paymentTerms`)}</Label>
+                    <Select
+                      name="paymentTerms"
+                      onValueChange={handlePaymentTermsChange}
+                      defaultValue={String(invoiceForm.header.terms)}
+                      value={String(invoiceForm.header.terms)}
+                    >
+                      <SelectTrigger className="w-full">
+                        <SelectValue placeholder="Select terms" />
+                      </SelectTrigger>
+                      <SelectContent className="">
+                        {paymentTerms.map((term, index) => (
+                          <SelectItem key={index.toString()} value={term.value.toString()}>
+                            {term.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <InputError className="mt-2" message={errors.terms} />
+                  </div>
+                  {isInvoice && (
+                    <div className="flex flex-col gap-y-2">
+                      <Label htmlFor="paymentTerms">{t('invoices.taxReceipt')}</Label>
+                      <Select
+                        name="paymentTerms"
+                        // onValueChange={handleTaxReceiptChange}
+                        defaultValue={String(invoiceForm.header.taxReceipt)}
+                        value={String(invoiceForm.header.taxReceipt)}
+                        disabled={true}
+                      >
+                        <SelectTrigger className="w-full">
+                          <SelectValue placeholder="Select terms" />
+                        </SelectTrigger>
+                        <SelectContent className="">
+                          {tax_receipts.map((receipt) => (
+                            <SelectItem key={receipt.id} value={String(receipt.id)}>
+                              {receipt.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <InputError className="mt-2" message={errors.tax_receipt} />
+                    </div>
+                  )}
                 </div>
-                <div className="flex flex-col gap-y-2">
-                  <Label htmlFor="paymentTerms">{t('invoices.taxReceipt')}</Label>
-                  <Select
-                    name="paymentTerms"
-                    // onValueChange={handleTaxReceiptChange}
-                    defaultValue={String(invoiceForm.header.taxReceipt)}
-                    value={String(invoiceForm.header.taxReceipt)}
-                    disabled={true}
-                  >
-                    <SelectTrigger className="w-full">
-                      <SelectValue placeholder="Select terms" />
-                    </SelectTrigger>
-                    <SelectContent className="">
-                      {tax_receipts.map((receipt) => (
-                        <SelectItem key={receipt.id} value={String(receipt.id)}>
-                          {receipt.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <InputError className="mt-2" message={errors.tax_receipt} />
-                </div>
-              </div>
-            ) : (
+              ))}
+            {!isInvoice && (
               <div className="col-span-12 flex flex-col place-items-end gap-y-6">
                 <Button disabled={invoiceForm.lines.length === 0} onClick={performUpdate}>
                   {t('global.actions.save')}
@@ -508,7 +529,7 @@ export default function Edit({
         <div className="col-span-12 min-h-48">
           <div className="flex flex-col gap-y-2">
             <div className="grid grid-cols-12">
-              <div className="col-span-10 flex flex-col gap-y-2 p-2">
+              <div className="col-span-10 flex flex-col gap-y-2 py-2">
                 <Label className="text-sm/6 font-medium">{t('global.notes')}</Label>
                 <Textarea
                   name="notes"

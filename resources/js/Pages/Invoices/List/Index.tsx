@@ -37,7 +37,7 @@ export const List: FC<Props> = ({ kind, data, currentInvoiceTypeFilter, onSelect
     ncf: false,
     amount_due: isInvoice,
     paid_status: isInvoice,
-    sourceType: !isInvoice,
+    // sourceType: !isInvoice,
   });
   const [rowSelection, setRowSelection] = useState({});
 
@@ -94,9 +94,9 @@ export const List: FC<Props> = ({ kind, data, currentInvoiceTypeFilter, onSelect
               .getAllColumns()
               .filter((column) => column.getCanHide())
               .filter((column) => {
-                if (isInvoice && column.id !== 'sourceType') {
-                  return true;
-                }
+                // if (isInvoice && column.id !== 'sourceType') {
+                //   return true;
+                // }
                 return !hiddenColumns.includes(column.id);
               })
               .map((column) => {

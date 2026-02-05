@@ -4,8 +4,10 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"log"
 	"time"
 
+	"github.com/martin3zra/acme/pkg/cache"
 	"github.com/martin3zra/acme/pkg/database"
 	"github.com/martin3zra/acme/pkg/foundation"
 )
@@ -236,7 +238,7 @@ func (s *Server) updateInvoice(ctx context.Context, uuid string, form *UpdateInv
 
 	return database.WithTransaction(s.db, func(tx *sql.Tx) error {
 		var termType *string
-		if form.Kind == TransactionKinds.Invoice {
+		if form.Kind == TransactionKinds.Invoice || form.Kind == TransactionKinds.Order {
 			termType = (*string)(&form.termType)
 		}
 		_, err = tx.Exec(`
@@ -305,9 +307,9 @@ func (s *Server) updateInvoice(ctx context.Context, uuid string, form *UpdateInv
 	})
 }
 
-func (s *Server) voidInvoice(ctx context.Context, uuid string) error {
+func (s *Server) voidInvoice(ctx context.Context, kind TransactionKind, uuid string) error {
 	companyID := CurrentCompany(ctx).ID
-	invoice, err := s.findInvoicesByUUID(ctx, TransactionKinds.Invoice, companyID, uuid)
+	invoice, err := s.findInvoicesByUUID(ctx, kind, companyID, uuid)
 	if err != nil {
 		return err
 	}
@@ -316,10 +318,10 @@ func (s *Server) voidInvoice(ctx context.Context, uuid string) error {
 		_, err = tx.Exec(`
     UPDATE invoices
     SET amount = 0, discount = NULL, tax = 0, total = 0,
-    amount_due = 0, payment = NULL, status = $3, paid_status = $4
-    WHERE company_id = $1 AND id = $2
+    amount_due = 0, payment = NULL, status = $4, paid_status = $5
+    WHERE company_id = $1 AND id = $2 AND transaction_kind = $3
   `,
-			companyID, invoice.ID, InvoiceStatuses.Void, PaidStatuses.Refunded,
+			companyID, invoice.ID, kind, InvoiceStatuses.Void, PaidStatuses.Refunded,
 		)
 		if err != nil {
 			return err
@@ -509,8 +511,12 @@ func (s *Server) storeInvoiceInternal(tx *sql.Tx, companyID int, form *StoreInvo
 	var termType *string
 	var taxReceiptSequence *taxReceiptSeq
 	var err error
-	if form.Kind == TransactionKinds.Invoice {
+
+	if form.Kind == TransactionKinds.Invoice || form.Kind == TransactionKinds.Order {
 		termType = (*string)(&form.termType)
+	}
+
+	if form.Kind == TransactionKinds.Invoice {
 		taxReceiptSequence, err = s.grabTaxReceiptSequence(tx, companyID, form.TaxReceipt)
 		if err != nil {
 			return invoiceUUID, err
@@ -600,13 +606,14 @@ func (s *Server) storeInvoiceInternal(tx *sql.Tx, companyID int, form *StoreInvo
 				companyID, form.Source.ID, form.Source.Type, foundation.AsJSON(map[string]any{
 					"type": form.Kind,
 					"id":   invoiceUUID,
+					"code": seqInfo.Code,
 				}))
 			if err != nil {
 				return invoiceUUID, err
 			}
 		}
 
-		if form.Source.Type == TransactionKinds.Estimate {
+		if form.Source.Type == TransactionKinds.Estimate || form.Source.Type == TransactionKinds.Order {
 			_, err := tx.Exec(
 				"UPDATE invoices SET status = 'closed', source = $4 "+
 					"WHERE company_id = $1 "+
@@ -614,10 +621,17 @@ func (s *Server) storeInvoiceInternal(tx *sql.Tx, companyID int, form *StoreInvo
 				companyID, form.Source.ID, form.Source.Type, foundation.ToJSON(map[string]any{
 					"type": form.Kind,
 					"id":   invoiceUUID,
+					"code": seqInfo.Code,
 				}))
 			if err != nil {
 				return invoiceUUID, err
 			}
+		}
+
+		// Delete the cache for the source of the transaction, so we
+		// can display updated values such as status ...
+		if err = s.purgeCacheByID(tx, form.Source.Type, form.Source.ID); err != nil {
+			return invoiceUUID, err
 		}
 	}
 
@@ -635,4 +649,14 @@ func (s *Server) storeInvoiceInternal(tx *sql.Tx, companyID int, form *StoreInvo
 	}
 
 	return invoiceUUID, err
+}
+
+func (s *Server) purgeCacheByID(tx *sql.Tx, kind TransactionKind, uuid string) error {
+	c := cache.NewPgCache(tx)
+	key := fmt.Sprintf("preview:%s:%s", kind, uuid)
+	if err := c.Delete(context.Background(), key); err != nil {
+		log.Printf("Error deleting cache: %v", err)
+		return err
+	}
+	return nil
 }

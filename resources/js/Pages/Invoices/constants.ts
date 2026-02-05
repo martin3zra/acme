@@ -14,6 +14,7 @@ import {
 
 export const paymentTerms: PaymentTerm[] = [
   { value: 'pia', label: 'Payment In Advance' },
+  { value: 'net0', label: 'Due on Receipt' },
   { value: 'net7', label: 'Net 7' },
   { value: 'net10', label: 'Net 10' },
   { value: 'net15', label: 'Net 15' },

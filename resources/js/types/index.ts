@@ -282,7 +282,7 @@ export type PaymentMethodType = {
   autoFocus?: boolean;
 };
 
-export type PaymentTermValue = 'pia' | 'net7' | 'net10' | 'net15' | 'net30' | 'net60' | 'net90' | 'net120';
+export type PaymentTermValue = 'pia' | 'net0' | 'net7' | 'net10' | 'net15' | 'net30' | 'net60' | 'net90' | 'net120';
 
 export type PaymentTerm = {
   value: PaymentTermValue;
@@ -326,6 +326,7 @@ export type HeaderForm = {
 export type InvoiceSource = {
   type: TransactionKind;
   id: string | number;
+  code: string;
 };
 
 export const Months = [

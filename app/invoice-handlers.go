@@ -14,6 +14,11 @@ import (
 )
 
 func resolveTransactionKind(ctx *routing.Context) TransactionKind {
+	kind := ctx.Request.Header.Get("X-Transaction-Kind")
+	if kind != "" {
+		return TransactionKind(kind)
+	}
+
 	path := ctx.Request.URL.Path
 	switch {
 	case strings.HasPrefix(path, "/estimates"):
@@ -172,21 +177,20 @@ func (s *Server) createInvoiceHandler(ctx *routing.Context) {
 		}),
 	}
 
-	if kind == TransactionKinds.Invoice {
-		taxReceipts, err := s.findTaxesReceipts(ctx.Request.Context())
-		if err != nil {
-			ctx.Error(err)
-			return
-		}
-		props["tax_receipts"] = foundation.MapSlice(taxReceipts, func(receipt *taxReceipt) map[string]any {
-			return map[string]any{
-				"id":        receipt.ID,
-				"name":      fmt.Sprintf("%s-%s", receipt.Type, receipt.Name),
-				"available": receipt.Current < receipt.SequenceEnd,
-			}
-		})
-		props["showPaymentCTA"] = true
+	taxReceipts, err := s.findTaxesReceipts(ctx.Request.Context())
+	if err != nil {
+		ctx.Error(err)
+		return
 	}
+	props["tax_receipts"] = foundation.MapSlice(taxReceipts, func(receipt *taxReceipt) map[string]any {
+		return map[string]any{
+			"id":        receipt.ID,
+			"name":      fmt.Sprintf("%s-%s", receipt.Type, receipt.Name),
+			"available": receipt.Current < receipt.SequenceEnd,
+		}
+	})
+	props["showPaymentCTA"] = true
+
 	ctx.Render("Invoices/Create", props)
 }
 
@@ -238,16 +242,15 @@ func (s *Server) editInvoiceHandler(ctx *routing.Context) {
 		}),
 	}
 
-	if kind == TransactionKinds.Invoice {
-		taxReceipts, err := s.findTaxesReceipts(ctx.Request.Context())
-		if err != nil {
-			ctx.Error(err)
-			return
-		}
-		props["tax_receipts"] = foundation.MapSlice(taxReceipts, func(receipt *taxReceipt) map[string]any {
-			return map[string]any{"id": receipt.ID, "name": fmt.Sprintf("%s-%s", receipt.Type, receipt.Name)}
-		})
+	taxReceipts, err := s.findTaxesReceipts(ctx.Request.Context())
+	if err != nil {
+		ctx.Error(err)
+		return
 	}
+	props["tax_receipts"] = foundation.MapSlice(taxReceipts, func(receipt *taxReceipt) map[string]any {
+		return map[string]any{"id": receipt.ID, "name": fmt.Sprintf("%s-%s", receipt.Type, receipt.Name)}
+	})
+
 	ctx.Render("Invoices/Edit", props)
 }
 
@@ -275,7 +278,7 @@ func (s *Server) storeInvoiceHandler() routing.HandlerFunc {
 
 		id, err := s.storeInvoice(ctx.Request.Context(), form)
 		if err != nil {
-			log.Printf("Error creating invoice: %v", err)
+			log.Printf("Error creating %s: %v", form.Kind, err)
 			ctx.BackWith("status", s.trans("global.wasNotCreated", i18n.Replacements{"subject": fmt.Sprintf("@global.%s", form.Kind)}))
 			return
 		}
@@ -289,10 +292,14 @@ func (s *Server) storeInvoiceHandler() routing.HandlerFunc {
 			return
 		}
 
-		if form.Kind == TransactionKinds.Invoice || form.Kind == TransactionKinds.Template {
+		switch form.Kind {
+		case TransactionKinds.Invoice, TransactionKinds.Template:
 			ctx.Flash("redirectTo", redirectAfterCreate("invoice", id, preferences.Redirect.Invoice))
-		} else {
+		case TransactionKinds.Estimate:
 			ctx.Flash("redirectTo", redirectAfterCreate(string(form.Kind), id, preferences.Redirect.Estimate))
+		case TransactionKinds.Order:
+			ctx.Flash("redirectTo", redirectAfterCreate(string(form.Kind), id, preferences.Redirect.Order))
+		default:
 		}
 
 		ctx.Back()
@@ -343,13 +350,23 @@ func (s *Server) updateInvoiceHandler() routing.HandlerFunc {
 func (s *Server) voidInvoiceHandler() routing.HandlerFunc {
 	return routing.WithRequest(func(ctx *routing.Context, form *ConfirmsPasswords) {
 
-		err := s.voidInvoice(ctx.Request.Context(), ctx.Param("uuid"))
+		kind := resolveTransactionKind(ctx)
+		uuid := ctx.Param("id")
+
+		err := s.voidInvoice(ctx.Request.Context(), kind, uuid)
 		if err != nil {
-			log.Printf("Error voiding invoice: %v", err)
-			ctx.BackWith("status", s.trans("global.wasNotVoided", i18n.Replacements{"subject": "@global.invoice"}))
+			log.Printf("Error voiding %s: %v", kind, err)
+			ctx.BackWith("status", s.trans("global.wasNotVoided", i18n.Replacements{"subject": "@global." + string(kind)}))
 			return
 		}
-		ctx.Flash("success", s.trans("global.wasVoided", i18n.Replacements{"subject": "@global.invoice"}))
+
+		c := cache.NewPgCache(s.db)
+		key := fmt.Sprintf("preview:%s:%s", kind, uuid)
+		if err = c.Delete(ctx.Request.Context(), key); err != nil {
+			log.Printf("Error deleting cache: %v", err)
+		}
+
+		ctx.Flash("success", s.trans("global.wasVoided", i18n.Replacements{"subject": "@global." + string(kind)}))
 
 		ctx.Redirect("/invoices")
 	})

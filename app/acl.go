@@ -11,18 +11,18 @@ var rolePermissionsCache = map[string]map[string]bool{}
 var groupedPermissions = map[string]map[string][]string{
 	"owner": {"*": {"*"}},
 	"admin": {
-		"view":    {"dashboard", "invoice", "estimate", "customer", "item", "payment", "reports", "setting"},
-		"viewAny": {"dashboard", "invoice", "estimate", "customer", "item", "payment", "reports", "setting"},
-		"create":  {"dashboard", "invoice", "estimate", "customer", "item", "payment", "reports", "setting"},
-		"delete":  {"dashboard", "invoice", "estimate", "customer", "item", "payment", "reports", "setting"},
-		"update":  {"dashboard", "invoice", "estimate", "customer", "item", "payment", "reports", "setting", "company:sequence"},
+		"view":    {"dashboard", "invoice", "estimate", "order", "customer", "item", "payment", "reports", "setting"},
+		"viewAny": {"dashboard", "invoice", "estimate", "order", "customer", "item", "payment", "reports", "setting"},
+		"create":  {"dashboard", "invoice", "estimate", "order", "customer", "item", "payment", "reports", "setting"},
+		"delete":  {"dashboard", "invoice", "estimate", "order", "customer", "item", "payment", "reports", "setting"},
+		"update":  {"dashboard", "invoice", "estimate", "order", "customer", "item", "payment", "reports", "setting", "company:sequence"},
 	},
 	"supervisor": {
 		"view":    {"dashboard", "customer", "item", "payment", "reports"},
-		"viewAny": {"dashboard", "invoice", "estimate", "customer", "item", "payment", "reports"},
-		"create":  {"dashboard", "invoice", "estimate", "customer", "item", "payment", "reports"},
-		"delete":  {"dashboard", "invoice", "estimate", "customer", "item", "payment", "reports"},
-		"update":  {"dashboard", "invoice", "estimate", "customer", "item", "payment", "reports"},
+		"viewAny": {"dashboard", "invoice", "estimate", "order", "customer", "item", "payment", "reports"},
+		"create":  {"dashboard", "invoice", "estimate", "order", "customer", "item", "payment", "reports"},
+		"delete":  {"dashboard", "invoice", "estimate", "order", "customer", "item", "payment", "reports"},
+		"update":  {"dashboard", "invoice", "estimate", "order", "customer", "item", "payment", "reports"},
 	},
 	"standard": {
 		"view":   {"invoice", "customer"},
