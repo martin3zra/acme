@@ -321,3 +321,85 @@ func CheckResourcePrerequisites(ctx context.Context, resource string, companyID 
 
 	return ctx, nil
 }
+
+func (s *Server) storeUploadSession(form *UploadSession) error {
+	_, err := s.db.Exec(`
+    INSERT INTO upload_sessions (id, user_id, filename, file_size, status, created_at, updated_at)
+    VALUES ($1, $2, $3, $4, $5, NOW(), NOW())`, form.ID, form.UserID, form.Filename, form.FileSize, form.Status)
+	return err
+}
+
+func (s *Server) findUploadSession(id string, userID int64) (*UploadSession, error) {
+
+	var sess UploadSession
+
+	err := s.db.QueryRow(`
+		SELECT
+			id, user_id, filename, file_size, status,
+			total_chunks, uploaded_chunks, error_message,
+			created_at, updated_at
+		FROM upload_sessions
+		WHERE id = $1 AND user_id = $2
+	`, id, userID).Scan(
+		&sess.ID,
+		&sess.UserID,
+		&sess.Filename,
+		&sess.FileSize,
+		&sess.Status,
+		&sess.TotalChunks,
+		&sess.UploadedChunks,
+		&sess.ErrorMessage,
+		&sess.CreatedAt,
+		&sess.UpdatedAt,
+	)
+
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+
+	if err != nil {
+		return nil, err
+	}
+
+	return &sess, nil
+}
+
+func (s *Server) updateUploadStatus(id string, status string) error {
+	_, err := s.db.Exec(`
+		UPDATE upload_sessions
+		SET status = $2, updated_at = NOW()
+		WHERE id = $1
+	`, id, status)
+	return err
+}
+
+func (s *Server) incrementUploadedChunks(id string) error {
+	_, err := s.db.Exec(`
+		UPDATE upload_sessions
+		SET uploaded_chunks = uploaded_chunks + 1,
+		    updated_at = NOW()
+		WHERE id = $1
+	`, id)
+	return err
+}
+
+func (s *Server) updateTotalChunks(id string, total int) error {
+	_, err := s.db.Exec(`
+		UPDATE upload_sessions
+		SET total_chunks = $2,
+		    updated_at = NOW()
+		WHERE id = $1 AND total_chunks IS NULL
+	`, id, total)
+	return err
+}
+
+func (s *Server) failUpload(id string, message string) error {
+	_, err := s.db.Exec(`
+		UPDATE upload_sessions
+		SET status = 'failed',
+		    error_message = $2,
+		    updated_at = NOW()
+		WHERE id = $1
+	`, message, id)
+	return err
+}

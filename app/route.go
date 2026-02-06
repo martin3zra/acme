@@ -97,6 +97,10 @@ func (s *Server) bootRoutes() {
 					route.POST("/taxes", s.storeTaxes())
 					route.PUT("/taxes/:id", s.updateTaxes())
 
+					route.POST("/uploads/init", s.startUploadChunkHandler())
+					route.POST("/uploads/chunks", s.uploadChunkHandler())
+					route.POST("/uploads/complete", s.completeUploadChunkHandler())
+
 					route.GroupPrefix("/settings/:account", func(route *routing.Router) {
 						route.GET("/profile", s.accountProfileHandler)
 						route.PUT("/profile", s.updateAccountProfileHandler())

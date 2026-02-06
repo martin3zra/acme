@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"mime/multipart"
 	"time"
 
 	"github.com/martin3zra/acme/app/mail"
@@ -1360,4 +1361,64 @@ func (StoreTaxForm) Rules() map[string]any {
 		"name": "required|min:2",
 		"rate": "required|min:0|max:99",
 	}
+}
+
+type UploadSessionForm struct {
+	support.FormRequest
+	Filename string `json:"filename"`
+	Size     int64  `json:"size"`
+	Mime     string `json:"mime"`
+}
+
+func (UploadSessionForm) Rules() map[string]any {
+	return map[string]any{
+		"mime":     "required",
+		"filename": "required",
+		"size":     "required",
+	}
+}
+
+type UploadChunkForm struct {
+	support.FormRequest
+	UploadId    string         `json:"upload_id"`
+	ChunkIndex  int            `json:"chunk_index"`
+	TotalChunks int            `json:"total_chunks"`
+	Filename    string         `json:"filename"`
+	Chunk       multipart.File `json:"chunk"`
+}
+
+func (UploadChunkForm) Rules() map[string]any {
+	return map[string]any{
+		"upload_id": "required",
+		// "chunk_index":  "required|min:0",
+		"total_chunks": "required",
+		"filename":     "required",
+		// "chunk":        "required",
+	}
+}
+
+type CompleteUploadForm struct {
+	support.FormRequest
+	UploadID string `json:"upload_id"`
+	Filename string `json:"filename"`
+}
+
+func (CompleteUploadForm) Rules() map[string]any {
+	return map[string]any{
+		"upload_id": "required",
+		"filename":  "required",
+	}
+}
+
+type UploadSession struct {
+	ID             string         `json:"id"`
+	UserID         int64          `json:"user_id"`
+	Filename       string         `json:"filename"`
+	FileSize       int64          `json:"file_size"`
+	Status         string         `json:"status"`
+	TotalChunks    sql.NullInt64  `json:"total_chunks"`
+	UploadedChunks int            `json:"uploaded_chunks"`
+	ErrorMessage   sql.NullString `json:"error_message"`
+	CreatedAt      time.Time      `json:"created_at"`
+	UpdatedAt      time.Time      `json:"updated_at"`
 }

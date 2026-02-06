@@ -153,7 +153,8 @@
       "save": "Salvar",
       "checkout": "Metodo de pago",
       "create": "Crear",
-      "markAsRecurrent": "Marcar como recurrente"
+      "markAsRecurrent": "Marcar como recurrente",
+      "import": "Importar"
     },
     "paymentMethods": {
       "primary": "Método primario",
