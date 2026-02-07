@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"log"
 	"mime/multipart"
+	"sync"
 	"time"
 
 	"github.com/martin3zra/acme/app/mail"
@@ -19,6 +20,8 @@ import (
 	"github.com/martin3zra/acme/pkg/routing"
 	"github.com/martin3zra/acme/pkg/support"
 	"github.com/martin3zra/acme/pkg/validator"
+	"golang.org/x/text/encoding"
+	"golang.org/x/text/encoding/charmap"
 )
 
 type LoginFormRequest struct {
@@ -1365,16 +1368,20 @@ func (StoreTaxForm) Rules() map[string]any {
 
 type UploadSessionForm struct {
 	support.FormRequest
-	Filename string `json:"filename"`
-	Size     int64  `json:"size"`
-	Mime     string `json:"mime"`
+	Filename  string `json:"filename"`
+	Size      int64  `json:"size"`
+	Mime      string `json:"mime"`
+	Delimiter string `json:"delimiter"`
+	Encoding  string `json:"encoding"`
 }
 
 func (UploadSessionForm) Rules() map[string]any {
 	return map[string]any{
-		"mime":     "required",
-		"filename": "required",
-		"size":     "required",
+		"mime":      "required",
+		"filename":  "required",
+		"size":      "required",
+		"delimiter": "required",
+		"encoding":  "required",
 	}
 }
 
@@ -1415,10 +1422,50 @@ type UploadSession struct {
 	UserID         int64          `json:"user_id"`
 	Filename       string         `json:"filename"`
 	FileSize       int64          `json:"file_size"`
+	Delimiter      string         `json:"delimiter"`
+	Encoding       string         `json:"encoding"`
 	Status         string         `json:"status"`
 	TotalChunks    sql.NullInt64  `json:"total_chunks"`
 	UploadedChunks int            `json:"uploaded_chunks"`
 	ErrorMessage   sql.NullString `json:"error_message"`
 	CreatedAt      time.Time      `json:"created_at"`
 	UpdatedAt      time.Time      `json:"updated_at"`
+}
+
+type ImportForm struct {
+	support.FormRequest
+	UploadID string `json:"upload_id"`
+	Type     string `json:"type"`
+}
+
+func (ImportForm) Rules() map[string]any {
+	return map[string]any{
+		"upload_id": "required",
+		"type":      "required",
+	}
+}
+
+type ImportEvent struct {
+	Type string `json:"type"`
+	Data any    `json:"data"`
+}
+
+var importStreams = sync.Map{} // importID → chan ImportEvent
+
+type ImportOptions struct {
+	Delimiter rune
+}
+
+type UploadEncoding string
+
+const (
+	EncodingUTF8    UploadEncoding = "utf-8"
+	EncodingLatin1  UploadEncoding = "latin-1"
+	EncodingWin1252 UploadEncoding = "windows-1252"
+)
+
+var encodingDecoders = map[UploadEncoding]*encoding.Decoder{
+	EncodingUTF8:    nil, // no-op
+	EncodingLatin1:  charmap.ISO8859_1.NewDecoder(),
+	EncodingWin1252: charmap.Windows1252.NewDecoder(),
 }

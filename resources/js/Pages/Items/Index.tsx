@@ -1,6 +1,6 @@
 import { ConfirmsPassword } from '@/components/confirms-password';
 import HeadingSmall from '@/components/heading-small';
-import { ImportDrawer } from '@/components/import-drawer';
+import { ImportDrawer } from '@/components/import-zone';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { useVerb } from '@/composables/use-verbs';

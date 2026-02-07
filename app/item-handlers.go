@@ -1,6 +1,10 @@
 package app
 
 import (
+	"bufio"
+	"encoding/csv"
+	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -9,11 +13,14 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"unicode/utf8"
 
 	"github.com/google/uuid"
 	"github.com/martin3zra/acme/pkg/i18n"
 	"github.com/martin3zra/acme/pkg/routing"
 	inertia "github.com/romsar/gonertia/v2"
+	"golang.org/x/text/encoding/charmap"
+	"golang.org/x/text/transform"
 )
 
 func (s *Server) itemsHandler(ctx *routing.Context) {
@@ -141,6 +148,7 @@ func (s *Server) startUploadChunkHandler() routing.HandlerFunc {
 		// 3️⃣ Create upload directory
 		dir := filepath.Join("uploads", uploadID)
 		if err := os.MkdirAll(dir, 0755); err != nil {
+			log.Println("failed to create upload dir: ", err)
 			ctx.JSON(http.StatusInternalServerError, map[string]any{
 				"status": "failed to create upload dir",
 			})
@@ -148,14 +156,17 @@ func (s *Server) startUploadChunkHandler() routing.HandlerFunc {
 		}
 
 		if err := s.storeUploadSession(&UploadSession{
-			ID:       uploadID,
-			UserID:   int64(ctx.User().Id),
-			Filename: form.Filename,
-			FileSize: form.Size,
-			Status:   "pending",
+			ID:        uploadID,
+			UserID:    int64(ctx.User().Id),
+			Filename:  form.Filename,
+			FileSize:  form.Size,
+			Delimiter: form.Delimiter,
+			Encoding:  form.Encoding,
+			Status:    "pending",
 		}); err != nil {
+			log.Println("Something went wrong starting the upoload.: ", err)
 			ctx.JSON(http.StatusInternalServerError, map[string]any{
-				"status": "failed to create upload dir",
+				"status": "Something went wrong starting the upoload.",
 			})
 			return
 		}
@@ -179,7 +190,7 @@ func (s *Server) uploadChunkHandler() routing.HandlerFunc {
 			return
 		}
 
-		uploadSession, err := s.findUploadSession(form.UploadId, int64(ctx.User().Id))
+		uploadSession, err := s.findUploadSession(form.UploadId)
 		if err != nil || uploadSession == nil {
 			ctx.JSON(http.StatusNotFound, map[string]any{
 				"status": "invalid upload id",
@@ -251,7 +262,7 @@ func (s *Server) completeUploadChunkHandler() routing.HandlerFunc {
 			return
 		}
 
-		uploadSession, err := s.findUploadSession(form.UploadID, int64(ctx.User().Id))
+		uploadSession, err := s.findUploadSession(form.UploadID)
 		if err != nil || uploadSession == nil {
 			ctx.JSON(http.StatusNotFound, map[string]any{
 				"status": "invalid upload id",
@@ -295,4 +306,357 @@ func (s *Server) completeUploadChunkHandler() routing.HandlerFunc {
 
 		ctx.JSON(http.StatusOK, nil)
 	})
+}
+
+func (s *Server) startImportHandler() routing.HandlerFunc {
+	return routing.WithRequest(func(ctx *routing.Context, form *ImportForm) {
+
+		importID := uuid.New()
+		if err := s.storeImport(importID.String(), form); err != nil {
+			log.Println("Error starting import: ", err)
+			ctx.JSON(http.StatusInternalServerError, map[string]any{
+				"status": "Error starting import",
+			})
+			return
+		}
+
+		go s.processImport(CurrentCompany(ctx.Request.Context()).ID, importID.String(), form.UploadID)
+
+		ctx.JSON(http.StatusOK, map[string]any{
+			"import_id": importID,
+			"status":    "queued",
+		})
+	})
+}
+
+func (s *Server) processImport(companyID int, importID, uploadID string) {
+	defer func() {
+		if r := recover(); r != nil {
+			s.failImport(importID, fmt.Sprint(r))
+		}
+	}()
+
+	uSess, err := s.findUploadSession(uploadID)
+	if err != nil {
+		s.failImport(importID, fmt.Sprint(err))
+		return
+	}
+
+	s.markStarted(importID)
+
+	filePath := resolveUploadPath(fmt.Sprintf("%s/%s", uploadID, uSess.Filename))
+
+	delimiter := rune(uSess.Delimiter[0])
+	emit(importID, ImportEvent{"phase", "reading_file"})
+	encoding := normalizeGivengEncoding(uSess.Encoding)
+	totalRows, err := countCSVRows(filePath, encoding, delimiter)
+	if err != nil {
+		s.failImport(importID, "Failed counting rows")
+		return
+	}
+
+	s.updateTotalRows(importID, totalRows)
+
+	// 2️⃣ Open fresh reader for import
+	file, utf8Reader, err := openForImport(filePath, encoding)
+	if err != nil {
+		s.failImport(importID, "Failed opening file")
+		return
+	}
+	defer file.Close()
+
+	emit(importID, ImportEvent{"phase", "mapping_columns"})
+	csvReader := newCSVReader(utf8Reader, delimiter)
+
+	headers, err := csvReader.Read()
+	if err != nil {
+		log.Println("Invalid CSV header", err)
+		s.failImport(importID, "Invalid CSV header")
+		return
+	}
+
+	if len(headers) <= 1 {
+		sampleLines, _ := readSampleLines(filePath, 20)
+		detected := DetectDelimiter(sampleLines)
+
+		if detected != rune(uSess.Delimiter[0]) {
+			s.failImport(
+				importID,
+				fmt.Sprintf(
+					"Delimiter %q produced 1 column. %q works better.",
+					uSess.Delimiter,
+					string(detected),
+				),
+			)
+			return
+		}
+		// 🚨 Hard stop – delimiter probably wrong
+		s.failImport(
+			importID,
+			fmt.Sprintf(
+				"Delimiter %q produced only one column. Please choose the correct delimiter.",
+				uSess.Delimiter,
+			),
+		)
+		return
+	}
+
+	columnMap, err := mapHeaders(headers)
+	if err != nil {
+		s.failImport(importID, err.Error())
+		return
+	}
+
+	emit(importID, ImportEvent{"phase", "importing_rows"})
+
+	if err := s.processRows(companyID, importID, csvReader, columnMap, totalRows); err != nil {
+		log.Println("Something wrong happens processing the records", err)
+		s.failImport(importID, err.Error())
+		emit(importID, ImportEvent{"type", "failed"})
+		return
+	}
+
+	emit(importID, ImportEvent{
+		Type: "progress",
+		Data: map[string]int{
+			"processed": totalRows,
+			"total":     totalRows,
+		},
+	})
+
+	s.completeImport(importID)
+}
+
+func resolveUploadPath(uploadID string) string {
+	// Example: uploads stored as /data/uploads/{upload_id}.csv
+	return filepath.Join("uploads", uploadID)
+}
+
+func openForImport(path string, enc UploadEncoding) (*os.File, io.Reader, error) {
+	file, err := os.Open(path)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	if dec := encodingDecoders[enc]; dec != nil {
+		reader := transform.NewReader(file, dec)
+  return file, reader, nil
+	}
+
+	return file, file, nil
+}
+
+func normalizeGivengEncoding(enc string) UploadEncoding {
+	e := strings.ToLower(strings.TrimSpace(enc))
+
+	switch e {
+	case "utf-8", "utf8":
+		return EncodingUTF8
+
+	case "latin-1", "latin1", "iso-8859-1":
+		// Treat Latin-1 as Windows-1252 (REALITY)
+		return EncodingWin1252
+
+	case "windows-1252", "win1252", "cp1252":
+		return EncodingWin1252
+	}
+
+	// Default fallback (safe)
+	return EncodingUTF8
+}
+
+func newCSVReader(r io.Reader, delimiter rune) *csv.Reader {
+	cr := csv.NewReader(r)
+	cr.Comma = delimiter
+	cr.FieldsPerRecord = -1
+	cr.LazyQuotes = true
+	cr.TrimLeadingSpace = true
+	return cr
+}
+
+func countCSVRows(path string, enc UploadEncoding, delimiter rune) (int, error) {
+	file, err := os.Open(path)
+	if err != nil {
+		log.Println("error open file: ", err)
+		return 0, err
+	}
+	defer file.Close()
+
+	var r io.Reader = file
+	if dec := encodingDecoders[enc]; dec != nil {
+		r = transform.NewReader(file, dec)
+	}
+
+	reader := newCSVReader(r, delimiter)
+
+	count := 0
+	for {
+		_, err := reader.Read()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			// ⚠️ Do NOT fail — row counting should be forgiving
+			log.Println("row read error:", err)
+			continue
+		}
+		count++
+	}
+
+	// minus header
+	if count > 0 {
+		count--
+	}
+
+	return count, nil
+}
+
+func normalizeEncoding(r io.Reader) io.Reader {
+	br := bufio.NewReader(r)
+
+	// Peek without consuming
+	peek, err := br.Peek(1024)
+	if err == nil && utf8.Valid(peek) {
+		return br
+	}
+	// Assume Windows-1252 fallback
+	return transform.NewReader(br, charmap.Windows1252.NewDecoder())
+}
+
+func mapHeaders(headers []string) (map[int]string, error) {
+	mapping := map[string]string{
+		"NOMBRE":      "name",
+		"DESCRIPCION": "description",
+		"PRECIO":      "price",
+		"TIPO":        "item_type",
+		"SKU":         "sku",
+		"CODIGO":      "code",
+		"BARRA":       "barcode",
+		"REFERENCIA":  "reference",
+		"REF_SUP":     "vendor_reference",
+	}
+
+	result := map[int]string{}
+
+	for i, h := range headers {
+		key := strings.ToUpper(strings.TrimSpace(h))
+		if v, ok := mapping[key]; ok {
+			result[i] = v
+		}
+	}
+
+	if _, ok := result[0]; !ok {
+		return nil, errors.New("Missing NAME column")
+	}
+
+	return result, nil
+}
+
+func (s *Server) importEventsHandler(w http.ResponseWriter, r *http.Request) {
+	importID := strings.TrimPrefix(r.URL.Path, "/sse/imports/")
+	if importID == "" {
+		http.Error(w, "missing import id", http.StatusBadRequest)
+		return
+	}
+	// Required SSE headers
+	w.Header().Set("Content-Type", "text/event-stream")
+	w.Header().Set("Cache-Control", "no-cache")
+	w.Header().Set("Connection", "keep-alive")
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+	w.Header().Set("X-Accel-Buffering", "no") // 🔥 Nginx hint
+
+	flusher, ok := w.(http.Flusher)
+	if !ok {
+		http.Error(w, "streaming unsupported", http.StatusInternalServerError)
+		return
+	}
+
+	ch := make(chan ImportEvent, 10)
+	importStreams.Store(importID, ch)
+	defer importStreams.Delete(importID)
+
+	for {
+		select {
+		case ev := <-ch:
+			data, _ := json.Marshal(ev)
+			fmt.Fprintf(w, "data: %s\n\n", data)
+			flusher.Flush()
+		case <-r.Context().Done():
+			return
+		}
+	}
+}
+
+// Helper to emit events
+func emit(importID string, event ImportEvent) {
+	if ch, ok := importStreams.Load(importID); ok {
+		ch.(chan ImportEvent) <- event
+	}
+}
+
+func DetectDelimiter(lines []string) rune {
+	candidates := []rune{',', ';', '\t', '|'}
+	best := ','
+	bestScore := -1
+
+	for _, d := range candidates {
+		counts := make([]int, 0, 10)
+		for i := 0; i < len(lines) && i < 10; i++ {
+			counts = append(counts, len(strings.Split(lines[i], string(d))))
+		}
+
+		score := 0
+		if counts[0] > 1 {
+			score += 2
+		}
+
+		for _, c := range counts {
+			if c == counts[0] {
+				score++
+			}
+		}
+
+		if score > bestScore {
+			bestScore = score
+			best = d
+		}
+	}
+
+	return best
+}
+
+func readSampleLines(filePath string, maxLines int) ([]string, error) {
+	file, err := os.Open(filePath)
+	if err != nil {
+		return nil, err
+	}
+	defer file.Close()
+
+	scanner := bufio.NewScanner(file)
+
+	// Increase buffer size in case of long CSV lines
+	const maxCapacity = 1024 * 1024 // 1MB
+	buf := make([]byte, 64*1024)
+	scanner.Buffer(buf, maxCapacity)
+
+	lines := make([]string, 0, maxLines)
+
+	for scanner.Scan() {
+		line := strings.TrimSpace(scanner.Text())
+		if line == "" {
+			continue
+		}
+
+		lines = append(lines, line)
+
+		if len(lines) >= maxLines {
+			break
+		}
+	}
+
+	if err := scanner.Err(); err != nil {
+		return lines, err
+	}
+
+	return lines, nil
 }

@@ -4,10 +4,15 @@ import (
 	"context"
 	"database/sql"
 	"database/sql/driver"
+	"encoding/csv"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
+	"log"
+	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/lib/pq"
 	"github.com/martin3zra/acme/pkg/database"
@@ -324,27 +329,29 @@ func CheckResourcePrerequisites(ctx context.Context, resource string, companyID 
 
 func (s *Server) storeUploadSession(form *UploadSession) error {
 	_, err := s.db.Exec(`
-    INSERT INTO upload_sessions (id, user_id, filename, file_size, status, created_at, updated_at)
-    VALUES ($1, $2, $3, $4, $5, NOW(), NOW())`, form.ID, form.UserID, form.Filename, form.FileSize, form.Status)
+    INSERT INTO upload_sessions (id, user_id, filename, file_size, delimiter, encoding, status, created_at, updated_at)
+    VALUES ($1, $2, $3, $4, $5, $6, $7, NOW(), NOW())`, form.ID, form.UserID, form.Filename, form.FileSize, form.Delimiter, form.Encoding, form.Status)
 	return err
 }
 
-func (s *Server) findUploadSession(id string, userID int64) (*UploadSession, error) {
+func (s *Server) findUploadSession(id string) (*UploadSession, error) {
 
 	var sess UploadSession
 
 	err := s.db.QueryRow(`
 		SELECT
-			id, user_id, filename, file_size, status,
+			id, user_id, filename, file_size, delimiter, encoding, status,
 			total_chunks, uploaded_chunks, error_message,
 			created_at, updated_at
 		FROM upload_sessions
-		WHERE id = $1 AND user_id = $2
-	`, id, userID).Scan(
+		WHERE id = $1
+	`, id).Scan(
 		&sess.ID,
 		&sess.UserID,
 		&sess.Filename,
 		&sess.FileSize,
+		&sess.Delimiter,
+		&sess.Encoding,
 		&sess.Status,
 		&sess.TotalChunks,
 		&sess.UploadedChunks,
@@ -401,5 +408,227 @@ func (s *Server) failUpload(id string, message string) error {
 		    updated_at = NOW()
 		WHERE id = $1
 	`, message, id)
+	return err
+}
+
+func (s *Server) storeImport(id string, form *ImportForm) error {
+	_, err := s.db.Exec(`
+    INSERT INTO imports (id, upload_id, user_id, status)
+    VALUES ($1, $2, $3, 'queued')`, id, form.UploadID, form.User().UUID)
+	return err
+}
+
+func (s *Server) processRows(
+	companyID int,
+	importID string,
+	reader *csv.Reader,
+	columnMap map[int]string,
+	total int,
+) error {
+	rowNum := 1
+	success := 0
+	failed := 0
+
+	for {
+		row, err := reader.Read()
+		if err == io.EOF {
+			break
+		}
+		rowNum++
+
+		record := map[string]any{}
+		for i, field := range row {
+			if col, ok := columnMap[i]; ok {
+				record[col] = strings.TrimSpace(field)
+			}
+		}
+
+		// Validation BEFORE transaction
+		if record["name"] == "" {
+			failed++
+			if err := database.WithTransaction(s.db, func(tx *sql.Tx) error {
+				return s.saveRowError(tx, importID, rowNum, "Name is required", row)
+			}); err != nil {
+				log.Println("saving row error", err)
+			}
+			continue
+		}
+
+		for k, v := range record {
+			if str, ok := v.(string); ok && !utf8.ValidString(str) {
+				failed++
+				_ = database.WithTransaction(s.db, func(tx *sql.Tx) error {
+					return s.saveRowError(tx, importID, rowNum, "Invalid UTF-8 in "+k, row)
+				})
+				continue
+			}
+		}
+
+		form := mapToStoreItemForm(record)
+		if form == nil {
+			failed++
+			if err := database.WithTransaction(s.db, func(tx *sql.Tx) error {
+				return s.saveRowError(tx, importID, rowNum, "Data mismatch", row)
+			}); err != nil {
+				log.Println("saving row error", err)
+			}
+			continue
+		}
+
+		// 🔥 ONE ROW = ONE TRANSACTION
+		if err = database.WithTransaction(s.db, func(tx *sql.Tx) error {
+			return s.storeItemBackground(tx, companyID, form)
+		}); err != nil {
+			log.Println("storing record", err)
+			if saveErr := database.WithTransaction(s.db, func(tx *sql.Tx) error {
+				return s.saveRowError(tx, importID, rowNum, err.Error(), row)
+			}); saveErr != nil {
+				log.Println("storing record", err)
+				failed++
+				continue
+			}
+		}
+
+		success++
+
+		if rowNum%25 == 0 {
+			if err := database.WithTransaction(s.db, func(tx *sql.Tx) error {
+				return s.updateProgress(tx, importID, rowNum-1, success, failed)
+			}); err != nil {
+				log.Println("updating progress", err)
+			}
+
+			emit(importID, ImportEvent{
+				"progress",
+				map[string]int{
+					"processed": rowNum - 1,
+					"total":     total,
+				},
+			})
+		}
+	}
+
+	return nil
+}
+
+// func (s *Server) processRows(
+// 	companyID int,
+// 	importID string,
+// 	reader *csv.Reader,
+// 	columnMap map[int]string,
+// 	total int,
+// ) error {
+// 	rowNum := 1
+// 	success := 0
+// 	failed := 0
+
+// 	return database.WithTransaction(s.db, func(tx *sql.Tx) error {
+
+// 		for {
+// 			row, err := reader.Read()
+// 			if err == io.EOF {
+// 				break
+// 			}
+
+// 			rowNum++
+
+// 			record := map[string]any{}
+// 			for i, field := range row {
+// 				if col, ok := columnMap[i]; ok {
+// 					record[col] = strings.TrimSpace(field)
+// 				}
+// 			}
+
+// 			if record["name"] == "" {
+// 				failed++
+// 				s.saveRowError(tx, importID, rowNum, "Name is required", row)
+// 				continue
+// 			}
+
+// 			form := mapToStoreItemForm(record)
+// 			if form == nil {
+// 				failed++
+// 				s.saveRowError(tx, importID, rowNum, "Data mismatch", row)
+// 				continue
+// 			}
+// 			err = s.storeItemBackground(tx, companyID, form)
+// 			if err != nil {
+// 				log.Println("error storing record", err)
+// 				failed++
+// 				s.saveRowError(tx, importID, rowNum, err.Error(), row)
+// 				continue
+// 			}
+
+// 			success++
+
+// 			if rowNum%25 == 0 {
+// 				s.updateProgress(tx, importID, rowNum-1, success, failed)
+// 				emit(importID, ImportEvent{
+// 					"progress",
+// 					map[string]int{
+// 						"processed": rowNum - 1,
+// 						"total":     total,
+// 					},
+// 				})
+// 			}
+// 		}
+// 		return nil
+// 	})
+
+// }
+
+func (s *Server) updateProgress(tx *sql.Tx, id string, processed, success, failed int) error {
+	_, err := tx.Exec(`
+		UPDATE imports
+		SET processed_rows=$2, success_rows=$3, failed_rows=$4
+		WHERE id=$1
+	`, id, processed, success, failed)
+	return err
+}
+
+func (s *Server) saveRowError(tx *sql.Tx, importID string, row int, msg string, data []string) error {
+	_, err := tx.Exec(`
+		INSERT INTO import_row_errors (import_id, row_number, error, raw_data)
+		VALUES ($1, $2, $3, $4)
+	`, importID, row, msg, strings.Join(data, ","))
+	return err
+}
+
+func (s *Server) completeImport(id string) {
+	s.db.Exec(`
+		UPDATE imports
+		SET status='completed', finished_at=now()
+		WHERE id=$1
+	`, id)
+
+	emit(id, ImportEvent{"completed", nil})
+}
+
+func (s *Server) failImport(id, msg string) {
+	s.db.Exec(`
+		UPDATE imports
+		SET status='failed', error_message=$2, finished_at=now()
+		WHERE id=$1
+	`, id, msg)
+
+	emit(id, ImportEvent{"failed", msg})
+}
+
+func (s *Server) markStarted(importID string) error {
+	_, err := s.db.Exec(`
+		UPDATE imports
+		SET status = 'processing',
+		    started_at = now()
+		WHERE id = $1
+	`, importID)
+	return err
+}
+
+func (s *Server) updateTotalRows(importID string, total int) error {
+	_, err := s.db.Exec(`
+		UPDATE imports
+		SET total_rows = $2
+		WHERE id = $1
+	`, importID, total)
 	return err
 }

@@ -11,3 +11,4 @@ bootstrap/*
 /public/build
 /public/hot
 acme.log
+uploads

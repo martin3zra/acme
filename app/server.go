@@ -103,6 +103,25 @@ func (s *Server) Start() error {
 	return err
 }
 
+func (s *Server) StartSSE() error {
+	mux := http.NewServeMux()
+
+	mux.HandleFunc("/sse/imports/", s.importEventsHandler)
+
+	server := &http.Server{
+		Addr:    ":8090", // separate port = no interference
+		Handler: mux,
+	}
+
+	log.Println("SSE server listening on :8090")
+	err := server.ListenAndServe()
+	if errors.Is(err, http.ErrServerClosed) {
+		return nil
+	}
+
+	return err
+}
+
 func (s *Server) Shutdown(ctx context.Context) error {
 	log.Print("Shutting down server")
 	// Stop accepting new connections

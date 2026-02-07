@@ -101,6 +101,8 @@ func (s *Server) bootRoutes() {
 					route.POST("/uploads/chunks", s.uploadChunkHandler())
 					route.POST("/uploads/complete", s.completeUploadChunkHandler())
 
+					route.POST("/imports", s.startImportHandler())
+
 					route.GroupPrefix("/settings/:account", func(route *routing.Router) {
 						route.GET("/profile", s.accountProfileHandler)
 						route.PUT("/profile", s.updateAccountProfileHandler())

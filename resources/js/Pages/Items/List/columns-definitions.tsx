@@ -42,6 +42,7 @@ export const getColumns = ({ onDidClick, t }: Props): ColumnDef<Item>[] => {
       id: 'identifiers.reference',
       accessorFn: (row) => row.identifiers?.reference ?? '', // prevent undefined
       meta: t('global.reference'),
+      size: 100,
       header: (props) => {
         return <HeaderCell title={t('global.reference')} alignment="left" columnWidth={props.column.getSize()} />;
       },
@@ -52,6 +53,7 @@ export const getColumns = ({ onDidClick, t }: Props): ColumnDef<Item>[] => {
     {
       accessorKey: 'name',
       meta: t('global.name'),
+      size: 320,
       header: ({ column }) => {
         return <HeaderSortCell<Item> title={t('global.name')} column={column} />;
       },
@@ -116,6 +118,7 @@ export const getColumns = ({ onDidClick, t }: Props): ColumnDef<Item>[] => {
     {
       accessorKey: 'item_type',
       meta: t('items.single.type'),
+      size: 45,
       header: (props) => {
         return <HeaderCell title={t('items.single.type')} alignment="left" columnWidth={props.column.getSize()} />;
       },
@@ -129,6 +132,7 @@ export const getColumns = ({ onDidClick, t }: Props): ColumnDef<Item>[] => {
     {
       accessorKey: 'unit.name',
       meta: t('global.unit'),
+      size: 84,
       header: (props) => {
         return <HeaderCell title={t('global.unit')} alignment="left" columnWidth={props.column.getSize()} />;
       },
@@ -139,6 +143,7 @@ export const getColumns = ({ onDidClick, t }: Props): ColumnDef<Item>[] => {
     {
       accessorKey: 'tax.name',
       meta: t('global.taxRate'),
+      size: 105,
       header: (props) => {
         return <HeaderCell title={t('global.taxRate')} alignment="left" columnWidth={props.column.getSize()} />;
       },

@@ -73,6 +73,13 @@ func run(args []string, stdout io.Writer) error {
 		}
 	}()
 
+	go func() {
+		if err := server.StartSSE(); err != nil {
+			log.Printf("something wrong happens starting the server error: %v", err)
+			cancel() // trigger shutdown
+		}
+	}()
+
 	// Wait for interrupt signal to gracefully shut down the server with a timeout of 10 seconds.
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, os.Interrupt)
