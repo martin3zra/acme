@@ -1,5 +1,6 @@
 import { ConfirmsPassword } from '@/components/confirms-password';
 import HeadingSmall from '@/components/heading-small';
+import { ImportDrawer } from '@/components/import-zone';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { useVerb } from '@/composables/use-verbs';
@@ -8,7 +9,7 @@ import { useTranslation } from '@/hooks/use-translation';
 import AppLayout from '@/layouts/app-layout';
 import { Customer, CustomerTypeFilter, CustomerVerb, PageProps, TaxReceipt } from '@/types';
 import { router, usePage } from '@inertiajs/react';
-import { Plus } from 'lucide-react';
+import { FileUp, Plus } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { List } from './List/Index';
 import CreateForm, { CreateFormParams } from './Shared/CreateForm';
@@ -26,6 +27,7 @@ export default function Index({
   const [loadingCustomer, setLoadingCustomer] = useState<boolean>(false);
   const [open, setOpen] = useCallbackState<boolean>(customer !== undefined);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [importSheetOpen, setImportSheetOpen] = useState<boolean>(false);
   const [selectedCustomer, setSelectedCustomer] = useState<CreateFormParams>({
     customer: undefined,
     action: customer !== undefined ? 'view' : 'create',
@@ -118,9 +120,14 @@ export default function Index({
             title={t('customers.title')}
             description={t('customers.description')}
             rightPanel={
-              <Button onClick={onCreateNewCustomer}>
-                <Plus /> {t('customers.newCustomer.title')}
-              </Button>
+              <div className="flex space-x-2">
+                <Button onClick={onCreateNewCustomer}>
+                  <Plus /> {t('customers.newCustomer.title')}
+                </Button>
+                <Button onClick={() => setImportSheetOpen(true)}>
+                  <FileUp /> {t('global.actions.import')}
+                </Button>
+              </div>
             }
           />
         )}
@@ -172,6 +179,7 @@ export default function Index({
             onOpenChange={modalHandler}
           />
         )}
+        <ImportDrawer source="customers" openImportDrawer={importSheetOpen} setImportDrawer={setImportSheetOpen} />
       </div>
     </AppLayout>
   );

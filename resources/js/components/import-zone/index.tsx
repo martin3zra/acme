@@ -31,6 +31,7 @@ type ImportCompletedPayload = {
   processed: number;
   success: number;
   failed: number;
+  warning: number;
 };
 
 type ImportPhase = 'reading_file' | 'normalizing_encoding' | 'mapping_columns' | 'importing_rows';
@@ -126,13 +127,16 @@ export function ImportDrawer({ source, openImportDrawer, setImportDrawer }: Prop
       case 'completed': {
         handleOnClear();
         const data: ImportCompletedPayload = JSON.parse(event.data);
-        const { total, success, failed, processed } = data;
-        console.log(total, success, failed, processed);
-        toast.success(`Imported ${success} of ${total} records`, {
-          id: IMPORT_TOAST_ID,
-          duration: 6000,
-          description: failed > 0 ? `${failed} rows failed` : 'All records imported successfully',
-        });
+        const { total, success, failed, processed, warning } = data;
+        toast.success(
+          warning > 0
+            ? `Imported ${success} rows of ${total} with ${warning} warning${warning > 1 ? 's' : ''}`
+            : `Imported ${success} of ${total} rows successfully`,
+        );
+
+        if (failed > 0) {
+          toast.error(`${failed} of ${total} rows failed to import`);
+        }
         break;
       }
 

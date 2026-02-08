@@ -24,6 +24,8 @@ import (
 	"golang.org/x/text/encoding/charmap"
 )
 
+const PaymentTermsMax = 120 // net120
+
 type LoginFormRequest struct {
 	support.FormRequest
 	Email    string `json:"email"`

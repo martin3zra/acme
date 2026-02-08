@@ -204,37 +204,41 @@ func (s *Server) storeCustomer(ctx context.Context, form *StoreCustomerForm) err
 			return err
 		}
 
-		stmt, err := tx.Prepare("INSERT INTO customers (company_id, name, contact_name, email, phone, payment_method, payment_terms, credit_limited, credit_limit, amount_due, customer_type, tax_receipt_id, code) " +
-			"VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13) RETURNING id")
-		if err != nil {
-			return err
-		}
-
-		var customerID int
-		err = stmt.QueryRow(companyID, form.Name, form.Contact, form.Email, form.Phone, form.PaymentMethod, form.PaymentTerms, form.CreditLimited, form.CreditLimit, form.OpenBalance, form.CustomerType, form.TaxReceipt, seqInfo.Code).Scan(&customerID)
-		if err != nil {
-			return err
-		}
-
-		if form.OpenBalance == 0 || form.OpenBalanceAsOf.IsZero() {
-			return nil
-		}
-
-		stmt, err = tx.Prepare("INSERT INTO invoices (company_id, date, type, due_on, customer_id, amount, amount_due, total, note, status, paid_status) " +
-			"VALUES($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING id")
-		if err != nil {
-			return err
-		}
-
-		var invoiceID int
-		err = stmt.QueryRow(companyID, form.OpenBalanceAsOf, InvoiceTermType.Opening, form.OpenBalanceAsOf, customerID, form.OpenBalance, form.OpenBalance, form.OpenBalance, "Saldo inicial", InvoiceStatuses.Sent, PaidStatuses.UnPaid).
-			Scan(&invoiceID)
-		if err != nil {
-			return err
-		}
-
-		return s.registerReceivable(tx, companyID, invoiceID, customerID)
+		return s.storeCustomerInternal(tx, companyID, seqInfo.Code, form)
 	})
+}
+
+func (s *Server) storeCustomerInternal(tx *sql.Tx, companyID int, code string, form *StoreCustomerForm) error {
+	stmt, err := tx.Prepare("INSERT INTO customers (company_id, name, contact_name, email, phone, payment_method, payment_terms, credit_limited, credit_limit, amount_due, customer_type, tax_receipt_id, code) " +
+		"VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13) RETURNING id")
+	if err != nil {
+		return err
+	}
+
+	var customerID int
+	err = stmt.QueryRow(companyID, form.Name, form.Contact, form.Email, form.Phone, form.PaymentMethod, form.PaymentTerms, form.CreditLimited, form.CreditLimit, form.OpenBalance, form.CustomerType, form.TaxReceipt, code).Scan(&customerID)
+	if err != nil {
+		return err
+	}
+
+	if form.OpenBalance == 0 || form.OpenBalanceAsOf.IsZero() {
+		return nil
+	}
+
+	stmt, err = tx.Prepare("INSERT INTO invoices (company_id, date, type, due_on, customer_id, amount, amount_due, total, note, status, paid_status) " +
+		"VALUES($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING id")
+	if err != nil {
+		return err
+	}
+
+	var invoiceID int
+	err = stmt.QueryRow(companyID, form.OpenBalanceAsOf, InvoiceTermType.Opening, form.OpenBalanceAsOf, customerID, form.OpenBalance, form.OpenBalance, form.OpenBalance, "Saldo inicial", InvoiceStatuses.Sent, PaidStatuses.UnPaid).
+		Scan(&invoiceID)
+	if err != nil {
+		return err
+	}
+
+	return s.registerReceivable(tx, companyID, invoiceID, customerID)
 }
 
 func (s *Server) updateCustomer(ctx context.Context, customerID int, form *UpdateCustomerForm) error {

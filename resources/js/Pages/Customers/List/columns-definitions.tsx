@@ -69,7 +69,7 @@ export const getColumns = ({ onDidClick, t }: Props): ColumnDef<Customer>[] => {
         return <HeaderSortCell<Customer> title={t('global.name')} column={column} />;
       },
       cell: (props) => {
-        return <TextCell columnWidth={props.column.getSize()} value={props.getValue() as string} />;
+        return <TextCell className="min-w-[320px] truncate" columnWidth={props.column.getSize()} value={props.getValue() as string} />;
       },
     },
     {
@@ -79,7 +79,7 @@ export const getColumns = ({ onDidClick, t }: Props): ColumnDef<Customer>[] => {
         return <HeaderCell title={t('global.contact')} alignment="left" columnWidth={props.column.getSize()} />;
       },
       cell: (props) => {
-        return <TextCell columnWidth={props.column.getSize()} value={props.getValue() as string} />;
+        return <TextCell className="min-w-[320px] truncate" columnWidth={props.column.getSize()} value={props.getValue() as string} />;
       },
     },
     {

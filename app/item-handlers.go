@@ -517,7 +517,7 @@ func countCSVRows(path string, enc UploadEncoding, delimiter rune) (int, error) 
 }
 
 func mapHeaders(headers []string, source string) (map[int]string, error) {
-	mapping := map[string]string{}
+	var mapping map[string]string
 
 	if source == "items" {
 		mapping = map[string]string{

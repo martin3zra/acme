@@ -89,6 +89,7 @@ type importFile struct {
 	ProcessedRows *int
 	SuccessRows   *int
 	FailedRows    *int
+	WarningRows   *int
 	ErrorMEssage  *string
 	CreatedAt     *time.Time
 	StartedAt     *time.Time
@@ -438,7 +439,7 @@ func (s *Server) storeImport(id string, form *ImportForm) error {
 func (s *Server) findImportByID(id string) (*importFile, error) {
 	i := new(importFile)
 	if err := s.db.QueryRow(`
-  SELECT id, upload_id, user_id, status, source, phase, total_rows, processed_rows, success_rows, failed_rows, error_message, created_at, started_at, finished_at
+  SELECT id, upload_id, user_id, status, source, phase, total_rows, processed_rows, success_rows, failed_rows, warning_rows, error_message, created_at, started_at, finished_at
   FROM imports
   WHERE id = $1
   `, id).Scan(
@@ -452,6 +453,7 @@ func (s *Server) findImportByID(id string) (*importFile, error) {
 		&i.ProcessedRows,
 		&i.SuccessRows,
 		&i.FailedRows,
+		&i.WarningRows,
 		&i.ErrorMEssage,
 		&i.CreatedAt,
 		&i.StartedAt,
@@ -476,9 +478,13 @@ func (s *Server) processRows(
 	failed := 0
 	var err error
 	var taxes []*tax
-	taxes, err = s.findTaxesInternal(companyID)
-	if err != nil {
-		return err
+	warnings := []ImportIssue{}
+
+	if source == "items" {
+		taxes, err = s.findTaxesInternal(companyID)
+		if err != nil {
+			return err
+		}
 	}
 
 	for {
@@ -495,41 +501,45 @@ func (s *Server) processRows(
 			}
 		}
 
-		// Validation BEFORE transaction
-		if record["name"] == "" {
-			failed++
-			if err := database.WithTransaction(s.db, func(tx *sql.Tx) error {
-				return s.saveRowError(tx, importID, rowNum, "Name is required", row)
-			}); err != nil {
-				log.Println("saving row error", err)
-			}
-			continue
-		}
-
 		for k, v := range record {
 			if str, ok := v.(string); ok && !utf8.ValidString(str) {
 				failed++
 				_ = database.WithTransaction(s.db, func(tx *sql.Tx) error {
-					return s.saveRowError(tx, importID, rowNum, "Invalid UTF-8 in "+k, row)
+					return s.saveRowIssue(tx, importID, ImportIssue{
+						Row:     rowNum,
+						Column:  k,
+						Level:   IssueLevel.Error,
+						Message: fmt.Sprintf("Invalid UTF-8 in %v", k),
+						Value:   str,
+					})
 				})
 				continue
 			}
 		}
 
 		if source == "items" {
-			if err := s.storeItemFromRecord(companyID, taxes, importID, row, rowNum, record); err != nil {
+			if err := s.storeItemFromRecord(companyID, taxes, importID, row, rowNum, record, &warnings); err != nil {
 				failed++
 				continue
 			}
 		} else {
-			s.storeCustomerFromRecord(record)
+			if err := s.storeCustomerFromRecord(companyID, importID, row, rowNum, record, &warnings); err != nil {
+				failed++
+				continue
+			}
 		}
 
 		success++
 
 		if rowNum%25 == 0 {
+			warningCount := 0
+			for _, w := range warnings {
+				if w.Level == "warning" {
+					warningCount++
+				}
+			}
 			if err := database.WithTransaction(s.db, func(tx *sql.Tx) error {
-				return s.updateProgress(tx, importID, rowNum-1, success, failed)
+				return s.updateProgress(tx, importID, rowNum-1, success, failed, warningCount)
 			}); err != nil {
 				log.Println("updating progress", err)
 			}
@@ -544,8 +554,17 @@ func (s *Server) processRows(
 		}
 	}
 
+	warningCount := 0
+	for _, w := range warnings {
+		if w.Level == "warning" {
+			warningCount++
+		}
+	}
 	if err := database.WithTransaction(s.db, func(tx *sql.Tx) error {
-		return s.updateProgress(tx, importID, rowNum-1, success, failed)
+		if err := s.storeImportIssues(tx, importID, warnings); err != nil {
+			return err
+		}
+		return s.updateProgress(tx, importID, rowNum-1, success, failed, warningCount)
 	}); err != nil {
 		log.Println("updating progress", err)
 		return err
@@ -553,11 +572,17 @@ func (s *Server) processRows(
 	return nil
 }
 
-func (s *Server) storeItemFromRecord(companyID int, taxes []*tax, importID string, row []string, rowNum int, record map[string]any) error {
-	form, err := mapToStoreItemForm(record, taxes)
+func (s *Server) storeItemFromRecord(companyID int, taxes []*tax, importID string, row []string, rowNum int, record map[string]any, warnings *[]ImportIssue) error {
+	form, err := mapToStoreItemForm(rowNum, record, taxes, warnings)
 	if form == nil {
 		if err := database.WithTransaction(s.db, func(tx *sql.Tx) error {
-			return s.saveRowError(tx, importID, rowNum, err.Error(), row)
+			return s.saveRowIssue(tx, importID, ImportIssue{
+				Row:     rowNum,
+				Column:  "all",
+				Level:   IssueLevel.Error,
+				Message: err.Error(),
+				Value:   strings.Join(row, ","),
+			})
 		}); err != nil {
 			log.Println("saving row error", err)
 			return err
@@ -570,7 +595,13 @@ func (s *Server) storeItemFromRecord(companyID int, taxes []*tax, importID strin
 	}); err != nil {
 		log.Println("storing record", err)
 		if saveErr := database.WithTransaction(s.db, func(tx *sql.Tx) error {
-			return s.saveRowError(tx, importID, rowNum, err.Error(), row)
+			return s.saveRowIssue(tx, importID, ImportIssue{
+				Row:     rowNum,
+				Column:  "all",
+				Level:   IssueLevel.Error,
+				Message: err.Error(),
+				Value:   strings.Join(row, ","),
+			})
 		}); saveErr != nil {
 			log.Println("storing record", err)
 			return err
@@ -579,24 +610,102 @@ func (s *Server) storeItemFromRecord(companyID int, taxes []*tax, importID strin
 	return nil
 }
 
-func (s *Server) storeCustomerFromRecord(record map[string]any) error {
+func (s *Server) storeCustomerFromRecord(companyID int, importID string, row []string, rowNum int, record map[string]any, warnings *[]ImportIssue) error {
+	form, code, err := mapToStoreCustomerForm(rowNum, record, warnings)
+	if form == nil || code == nil {
+		if err := database.WithTransaction(s.db, func(tx *sql.Tx) error {
+			return s.saveRowIssue(tx, importID, ImportIssue{
+				Row:     rowNum,
+				Column:  "all",
+				Level:   IssueLevel.Error,
+				Message: err.Error(),
+				Value:   strings.Join(row, ","),
+			})
+		}); err != nil {
+			log.Println("saving row error", err)
+			return err
+		}
+		return errors.New("Unable to map the record to the desired type")
+	}
+	// 🔥 ONE ROW = ONE TRANSACTION
+	if err := database.WithTransaction(s.db, func(tx *sql.Tx) error {
+		return s.storeCustomerInternal(tx, companyID, *code, form)
+	}); err != nil {
+		log.Println("storing record", err)
+		if saveErr := database.WithTransaction(s.db, func(tx *sql.Tx) error {
+			return s.saveRowIssue(tx, importID, ImportIssue{
+				Row:     rowNum,
+				Column:  "all",
+				Level:   IssueLevel.Error,
+				Message: err.Error(),
+				Value:   strings.Join(row, ","),
+			})
+		}); saveErr != nil {
+			log.Println("storing record", err)
+			return err
+		}
+	}
 	return nil
 }
 
-func (s *Server) updateProgress(tx *sql.Tx, id string, processed, success, failed int) error {
+func (s *Server) updateProgress(tx *sql.Tx, id string, processed, success, failed, warnings int) error {
 	_, err := tx.Exec(`
 		UPDATE imports
-		SET processed_rows=$2, success_rows=$3, failed_rows=$4
+		SET processed_rows=$2, success_rows=$3, failed_rows=$4, warning_rows=$5
 		WHERE id=$1
-	`, id, processed, success, failed)
+	`, id, processed, success, failed, warnings)
 	return err
 }
 
-func (s *Server) saveRowError(tx *sql.Tx, importID string, row int, msg string, data []string) error {
+func (s *Server) saveRowIssue(tx *sql.Tx, importID string, i ImportIssue) error {
 	_, err := tx.Exec(`
-		INSERT INTO import_row_errors (import_id, row_number, error, raw_data)
-		VALUES ($1, $2, $3, $4)
-	`, importID, row, msg, strings.Join(data, ","))
+		INSERT INTO import_row_issues 
+    			(import_id, row_number, column_name, level, message, value)
+		VALUES 
+      ($1, $2, $3, $4, $5, $6)
+	`, importID, i.Row, i.Column, string(i.Level), i.Message, i.Value)
+	return err
+}
+
+func (s *Server) storeImportIssues(
+	tx *sql.Tx,
+	importID string,
+	issues []ImportIssue,
+) error {
+	if len(issues) == 0 {
+		return nil
+	}
+
+	var (
+		args   []any
+		values []string
+	)
+
+	for i, issue := range issues {
+		idx := i*6 + 1
+		values = append(values,
+			fmt.Sprintf(
+				"($%d,$%d,$%d,$%d,$%d,$%d)",
+				idx, idx+1, idx+2, idx+3, idx+4, idx+5,
+			),
+		)
+
+		args = append(args,
+			importID,
+			issue.Row,
+			issue.Column,
+			string(issue.Level),
+			issue.Message,
+			issue.Value,
+		)
+	}
+
+	query := `
+		INSERT INTO import_row_issues
+		(import_id, row_number, column_name, level, message, value)
+		VALUES ` + strings.Join(values, ",")
+
+	_, err := tx.Exec(query, args...)
 	return err
 }
 
@@ -614,6 +723,7 @@ func (s *Server) completeImport(ifile *importFile) {
 			"processed": ifile.ProcessedRows,
 			"success":   ifile.SuccessRows,
 			"failed":    ifile.FailedRows,
+			"warning":   ifile.WarningRows,
 		}),
 	})
 }
