@@ -16,7 +16,11 @@ type tax struct {
 }
 
 func (s *Server) findTaxes(ctx context.Context) ([]*tax, error) {
-	rows, err := s.db.Query("SELECT id, uuid, name, rate, created_at, updated_at, deleted_at FROM taxes WHERE company_id = $1", CurrentCompany(ctx).ID)
+	return s.findTaxesInternal(CurrentCompany(ctx).ID)
+}
+
+func (s *Server) findTaxesInternal(companyID int) ([]*tax, error) {
+	rows, err := s.db.Query("SELECT id, uuid, name, rate, created_at, updated_at, deleted_at FROM taxes WHERE company_id = $1", companyID)
 	if err != nil {
 		return nil, err
 	}

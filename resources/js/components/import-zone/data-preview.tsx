@@ -2,12 +2,13 @@ import { CsvPreview } from '.';
 import { Button } from '../ui/button';
 
 type Props = {
+  totalRows: number;
   preview: CsvPreview | null;
   encoding: string | null;
   handleOnClear: () => void;
 };
 
-export function DropZonePreview({ preview, encoding, handleOnClear }: Props) {
+export function DropZonePreview({ totalRows, preview, encoding, handleOnClear }: Props) {
   if (preview === null) {
     return <></>;
   }
@@ -49,7 +50,9 @@ export function DropZonePreview({ preview, encoding, handleOnClear }: Props) {
           </div>
           <p className="text-xs text-green-600">Header row detected • {preview.headers.length} columns found</p>
 
-          <p className="text-muted-foreground text-xs">Showing first {preview.rows.length} rows</p>
+          <p className="text-muted-foreground text-xs">
+            Showing first {preview.rows.length} of {totalRows} rows
+          </p>
           {encoding && (
             <p className="text-muted-foreground text-xs">
               Encoding detected: <strong>{encoding}</strong>

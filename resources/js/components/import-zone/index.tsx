@@ -7,6 +7,7 @@ import axios from 'axios';
 import { useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { Progress } from '../ui/progress';
+import { Spinner } from '../ui/spinner';
 import { DropZonePreview } from './data-preview';
 import { DownloadableSampleSection } from './downloadble-sample-section';
 import { DropZone } from './drop-zone';
@@ -24,6 +25,13 @@ type ImportState =
   | 'queued'
   | 'completed'
   | 'failed';
+
+type ImportCompletedPayload = {
+  total: number;
+  processed: number;
+  success: number;
+  failed: number;
+};
 
 type ImportPhase = 'reading_file' | 'normalizing_encoding' | 'mapping_columns' | 'importing_rows';
 
@@ -51,6 +59,7 @@ const phaseLabel = {
   mapping_columns: 'Mapping columns…',
   importing_rows: 'Importing rows…',
 };
+const IMPORT_TOAST_ID = 'import-progress';
 
 export type CsvPreview = {
   headers: string[];
@@ -61,15 +70,17 @@ const DELIMITERS = ['auto', ',', ';', '\t', '|'] as const;
 type Delimiter = (typeof DELIMITERS)[number];
 
 type Props = {
+  source: 'items' | 'customers';
   openImportDrawer: boolean;
   setImportDrawer: React.Dispatch<React.SetStateAction<boolean>>;
 };
 
-export function ImportDrawer({ openImportDrawer, setImportDrawer }: Props) {
+export function ImportDrawer({ source, openImportDrawer, setImportDrawer }: Props) {
   const headers = useHeader().headers;
   const [fileText, setFileText] = useState<string>('');
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<CsvPreview | null>(null);
+  const [totalRows, setTotalRows] = useState<number>(0);
   const [encoding, setEncoding] = useState<string | null>(null);
   const [state, setState] = useState<ImportState>('idle');
   const [phase, setPhase] = useState<ImportPhase | null>(null);
@@ -82,20 +93,63 @@ export function ImportDrawer({ openImportDrawer, setImportDrawer }: Props) {
 
   const importDisabled = !file || state === 'initializing' || state === 'uploading' || state === 'processing' || state === 'completed';
 
-  useEffect(() => {
-    if (state === 'completed') {
-      toast.success('Import completed', {
-        description: 'Your file was successfully imported.',
-      });
-      handleOnClear();
-    }
+  function updateImportToast(event: { type: string; data?: any }) {
+    switch (event.type) {
+      case 'phase': {
+        setState('processing');
+        setPhase(event.data);
+        break;
+      }
 
-    if (state === 'failed') {
-      toast.error('Import failed', {
-        description: 'There was an issue processing your file.',
-      });
+      case 'queued':
+        toast.loading('Import queued…', {
+          id: IMPORT_TOAST_ID,
+          duration: Infinity,
+        });
+        break;
+
+      case 'processing':
+        toast.loading(`Processing ${event.data.processed_rows} / ${event.data.total_rows}`, {
+          id: IMPORT_TOAST_ID,
+          duration: Infinity,
+        });
+        break;
+
+      case 'progress': {
+        setProgress({
+          processed: event.data.processed,
+          total: event.data.total,
+        });
+        break;
+      }
+
+      case 'completed': {
+        handleOnClear();
+        const data: ImportCompletedPayload = JSON.parse(event.data);
+        const { total, success, failed, processed } = data;
+        console.log(total, success, failed, processed);
+        toast.success(`Imported ${success} of ${total} records`, {
+          id: IMPORT_TOAST_ID,
+          duration: 6000,
+          description: failed > 0 ? `${failed} rows failed` : 'All records imported successfully',
+        });
+        break;
+      }
+
+      case 'failed':
+        setState('failed');
+        setProgress(null);
+        setPhase(null);
+        toast.error('Import failed', {
+          id: IMPORT_TOAST_ID,
+          duration: 8000,
+        });
+        break;
+      default: {
+        console.warn('Unknown SSE event', event);
+      }
     }
-  }, [state]);
+  }
 
   function connectToSSE(importId: string) {
     // Always close an existing connection first
@@ -113,60 +167,11 @@ export function ImportDrawer({ openImportDrawer, setImportDrawer }: Props) {
       try {
         const event = JSON.parse(e.data);
 
-        switch (event.type) {
-          case 'phase': {
-            setState('processing');
-            setPhase(event.data);
-            break;
-          }
+        updateImportToast(event);
 
-          case 'progress': {
-            setProgress({
-              processed: event.data.processed,
-              total: event.data.total,
-            });
-            break;
-          }
-
-          case 'completed': {
-            setState('completed');
-
-            // ✅ clear progress explicitly
-            setProgress(null);
-            setPhase(null);
-
-            es.close();
-            cleanupSSE();
-            break;
-          }
-
-          case 'row_error': {
-            setErrors((prev) => [
-              ...prev,
-              {
-                row: event.data.row,
-                error: event.data.error,
-                raw: event.data.raw,
-              },
-            ]);
-            break;
-          }
-
-          case 'failed': {
-            setState('failed');
-
-            // ✅ clear progress explicitly
-            setProgress(null);
-            setPhase(null);
-
-            es.close();
-            cleanupSSE();
-            break;
-          }
-
-          default: {
-            console.warn('Unknown SSE event', event);
-          }
+        if (event.type === 'completed' || event.type === 'failed') {
+          es.close();
+          cleanupSSE();
         }
       } catch (err) {
         console.error('Invalid SSE payload', err);
@@ -261,7 +266,7 @@ export function ImportDrawer({ openImportDrawer, setImportDrawer }: Props) {
 
     const headers = lines[0].split(delimiter).map((h) => h.trim());
     const columnCount = headers.length;
-
+    setTotalRows(lines.length - 1);
     const rows = lines.slice(1, MAX_PREVIEW_ROWS + 1).map((line) => {
       const cells = line.split(delimiter).map((cell) => cell.trim());
       // ✅ Normalize row length
@@ -306,19 +311,32 @@ export function ImportDrawer({ openImportDrawer, setImportDrawer }: Props) {
   }
 
   const startImport = async (uploadId: string) => {
-    const res = await axios.post(
-      '/imports',
-      {
-        upload_id: uploadId,
-        type: 'items',
-      },
-      { ...headers },
-    );
+    try {
+      const res = await axios.post(
+        '/imports',
+        {
+          upload_id: uploadId,
+          type: source,
+        },
+        { ...headers },
+      );
 
-    return res.data as {
-      import_id: string;
-      status: 'queued';
-    };
+      console.log(res.status);
+
+      return res.data as {
+        import_id: string;
+        status: 'queued';
+      };
+    } catch (err: any) {
+      // 1. Extract the error response from Axios
+      const errorData: ErrorResponse = err.response?.data;
+
+      // 2. Handle the toast (using the 'status' or 'error' field from your foundation.ErrorBag)
+      toast.error(errorData?.status || 'Import initialization failed');
+
+      // 3. Re-throw to prevent the calling function from continuing
+      throw new Error(errorData?.status || 'Failed fetching the data');
+    }
   };
 
   const onStartUpload = async () => {
@@ -428,9 +446,12 @@ export function ImportDrawer({ openImportDrawer, setImportDrawer }: Props) {
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
+    setTotalRows(0);
     setPreview(null);
     setFile(null);
     setFileText('');
+    setProgress(null);
+    setPhase(null);
     setState('idle');
   };
 
@@ -453,6 +474,35 @@ export function ImportDrawer({ openImportDrawer, setImportDrawer }: Props) {
           <div className="flex flex-col px-6">
             {/* Sample file */}
             <DownloadableSampleSection />
+
+            {state !== 'idle' && state !== 'previewing' && (
+              <>
+                <p className="text-muted-foreground text-sm">
+                  {state === 'initializing' && 'Preparing upload…'}
+                  {state === 'uploading' && `Uploading… ${progress}%`}
+                  {state === 'processing' && 'Processing CSV…'}
+                  {state === 'done' && 'Import completed'}
+                </p>
+                <div className="space-y-2 py-6">
+                  <p className="text-muted-foreground text-sm">
+                    {state === 'queued' && 'Preparing import…'}
+                    {phase && phaseLabel[phase]}
+                    {state === 'completed' && 'Import completed'}
+                    {state === 'failed' && 'Import failed'}
+                  </p>
+                </div>
+              </>
+            )}
+
+            {state === 'processing' && progress?.total != null && (
+              <div className="space-y-1">
+                <Progress value={progress.processed != null ? (progress.processed / progress.total) * 100 : 0} />
+                <p className="text-muted-foreground text-xs">
+                  {progress.processed ?? 0} of {progress.total} rows
+                </p>
+              </div>
+            )}
+            <ImportErrorTable errors={errors} />
 
             <div className="relative max-h-64">
               <div className="mb-3 max-w-sm">
@@ -490,38 +540,13 @@ export function ImportDrawer({ openImportDrawer, setImportDrawer }: Props) {
                     <span className="text-xs">Wrong? Choose a different one below.</span>
                   </p>
                 )}
-                <DropZonePreview preview={preview} encoding={encoding} handleOnClear={handleOnClear} />
+                <DropZonePreview totalRows={totalRows} preview={preview} encoding={encoding} handleOnClear={handleOnClear} />
               </div>
 
               <div className={preview === null ? 'opacity-100' : 'pointer-events-none opacity-0'}>
                 <DropZone handleZoneClick={() => fileInputRef.current?.click()} handleFileSelect={handleFileSelect} />
               </div>
             </div>
-
-            <p className="text-muted-foreground text-sm">
-              {state === 'initializing' && 'Preparing upload…'}
-              {state === 'uploading' && `Uploading… ${progress}%`}
-              {state === 'processing' && 'Processing CSV…'}
-              {state === 'done' && 'Import completed'}
-            </p>
-            <div className="space-y-2 py-6">
-              <p className="text-muted-foreground text-sm">
-                {state === 'queued' && 'Preparing import…'}
-                {phase && phaseLabel[phase]}
-                {state === 'completed' && 'Import completed'}
-                {state === 'failed' && 'Import failed'}
-              </p>
-            </div>
-
-            {state === 'processing' && progress?.total != null && (
-              <div className="space-y-1">
-                <Progress value={progress.processed != null ? (progress.processed / progress.total) * 100 : 0} />
-                <p className="text-muted-foreground text-xs">
-                  {progress.processed ?? 0} of {progress.total} rows
-                </p>
-              </div>
-            )}
-            <ImportErrorTable errors={errors} />
           </div>
 
           {/* Footer */}
@@ -535,6 +560,7 @@ export function ImportDrawer({ openImportDrawer, setImportDrawer }: Props) {
                 </Button>
 
                 <Button disabled={importDisabled} onClick={onStartUpload}>
+                  {(state === 'uploading' || state === 'processing') && <Spinner />}
                   Import file
                 </Button>
               </div>

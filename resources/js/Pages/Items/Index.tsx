@@ -148,7 +148,7 @@ export default function Index({
             onOpenChange={modalHandler}
           />
         )}
-        <ImportDrawer openImportDrawer={importSheetOpen} setImportDrawer={setImportSheetOpen} />
+        <ImportDrawer source="items" openImportDrawer={importSheetOpen} setImportDrawer={setImportSheetOpen} />
       </div>
     </AppLayout>
   );

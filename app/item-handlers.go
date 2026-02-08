@@ -13,13 +13,11 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
-	"unicode/utf8"
 
 	"github.com/google/uuid"
 	"github.com/martin3zra/acme/pkg/i18n"
 	"github.com/martin3zra/acme/pkg/routing"
 	inertia "github.com/romsar/gonertia/v2"
-	"golang.org/x/text/encoding/charmap"
 	"golang.org/x/text/transform"
 )
 
@@ -320,7 +318,7 @@ func (s *Server) startImportHandler() routing.HandlerFunc {
 			return
 		}
 
-		go s.processImport(CurrentCompany(ctx.Request.Context()).ID, importID.String(), form.UploadID)
+		go s.processImport(CurrentCompany(ctx.Request.Context()).ID, importID.String(), form)
 
 		ctx.JSON(http.StatusOK, map[string]any{
 			"import_id": importID,
@@ -329,14 +327,14 @@ func (s *Server) startImportHandler() routing.HandlerFunc {
 	})
 }
 
-func (s *Server) processImport(companyID int, importID, uploadID string) {
+func (s *Server) processImport(companyID int, importID string, form *ImportForm) {
 	defer func() {
 		if r := recover(); r != nil {
 			s.failImport(importID, fmt.Sprint(r))
 		}
 	}()
 
-	uSess, err := s.findUploadSession(uploadID)
+	uSess, err := s.findUploadSession(form.UploadID)
 	if err != nil {
 		s.failImport(importID, fmt.Sprint(err))
 		return
@@ -344,7 +342,7 @@ func (s *Server) processImport(companyID int, importID, uploadID string) {
 
 	s.markStarted(importID)
 
-	filePath := resolveUploadPath(fmt.Sprintf("%s/%s", uploadID, uSess.Filename))
+	filePath := resolveUploadPath(fmt.Sprintf("%s/%s", form.UploadID, uSess.Filename))
 
 	delimiter := rune(uSess.Delimiter[0])
 	emit(importID, ImportEvent{"phase", "reading_file"})
@@ -401,7 +399,7 @@ func (s *Server) processImport(companyID int, importID, uploadID string) {
 		return
 	}
 
-	columnMap, err := mapHeaders(headers)
+	columnMap, err := mapHeaders(headers, form.Type)
 	if err != nil {
 		s.failImport(importID, err.Error())
 		return
@@ -409,7 +407,7 @@ func (s *Server) processImport(companyID int, importID, uploadID string) {
 
 	emit(importID, ImportEvent{"phase", "importing_rows"})
 
-	if err := s.processRows(companyID, importID, csvReader, columnMap, totalRows); err != nil {
+	if err := s.processRows(companyID, importID, form.Type, csvReader, columnMap, totalRows); err != nil {
 		log.Println("Something wrong happens processing the records", err)
 		s.failImport(importID, err.Error())
 		emit(importID, ImportEvent{"type", "failed"})
@@ -424,7 +422,14 @@ func (s *Server) processImport(companyID int, importID, uploadID string) {
 		},
 	})
 
-	s.completeImport(importID)
+	importFile, err := s.findImportByID(importID)
+	if err != nil {
+		log.Println("Something wrong happens processing the records", err)
+		s.failImport(importID, err.Error())
+		emit(importID, ImportEvent{"type", "failed"})
+	}
+
+	s.completeImport(importFile)
 }
 
 func resolveUploadPath(uploadID string) string {
@@ -440,7 +445,7 @@ func openForImport(path string, enc UploadEncoding) (*os.File, io.Reader, error)
 
 	if dec := encodingDecoders[enc]; dec != nil {
 		reader := transform.NewReader(file, dec)
-  return file, reader, nil
+		return file, reader, nil
 	}
 
 	return file, file, nil
@@ -511,29 +516,37 @@ func countCSVRows(path string, enc UploadEncoding, delimiter rune) (int, error) 
 	return count, nil
 }
 
-func normalizeEncoding(r io.Reader) io.Reader {
-	br := bufio.NewReader(r)
+func mapHeaders(headers []string, source string) (map[int]string, error) {
+	mapping := map[string]string{}
 
-	// Peek without consuming
-	peek, err := br.Peek(1024)
-	if err == nil && utf8.Valid(peek) {
-		return br
+	if source == "items" {
+		mapping = map[string]string{
+			"NOMBRE":      "name",
+			"DESCRIPCION": "description",
+			"PRECIO":      "price",
+			"ITBIS":       "tax_rate",
+			"TIPO":        "item_type",
+			"SKU":         "sku",
+			"CODIGO":      "code",
+			"BARRA":       "barcode",
+			"REFERENCIA":  "reference",
+			"REF_SUP":     "vendor_reference",
+		}
 	}
-	// Assume Windows-1252 fallback
-	return transform.NewReader(br, charmap.Windows1252.NewDecoder())
-}
 
-func mapHeaders(headers []string) (map[int]string, error) {
-	mapping := map[string]string{
-		"NOMBRE":      "name",
-		"DESCRIPCION": "description",
-		"PRECIO":      "price",
-		"TIPO":        "item_type",
-		"SKU":         "sku",
-		"CODIGO":      "code",
-		"BARRA":       "barcode",
-		"REFERENCIA":  "reference",
-		"REF_SUP":     "vendor_reference",
+	if source == "customers" {
+		mapping = map[string]string{
+			"NOMBRE":          "name",
+			"NOMBRE_CONTACTO": "contact_name",
+			"TELEFONO":        "phone",
+			"CORREO":          "email",
+			"PAGO":            "payment_method",
+			"LIMITE":          "credit_limit",
+			"CONDICIONES":     "payment_terms",
+			"TIPO_NCFTP":      "tax_receipt_id",
+			"CODIGO":          "code",
+			"LIMITE_CRE":      "credit_limited",
+		}
 	}
 
 	result := map[int]string{}

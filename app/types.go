@@ -1418,12 +1418,13 @@ func (CompleteUploadForm) Rules() map[string]any {
 }
 
 type UploadSession struct {
-	ID             string         `json:"id"`
-	UserID         int64          `json:"user_id"`
-	Filename       string         `json:"filename"`
-	FileSize       int64          `json:"file_size"`
-	Delimiter      string         `json:"delimiter"`
-	Encoding       string         `json:"encoding"`
+	ID        string `json:"id"`
+	UserID    int64  `json:"user_id"`
+	Filename  string `json:"filename"`
+	FileSize  int64  `json:"file_size"`
+	Delimiter string `json:"delimiter"`
+	Encoding  string `json:"encoding"`
+	// Type           string         `json:"records_type"`
 	Status         string         `json:"status"`
 	TotalChunks    sql.NullInt64  `json:"total_chunks"`
 	UploadedChunks int            `json:"uploaded_chunks"`
@@ -1441,7 +1442,7 @@ type ImportForm struct {
 func (ImportForm) Rules() map[string]any {
 	return map[string]any{
 		"upload_id": "required",
-		"type":      "required",
+		"type":      "required|in:items,customers",
 	}
 }
 

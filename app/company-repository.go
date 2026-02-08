@@ -78,6 +78,23 @@ func (d *RedirectPreferences) Scan(value any) error {
 	return json.Unmarshal(b, &d)
 }
 
+type importFile struct {
+	ID            string
+	UploadID      string
+	UserID        string
+	Source        *string
+	Status        string
+	Phase         *string
+	TotalRows     *int
+	ProcessedRows *int
+	SuccessRows   *int
+	FailedRows    *int
+	ErrorMEssage  *string
+	CreatedAt     *time.Time
+	StartedAt     *time.Time
+	FinishedAt    *time.Time
+}
+
 func (s *Server) findCompanies(ctx context.Context) ([]*Company, error) {
 	rows, err := s.db.Query("SELECT id, uuid, name, identifier, city, address, created_at, updated_at, deleted_at FROM companies WHERE account_id = $1", CurrentAccount(ctx))
 	if err != nil {
@@ -413,14 +430,43 @@ func (s *Server) failUpload(id string, message string) error {
 
 func (s *Server) storeImport(id string, form *ImportForm) error {
 	_, err := s.db.Exec(`
-    INSERT INTO imports (id, upload_id, user_id, status)
-    VALUES ($1, $2, $3, 'queued')`, id, form.UploadID, form.User().UUID)
+    INSERT INTO imports (id, upload_id, user_id, source, status)
+    VALUES ($1, $2, $3, $4, 'queued')`, id, form.UploadID, form.User().UUID, form.Type)
 	return err
+}
+
+func (s *Server) findImportByID(id string) (*importFile, error) {
+	i := new(importFile)
+	if err := s.db.QueryRow(`
+  SELECT id, upload_id, user_id, status, source, phase, total_rows, processed_rows, success_rows, failed_rows, error_message, created_at, started_at, finished_at
+  FROM imports
+  WHERE id = $1
+  `, id).Scan(
+		&i.ID,
+		&i.UploadID,
+		&i.UserID,
+		&i.Status,
+		&i.Source,
+		&i.Phase,
+		&i.TotalRows,
+		&i.ProcessedRows,
+		&i.SuccessRows,
+		&i.FailedRows,
+		&i.ErrorMEssage,
+		&i.CreatedAt,
+		&i.StartedAt,
+		&i.FinishedAt,
+	); err != nil {
+		return nil, err
+	}
+
+	return i, nil
 }
 
 func (s *Server) processRows(
 	companyID int,
 	importID string,
+	source string,
 	reader *csv.Reader,
 	columnMap map[int]string,
 	total int,
@@ -428,6 +474,12 @@ func (s *Server) processRows(
 	rowNum := 1
 	success := 0
 	failed := 0
+	var err error
+	var taxes []*tax
+	taxes, err = s.findTaxesInternal(companyID)
+	if err != nil {
+		return err
+	}
 
 	for {
 		row, err := reader.Read()
@@ -464,29 +516,13 @@ func (s *Server) processRows(
 			}
 		}
 
-		form := mapToStoreItemForm(record)
-		if form == nil {
-			failed++
-			if err := database.WithTransaction(s.db, func(tx *sql.Tx) error {
-				return s.saveRowError(tx, importID, rowNum, "Data mismatch", row)
-			}); err != nil {
-				log.Println("saving row error", err)
-			}
-			continue
-		}
-
-		// 🔥 ONE ROW = ONE TRANSACTION
-		if err = database.WithTransaction(s.db, func(tx *sql.Tx) error {
-			return s.storeItemBackground(tx, companyID, form)
-		}); err != nil {
-			log.Println("storing record", err)
-			if saveErr := database.WithTransaction(s.db, func(tx *sql.Tx) error {
-				return s.saveRowError(tx, importID, rowNum, err.Error(), row)
-			}); saveErr != nil {
-				log.Println("storing record", err)
+		if source == "items" {
+			if err := s.storeItemFromRecord(companyID, taxes, importID, row, rowNum, record); err != nil {
 				failed++
 				continue
 			}
+		} else {
+			s.storeCustomerFromRecord(record)
 		}
 
 		success++
@@ -508,74 +544,44 @@ func (s *Server) processRows(
 		}
 	}
 
+	if err := database.WithTransaction(s.db, func(tx *sql.Tx) error {
+		return s.updateProgress(tx, importID, rowNum-1, success, failed)
+	}); err != nil {
+		log.Println("updating progress", err)
+		return err
+	}
 	return nil
 }
 
-// func (s *Server) processRows(
-// 	companyID int,
-// 	importID string,
-// 	reader *csv.Reader,
-// 	columnMap map[int]string,
-// 	total int,
-// ) error {
-// 	rowNum := 1
-// 	success := 0
-// 	failed := 0
+func (s *Server) storeItemFromRecord(companyID int, taxes []*tax, importID string, row []string, rowNum int, record map[string]any) error {
+	form, err := mapToStoreItemForm(record, taxes)
+	if form == nil {
+		if err := database.WithTransaction(s.db, func(tx *sql.Tx) error {
+			return s.saveRowError(tx, importID, rowNum, err.Error(), row)
+		}); err != nil {
+			log.Println("saving row error", err)
+			return err
+		}
+		return errors.New("Unable to map the record to the desired type")
+	}
+	// 🔥 ONE ROW = ONE TRANSACTION
+	if err := database.WithTransaction(s.db, func(tx *sql.Tx) error {
+		return s.storeItemBackground(tx, companyID, form)
+	}); err != nil {
+		log.Println("storing record", err)
+		if saveErr := database.WithTransaction(s.db, func(tx *sql.Tx) error {
+			return s.saveRowError(tx, importID, rowNum, err.Error(), row)
+		}); saveErr != nil {
+			log.Println("storing record", err)
+			return err
+		}
+	}
+	return nil
+}
 
-// 	return database.WithTransaction(s.db, func(tx *sql.Tx) error {
-
-// 		for {
-// 			row, err := reader.Read()
-// 			if err == io.EOF {
-// 				break
-// 			}
-
-// 			rowNum++
-
-// 			record := map[string]any{}
-// 			for i, field := range row {
-// 				if col, ok := columnMap[i]; ok {
-// 					record[col] = strings.TrimSpace(field)
-// 				}
-// 			}
-
-// 			if record["name"] == "" {
-// 				failed++
-// 				s.saveRowError(tx, importID, rowNum, "Name is required", row)
-// 				continue
-// 			}
-
-// 			form := mapToStoreItemForm(record)
-// 			if form == nil {
-// 				failed++
-// 				s.saveRowError(tx, importID, rowNum, "Data mismatch", row)
-// 				continue
-// 			}
-// 			err = s.storeItemBackground(tx, companyID, form)
-// 			if err != nil {
-// 				log.Println("error storing record", err)
-// 				failed++
-// 				s.saveRowError(tx, importID, rowNum, err.Error(), row)
-// 				continue
-// 			}
-
-// 			success++
-
-// 			if rowNum%25 == 0 {
-// 				s.updateProgress(tx, importID, rowNum-1, success, failed)
-// 				emit(importID, ImportEvent{
-// 					"progress",
-// 					map[string]int{
-// 						"processed": rowNum - 1,
-// 						"total":     total,
-// 					},
-// 				})
-// 			}
-// 		}
-// 		return nil
-// 	})
-
-// }
+func (s *Server) storeCustomerFromRecord(record map[string]any) error {
+	return nil
+}
 
 func (s *Server) updateProgress(tx *sql.Tx, id string, processed, success, failed int) error {
 	_, err := tx.Exec(`
@@ -594,14 +600,22 @@ func (s *Server) saveRowError(tx *sql.Tx, importID string, row int, msg string, 
 	return err
 }
 
-func (s *Server) completeImport(id string) {
+func (s *Server) completeImport(ifile *importFile) {
 	s.db.Exec(`
 		UPDATE imports
 		SET status='completed', finished_at=now()
 		WHERE id=$1
-	`, id)
+	`, ifile.ID)
 
-	emit(id, ImportEvent{"completed", nil})
+	emit(ifile.ID, ImportEvent{
+		Type: "completed",
+		Data: foundation.ToJSON(map[string]any{
+			"total":     ifile.TotalRows,
+			"processed": ifile.ProcessedRows,
+			"success":   ifile.SuccessRows,
+			"failed":    ifile.FailedRows,
+		}),
+	})
 }
 
 func (s *Server) failImport(id, msg string) {
