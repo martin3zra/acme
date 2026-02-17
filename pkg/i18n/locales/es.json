@@ -10,6 +10,7 @@
     "delete": "Eliminar",
     "edit": "Editar",
     "save": "Guardar",
+    "saving": "Guardando...",
     "verified": "Verificado",
     "link": "Vinculado",
     "email": "Correo electronico",
@@ -27,6 +28,7 @@
     "addedAt": "Creado en",
     "payDate": "Pagado en",
     "datePlaceholder": "Elige una fecha",
+    "dangerZone": "Zona de peligro",
     "status": "Estado",
     "amount": "Monto",
     "payment": "Pago",
@@ -86,6 +88,16 @@
     "wasDeleted": ":subject fue eliminad@action con éxito!",
     "wasNotVoided": "No se anulo :subject. Algo salió mal.",
     "wasVoided": ":subject fue anulad@action con éxito!",
+    "somethingWentWrong": "Algo salió mal. Por favor, inténtalo de nuevo.",
+    "pendingVerification": "Ya tienes pendiente un cambio de correo electrónico a :email. Verifícalo antes de solicitar uno nuevo.",
+    "onlyCsvOrTxtAllowed": "Solo se permiten archivos CSV o TXT.",
+    "invalid": {
+      "totalChunkSize": "El tamaño total del archivo excede el límite permitido.",
+      "uploadId": "ID de carga no válido.",
+      "uploadAlreadyCompleted": "Esta carga ya ha sido completada.",
+      "missingChunks": "No se han subido todos los fragmentos.",
+      "notFoundChunks": "No se han subido ningún los fragmento."
+    },
     "visit": "Visita :to ",
     "city": "Ciudad",
     "credit_limit": "Limite de credito",
@@ -154,7 +166,8 @@
       "checkout": "Metodo de pago",
       "create": "Crear",
       "markAsRecurrent": "Marcar como recurrente",
-      "import": "Importar"
+      "import": "Importar",
+      "mismatch": "El :subject no coincide"
     },
     "paymentMethods": {
       "primary": "Método primario",
@@ -250,6 +263,39 @@
       "invoices": "Facturas",
       "estimates": "Cotizaciones"
     },
+    "chart": {
+      "title": "Ventas y gastos",
+      "last12Months": "Últimos 12 meses",
+      "legend": {
+        "sales": "Ventas",
+        "expenses": "Gastos"
+      },
+      "summary": {
+        "sales": "Total Ventas",
+        "expenses": "Total Gastos",
+        "receipts": "Total Ingresos",
+        "netIncome": "Total Ingresos netos"
+      },
+      "months": {
+        "jan": "Ene",
+        "feb": "Feb",
+        "mar": "Mar",
+        "apr": "Abr",
+        "may": "May",
+        "jun": "Jun",
+        "jul": "Jul",
+        "aug": "Ago",
+        "sep": "Sep",
+        "oct": "Oct",
+        "nov": "Nov",
+        "dec": "Dic"
+      }
+    },
+    "emptyState": {
+      "title": "No hay datos gráficos disponibles",
+      "description": "Intente seleccionar otro período o agregar facturas.",
+      "action": "Crear mi primera factura"
+    },
     "statuses": {
       "draft": "Borrador",
       "sent": "Enviada",
@@ -343,6 +389,8 @@
     }
   },
   "users": {
+    "title": "Usuarios",
+    "description": "Administra tus usuarios y detalles de permisos.",
     "single": {
       "title": "Crear un nuevo usuario",
       "description": "Proporcione los detalles necesarios para configurar el usuario. Esta información le ayudará a identificar y gestionar dentro de su equipo el sistema."
@@ -352,8 +400,8 @@
       "description": "Detalles del usuario seleccionado."
     },
     "newUser": {
-      "title": "Nueva usuario",
-      "description": "Crea una nueva usuario."
+      "title": "Nuevo usuario",
+      "description": "Crea un nuevo usuario."
     },
     "editUser": {
       "title": "Editar usuario",
@@ -383,7 +431,42 @@
     "sales": "Ventas",
     "expenses": "Gastos",
     "profit-lost": "Ganancias y Pérdidas",
-    "taxes": "Impuestos"
+    "taxes": "Impuestos",
+    "action": {
+      "idle": "Generar Reporte",
+      "processing": "Generando Reporte...",
+      "downloadPDF": "Descargar PDF"
+    },
+    "emptyState": {
+      "title": "Selecciona tus filtros y haz clic en generar reporte",
+      "description": "Una vez que hagas clic en <b>Generar Reporte</b>, los resultados aparecerán aquí."
+    },
+    "filters": {
+      "type": {
+        "title": "Tipo de reporte",
+        "sales_by_customer": "Ventas por cliente",
+        "sales_by_item": "Ventas por artículo",
+        "sales_by_date": "Ventas por fecha"
+      },
+      "showInvoice": {
+        "title": "Mostrar facturas",
+        "descriptionWhenAvailable": "Puede mostrar u ocultar facturas en cualquier momento",
+        "descriptionWhenNotAvailable": "Solo disponible para reportes por cliente o fecha."
+      },
+      "ranges": {
+        "today": "Hoy",
+        "this_week": "Esta semana",
+        "this_month": "Este mes",
+        "last_month": "Mes pasado",
+        "this_quarter": "Este trimestre",
+        "this_year": "Este año",
+        "previous_week": "Semana pasada",
+        "previous_month": "Mes pasado",
+        "previous_quarter": "Trimestre pasado",
+        "previous_year": "Año pasado",
+        "custom": "Personalizado"
+      }
+    }
   },
   "invoices": {
     "title": "Facturas",
@@ -391,6 +474,8 @@
     "paidStatus": "Pagada",
     "paymentTerms": "Condiciones de pago",
     "taxReceipt": "Tipo NCF",
+    "creditLimitExceeded": "Límite de crédito excedido",
+    "totalAmountDiffs": "Total de la factura no coincide con los detalles de pago",
     "line": {
       "form": {
         "placeholder": "Referencia o presione ⌘K",
@@ -794,6 +879,62 @@
       "description": "Esta acción no se puede deshacer. Eliminará permanentemente los cambios sin guardar del pago y los datos de nuestros servidores.",
       "confirm": "Si, continuar",
       "cancel": "Cancelar"
+    }
+  },
+  "profile": {
+    "title": "Configuraciones de la cuenta",
+    "description": "Administre la configuración de su cuenta y establezca las preferencias de correo electrónico.",
+    "memberSince": "Miembro desde",
+    "alert": {
+      "emailChangePending": "Tu cambio de correo electrónico está pendiente. Revisa tu bandeja de entrada en :email para verificar la nueva dirección."
+    },
+    "actions": {
+      "editProfile": "Editar perfil",
+      "updateProfile": "Actualizar perfil",
+      "changePassword": "Cambiar contraseña"
+    },
+    "companies": {
+      "title": "Compañias",
+      "description": "Gestionar empresas y configuraciones, secuencias y definiciones.",
+      "viewCompany": {
+        "title": "Ver compañia",
+        "description": "Detalles de la compañia seleccionada.",
+        "overview": {
+          "title": "Visión general",
+          "danger": "Si la empresa queda inhabilitada, todo lo relacionado con empleados, nóminas, ingresos, descuentos o cualquier otra acción ya no será aceptada.",
+          "dangerAction": "Inhabilitar empresa"
+        },
+        "sequences": "Secuencias",
+        "taxes": {
+          "title": "Impuestos",
+          "description": "Gestione los impuestos de su empresa y establezca preferencias de tasas."
+        },
+        "redirectPreferences":{
+          "title": "Preferencias de redirección",
+          "description": "Gestiona a dónde quieres ser redirigido después de la creación de una factura, un cliente, un presupuesto o un pedido.",
+          "afterCreatingInvoice": "Después de crear una factura",
+          "afterCreatingCustomer": "Después de crear un cliente",
+          "afterCreatingEstimate": "Después de crear una cotización",
+          "afterCreatingOrder": "Después de crear un pedido",
+          "afterCreatingPayment": "Después de crear un pago",
+          "afterCreatingItem": "Después de crear un producto",
+          "redirectToList": "Redirigir a la lista de :resource",
+          "redirectToDetail": "Redirigir al detalle de :resource",
+          "stayOnForm": "Permanecer en el formulario"
+        }
+      },
+      "newCompany": {
+        "title": "Nueva compañia",
+        "description": "Crea una nueva compañia para facturarle."
+      },
+      "editCompany": {
+        "title": "Editar compañia",
+        "description": "Edita los detalles de la compañia seleccionada"
+      },
+      "trashCompany": {
+        "title": "Borrar compañia",
+        "description": "Borra los detalles de la compañia seleccionada."
+      }
     }
   }
 }

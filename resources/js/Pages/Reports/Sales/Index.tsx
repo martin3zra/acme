@@ -67,15 +67,15 @@ export default function Index({
       <ReportLayout.ContentSection>
         <div>
           <div className="flex flex-col space-y-2">
-            <Label>Select Report Type</Label>
+            <Label>{t('reports.filters.type.title')}</Label>
             <Select onValueChange={(value) => updateRequest('reportType', value)} defaultValue={request.reportType}>
               <SelectTrigger className="w-[280px]">
-                <SelectValue placeholder="Select report type" />
+                <SelectValue placeholder={t('reports.filters.type.title')} />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="sales_by_customer">Sales by Customer</SelectItem>
-                <SelectItem value="sales_by_item">Sales by Item</SelectItem>
-                <SelectItem value="sales_by_date">Sales by Date</SelectItem>
+                <SelectItem value="sales_by_customer">{t('reports.filters.type.sales_by_customer')}</SelectItem>
+                <SelectItem value="sales_by_item">{t('reports.filters.type.sales_by_item')}</SelectItem>
+                <SelectItem value="sales_by_date">{t('reports.filters.type.sales_by_date')}</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -92,11 +92,11 @@ export default function Index({
                 className="data-[state=checked]:border-primary data-[state=checked]:bg-primary dark:data-[state=checked]:bg-primary dark:data-[state=checked]:border-primary disabled:cursor-not-allowed data-[state=checked]:text-white"
               />
               <div className="grid gap-1.5 font-normal">
-                <p className="text-sm leading-none font-medium">Display invoices</p>
+                <p className="text-sm leading-none font-medium">{t('reports.filters.showInvoice.title')}</p>
                 {!invoicesAllowed.includes(request.reportType) ? (
-                  <p className="text-muted-foreground text-sm italic">Only available for customer/date-based reports.</p>
+                  <p className="text-muted-foreground text-sm italic">{t('reports.filters.showInvoice.descriptionWhenNotAvailable')}</p>
                 ) : (
-                  <p className="text-muted-foreground text-sm">You can show or hide invoices at any time.</p>
+                  <p className="text-muted-foreground text-sm">{t('reports.filters.showInvoice.descriptionWhenAvailable')}</p>
                 )}
               </div>
             </Label>

@@ -51,7 +51,7 @@ export const CompanyList: FC<Props> = ({ data, onSelectCompany }) => {
 
   return (
     <div>
-      <HeadingSmall title="Companies" description="Manage your subscription and billing details"></HeadingSmall>
+      <HeadingSmall title={t('profile.companies.title')} description={t('profile.companies.description')}></HeadingSmall>
       <div className="mt-2 rounded-md border">
         <Table>
           <TableHeader>

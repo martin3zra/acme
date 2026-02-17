@@ -124,7 +124,7 @@ export default class ReportLayout extends React.Component<Props, State> {
           <div className="flex justify-end">
             <Button onClick={this.handleDownload} disabled={!pdfUrl} className="flex cursor-pointer items-center gap-2 disabled:cursor-not-allowed">
               <Download className="h-4 w-4" />
-              Download PDF
+              {trans('reports.action.downloadPDF')}
             </Button>
           </div>
         </AppLayout.Actions>
@@ -149,7 +149,12 @@ export default class ReportLayout extends React.Component<Props, State> {
               <TabsContent value={activeTab}>{contentSection ? (contentSection as JSX.Element) : null}</TabsContent>
             </Tabs>
             <div className="py-4">
-              <ActionButton processing={processing} handleOnClick={this.generateReport} />
+              <ActionButton
+                idleTitle={trans('reports.action.idle')}
+                processingTitle={trans('reports.action.processing')}
+                processing={processing}
+                handleOnClick={this.generateReport}
+              />
             </div>
           </div>
           <div className="h-full basis-3/4 bg-gray-300">
@@ -166,10 +171,8 @@ export default class ReportLayout extends React.Component<Props, State> {
                 >
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17v-6h13M5 7h14M5 11h14M5 15h14" />
                 </svg>
-                <h2 className="text-lg font-semibold">No report generated</h2>
-                <p className="mt-2 text-sm">
-                  Choose your options and click <strong>Generate Report</strong> to see it here.
-                </p>
+                <h2 className="text-lg font-semibold">{trans('reports.emptyState.title')}</h2>
+                <p className="mt-2 text-sm" dangerouslySetInnerHTML={{ __html: trans('reports.emptyState.description') }} />
               </div>
             )}
           </div>

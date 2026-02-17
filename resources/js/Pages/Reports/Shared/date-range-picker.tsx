@@ -2,6 +2,7 @@ import { Button } from '@/components/ui/button';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { cn } from '@/lib/utils';
+import { es } from 'date-fns/locale';
 import { CalendarIcon, X } from 'lucide-react';
 import { DateRange } from 'react-day-picker';
 
@@ -31,7 +32,14 @@ export default function DateRangePicker({ dateRange, setDateRange }: Props) {
           </Button>
         </PopoverTrigger>
         <PopoverContent className="w-auto p-0">
-          <Calendar mode="range" selected={dateRange} onSelect={setDateRange} initialFocus />
+          <Calendar
+            mode="range"
+            selected={dateRange}
+            onSelect={setDateRange}
+            captionLayout="dropdown"
+            className="w-[280px] rounded border p-3 shadow-md"
+            locale={es}
+          />
         </PopoverContent>
       </Popover>
       {dateRange && (

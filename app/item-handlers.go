@@ -135,7 +135,7 @@ func (s *Server) startUploadChunkHandler() routing.HandlerFunc {
 		ext := strings.ToLower(filepath.Ext(form.Filename))
 		if ext != ".csv" && ext != ".txt" {
 			ctx.JSON(http.StatusBadRequest, map[string]any{
-				"status": "only CSV or TXT allowed",
+				"status": s.trans("global.onlyCsvOrTxtAllowed"),
 			})
 			return
 		}
@@ -148,7 +148,7 @@ func (s *Server) startUploadChunkHandler() routing.HandlerFunc {
 		if err := os.MkdirAll(dir, 0755); err != nil {
 			log.Println("failed to create upload dir: ", err)
 			ctx.JSON(http.StatusInternalServerError, map[string]any{
-				"status": "failed to create upload dir",
+				"status": s.trans("global.somethingWentWrong"),
 			})
 			return
 		}
@@ -164,7 +164,7 @@ func (s *Server) startUploadChunkHandler() routing.HandlerFunc {
 		}); err != nil {
 			log.Println("Something went wrong starting the upoload.: ", err)
 			ctx.JSON(http.StatusInternalServerError, map[string]any{
-				"status": "Something went wrong starting the upoload.",
+				"status": s.trans("global.somethingWentWrong"),
 			})
 			return
 		}
@@ -182,8 +182,9 @@ func (s *Server) uploadChunkHandler() routing.HandlerFunc {
 		}
 
 		if form.TotalChunks <= 0 {
+			log.Println("Invalid total_chunks value:", form.TotalChunks)
 			ctx.JSON(http.StatusBadRequest, map[string]any{
-				"status": "invalid total_chunks",
+				"status": s.trans("global.invalid.totalChunkSize"),
 			})
 			return
 		}
@@ -191,7 +192,7 @@ func (s *Server) uploadChunkHandler() routing.HandlerFunc {
 		uploadSession, err := s.findUploadSession(form.UploadId)
 		if err != nil || uploadSession == nil {
 			ctx.JSON(http.StatusNotFound, map[string]any{
-				"status": "invalid upload id",
+				"status": s.trans("global.invalid.uploadId"),
 			})
 			return
 		}
@@ -199,8 +200,9 @@ func (s *Server) uploadChunkHandler() routing.HandlerFunc {
 		// 🔥 Set total_chunks ONCE
 		if !uploadSession.TotalChunks.Valid {
 			if err := s.updateTotalChunks(form.UploadId, form.TotalChunks); err != nil {
+				log.Println("failed to set total_chunks:", err)
 				ctx.JSON(http.StatusInternalServerError, map[string]any{
-					"status": "failed to set total_chunks",
+					"status": s.trans("global.somethingWentWrong"),
 				})
 				return
 			}
@@ -208,7 +210,7 @@ func (s *Server) uploadChunkHandler() routing.HandlerFunc {
 
 		if uploadSession.Status == "completed" {
 			ctx.JSON(http.StatusBadRequest, map[string]any{
-				"status": "upload already completed",
+				"status": s.trans("global.invalid.uploadAlreadyCompleted"),
 			})
 			return
 		}
@@ -217,7 +219,7 @@ func (s *Server) uploadChunkHandler() routing.HandlerFunc {
 			if err := s.updateUploadStatus(form.UploadId, "uploading"); err != nil {
 				log.Println("updating uploaded status: ", err)
 				ctx.JSON(http.StatusInternalServerError, map[string]any{
-					"status": "something wrong happens",
+					"status": s.trans("global.somethingWentWrong"),
 				})
 				return
 			}
@@ -226,9 +228,10 @@ func (s *Server) uploadChunkHandler() routing.HandlerFunc {
 		dstPath := filepath.Join("uploads", form.UploadId, fmt.Sprintf("%d.part", form.ChunkIndex))
 		dst, err := os.Create(dstPath)
 		if err != nil {
+			log.Println("cannot write chunk: ", err)
 			s.failUpload(form.UploadId, "cannot write chunk: "+err.Error())
 			ctx.JSON(http.StatusBadRequest, map[string]any{
-				"status": "cannot write chunk",
+				"status": s.trans("global.somethingWentWrong"),
 			})
 			return
 		}
@@ -239,7 +242,7 @@ func (s *Server) uploadChunkHandler() routing.HandlerFunc {
 		if err := s.incrementUploadedChunks(form.UploadId); err != nil {
 			log.Println("incrementing uploaded: ", err)
 			ctx.JSON(http.StatusInternalServerError, map[string]any{
-				"status": "something wrong happens",
+				"status": s.trans("global.somethingWentWrong"),
 			})
 			return
 		}
@@ -255,7 +258,7 @@ func (s *Server) completeUploadChunkHandler() routing.HandlerFunc {
 		ext := strings.ToLower(filepath.Ext(form.Filename))
 		if ext != ".csv" && ext != ".txt" {
 			ctx.JSON(http.StatusBadRequest, map[string]any{
-				"status": "only CSV or TXT allowed",
+				"status": s.trans("global.invalid.onlyCsvOrTxtAllowed"),
 			})
 			return
 		}
@@ -263,14 +266,14 @@ func (s *Server) completeUploadChunkHandler() routing.HandlerFunc {
 		uploadSession, err := s.findUploadSession(form.UploadID)
 		if err != nil || uploadSession == nil {
 			ctx.JSON(http.StatusNotFound, map[string]any{
-				"status": "invalid upload id",
+				"status": s.trans("global.invalid.uploadId"),
 			})
 			return
 		}
 
 		if uploadSession.UploadedChunks != int(uploadSession.TotalChunks.Int64) {
 			ctx.JSON(http.StatusBadRequest, map[string]any{
-				"status": "missing chunks",
+				"status": s.trans("global.invalid.missingChunks"),
 			})
 			return
 		}
@@ -278,7 +281,7 @@ func (s *Server) completeUploadChunkHandler() routing.HandlerFunc {
 		parts, _ := filepath.Glob(filepath.Join("uploads", form.UploadID, "*.part"))
 		if len(parts) == 0 {
 			ctx.JSON(http.StatusNotFound, map[string]any{
-				"status": "no chunks uploaded",
+				"status": s.trans("global.invalid.notFoundChunks"),
 			})
 			return
 		}
@@ -297,7 +300,7 @@ func (s *Server) completeUploadChunkHandler() routing.HandlerFunc {
 		if err := s.updateUploadStatus(form.UploadID, "completed"); err != nil {
 			log.Println("mutating uploaded status: ", err)
 			ctx.JSON(http.StatusInternalServerError, map[string]any{
-				"status": "something wrong happens",
+				"status": s.trans("global.somethingWentWrong"),
 			})
 			return
 		}
@@ -313,7 +316,7 @@ func (s *Server) startImportHandler() routing.HandlerFunc {
 		if err := s.storeImport(importID.String(), form); err != nil {
 			log.Println("Error starting import: ", err)
 			ctx.JSON(http.StatusInternalServerError, map[string]any{
-				"status": "Error starting import",
+				"status": s.trans("global.somethingWentWrong"),
 			})
 			return
 		}

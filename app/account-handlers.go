@@ -257,7 +257,7 @@ func (s *Server) accountProfileHandler(ctx *routing.Context) {
 	}
 
 	props := map[string]any{
-		"translations": trans("companies", "users"),
+		"translations": trans("companies", "users", "profile"),
 		"companies":    companies,
 		"users":        users,
 		"roles":        RoleMap,
@@ -347,14 +347,14 @@ func (s *Server) updateAccountProfileHandler() routing.HandlerFunc {
 		uuid := ctx.Param("account")
 		user, err := s.findUserByAccountUUID(uuid)
 		if err != nil {
-			s.session.Errors("name", "Something wrong happened")
+			s.session.Errors("name", s.trans("global.somethingWentWrong"))
 			log.Println("errors", err.Error())
 			ctx.Back()
 			return
 		}
 
 		if err := s.updateProfile(uuid, form); err != nil {
-			s.session.Errors("name", "Something wrong happened")
+			s.session.Errors("name", s.trans("global.somethingWentWrong"))
 			log.Println("errors", err.Error())
 			ctx.Back()
 			return
@@ -362,7 +362,7 @@ func (s *Server) updateAccountProfileHandler() routing.HandlerFunc {
 
 		if !strings.EqualFold(user.Email, form.Email) {
 			if user.PendingEmail != nil {
-				s.session.Errors("email", fmt.Sprintf("You already have a pending email change to %s. Please verify it before requesting a new one.", *user.PendingEmail))
+				s.session.Errors("email", s.trans("global.pendingVerification", i18n.Replacements{"email": *user.PendingEmail}))
 				ctx.Back()
 				return
 			}

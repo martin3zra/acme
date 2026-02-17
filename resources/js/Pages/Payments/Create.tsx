@@ -82,16 +82,6 @@ export default function Create({
   }, [receivables, invoice_uuid, setPaymentForm]);
 
   useEffect(() => {
-    // Reset everything when switching customers
-    setRowSelection({});
-    setPaymentForm((prev) => ({
-      ...prev,
-      header: { ...prev.header, customer: undefined },
-      lines: [],
-    }));
-  }, [customer?.uuid, setPaymentForm]);
-
-  useEffect(() => {
     const searchCustomer = () => {
       router.reload({ only: ['customers'], data: { search: dedbouncedSearch }, preserveUrl: true });
     };
@@ -205,8 +195,10 @@ export default function Create({
 
   const performPaymentCancelation = (event: React.MouseEvent<HTMLButtonElement>) => {
     event.preventDefault();
-    removePaymentForm();
     router.get('/payments');
+    setTimeout(() => {
+      removePaymentForm();
+    }, 300);
   };
 
   const handleCheckout = (event: React.MouseEvent<HTMLButtonElement>) => {

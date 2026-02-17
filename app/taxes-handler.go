@@ -15,7 +15,7 @@ func (s *Server) storeTaxes() routing.HandlerFunc {
 			ctx.BackWith("status", s.trans("global.wasNotCreated", i18n.Replacements{"subject": "@global.tax"}))
 			return
 		}
-		ctx.Flash("success", "Tax was created successfully!")
+		ctx.Flash("success", s.trans("global.wasCreated", i18n.Replacements{"subject": "@global.tax"}))
 		ctx.Back()
 	})
 }
@@ -28,7 +28,8 @@ func (s *Server) updateTaxes() routing.HandlerFunc {
 			ctx.BackWith("status", s.trans("global.wasNotUpdated", i18n.Replacements{"subject": "@global.tax"}))
 			return
 		}
-		ctx.Flash("success", "Tax was updated successfully!")
+
+		ctx.Flash("success", s.trans("global.wasUpdated", i18n.Replacements{"subject": "@global.tax"}))
 		ctx.Back()
 	})
 }

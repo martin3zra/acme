@@ -32,22 +32,20 @@ export default function Overview({ company }: Props) {
         </div>
       </div>
       <div>
-        <h4>Address</h4>
+        <h4>{t('global.address')}</h4>
         <p>
           {company.address}, {company.city}
         </p>
       </div>
       <Card className="bg-red-100 text-red-700">
         <CardHeader>
-          <CardTitle>Danger Zone</CardTitle>
+          <CardTitle>{t('global.dangerZone')}</CardTitle>
         </CardHeader>
         <CardContent>
-          <p>
-            If the company is disabled, everything related to employees, payroll, income, discounts, or any other action will no longer be accepted.
-          </p>
+          <p>{t('profile.companies.viewCompany.overview.danger')}</p>
         </CardContent>
         <CardFooter>
-          <Button variant={'destructive'}>Mark as disabled</Button>
+          <Button variant={'destructive'}>{t('profile.companies.viewCompany.overview.dangerAction')}</Button>
         </CardFooter>
       </Card>
     </div>

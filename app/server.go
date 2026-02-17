@@ -45,7 +45,7 @@ func NewServer(assets, resources embed.FS) *Server {
 	if err != nil {
 		panic(err)
 	}
-	translator := i18n.NewTranslator(trans("global", "companies"))
+	translator := i18n.NewTranslator(trans("global", "companies", "profile"))
 
 	server := &Server{
 		qs:         qs,

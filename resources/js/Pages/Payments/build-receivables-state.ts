@@ -29,6 +29,15 @@ export function buildReceivableState(
     lines[0].payment = receivables[0].invoice.amount_due;
   }
 
+  // ✅ Move selected invoice to the front
+  if (invoice_uuid) {
+    lines.sort((a, b) => {
+      if (a.uuid === invoice_uuid) return -1;
+      if (b.uuid === invoice_uuid) return 1;
+      return 0;
+    });
+  }
+
   const rowSelection: FlagSet = {};
   if (selectedRowId > 0) {
     rowSelection[selectedRowId.toString()] = true;

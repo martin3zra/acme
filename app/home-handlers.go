@@ -3,6 +3,7 @@ package app
 import (
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/martin3zra/acme/pkg/foundation"
 	"github.com/martin3zra/acme/pkg/routing"
@@ -73,7 +74,17 @@ func (s *Server) homeHandler(ctx *routing.Context) {
 		"chart": map[string]any{
 			"data":           chartData,
 			"totals":         totals,
-			"availableYears": [5]int{2022, 2023, 2024, 2025, 2026}, // load this based on the data of the current company
+			"availableYears": availableYearsForDashboard(ctx),
 		},
 	})
+}
+
+func availableYearsForDashboard(ctx *routing.Context) []int {
+	businessYear := CurrentCompany(ctx.Request.Context()).CreatedAt.Year()
+	currentYear := time.Now().Year()
+	years := make([]int, 0)
+	for y := businessYear; y <= currentYear; y++ {
+		years = append(years, y)
+	}
+	return years
 }

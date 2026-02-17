@@ -4,7 +4,9 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Spinner } from '@/components/ui/spinner';
 import { useHeader } from '@/composables/use-headers';
+import { useTranslation } from '@/hooks/use-translation';
 import { PageProps } from '@/types';
 import { Transition } from '@headlessui/react';
 import { useForm, usePage } from '@inertiajs/react';
@@ -16,6 +18,7 @@ interface AccountForm {
 }
 
 export default function AccountForm() {
+  const t = useTranslation().trans;
   const { auth } = usePage<PageProps>().props;
   const { headers } = useHeader();
 
@@ -29,23 +32,23 @@ export default function AccountForm() {
   };
   return (
     <div>
-      {auth.user.pending_email != null && (
+      {auth.user.pending_email !== null && (
         <div className="col-span-12 space-y-2">
           <Alert variant="destructive" className="border-red-400 bg-red-100/50">
-            <AlertDescription className="inline">
-              Your email change is pending. Please check your inbox at <span className="font-bold">{auth.user.pending_email}</span> to verify the new
-              address.
-            </AlertDescription>
+            <AlertDescription
+              className="inline"
+              dangerouslySetInnerHTML={{ __html: t('profile.alert.emailChangePending', { email: auth.user.pending_email }) }}
+            />
           </Alert>
         </div>
       )}
       <FormSection onSubmit={submit}>
-        <FormSection.Title>Account</FormSection.Title>
-        <FormSection.Description>Manage your account settings and set e-mail preferences.</FormSection.Description>
+        <FormSection.Title>{t('global.profile')}</FormSection.Title>
+        <FormSection.Description>{t('profile.description')}</FormSection.Description>
         <FormSection.Form>
           <div className="col-span-6 space-y-2">
             <Label htmlFor="name" className="text-end">
-              Name
+              {t('global.name')}
             </Label>
             <Input
               type="text"
@@ -59,7 +62,7 @@ export default function AccountForm() {
           </div>
           <div className="col-span-6 space-y-2">
             <Label htmlFor="email" className="text-end">
-              Email
+              {t('global.email')}
             </Label>
             <Input type="email" name="email" className="h-12 md:text-xl" value={data.email} onChange={(e) => setData('email', e.target.value)} />
             <InputError message={errors.email} />
@@ -76,7 +79,8 @@ export default function AccountForm() {
             <p className="text-sm text-gray-600">Saved.</p>
           </Transition>
           <Button type="submit" disabled={processing} className="h-12 md:text-xl">
-            Update account
+            {processing && <Spinner />}
+            {t('profile.actions.updateProfile')}
           </Button>
         </FormSection.Actions>
       </FormSection>

@@ -3,7 +3,7 @@ import { StatusBadge } from '@/components/status-badge';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
-import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet';
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import useCallbackState from '@/hooks/use-callback-state';
 import { useInitials } from '@/hooks/use-initials';
 import { useTranslation } from '@/hooks/use-translation';
@@ -21,7 +21,7 @@ import UserForm, { UserFormParams } from './Users/UserForm';
 
 export const breadcrumbs: BreadcrumbItem[] = [
   {
-    title: 'Account Settings',
+    title: 'profile.title',
     href: '',
   },
 ];
@@ -65,6 +65,24 @@ export default function Account({
   });
   const hasCompanies = companies.length > 0;
   const hasUsers = users.length > 0;
+
+  const option = {
+    'company:view': {
+      title: t('profile.companies.viewCompany.description'),
+    },
+    'company:form': {
+      title: selectedCompany.action === 'create' ? t('companies.single.title') : t('companies.viewCompany.title'),
+    },
+    'user:view': {
+      title: t('users.viewUser.title'),
+    },
+    'user:form': {
+      title: selectedUser.action === 'create' ? t('users.newUser.title') : t('users.editUser.title'),
+    },
+    profile: {
+      title: selectedUser.action === 'create' ? t('users.newUser.title') : t('users.editUser.title'),
+    },
+  }[state.sheetContent];
 
   const onSelectCompany = (company: Company, action: Verb): void => {
     if (action === 'trash') return;
@@ -158,11 +176,11 @@ export default function Account({
               </div>
             </div>
             <div>
-              <h4>Member since</h4>
+              <h4>{t('profile.memberSince')}</h4>
               {format(auth.user.created_at, 'PPP')}
             </div>
             <div className="space-y-6">
-              <Button onClick={onEditProfile}>Edit Profile</Button>
+              <Button onClick={onEditProfile}>{t('profile.actions.editProfile')}</Button>
             </div>
           </div>
           <div className="basis-[68vw] space-y-6">
@@ -177,8 +195,7 @@ export default function Account({
         <Sheet open={state.sheetState} onOpenChange={onOpenChange}>
           <SheetContent side="right" className="m-4 flex h-[calc(100vh-2rem)] w-full flex-col rounded-md sm:max-w-[1380px] md:max-w-4xl">
             <SheetHeader className="pb-0">
-              <SheetTitle>{t(`global.profile`)}</SheetTitle>
-              <SheetDescription className="text-[12px]">Manage your subscription and billing details</SheetDescription>
+              <SheetTitle>{option.title}</SheetTitle>
             </SheetHeader>
             <div className="grid gap-2 overflow-y-scroll px-4">
               {state.sheetContent === 'company:view' && selectedCompany.company !== undefined && <Show company={selectedCompany.company} />}

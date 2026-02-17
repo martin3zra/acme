@@ -259,7 +259,7 @@ func (s *Server) storeInvoiceHandler() routing.HandlerFunc {
 
 		if form.Kind == TransactionKinds.Invoice {
 			if form.Terms == "pia" && form.total != form.paymentTotalAmount() {
-				ctx.BackWith("status", "Invoice total amount and the payment details are different.")
+				ctx.BackWith("status", s.trans("@invoices.totalAmountDiffs"))
 				return
 			}
 			if form.Terms != "pia" {
@@ -270,7 +270,7 @@ func (s *Server) storeInvoiceHandler() routing.HandlerFunc {
 				}
 
 				if customer.CreditLimited && customer.AmountDue+form.total > customer.CreditLimit {
-					ctx.BackWith("status", "Credit limit exceeded.")
+					ctx.BackWith("status", s.trans("@invoices.creditLimitExceeded"))
 					return
 				}
 			}
@@ -311,7 +311,7 @@ func (s *Server) updateInvoiceHandler() routing.HandlerFunc {
 
 		if form.Kind == TransactionKinds.Invoice {
 			if form.Terms == "pia" && form.total != form.paymentTotalAmount() {
-				ctx.BackWith("status", "Invoice total amount and the payment details are different.")
+				ctx.BackWith("status", s.trans("@invoices.totalAmountDiffs"))
 				return
 			}
 
@@ -322,7 +322,7 @@ func (s *Server) updateInvoiceHandler() routing.HandlerFunc {
 			}
 
 			if customer.CreditLimited && customer.AmountDue+form.total > customer.CreditLimit {
-				ctx.BackWith("status", "Credit limit exceeded.")
+				ctx.BackWith("status", s.trans("@invoices.creditLimitExceeded"))
 				return
 			}
 		}
@@ -415,7 +415,7 @@ func (s *Server) printInvoiceHandler(ctx *routing.Context) {
 	uuid := ctx.Param("id")
 	hash := ctx.Param("hash")
 	if !foundation.NewHashable().Sha1Equals(uuid, hash) {
-		ctx.BackWith("status", "The hash does not match")
+		ctx.BackWith("status", s.trans("global.mismatch", i18n.Replacements{"subject": "HASH"}))
 		return
 	}
 

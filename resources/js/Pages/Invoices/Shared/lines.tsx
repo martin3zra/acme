@@ -70,6 +70,10 @@ export const Lines = ({
     handleKeyDown(event);
   };
 
+  const handleCreateNewItem = () => {
+    alert('this feature is not implemented yet. please create the item first and then add it to the invoice');
+  };
+
   return (
     <>
       <table className="w-full table-auto">
@@ -133,7 +137,7 @@ export const Lines = ({
           </CommandList>
         </Command>
         <div className="flex w-full items-center justify-center rounded-b-lg border bg-gray-100/25 py-2">
-          <button className="flex cursor-pointer items-center justify-center gap-x-2 text-indigo-400" onClick={() => alert('Create new item')}>
+          <button className="flex cursor-pointer items-center justify-center gap-x-2 text-indigo-400" onClick={handleCreateNewItem}>
             <LayoutListIcon className="size-4" /> {t(`${kind}s.line.form.addNew`)}
           </button>
         </div>

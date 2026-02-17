@@ -1,9 +1,11 @@
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { useTranslation } from '@/hooks/use-translation';
 import { usePage } from '@inertiajs/react';
 import { useEffect, useState } from 'react';
 import { DateRange } from 'react-day-picker';
 
 export function DateRangeQuickSelect({ initialPreset, onChange }: { initialPreset: string; onChange: (range: DateRange | undefined) => void }) {
+  const t = useTranslation().trans;
   const { props } = usePage<{ dateRanges: { label: string; key: string; from?: string; to?: string }[] }>();
   const { dateRanges } = props;
 
@@ -48,7 +50,7 @@ export function DateRangeQuickSelect({ initialPreset, onChange }: { initialPrese
       <SelectContent>
         {dateRanges.map((preset) => (
           <SelectItem key={preset.key} value={preset.key}>
-            {preset.label}
+            {t(`reports.filters.ranges.${preset.key}`)}
           </SelectItem>
         ))}
       </SelectContent>

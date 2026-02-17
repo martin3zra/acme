@@ -1,4 +1,5 @@
 import { cn } from '@/lib/utils';
+import { SlotProps } from '@/types';
 import { PopoverClose } from '@radix-ui/react-popover';
 import React, { JSX } from 'react';
 import { Command, CommandGroup, CommandInput, CommandItem, CommandList } from './ui/command';
@@ -23,11 +24,11 @@ interface InputSearchableState {
   search: string;
 }
 
-function Actions({ children }: React.ReactNode): JSX.Element {
+function Actions({ children }: SlotProps): JSX.Element {
   return <>{children}</>;
 }
 
-function Trigger({ children }: React.ReactNode): JSX.Element {
+function Trigger({ children }: SlotProps): JSX.Element {
   return <>{children}</>;
 }
 

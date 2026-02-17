@@ -76,7 +76,7 @@ func (s *Server) companyUpdateSequences() routing.HandlerFunc {
 			return
 		}
 
-		ctx.Flash("success", "Sequences updated successfully!")
+		ctx.Flash("success", s.trans("global.wasUpdated", i18n.Replacements{"subject": "@profile.companies.viewCompany.sequences"}))
 
 		ctx.Redirect(fmt.Sprintf("/settings/%s/profile", ctx.Param("account")))
 	})
@@ -90,7 +90,7 @@ func (s *Server) companyUpdateRedirectPreferences() routing.HandlerFunc {
 			return
 		}
 
-		ctx.Flash("success", "Redirect Preferences updated successfully!")
+		ctx.Flash("success", s.trans("global.wasUpdated", i18n.Replacements{"subject": "@profile.companies.viewCompany.redirectPreferences.title"}))
 
 		ctx.Redirect(fmt.Sprintf("/settings/%s/profile", ctx.Param("account")))
 	})
