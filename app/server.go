@@ -19,6 +19,7 @@ import (
 	"github.com/martin3zra/acme/pkg/routing"
 	"github.com/martin3zra/acme/pkg/session"
 	"github.com/martin3zra/acme/pkg/store"
+	"github.com/martin3zra/acme/pkg/support"
 )
 
 //go:embed sql/*.sql
@@ -64,8 +65,7 @@ func (s *Server) Boot() {
 	s.openDatabaseConnection()
 	s.configureMailClient()
 
-	isRunningInCli := os.Getenv("RUNNING_IN_CLI")
-	if isRunningInCli == "YES" {
+	if s.isRunningInCLI() {
 		return
 	}
 
@@ -104,6 +104,10 @@ func (s *Server) Start() error {
 }
 
 func (s *Server) StartSSE() error {
+	if s.isRunningInCLI() {
+		return nil
+	}
+
 	mux := http.NewServeMux()
 
 	mux.HandleFunc("/sse/imports/", s.importEventsHandler)
@@ -124,16 +128,21 @@ func (s *Server) StartSSE() error {
 
 func (s *Server) Shutdown(ctx context.Context) error {
 	log.Print("Shutting down server")
+
+	if err := s.db.Close(); err != nil {
+		return fmt.Errorf("db close: %w", err)
+	}
+
+	if s.isRunningInCLI() {
+		return nil
+	}
+
 	// Stop accepting new connections
 	s.httpServer.SetKeepAlivesEnabled(false)
 
 	// Attempt graceful shutdown
 	if err := s.httpServer.Shutdown(ctx); err != nil {
 		return fmt.Errorf("http shutdown: %w", err)
-	}
-
-	if err := s.db.Close(); err != nil {
-		return fmt.Errorf("db close: %w", err)
 	}
 
 	return nil
@@ -166,6 +175,12 @@ func (s *Server) abortWhenPrerequisiteMissing(ctx *routing.Context, resource str
 		return false
 	}
 
+	// acCtx := context.WithValue(userCtx, support.AccountKey{}, ac)
+	account := ctx.Request.Context().Value(support.AccountKey{}).(map[string]any)
+	if account == nil {
+		log.Println("account not found in context")
+		return false
+	}
 	company := CurrentCompany(ctx.Request.Context())
 	key := fmt.Sprintf("%s:%d", resource, company.ID)
 	result, ok := cache[key]
@@ -173,9 +188,21 @@ func (s *Server) abortWhenPrerequisiteMissing(ctx *routing.Context, resource str
 	if result.Ok || len(result.Missing) == 0 {
 		return false
 	}
+	urls := map[string]string{
+		"customers": "/customers?mode=creating",
+		"items":     "/items?mode=creating",
+		// "tax_sequence": fmt.Sprintf("/settings/%v/profile?company_id=%s&tab=taxes", account["uuid"], company.UUID),
+		"taxes": fmt.Sprintf("/settings/%v/profile?company_id=%s&tab=taxes", account["uuid"], company.UUID),
+	}
+	var enriched []Missing
+
+	for _, m := range result.Missing {
+		enriched = append(enriched, Missing{Key: m.Key, Message: m.Message, URL: urls[m.Key]})
+	}
+
 	ctx.Render("Error/Prerequisites", map[string]any{
 		"resource": resource,
-		"missing":  result.Missing,
+		"missing":  enriched,
 	})
 	return true
 }
@@ -267,4 +294,9 @@ func (s *Server) enqueueInvoiceEmail(companyID int, invoiceUUID string) {
 			"lines":  lines,
 		}, buf.Bytes()))
 
+}
+
+func (s *Server) isRunningInCLI() bool {
+	isRunningInCli := os.Getenv("RUNNING_IN_CLI")
+	return isRunningInCli == "YES"
 }

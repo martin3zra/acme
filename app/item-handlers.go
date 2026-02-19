@@ -38,6 +38,7 @@ func (s *Server) itemsHandler(ctx *routing.Context) {
 	}
 
 	ctx.Render("Items/Index", inertia.Props{
+		"openState":             ctx.Query("mode") == "creating",
 		"translations":          trans("items"),
 		"items":                 items,
 		"currentItemTypeFilter": itemType,

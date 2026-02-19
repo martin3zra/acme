@@ -146,6 +146,26 @@
       "title": "Advertencia",
       "description": "Proceda con precaución, esto no es permanente."
     },
+    "prerequisites": {
+      "title": "Acción bloqueada",
+      "description": "Antes de continuar con :resource, los siguientes elementos deben estar configurados:",
+      "resources": {
+        "estimate": "la Cotización",
+        "invoice": "la Factura",
+        "item": "el Producto ó Servicio"
+      },
+      "missing": {
+        "customers": "Debe existir al menos un cliente.",
+        "items": "Debe existir al menos un producto ó servicio.",
+        "tax_sequence": "La secuencia de impuestos de la factura no está configurada.",
+        "units": "Debe existir al menos una unidad.",
+        "taxes": "Debe existir al menos una tasa impositiva."
+      },
+      "actions": {
+        "goToSettings": "Ir a ajustes",
+        "goToHome": "Ir al Panel"
+      }
+    },
     "actions": {
       "title": "Acciones",
       "view": "Ver",
@@ -257,6 +277,33 @@
   "dashboard": {
     "due_invoices": "Facturas vencidas",
     "estimates": "Cotizaciones recientes",
+    "welcomeBoard": {
+      "title": "🚀 Tu recorrido de configuración",
+      "description": "Ya todo está listo para comenzar. Empieza creando un cliente o un producto y luego continúa con la emisión de facturas y la creación de presupuestos.",
+      "steps": {
+        "items": {
+          "customer": {
+            "name": "Crear un cliente",
+            "description": "Añade tu primer cliente."
+          },
+          "item": {
+            "name": "Agregar productos",
+            "description": "Define qué vendes."
+          },
+          "invoice": {
+            "name": "Iniciar facturación",
+            "description": "Generar facturas."
+          },
+          "estimate": {
+            "name": "Crear estimaciones",
+            "description": "Proporcionar cotizaciones por adelantado."
+          }
+        },
+        "completed": "Has completado :completed de :total pasos",
+        "done": "Completado",
+        "pending": "Pendiente"
+      }
+    },
     "stats": {
       "total_amount_due": "Monto total vencido",
       "customers": "Clientes",

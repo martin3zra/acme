@@ -20,11 +20,12 @@ export default function Index({
   taxes,
   units,
   currentItemTypeFilter,
-}: PageProps<{ items: Item[]; taxes: Tax[]; units: Unit[]; currentItemTypeFilter: ItemTypeFilter }>) {
+  openState,
+}: PageProps<{ openState: boolean; items: Item[]; taxes: Tax[]; units: Unit[]; currentItemTypeFilter: ItemTypeFilter }>) {
   const t = useTranslation().trans;
   const page = usePage<PageProps>();
   const [loadingItem, setLoadingItem] = useState<boolean>(false);
-  const [open, setOpen] = useState<boolean>(false);
+  const [open, setOpen] = useState<boolean>(openState);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState<boolean>(false);
   const [importSheetOpen, setImportSheetOpen] = useState<boolean>(false);
   const [selectedItem, setSelectedItem] = useState<CreateFormParams>({

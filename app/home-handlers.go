@@ -61,7 +61,14 @@ func (s *Server) homeHandler(ctx *routing.Context) {
 	}
 
 	ctx.Render("Home/Index", map[string]any{
-		"translations": trans("dashboard"),
+		"translations":   trans("dashboard"),
+		"hasMissingData": stats.TotalCustomers+stats.TotalEstimates+stats.TotalInvoices == 0,
+		"progress": map[string]any{
+			"customer_created":  stats.TotalCustomers > 0,
+			"products_created":  stats.TotalCustomers > 0, // grab the the total products
+			"invoices_created":  stats.TotalInvoices > 0,
+			"estimates_created": stats.TotalEstimates > 0,
+		},
 		"stats": []any{
 			map[string]any{"label": "dashboard.stats.total_amount_due", "value": foundation.FormatAmount(stats.TotalDueAmount), "icon": "dollar", "bg": "bg-pink-100"},
 			map[string]any{"label": "dashboard.stats.customers", "value": stats.TotalCustomers, "icon": "users", "bg": "bg-blue-100"},

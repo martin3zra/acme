@@ -1,12 +1,11 @@
 'use client';
 
-import { BadgeCheck, Bell, ChevronsUpDown, CreditCard, Sparkles } from 'lucide-react';
+import { ChevronsUpDown } from 'lucide-react';
 
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import {
   DropdownMenu,
   DropdownMenuContent,
-  DropdownMenuGroup,
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
@@ -60,6 +59,7 @@ export function NavUser({ user }: { user: User }) {
                 </div>
               </div>
             </DropdownMenuLabel>
+            {/* 
             <DropdownMenuSeparator />
             <DropdownMenuGroup>
               <DropdownMenuItem>
@@ -81,7 +81,7 @@ export function NavUser({ user }: { user: User }) {
                 <Bell />
                 {t('global.navUser.notifications')}
               </DropdownMenuItem>
-            </DropdownMenuGroup>
+            </DropdownMenuGroup> */}
             <DropdownMenuSeparator />
             <DropdownMenuItem>
               <IconLogout />

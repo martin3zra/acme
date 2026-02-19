@@ -1239,13 +1239,16 @@ func (RedirectPreferencesForm) Rules() map[string]any {
 	}
 }
 
+type Missing struct {
+	Key     string `json:"key"`
+	Message string `json:"message"`
+	URL     string `json:"url,omitempty"`
+}
+
 type PrerequisiteResult struct {
-	Resource string `json:"resource"`
-	Ok       bool   `json:"ok"`
-	Missing  []struct {
-		Key     string `json:"key"`
-		Message string `json:"message"`
-	} `json:"missing"`
+	Resource string    `json:"resource"`
+	Ok       bool      `json:"ok"`
+	Missing  []Missing `json:"missing"`
 }
 
 type prereqCacheKeyType struct{}

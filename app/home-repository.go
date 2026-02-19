@@ -130,8 +130,8 @@ func (s *Server) findTotalsProfitOfLast12Months(ctx context.Context) (*Totals, e
 	err := s.db.QueryRow(`
     SELECT
       COALESCE(SUM(CASE WHEN status = 'closed' THEN total ELSE 0 END), 0) AS total_sales,
-      SUM(0) AS total_receipts, -- placeholder until receipts logic/table exists 
-      SUM(0) AS total_expenses, -- placeholder until expenses table exists
+      0 AS total_receipts, -- placeholder until receipts logic/table exists 
+      0 AS total_expenses, -- placeholder until expenses table exists
       COALESCE(SUM(CASE WHEN status = 'closed' THEN total ELSE 0 END), 0) - COALESCE(SUM(0), 0) AS net_income
     FROM invoices 
     WHERE company_id = $1

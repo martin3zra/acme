@@ -134,6 +134,11 @@ func (s *Server) showInvoiceHandler(ctx *routing.Context) {
 
 func (s *Server) createInvoiceHandler(ctx *routing.Context) {
 	kind := resolveTransactionKind(ctx)
+
+	if s.abortWhenPrerequisiteMissing(ctx, string(kind)) {
+		return
+	}
+
 	term := ctx.Query("search")
 
 	var customer *customer

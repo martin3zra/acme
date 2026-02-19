@@ -1,10 +1,11 @@
-import AppLayout from "@/layouts/app-layout";
-import { PageProps } from "@/types";
-import { Head, usePage } from "@inertiajs/react";
+import { useTranslation } from '@/hooks/use-translation';
+import { PageProps } from '@/types';
+import { Link, usePage } from '@inertiajs/react';
 
 type MissingItem = {
   key: string;
   message: string;
+  url: string;
 };
 
 type Props = {
@@ -13,46 +14,34 @@ type Props = {
 };
 
 export default function Prerequisites({ resource, missing }: Props) {
+  const t = useTranslation().trans;
   const { auth } = usePage<PageProps>().props;
+
   return (
     <>
-      <Head title={`Cannot continue`} />
+      <div className="mx-auto mt-20 max-w-2xl rounded-xl bg-white p-6 shadow">
+        <h1 className="text-xl font-semibold text-red-600">{t('global.prerequisites.title')}</h1>
 
-      <div className="max-w-2xl mx-auto mt-20 p-6 bg-white rounded-xl shadow">
-        <h1 className="text-xl font-semibold text-red-600">
-          Action blocked
-        </h1>
-
-        <p className="mt-2 text-gray-600">
-          Before you can continue with <strong>{resource}</strong>, the following
-          items must be configured:
-        </p>
+        <p className="mt-2 text-gray-600">{t('global.prerequisites.description', { resource: t(`global.prerequisites.resources.${resource}`) })}</p>
 
         <ul className="mt-4 space-y-2">
-          {missing.map(item => (
-            <li
-              key={item.key}
-              className="flex items-start gap-2 p-3 bg-red-50 border border-red-200 rounded"
-            >
-              <span className="text-red-600">•</span>
-              <span>{item.message}</span>
+          {missing.map((item) => (
+            <li key={item.key} className="flex items-start gap-2 rounded border border-red-200 bg-red-50 p-3">
+              <Link href={item.url}>
+                <span className="text-red-600">•</span>
+                <span>{t(`global.prerequisites.missing.${item.key}`)}</span>
+              </Link>
             </li>
           ))}
         </ul>
 
         <div className="mt-6 flex gap-3">
-          <a
-            href={`/settings/${auth.account.uuid}/profile`}
-            className="px-4 py-2 bg-primary text-primary-foreground rounded"
-          >
-            Go to settings
+          <a href={`/settings/${auth.account.uuid}/profile`} className="bg-primary text-primary-foreground rounded px-4 py-2">
+            {t('global.prerequisites.actions.goToSettings')}
           </a>
 
-          <a
-            href="/home"
-            className="px-4 py-2 border rounded"
-          >
-            Back to home
+          <a href="/home" className="rounded border px-4 py-2">
+            {t('global.prerequisites.actions.goToHome')}
           </a>
         </div>
       </div>

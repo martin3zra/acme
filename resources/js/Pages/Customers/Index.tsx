@@ -21,11 +21,18 @@ export default function Index({
   customer,
   tax_receipts,
   currentCustomerTypeFilter,
-}: PageProps<{ customers: Customer[]; customer: Customer; tax_receipts: TaxReceipt[]; currentCustomerTypeFilter: CustomerTypeFilter }>) {
+  openState,
+}: PageProps<{
+  openState: boolean;
+  customers: Customer[];
+  customer: Customer;
+  tax_receipts: TaxReceipt[];
+  currentCustomerTypeFilter: CustomerTypeFilter;
+}>) {
   const t = useTranslation().trans;
   const page = usePage<PageProps>();
   const [loadingCustomer, setLoadingCustomer] = useState<boolean>(false);
-  const [open, setOpen] = useCallbackState<boolean>(customer !== undefined);
+  const [open, setOpen] = useCallbackState<boolean>(customer !== undefined || openState);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [importSheetOpen, setImportSheetOpen] = useState<boolean>(false);
   const [selectedCustomer, setSelectedCustomer] = useState<CreateFormParams>({

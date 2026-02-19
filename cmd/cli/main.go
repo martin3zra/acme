@@ -8,7 +8,6 @@ import (
 	"log"
 	"os"
 	"path/filepath"
-	"time"
 
 	"github.com/joho/godotenv"
 	"github.com/martin3zra/acme/app"
@@ -24,7 +23,7 @@ const (
 
 func main() {
 	if len(os.Args) < 2 {
-		fmt.Println("Usage: mycli <command> [arguments]")
+		fmt.Println("Usage: Acme CLI <command> [arguments]")
 		return
 	}
 
@@ -83,16 +82,16 @@ func run(args []string, stdout io.Writer) error {
 	server.Boot()
 
 	// Create a root context with cancel
-	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 10*time.Second)
+	shutdownCtx, shutdownCancel := context.WithCancel(context.Background())
 	defer shutdownCancel()
-
-	if err := server.Shutdown(shutdownCtx); err != nil {
-		log.Printf("server shutdown error: %v", err)
-	}
 
 	log.Println("Starting the server")
 
 	menu(args, server)
+
+	if err := server.Shutdown(shutdownCtx); err != nil {
+		log.Printf("server shutdown error: %v", err)
+	}
 
 	return nil
 }
@@ -112,7 +111,7 @@ func menu(args []string, server *app.Server) {
 			fmt.Println("Hello, world!")
 		}
 	case "version":
-		fmt.Println("mycli version 1.0.0")
+		fmt.Println("Acme CLI version 1.0.0")
 	case "generate:key":
 		fmt.Println("generate key", str.GenerateRandom())
 	case "setup:account":

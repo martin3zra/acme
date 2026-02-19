@@ -210,7 +210,7 @@ func RestrictedAccess(next routing.HandlerFunc) routing.HandlerFunc {
 
 func AutoResourcePrerequisiteMiddleware(next routing.HandlerFunc) routing.HandlerFunc {
 	return func(ctx *routing.Context) {
-		resource, ok := resourceFromPath(ctx.Request.URL.Path)
+		resource, ok := resourceFromPath(ctx.Request.URL.Path, true)
 		if !ok {
 			next(ctx)
 			return
@@ -269,16 +269,19 @@ func getAccount(attrs map[string]any) map[string]any {
 	return accountMap
 }
 
-func resourceFromPath(path string) (string, bool) {
+func resourceFromPath(path string, base bool) (string, bool) {
 	parts := strings.Split(strings.Trim(path, "/"), "/")
 	if len(parts) < 1 {
 		return "", false
 	}
 
-	resource := parts[len(parts)-1]
+	var resource string
+	if base {
+		resource = parts[0] // first child
+	} else {
+		resource = parts[len(parts)-1] // last child
+	}
 
-	// Normalize
-	resource = strings.TrimSuffix(resource, "s") // invoices → invoice
-
+	resource = strings.TrimSuffix(resource, "s")
 	return resource, true
 }

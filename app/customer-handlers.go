@@ -33,6 +33,7 @@ func (s *Server) customersHandler(ctx *routing.Context) {
 		return
 	}
 	props := map[string]any{
+		"openState":                 ctx.Query("mode") == "creating",
 		"translations":              trans("customers"),
 		"customers":                 customers,
 		"currentCustomerTypeFilter": customerType,

@@ -9,10 +9,8 @@ import {
   ClipboardList,
   ClipboardPenLineIcon,
   CreditCard,
-  HelpCircleIcon,
   LayoutDashboardIcon,
   LayoutListIcon,
-  SearchIcon,
   SettingsIcon,
   UsersIcon,
 } from 'lucide-react';
@@ -78,16 +76,16 @@ const navSecondary: NavItem[] = [
     match: ['/settings'],
     icon: SettingsIcon,
   },
-  {
-    title: 'global.navSecondary.get-help',
-    url: '#',
-    icon: HelpCircleIcon,
-  },
-  {
-    title: 'global.navSecondary.search',
-    url: '#',
-    icon: SearchIcon,
-  },
+  // {
+  //   title: 'global.navSecondary.get-help',
+  //   url: '#',
+  //   icon: HelpCircleIcon,
+  // },
+  // {
+  //   title: 'global.navSecondary.search',
+  //   url: '#',
+  //   icon: SearchIcon,
+  // },
 ];
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {

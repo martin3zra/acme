@@ -2,7 +2,7 @@ import { useNumber } from '@/composables/use-number';
 import { useTranslation } from '@/hooks/use-translation';
 import { ChartPoint, Replacements, Totals } from '@/types';
 import { Area, ComposedChart, Legend, Line, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
-import { EmptyChartState } from './empty-state';
+import { EmptyChartState } from './chart-empty-state';
 import { CustomLegend } from './legend-content';
 import { CustomTooltip, tooltipContentStyle, tooltipLabelStyle } from './tooltip-content';
 
