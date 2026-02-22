@@ -4,7 +4,6 @@ import (
 	"context"
 	"database/sql"
 	"errors"
-	"fmt"
 
 	"github.com/martin3zra/acme/pkg/foundation"
 )
@@ -12,7 +11,7 @@ import (
 type taxReceipt struct {
 	ID            int    `json:"id"`
 	Name          string `json:"name"`
-	Series        string `json:"series"`
+	Serie         string `json:"serie"`
 	Type          string `json:"type"`
 	SequenceStart int    `json:"sequence_start"`
 	SequenceEnd   int    `json:"sequence_end"`
@@ -26,8 +25,45 @@ type taxReceiptSeq struct {
 	Number string
 }
 
+func (s *Server) findTaxReceiptsForSetup(ctx context.Context) ([]*taxReceipt, error) {
+	rows, err := s.db.Query(`
+    SELECT s.id, s.name, s.serie, s.type, COALESCE(b.sequence_start, 0), COALESCE(b.sequence_end, 0), COALESCE(b.current, 0), b.created_at, b.updated_at, b.deleted_at
+    FROM shared_tax_receipts s
+    LEFT JOIN tax_receipts b
+      ON s.id = b.id
+      AND b.company_id = $1
+    ORDER by id;
+  `, CurrentCompany(ctx).ID)
+	if err != nil {
+		return nil, err
+	}
+
+	data := make([]*taxReceipt, 0)
+	for rows.Next() {
+		t := new(taxReceipt)
+		if err = rows.Scan(
+			&t.ID,
+			&t.Name,
+			&t.Serie,
+			&t.Type,
+			&t.SequenceStart,
+			&t.SequenceEnd,
+			&t.Current,
+			&t.CreatedAt,
+			&t.UpdatedAt,
+			&t.DeletedAt,
+		); err != nil {
+			return nil, err
+		}
+
+		data = append(data, t)
+	}
+
+	return data, nil
+}
+
 func (s *Server) findTaxesReceipts(ctx context.Context) ([]*taxReceipt, error) {
-	rows, err := s.db.Query("SELECT id, name, series, type, sequence_start, sequence_end, current, created_at, updated_at, deleted_at "+
+	rows, err := s.db.Query("SELECT id, name, serie, type, sequence_start, sequence_end, current, created_at, updated_at, deleted_at "+
 		"FROM tax_receipts WHERE company_id = $1 ORDER BY id", CurrentCompany(ctx).ID)
 	if err != nil {
 		return nil, err
@@ -39,7 +75,7 @@ func (s *Server) findTaxesReceipts(ctx context.Context) ([]*taxReceipt, error) {
 		if err = rows.Scan(
 			&t.ID,
 			&t.Name,
-			&t.Series,
+			&t.Serie,
 			&t.Type,
 			&t.SequenceStart,
 			&t.SequenceEnd,
@@ -59,9 +95,9 @@ func (s *Server) findTaxesReceipts(ctx context.Context) ([]*taxReceipt, error) {
 
 func (s *Server) grabTaxReceiptSequence(tx *sql.Tx, companyId, taxReceiptID int) (*taxReceiptSeq, error) {
 	var sequence, sequenceEnd int64
-	var series, taxType string
-	row := tx.QueryRow("SELECT series, type, current, sequence_end FROM tax_receipts WHERE company_id = $1 AND id = $2", companyId, taxReceiptID)
-	err := row.Scan(&series, &taxType, &sequence, &sequenceEnd)
+	var serie string
+	row := tx.QueryRow("SELECT serie, current, sequence_end FROM tax_receipts WHERE company_id = $1 AND id = $2", companyId, taxReceiptID)
+	err := row.Scan(&serie, &sequence, &sequenceEnd)
 	if err != nil {
 		return nil, err
 	}
@@ -76,7 +112,7 @@ func (s *Server) grabTaxReceiptSequence(tx *sql.Tx, companyId, taxReceiptID int)
 		return nil, err
 	}
 
-	taxNumber := foundation.GeneratePrefixedNumber(fmt.Sprintf("%s%s", series, taxType), 8, int(sequence))
+	taxNumber := foundation.GeneratePrefixedNumber(serie, 8, int(sequence))
 
 	return &taxReceiptSeq{Seq: sequence, Number: taxNumber}, nil
 }

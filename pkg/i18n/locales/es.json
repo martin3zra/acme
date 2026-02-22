@@ -11,6 +11,7 @@
     "edit": "Editar",
     "save": "Guardar",
     "saving": "Guardando...",
+    "confirmAndSave": "Confirmar y Guardar",
     "verified": "Verificado",
     "link": "Vinculado",
     "email": "Correo electronico",
@@ -148,18 +149,21 @@
     },
     "prerequisites": {
       "title": "Acción bloqueada",
-      "description": "Antes de continuar con :resource, los siguientes elementos deben estar configurados:",
+      "description": "Antes de continuar con :resource, los siguientes elementos deben estar configurados u existir:",
       "resources": {
         "estimate": "la Cotización",
         "invoice": "la Factura",
-        "item": "el Producto ó Servicio"
+        "item": "el Producto ó Servicio",
+        "payment": "el Recibo de Ingreso"
       },
       "missing": {
         "customers": "Debe existir al menos un cliente.",
         "items": "Debe existir al menos un producto ó servicio.",
         "tax_sequence": "La secuencia de impuestos de la factura no está configurada.",
+        "order_sequence": "La secuencia de pedidos no está configurada.",
         "units": "Debe existir al menos una unidad.",
-        "taxes": "Debe existir al menos una tasa impositiva."
+        "taxes": "Debe existir al menos una tasa impositiva.",
+        "invoices": "Debe existir al menos una factura."
       },
       "actions": {
         "goToSettings": "Ir a ajustes",
@@ -223,6 +227,7 @@
     },
     "paymentTermsOptions": {
       "pia": "Pago por adelantado",
+      "net0": "Pago contra entrega",
       "net7": "7 días",
       "net10": "10 días",
       "net15": "15 días",
@@ -955,6 +960,10 @@
         "taxes": {
           "title": "Impuestos",
           "description": "Gestione los impuestos de su empresa y establezca preferencias de tasas."
+        },
+        "taxSequences": {
+          "title": "Secuencias de impuestos",
+          "description": "Gestione las secuencias de impuestos de su empresa."
         },
         "redirectPreferences":{
           "title": "Preferencias de redirección",

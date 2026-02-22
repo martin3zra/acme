@@ -30,6 +30,7 @@ type Company struct {
 	Sequences           *CompanySequence    `json:"sequences"`
 	SeqLastUpdatedAt    *time.Time          `json:"seq_last_updated_at"`
 	RedirectPreferences RedirectPreferences `json:"redirect_preferences"`
+	TaxReceipts         []*taxReceipt       `json:"tax_receipts"`
 	UserRole            string              `json:"_"`
 	foundation.Timestamps
 }
@@ -187,6 +188,10 @@ func (s *Server) storeCompany(accountID, userID int, form StoreCompanyForm) erro
 			return err
 		}
 
+		if err := s.copySharedData(tx, companyID); err != nil {
+			return err
+		}
+
 		return s.linkCompanyDefaultSequences(tx, companyID)
 	})
 }
@@ -225,6 +230,12 @@ func (s *Server) linkCompanyDefaultSequences(tx *sql.Tx, companyID int) error {
 			"padding": 6,
 			"format":  "{prefix}-{year}-{seq}",
 		},
+		"order": map[string]any{
+			"prefix":  "ORD-",
+			"next":    1,
+			"padding": 6,
+			"format":  "{prefix}-{year}-{seq}",
+		},
 		"template": map[string]any{
 			"prefix":  "TPL",
 			"next":    1,
@@ -248,6 +259,11 @@ func (s *Server) linkCompanyDefaultSequences(tx *sql.Tx, companyID int) error {
     ON CONFLICT(company_id) DO UPDATE SET sequences = $2, redirect_preferences = $3, updated_at = now()`,
 		companyID, foundation.ToJSON(defaultSequences), foundation.ToJSON(defaultRedirectPreferences),
 	)
+	return err
+}
+
+func (s *Server) copySharedData(tx *sql.Tx, companyID int) error {
+	_, err := tx.Exec(`SELECT copy_shared_data($1);`, companyID)
 	return err
 }
 
@@ -286,6 +302,13 @@ func (s *Server) updateRedirectPreferences(ctx context.Context, uuid string, for
     UPDATE companies_settings
     SET redirect_preferences = $3, updated_at = now()
     WHERE company_id = (SELECT id FROM companies WHERE account_id = $1 AND uuid = $2)`, CurrentAccount(ctx), uuid, foundation.ToJSON(form))
+	return err
+}
+
+func (s *Server) upsertTaxReceipts(ctx context.Context, form *TaxReceiptsForm) error {
+	_, err := s.db.Exec(`
+      SELECT upsert_tax_receipts($1, $2::jsonb)
+  `, CurrentCompany(ctx).ID, foundation.AsJSON(form.Receipts))
 	return err
 }
 

@@ -69,6 +69,7 @@ export interface Company {
   taxes: Tax[];
   sequences: Sequences;
   redirect_preferences: RedirectPreference;
+  tax_receipts: TaxReceiptForSetup[];
   created_at: string;
   updated_at: string;
 }
@@ -309,6 +310,14 @@ export interface Nameable {
 
 export interface TaxReceipt extends Nameable {
   available: boolean;
+}
+
+export interface TaxReceiptForSetup extends Nameable {
+  serie: string;
+  type: 'Fiscal' | 'Especial' | 'e-CF';
+  sequence_start: number;
+  sequence_end: number;
+  current: number;
 }
 
 export type currencySignature = (value: number | string, precision?: number, inCent?: boolean) => string;

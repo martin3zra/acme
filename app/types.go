@@ -667,6 +667,7 @@ type StoreInvoiceForm struct {
 	tax        float64
 	total      float64
 	paidStatus PaidStatus
+	status     InvoiceStatus
 	dueOn      *time.Time
 	termType   TermType
 }
@@ -726,11 +727,13 @@ func (form *StoreInvoiceForm) Compute() {
 		form.paidStatus = PaidStatuses.UnPaid
 		return
 	}
+	form.status = InvoiceStatuses.Closed
 	form.paidStatus = PaidStatuses.Paid
 	form.termType = InvoiceTermType.Cash
 	termInDays := getNetDays(form.Terms)
 	if termInDays >= 0 {
 		form.amountDue = form.total
+		form.status = InvoiceStatuses.Sent
 		form.paidStatus = PaidStatuses.UnPaid
 		form.termType = InvoiceTermType.Credit
 
@@ -1236,6 +1239,25 @@ func (RedirectPreferencesForm) Rules() map[string]any {
 		"order":    "required|in:list,detail,stay",
 		"item":     "required|in:list,detail,stay",
 		"payment":  "required|in:list,detail,stay",
+	}
+}
+
+type TaxReceiptSequenceForm struct {
+	ID    int `json:"id"`
+	Start int `json:"start"`
+	End   int `json:"end"`
+}
+type TaxReceiptsForm struct {
+	support.FormRequest
+	Receipts []TaxReceiptSequenceForm `json:"receipts"`
+}
+
+func (TaxReceiptsForm) Rules() map[string]any {
+	return map[string]any{
+		"receipts":         "required|min:1",
+		"receipts.*.id":    "required|exists:shared_tax_receipts,id",
+		"receipts.*.start": "required|min:1",
+		"receipts.*.end":   "required|min:1|gt:start",
 	}
 }
 

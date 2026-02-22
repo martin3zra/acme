@@ -40,7 +40,7 @@ func (s *Server) customersHandler(ctx *routing.Context) {
 		"tax_receipts": foundation.MapSlice(taxReceipts, func(receipt *taxReceipt) map[string]any {
 			return map[string]any{
 				"id":        receipt.ID,
-				"name":      fmt.Sprintf("%s-%s", receipt.Type, receipt.Name),
+				"name":      fmt.Sprintf("%s-%s", receipt.Serie, receipt.Name),
 				"available": receipt.Current < receipt.SequenceEnd,
 			}
 		}),

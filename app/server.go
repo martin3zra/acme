@@ -175,7 +175,6 @@ func (s *Server) abortWhenPrerequisiteMissing(ctx *routing.Context, resource str
 		return false
 	}
 
-	// acCtx := context.WithValue(userCtx, support.AccountKey{}, ac)
 	account := ctx.Request.Context().Value(support.AccountKey{}).(map[string]any)
 	if account == nil {
 		log.Println("account not found in context")
@@ -189,10 +188,12 @@ func (s *Server) abortWhenPrerequisiteMissing(ctx *routing.Context, resource str
 		return false
 	}
 	urls := map[string]string{
-		"customers": "/customers?mode=creating",
-		"items":     "/items?mode=creating",
-		// "tax_sequence": fmt.Sprintf("/settings/%v/profile?company_id=%s&tab=taxes", account["uuid"], company.UUID),
-		"taxes": fmt.Sprintf("/settings/%v/profile?company_id=%s&tab=taxes", account["uuid"], company.UUID),
+		"customers":      "/customers?mode=creating",
+		"items":          "/items?mode=creating",
+		"tax_sequence":   fmt.Sprintf("/settings/%v/profile?company_id=%s&tab=taxSequences", account["uuid"], company.UUID),
+		"order_sequence": fmt.Sprintf("/settings/%v/profile?company_id=%s&tab=sequences", account["uuid"], company.UUID),
+		"taxes":          fmt.Sprintf("/settings/%v/profile?company_id=%s&tab=taxes", account["uuid"], company.UUID),
+		"invoices":       fmt.Sprintf("/settings/%v/profile?company_id=%s&tab=invoices", account["uuid"], company.UUID),
 	}
 	var enriched []Missing
 

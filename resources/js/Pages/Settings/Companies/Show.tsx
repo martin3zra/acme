@@ -5,6 +5,7 @@ import { useEffect, useState } from 'react';
 import Overview from '../Shared/overview';
 import { RedirectPreferences } from '../Shared/redirect-preferences';
 import TaxList from '../Shared/tax-list';
+import { TaxReceipts } from '../Shared/tax-receipts';
 import SequenceView from './Sequences';
 
 export type Props = {
@@ -34,6 +35,7 @@ export default function Show({ company }: Props) {
         <TabsTrigger value="overview">{t('profile.companies.viewCompany.overview.title')}</TabsTrigger>
         <TabsTrigger value="sequences">{t('profile.companies.viewCompany.sequences')}</TabsTrigger>
         <TabsTrigger value="taxes">{t('profile.companies.viewCompany.taxes.title')}</TabsTrigger>
+        <TabsTrigger value="taxSequences">{t('profile.companies.viewCompany.taxSequences.title')}</TabsTrigger>
         <TabsTrigger value="redirectPreferences">{t('profile.companies.viewCompany.redirectPreferences.title')}</TabsTrigger>
       </TabsList>
       <TabsContent value="overview">
@@ -44,6 +46,9 @@ export default function Show({ company }: Props) {
       </TabsContent>
       <TabsContent value="taxes">
         <TaxList taxes={company.taxes} />
+      </TabsContent>
+      <TabsContent value="taxSequences" className="min-h-0 flex-1 overflow-y-auto py-0">
+        <TaxReceipts uuid={company.uuid} taxReceipts={company.tax_receipts} />
       </TabsContent>
       <TabsContent value="redirectPreferences">
         <RedirectPreferences uuid={company.uuid} preferences={company.redirect_preferences} />

@@ -95,3 +95,17 @@ func (s *Server) companyUpdateRedirectPreferences() routing.HandlerFunc {
 		ctx.Redirect(fmt.Sprintf("/settings/%s/profile", ctx.Param("account")))
 	})
 }
+
+func (s *Server) companyUpdateTaxReceipts() routing.HandlerFunc {
+	return routing.WithRequest(func(ctx *routing.Context, form *TaxReceiptsForm) {
+
+		if err := s.upsertTaxReceipts(ctx.Request.Context(), form); err != nil {
+			ctx.Error(err)
+			return
+		}
+
+		ctx.Flash("success", s.trans("global.wasUpdated", i18n.Replacements{"subject": "@profile.companies.viewCompany.taxSequences.title"}))
+
+		ctx.Redirect(fmt.Sprintf("/settings/%s/profile", ctx.Param("account")))
+	})
+}

@@ -36,29 +36,37 @@ func (s *Server) itemsHandler(ctx *routing.Context) {
 		ctx.Error(err)
 		return
 	}
-
-	ctx.Render("Items/Index", inertia.Props{
-		"openState":             ctx.Query("mode") == "creating",
+	mode := ctx.Query("mode")
+	props := inertia.Props{
+		"openState":             mode == "creating",
 		"translations":          trans("items"),
 		"items":                 items,
 		"currentItemTypeFilter": itemType,
-		"units": inertia.Defer(func() (any, error) {
-			units, err := s.findUnits(ctx.Request.Context())
-			if err != nil {
-				ctx.Error(err)
-				return nil, nil
-			}
-			return units, err
-		}, "attributes"),
-		"taxes": inertia.Defer(func() (any, error) {
-			taxes, err := s.findTaxes(ctx.Request.Context())
-			if err != nil {
-				ctx.Error(err)
-				return nil, nil
-			}
-			return taxes, nil
-		}, "attributes"),
-	})
+	}
+	// only add units defer if not creating
+	if mode != "creating" {
+		props["units"] = inertia.Defer(func() (any, error) {
+			return s.findUnits(ctx.Request.Context())
+		}, "attributes")
+		props["taxes"] = inertia.Defer(func() (any, error) {
+			return s.findTaxes(ctx.Request.Context())
+		}, "attributes")
+	} else {
+		units, err := s.findUnits(ctx.Request.Context())
+		if err != nil {
+			ctx.Error(err)
+			return
+		}
+		props["units"] = units
+		taxes, err := s.findTaxes(ctx.Request.Context())
+		if err != nil {
+			ctx.Error(err)
+			return
+		}
+		props["taxes"] = taxes
+	}
+
+	ctx.Render("Items/Index", props)
 }
 
 func (s *Server) storeItemHandler() routing.HandlerFunc {

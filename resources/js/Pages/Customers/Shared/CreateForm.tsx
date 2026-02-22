@@ -322,7 +322,6 @@ export default function CreateForm({ onFinish, params }: CreateFormProps) {
                         defaultMonth={data.open_balance_as_of}
                         selected={data.open_balance_as_of}
                         onSelect={(value) => setData('open_balance_as_of', value)}
-                        initialFocus
                       />
                     </PopoverContent>
                   </Popover>

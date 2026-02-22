@@ -126,39 +126,55 @@ func (m Mailer) sendViaSMTP(mailable Mailable) {
 		to = append(to, fmt.Sprintf("%s <%s>", t.Name, t.Email))
 	}
 
-	boundary := generateBoundary()
 	subject := mailable.Subject()
-
-	// Headers
-	headers := []string{
-		"To: " + strings.Join(to, ", "),
-		"From: " + from,
-		"Subject: " + subject,
-		"MIME-Version: 1.0",
-		"Content-Type: multipart/mixed; boundary=" + boundary,
-	}
-
 	var msg bytes.Buffer
-	msg.WriteString(strings.Join(headers, "\r\n") + "\r\n\r\n")
 
-	// Body part
-	msg.WriteString("--" + boundary + "\r\n")
-	msg.WriteString("Content-Type: text/html; charset=\"UTF-8\"\r\n\r\n")
-	msg.WriteString(m.composeHTML(mailable.Content(), mailable.Data()) + "\r\n")
+	if len(mailable.Attachments()) > 0 {
+		boundary := generateBoundary()
+		// Headers
+		headers := []string{
+			"To: " + strings.Join(to, ", "),
+			"From: " + from,
+			"Subject: " + subject,
+			"MIME-Version: 1.0",
+			"Content-Type: multipart/mixed; boundary=" + boundary,
+		}
+		msg.WriteString(strings.Join(headers, "\r\n") + "\r\n\r\n")
 
-	// Attachments
-	for _, att := range mailable.Attachments() {
-		encoded := make([]byte, base64.StdEncoding.EncodedLen(len(att.Content)))
-		base64.StdEncoding.Encode(encoded, att.Content)
-
+		// Body part
 		msg.WriteString("--" + boundary + "\r\n")
-		msg.WriteString(fmt.Sprintf("Content-Type: %s\r\n", att.MIMEType))
-		msg.WriteString("Content-Transfer-Encoding: base64\r\n")
-		msg.WriteString(fmt.Sprintf("Content-Disposition: attachment; filename=\"%s\"\r\n\r\n", att.Filename))
-		msg.WriteString(splitBase64(string(encoded)) + "\r\n")
-	}
+		msg.WriteString("Content-Type: text/html; charset=\"UTF-8\"\r\n\r\n")
+		msg.WriteString(m.composeHTML(mailable.Content(), mailable.Data()) + "\r\n")
 
-	msg.WriteString("--" + boundary + "--")
+		// Attachments
+		for _, att := range mailable.Attachments() {
+			encoded := make([]byte, base64.StdEncoding.EncodedLen(len(att.Content)))
+			base64.StdEncoding.Encode(encoded, att.Content)
+
+			msg.WriteString("--" + boundary + "\r\n")
+			msg.WriteString(fmt.Sprintf("Content-Type: %s\r\n", att.MIMEType))
+			msg.WriteString("Content-Transfer-Encoding: base64\r\n")
+			msg.WriteString(fmt.Sprintf("Content-Disposition: attachment; filename=\"%s\"\r\n\r\n", att.Filename))
+			msg.WriteString(splitBase64(string(encoded)) + "\r\n")
+		}
+
+		msg.WriteString("--" + boundary + "--")
+
+	} else {
+
+		// Headers
+		headers := []string{
+			"To: " + strings.Join(to, ", "),
+			"From: " + from,
+			"Subject: " + subject,
+			"MIME-Version: 1.0",
+			"Content-Type: text/html; charset=\"UTF-8\"",
+		}
+
+		// Body part
+		msg.WriteString(strings.Join(headers, "\r\n") + "\r\n\r\n")
+		msg.WriteString(m.composeHTML(mailable.Content(), mailable.Data()) + "\r\n")
+	}
 
 	addr := fmt.Sprintf("%s:%s", m.cfg.Host, m.cfg.Port)
 	err := smtp.SendMail(addr, smtp.PlainAuth("", m.cfg.Username, m.cfg.Password, m.cfg.Host), m.cfg.From, []string{m.to.Email}, msg.Bytes())

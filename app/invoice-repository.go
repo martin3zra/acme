@@ -577,7 +577,7 @@ func (s *Server) storeInvoiceInternal(tx *sql.Tx, companyID int, form *StoreInvo
 		form.amountDue,
 		form.total,
 		form.Notes,
-		InvoiceStatuses.Sent,
+		form.status,
 		form.paidStatus,
 		foundation.ToJSON(form.Payment),
 		seqInfo.Code,
