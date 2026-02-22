@@ -485,15 +485,13 @@ func (s *Server) updateInvoiceBalance(tx *sql.Tx, companyID, invoiceID int, bala
 	stmt := `
     UPDATE invoices
     SET amount_due = amount_due + $3, paid_status = CASE
-      WHEN  amount_due + $3 < 0 THEN 'overpaid'::paid_status
       WHEN  amount_due + $3 = 0 THEN 'paid'::paid_status
       WHEN  amount_due + $3 = total THEN 'unpaid'::paid_status
       ELSE 'partial'::paid_status
     END,
     status = CASE
-      WHEN amount_due + $3 = 0 THEN 'completed'::invoice_status
-      WHEN amount_due + $3 >= total THEN 'open'::invoice_status
-      ELSE 'partial'::invoice_status
+      WHEN amount_due + $3 = 0 THEN 'closed'::invoice_status
+      ELSE 'sent'::invoice_status
     END
     WHERE company_id = $1 AND id = $2
   `

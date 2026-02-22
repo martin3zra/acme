@@ -484,6 +484,19 @@
     "expenses": "Gastos",
     "profit-lost": "Ganancias y Pérdidas",
     "taxes": "Impuestos",
+    "pdf": {
+      "sales": {
+        "title": "Reporte de ventas: por :type",
+        "titleWithDetail": "Reporte de ventas: por :type (Detallado)",
+        "totalSales": "Total de ventas"
+      },
+      "grandTotal": "Total general",
+      "taxes": {
+        "title": "Reporte Fiscal"
+      },
+      "generatedBy": "Generado por :platform v0",
+      "noDataInRange": "No se encontraron datos para el rango seleccionado :start a :end."
+    },
     "action": {
       "idle": "Generar Reporte",
       "processing": "Generando Reporte...",

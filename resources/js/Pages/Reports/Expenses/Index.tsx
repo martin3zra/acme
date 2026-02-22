@@ -28,6 +28,7 @@ export default function Index({ auth, csrf_token, initialRange, initialPreset }:
     endpoint: 'expenses',
     reportType: 'expenses',
     dateRange: initialDateRange,
+    presetKey: initialPreset,
     csrfToken: csrf_token,
   });
 
@@ -43,11 +44,21 @@ export default function Index({ auth, csrf_token, initialRange, initialPreset }:
         <div className="flex flex-col space-y-4 gap-y-2">
           <div className="flex flex-col space-y-2">
             <Label>{t('global.dateRangePresets')}</Label>
-            <DateRangeQuickSelect initialPreset={initialPreset} onChange={(range) => updateRequest('dateRange', range)} />
+            <DateRangeQuickSelect
+              initialPreset={initialPreset}
+              onChange={(presetKey, range) => {
+                updateRequest('dateRange', range);
+                updateRequest('presetKey', presetKey);
+              }}
+            />
           </div>
           <div className="flex flex-col space-y-2">
             <Label htmlFor="date">{t('global.dateRange')}</Label>
-            <DateRangePicker dateRange={request.dateRange} setDateRange={(range) => updateRequest('dateRange', range)} />
+            <DateRangePicker
+              dateRange={request.dateRange}
+              disabled={request.presetKey !== 'custom'}
+              setDateRange={(range) => updateRequest('dateRange', range)}
+            />
           </div>
         </div>
       </ReportLayout.FilterSection>

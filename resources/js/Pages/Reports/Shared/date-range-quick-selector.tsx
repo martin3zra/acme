@@ -1,10 +1,17 @@
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useTranslation } from '@/hooks/use-translation';
+import { parseLocalDate } from '@/lib/utils';
 import { usePage } from '@inertiajs/react';
 import { useEffect, useState } from 'react';
 import { DateRange } from 'react-day-picker';
 
-export function DateRangeQuickSelect({ initialPreset, onChange }: { initialPreset: string; onChange: (range: DateRange | undefined) => void }) {
+export function DateRangeQuickSelect({
+  initialPreset,
+  onChange,
+}: {
+  initialPreset: string;
+  onChange: (presetKey: string, range: DateRange | undefined) => void;
+}) {
   const t = useTranslation().trans;
   const { props } = usePage<{ dateRanges: { label: string; key: string; from?: string; to?: string }[] }>();
   const { dateRanges } = props;
@@ -13,12 +20,12 @@ export function DateRangeQuickSelect({ initialPreset, onChange }: { initialPrese
   useEffect(() => {
     const preset = dateRanges.find((p) => p.key === initialPreset);
     if (preset?.from) {
-      onChange({
-        from: new Date(preset.from),
-        to: preset.to ? new Date(preset.to) : undefined,
+      onChange(preset.key, {
+        from: parseLocalDate(preset.from),
+        to: preset.to ? parseLocalDate(preset.to) : undefined,
       });
     } else {
-      onChange(undefined);
+      onChange(initialPreset, undefined);
     }
   }, [initialPreset, dateRanges]);
 
@@ -29,13 +36,14 @@ export function DateRangeQuickSelect({ initialPreset, onChange }: { initialPrese
 
     if (preset.key === 'custom') {
       // Let user open calendar manually
-      onChange(undefined);
+      onChange(key, undefined);
     } else {
       onChange(
+        preset.key,
         preset.from
           ? {
-              from: new Date(preset.from),
-              to: preset.to ? new Date(preset.to) : undefined,
+              from: parseLocalDate(preset.from),
+              to: preset.to ? parseLocalDate(preset.to) : undefined,
             }
           : undefined,
       );
@@ -44,7 +52,7 @@ export function DateRangeQuickSelect({ initialPreset, onChange }: { initialPrese
 
   return (
     <Select value={selectedKey} onValueChange={handleChange}>
-      <SelectTrigger className="w-[280px]">
+      <SelectTrigger className="w-70">
         <SelectValue placeholder="Select period" />
       </SelectTrigger>
       <SelectContent>

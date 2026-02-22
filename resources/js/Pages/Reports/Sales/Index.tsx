@@ -37,6 +37,7 @@ export default function Index({
     endpoint: 'sales',
     reportType: initialReportType,
     dateRange: initialDateRange,
+    presetKey: initialPreset,
     showInvoices: false,
     csrfToken: csrf_token,
   });
@@ -56,11 +57,21 @@ export default function Index({
         <div className="flex flex-col space-y-4 gap-y-2">
           <div className="flex flex-col space-y-2">
             <Label>{t('global.dateRangePresets')}</Label>
-            <DateRangeQuickSelect initialPreset={initialPreset} onChange={(range) => updateRequest('dateRange', range)} />
+            <DateRangeQuickSelect
+              initialPreset={initialPreset}
+              onChange={(presetKey, range) => {
+                updateRequest('dateRange', range);
+                updateRequest('presetKey', presetKey);
+              }}
+            />
           </div>
           <div className="flex flex-col space-y-2">
             <Label htmlFor="date">{t('global.dateRange')}</Label>
-            <DateRangePicker dateRange={request.dateRange} setDateRange={(range) => updateRequest('dateRange', range)} />
+            <DateRangePicker
+              disabled={request.presetKey !== 'custom'}
+              dateRange={request.dateRange}
+              setDateRange={(range) => updateRequest('dateRange', range)}
+            />
           </div>
         </div>
       </ReportLayout.FilterSection>
@@ -69,7 +80,7 @@ export default function Index({
           <div className="flex flex-col space-y-2">
             <Label>{t('reports.filters.type.title')}</Label>
             <Select onValueChange={(value) => updateRequest('reportType', value)} defaultValue={request.reportType}>
-              <SelectTrigger className="w-[280px]">
+              <SelectTrigger className="w-70">
                 <SelectValue placeholder={t('reports.filters.type.title')} />
               </SelectTrigger>
               <SelectContent>
@@ -80,7 +91,7 @@ export default function Index({
             </Select>
           </div>
           <div className="py-4">
-            <Label className="hover:bg-accent/50 has-[[aria-checked=true]]:border-primary flex cursor-pointer items-start gap-3 rounded-lg border p-3 has-[:disabled]:cursor-not-allowed has-[[aria-checked=true]]:bg-blue-50 dark:has-[[aria-checked=true]]:border-blue-900 dark:has-[[aria-checked=true]]:bg-blue-950">
+            <Label className="hover:bg-accent/50 has-aria-checked:border-primary flex cursor-pointer items-start gap-3 rounded-lg border p-3 has-[:disabled]:cursor-not-allowed has-[[aria-checked=true]]:bg-blue-50 dark:has-[[aria-checked=true]]:border-blue-900 dark:has-[[aria-checked=true]]:bg-blue-950">
               <Checkbox
                 id="showInvoices"
                 checked={request.showInvoices as boolean}

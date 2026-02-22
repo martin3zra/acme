@@ -147,7 +147,7 @@ func (s *Server) NextOccurrenceFrom(r *Recurrence, anchor time.Time, loc *time.L
 		}
 
 		// Start searching from the NEXT week boundary
-		searchStart = startOfWeek(searchStart).AddDate(0, 0, 7)
+		searchStart = schedulerStartOfWeek(searchStart).AddDate(0, 0, 7)
 
 		// No weekdays → same weekday as anchor
 		if len(r.Weekdays) == 0 {
@@ -193,8 +193,8 @@ func (s *Server) ComputeNextRunAt(r *Recurrence, loc *time.Location) *time.Time 
 	return &next
 }
 
-// startOfWeek: start of week (Monday-based)
-func startOfWeek(t time.Time) time.Time {
+// schedulerStartOfWeek: start of week (Monday-based)
+func schedulerStartOfWeek(t time.Time) time.Time {
 	weekday := int(t.Weekday())
 	if weekday == 0 { // Sunday
 		weekday = 7

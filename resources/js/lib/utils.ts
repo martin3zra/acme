@@ -189,3 +189,8 @@ export function recurrenceCaption(data: Recurrent): string {
 
   return caption;
 }
+
+export function parseLocalDate(dateStr: string) {
+  const [y, m, d] = dateStr.split('-').map(Number);
+  return new Date(y, m - 1, d);
+}

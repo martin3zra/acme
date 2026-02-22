@@ -1291,10 +1291,9 @@ type DateRange struct {
 }
 
 type PresetRange struct {
-	Label string `json:"label"`
-	Key   string `json:"key"`
-	From  string `json:"from,omitempty"`
-	To    string `json:"to,omitempty"`
+	Key  string `json:"key"`
+	From string `json:"from,omitempty"`
+	To   string `json:"to,omitempty"`
 }
 
 type ReportForm struct {
