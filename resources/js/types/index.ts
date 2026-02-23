@@ -565,3 +565,26 @@ export interface RedirectPreference {
   customer: RedirectPreferenceValue;
   item: RedirectPreferenceValue;
 }
+
+export type ExpenseCategory = {
+  id: number;
+  uuid: string;
+  name: string;
+  description: string;
+  created_at: string;
+  updated_at: string;
+  deleted_at: string;
+};
+
+export type Expense = {
+  id: number;
+  uuid: string;
+  amount: number;
+  notes: string;
+  receipt_url: string;
+  date: string;
+  category: ExpenseCategory;
+  created_at: string;
+  updated_at: string;
+  deleted_at?: string;
+};

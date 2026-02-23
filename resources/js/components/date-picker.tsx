@@ -18,15 +18,20 @@ type DatePickerFieldProps = {
   value?: Date;
   onChange: (date: Date | undefined) => void;
   error?: string;
+  className?: string;
 };
 
-export function DatePickerField({ id, label, placeholder = 'Pick a date', value, onChange, error }: DatePickerFieldProps) {
+export function DatePickerField({ id, label, placeholder = 'Pick a date', value, onChange, error, className }: DatePickerFieldProps) {
   return (
     <div className="flex flex-col gap-y-2">
       <Label htmlFor={id}>{label}</Label>
       <Popover>
         <PopoverTrigger asChild>
-          <Button type="button" variant="outline" className={cn('w-[280px] justify-start text-left font-normal', !value && 'text-muted-foreground')}>
+          <Button
+            type="button"
+            variant="outline"
+            className={cn('w-70 justify-start text-left font-normal', !value && 'text-muted-foreground', className)}
+          >
             <CalendarIcon className="mr-2 h-4 w-4" />
             {value ? format(value, 'dd-MM-yyyy') : <span>{placeholder}</span>}
           </Button>
@@ -38,7 +43,7 @@ export function DatePickerField({ id, label, placeholder = 'Pick a date', value,
             selected={value}
             onSelect={onChange}
             captionLayout="dropdown"
-            className="w-[280px] rounded-md border p-3 shadow-md"
+            className="min-w-56 rounded-md border p-3 shadow-md"
             locale={es}
           />
         </PopoverContent>

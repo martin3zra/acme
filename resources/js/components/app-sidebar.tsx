@@ -11,6 +11,7 @@ import {
   CreditCard,
   LayoutDashboardIcon,
   LayoutListIcon,
+  Receipt,
   SettingsIcon,
   UsersIcon,
 } from 'lucide-react';
@@ -59,6 +60,12 @@ const navMain: NavItem[] = [
     url: '/payments',
     icon: CreditCard,
     requiredAbility: 'viewAny:payment',
+  },
+  {
+    title: 'global.navMain.expenses',
+    url: '/expenses',
+    icon: Receipt,
+    requiredAbility: 'viewAny:expense',
   },
   {
     title: 'global.navMain.reports',

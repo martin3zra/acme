@@ -77,6 +77,7 @@
     "price": "Precio",
     "notes": "Notas",
     "noNotesWasLeft": "No se dejó ninguna nota.",
+    "category": "Categoria",
     "createdBy": "Creado por",
     "paymentSummary": "Resumen de pago",
     "limitReached": "Límite alcanzado",
@@ -255,6 +256,7 @@
       "customers": "Clientes",
       "items": "Productos",
       "payments": "Pagos",
+      "expenses": "Gastos",
       "reports": "Reportes"
     },
     "navSecondary": {
@@ -929,6 +931,64 @@
     },
     "confirmsPassword": {
       "title": "¿Estás seguro que deseas anular el pago :payment?",
+      "description": "¿Estás seguro de que deseas anular este pago? Esta acción no se puede deshacer. Una vez que el pago quede nulo pasará de :total a $0.00.",
+      "confirm": "Si, borralo",
+      "cancel": "Cancelar"
+    },
+    "statuses": {
+      "pending": "Abierta",
+      "failed": "Enviada",
+      "completed": "Terminada",
+      "void": "Nula"
+    },
+    "confirmsCancelation": {
+      "title": "¿Estás seguro que deseas cancelar?",
+      "description": "Esta acción no se puede deshacer. Eliminará permanentemente los cambios sin guardar del pago y los datos de nuestros servidores.",
+      "confirm": "Si, continuar",
+      "cancel": "Cancelar"
+    }
+  },
+  "expenses": {
+    "title": "Gastos",
+    "description": "Todos los gastos registrados se muestran aquí.",
+    "line": {
+      "form": {
+        "placeholder": "Referencia o presione ⌘K",
+        "addNew": "Registrar nuevo artículo",
+        "search": "Escriba un nombre de artículo..."
+      }
+    },
+    "single": {
+      "title": "Pago",
+      "description": "Detalles del pago seleccionado.",
+      "payTo": "Pagar a",
+      "paymentFrom": "Pago de",
+      "totalSummary": "Resumen total del pago",
+      "invoice": "Factura",
+      "viewInvoice": "Ver factura"
+    },
+    "viewExpense": {
+      "title": "Ver pago",
+      "description": "Detalles del pago seleccionado."
+    },
+    "newExpense": {
+      "title": "Nuevo gasto",
+      "description": "Registra un nuevo gasto."
+    },
+    "editExpense": {
+      "title": "Editar pago",
+      "description": "Edita los detalles del pago seleccionado"
+    },
+    "voidExpense": {
+      "title": "Anular pago",
+      "description": "Anula los detalles del pago seleccionado."
+    },
+    "emptyState": {
+      "title": "Registra tu primer gasto",
+      "description": "Una vez que registres tus gastos, aparecerán aquí."
+    },
+    "confirmsPassword": {
+      "title": "¿Estás seguro que deseas anular el pago :expense?",
       "description": "¿Estás seguro de que deseas anular este pago? Esta acción no se puede deshacer. Una vez que el pago quede nulo pasará de :total a $0.00.",
       "confirm": "Si, borralo",
       "cancel": "Cancelar"

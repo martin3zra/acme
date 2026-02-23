@@ -1,12 +1,11 @@
 import ActionSection from '@/components/action-section';
 import { ConfirmsPassword } from '@/components/confirms-password';
+import { DatePickerField } from '@/components/date-picker';
 import FormSection from '@/components/form-section';
 import InputError from '@/components/input-error';
 import { Button } from '@/components/ui/button';
-import { Calendar } from '@/components/ui/calendar';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Separator } from '@/components/ui/separator';
 import { useHeader } from '@/composables/use-headers';
@@ -18,8 +17,7 @@ import { paymentTerms } from '@/Pages/Invoices/constants';
 import { Customer, CustomerType, CustomerTypes, PageProps, PaymentMethods, TaxReceipt, Verb } from '@/types';
 import { Field, Radio, RadioGroup, Switch } from '@headlessui/react';
 import { useForm, usePage } from '@inertiajs/react';
-import { format } from 'date-fns/format';
-import { CalendarIcon, CheckCircleIcon } from 'lucide-react';
+import { CheckCircleIcon } from 'lucide-react';
 import { useState } from 'react';
 
 export type CreateFormParams = {
@@ -305,27 +303,15 @@ export default function CreateForm({ onFinish, params }: CreateFormProps) {
                   <InputError className="mt-2" message={errors.open_balance} />
                 </div>
                 <div className="col-span-3">
-                  <Label>{t('customers.single.openBalanceAsOf')}</Label>
-                  <Popover>
-                    <PopoverTrigger asChild>
-                      <Button
-                        variant={'outline'}
-                        className={cn('mt-2 w-[200px] justify-start text-left font-normal', !data.open_balance_as_of && 'text-muted-foreground')}
-                      >
-                        <CalendarIcon />
-                        {data.open_balance_as_of ? format(data.open_balance_as_of, 'PPP') : <span>{t('global.datePlaceholder')}</span>}
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="pointer-events-auto w-auto p-0">
-                      <Calendar
-                        mode="single"
-                        defaultMonth={data.open_balance_as_of}
-                        selected={data.open_balance_as_of}
-                        onSelect={(value) => setData('open_balance_as_of', value)}
-                      />
-                    </PopoverContent>
-                  </Popover>
-                  <InputError className="mt-2" message={errors.open_balance_as_of} />
+                  <DatePickerField
+                    id="date"
+                    label={t('customers.single.openBalanceAsOf')}
+                    placeholder={t('global.datePlaceholder')}
+                    value={data.open_balance_as_of}
+                    onChange={(value) => setData('open_balance_as_of', value)}
+                    error={errors.open_balance_as_of}
+                    className="w-52"
+                  />
                 </div>
               </>
             )}

@@ -1496,3 +1496,24 @@ var encodingDecoders = map[UploadEncoding]*encoding.Decoder{
 	EncodingLatin1:  charmap.ISO8859_1.NewDecoder(),
 	EncodingWin1252: charmap.Windows1252.NewDecoder(),
 }
+
+type StoreExpenseForm struct {
+	support.FormRequest
+	Category string    `json:"category"`
+	Date     time.Time `json:"date"`
+	Notes    string    `json:"notes"`
+	Amount   float64   `json:"amount"`
+}
+
+func (form StoreExpenseForm) Authorize() bool {
+	return Can(form.User(), "create:expense")
+}
+
+func (form StoreExpenseForm) Rules() map[string]any {
+	return map[string]any{
+		"category": "bail|required|exists:expenses_categories,uuid",
+		"date":     "bail|required|date",
+		"notes":    "sometime",
+		"amount":   "required|min:0",
+	}
+}
