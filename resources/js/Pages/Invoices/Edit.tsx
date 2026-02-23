@@ -1,4 +1,5 @@
 import { AlertDestructive } from '@/components/alert-destructive';
+import { DatePickerField } from '@/components/date-picker';
 import InputError from '@/components/input-error';
 import {
   AlertDialog,
@@ -11,10 +12,8 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
-import { Calendar } from '@/components/ui/calendar';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Separator } from '@/components/ui/separator';
 import { useHeader } from '@/composables/use-headers';
@@ -23,7 +22,7 @@ import { useDebounced } from '@/hooks/use-debounced';
 import { usePersistedState } from '@/hooks/use-persisted-state';
 import { useTranslation } from '@/hooks/use-translation';
 import AppLayout from '@/layouts/app-layout';
-import { addDays, cn, getDaysFromTerm, isNotEmpty } from '@/lib/utils';
+import { addDays, getDaysFromTerm, isNotEmpty } from '@/lib/utils';
 import {
   Auth,
   BTForm,
@@ -44,7 +43,6 @@ import {
 import { Textarea } from '@headlessui/react';
 import { router, useForm, usePage } from '@inertiajs/react';
 import { format } from 'date-fns';
-import { CalendarIcon } from 'lucide-react';
 import React, { useCallback, useEffect, useState } from 'react';
 import { defaultDiscount, makeEditBreadcrumbs, paymentTerms } from './constants';
 import CheckoutForm from './Shared/checkout-form';
@@ -414,28 +412,15 @@ export default function Edit({
           <div className="grid grid-cols-12">
             <div className="col-span-6 flex flex-col gap-y-6">
               <div className="flex flex-col gap-y-2">
-                <Label htmlFor="date">{t('global.date')}</Label>
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button
-                      variant={'outline'}
-                      className={cn('w-[280px] justify-start text-left font-normal', !invoiceForm.header.date && 'text-muted-foreground')}
-                    >
-                      <CalendarIcon />
-                      {invoiceForm.header.date ? format(invoiceForm.header.date, 'PPP') : <span>{t('global.datePlaceholder')}</span>}
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0">
-                    <Calendar
-                      mode="single"
-                      defaultMonth={invoiceForm.header.date}
-                      selected={invoiceForm.header.date}
-                      onSelect={handleDateChange}
-                      initialFocus
-                    />
-                  </PopoverContent>
-                </Popover>
-                <InputError className="mt-2" message={errors.date} />
+                <DatePickerField
+                  id="date"
+                  label={t('global.date')}
+                  placeholder={t('global.datePlaceholder')}
+                  value={invoiceForm.header.date}
+                  onChange={handleDateChange}
+                  error={errors.date}
+                  className="w-52"
+                />
               </div>
               {isInvoice && (
                 <div className="flex flex-col gap-y-2">

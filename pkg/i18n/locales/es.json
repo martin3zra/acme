@@ -33,6 +33,7 @@
     "status": "Estado",
     "amount": "Monto",
     "payment": "Pago",
+    "expense": "Gasto",
     "discount": "Descuento",
     "bulkDiscount": "Descuento masivo",
     "bulkPayment": "Pago masivo",
@@ -951,13 +952,6 @@
   "expenses": {
     "title": "Gastos",
     "description": "Todos los gastos registrados se muestran aquí.",
-    "line": {
-      "form": {
-        "placeholder": "Referencia o presione ⌘K",
-        "addNew": "Registrar nuevo artículo",
-        "search": "Escriba un nombre de artículo..."
-      }
-    },
     "single": {
       "title": "Pago",
       "description": "Detalles del pago seleccionado.",
@@ -968,40 +962,42 @@
       "viewInvoice": "Ver factura"
     },
     "viewExpense": {
-      "title": "Ver pago",
-      "description": "Detalles del pago seleccionado."
+      "title": "Ver gasto",
+      "description": "Detalles del gasto seleccionado."
     },
     "newExpense": {
       "title": "Nuevo gasto",
       "description": "Registra un nuevo gasto."
     },
     "editExpense": {
-      "title": "Editar pago",
-      "description": "Edita los detalles del pago seleccionado"
+      "title": "Editar gasto",
+      "description": "Edita los detalles del gasto seleccionado"
     },
-    "voidExpense": {
-      "title": "Anular pago",
-      "description": "Anula los detalles del pago seleccionado."
+    "trashExpense": {
+      "title": "Archivar gasto",
+      "description": "Archiva los detalles del gasto seleccionado."
     },
     "emptyState": {
       "title": "Registra tu primer gasto",
       "description": "Una vez que registres tus gastos, aparecerán aquí."
     },
     "confirmsPassword": {
-      "title": "¿Estás seguro que deseas anular el pago :expense?",
-      "description": "¿Estás seguro de que deseas anular este pago? Esta acción no se puede deshacer. Una vez que el pago quede nulo pasará de :total a $0.00.",
-      "confirm": "Si, borralo",
+      "title": "¿Estás seguro que deseas archivar el gasto :expense?",
+      "description": "¿Estás seguro de que deseas archivar este gasto? Esta acción no se puede deshacer. Una vez que el gasto quede archivado pasará de :total a $0.00.",
+      "confirm": "Si, archivalo",
       "cancel": "Cancelar"
     },
-    "statuses": {
-      "pending": "Abierta",
-      "failed": "Enviada",
-      "completed": "Terminada",
-      "void": "Nula"
+    "archive": {
+      "title": "Archivar gasto",
+      "description": "Oculta este registro de tu vista principal sin eliminarlo. Los gastos archivados permanecen guardados y puedes desarchivarlos en cualquier momento."
+    },
+    "unarchive": {
+      "title": "Desarchivar gasto",
+      "description": "Restaura este registro a tu lista principal de gastos. El desarchivo te permite volver a ver y gestionar el gasto como de costumbre."
     },
     "confirmsCancelation": {
       "title": "¿Estás seguro que deseas cancelar?",
-      "description": "Esta acción no se puede deshacer. Eliminará permanentemente los cambios sin guardar del pago y los datos de nuestros servidores.",
+      "description": "Esta acción no se puede deshacer. Eliminará permanentemente los cambios sin guardar del gasto y los datos de nuestros servidores.",
       "confirm": "Si, continuar",
       "cancel": "Cancelar"
     }

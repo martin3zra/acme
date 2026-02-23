@@ -19,9 +19,10 @@ type DatePickerFieldProps = {
   onChange: (date: Date | undefined) => void;
   error?: string;
   className?: string;
+  disabled?: boolean;
 };
 
-export function DatePickerField({ id, label, placeholder = 'Pick a date', value, onChange, error, className }: DatePickerFieldProps) {
+export function DatePickerField({ id, label, placeholder = 'Pick a date', value, onChange, error, className, disabled }: DatePickerFieldProps) {
   return (
     <div className="flex flex-col gap-y-2">
       <Label htmlFor={id}>{label}</Label>
@@ -45,6 +46,7 @@ export function DatePickerField({ id, label, placeholder = 'Pick a date', value,
             captionLayout="dropdown"
             className="min-w-56 rounded-md border p-3 shadow-md"
             locale={es}
+            disabled={disabled}
           />
         </PopoverContent>
       </Popover>

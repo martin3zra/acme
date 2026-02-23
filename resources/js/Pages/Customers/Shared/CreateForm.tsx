@@ -71,6 +71,7 @@ export default function CreateForm({ onFinish, params }: CreateFormProps) {
 
   const viewMode = params.action === 'view';
   const isDisabled = params.customer?.status === 'disabled';
+  const verbName = useVerb().action(params.action);
 
   const options = {
     ...headers,
@@ -80,8 +81,6 @@ export default function CreateForm({ onFinish, params }: CreateFormProps) {
       onFinish();
     },
   };
-
-  const verbName = useVerb().action(params.action);
 
   const submit = () => {
     if (params.action === 'create') post('/customers', options);
@@ -101,7 +100,7 @@ export default function CreateForm({ onFinish, params }: CreateFormProps) {
               <RadioGroup
                 id="customer_type"
                 className="grid grid-cols-3 gap-6"
-                value={data.customer_type}
+                value={data.customer_type as CustomerType}
                 onChange={(type: CustomerType) => setData('customer_type', type)}
               >
                 {CustomerTypes.map((type: CustomerType) => (

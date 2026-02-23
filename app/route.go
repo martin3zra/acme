@@ -89,6 +89,8 @@ func (s *Server) bootRoutes() {
 
 					route.GET("/expenses", s.expensesHandler).Can("viewAny:expense")
 					route.POST("/expenses", s.storeExpenseHandler())
+					route.DELETE("/expenses/:id", s.deleteExpenseHandler())
+					route.PUT("/expenses/:id", s.updateExpenseHandler())
 
 					route.GET("/reports/sales", s.reportSalesHandler).Can("viewAny:reports")
 					route.POST("/reports/sales", s.generateSalesReportHandler()) // .Can("viewAny:reports")

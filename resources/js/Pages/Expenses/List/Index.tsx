@@ -1,8 +1,7 @@
 import { Button } from '@/components/ui/button';
-import { DropdownMenu, DropdownMenuCheckboxItem, DropdownMenuContent, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useTranslation } from '@/hooks/use-translation';
-import { Expense, PaymentVerb } from '@/types';
+import { Expense, Verb } from '@/types';
 import {
   ColumnFiltersState,
   flexRender,
@@ -14,13 +13,12 @@ import {
   useReactTable,
   VisibilityState,
 } from '@tanstack/react-table';
-import { ChevronDown } from 'lucide-react';
 import { FC, useState } from 'react';
 import { getColumns } from './columns-definitions';
 
 type Props = {
   data: Expense[];
-  onSelectExpense: (Expense: Expense, action: PaymentVerb) => void;
+  onSelectExpense: (Expense: Expense, action: Verb) => void;
 };
 
 export const List: FC<Props> = ({ data, onSelectExpense }) => {
@@ -53,38 +51,6 @@ export const List: FC<Props> = ({ data, onSelectExpense }) => {
 
   return (
     <div>
-      <div className="flex items-center py-4">
-        {/* <Input
-          placeholder="Filter names..."
-          value={(table.getColumn('customer.name')?.getFilterValue() as string) ?? ''}
-          onChange={(event) => table.getColumn('customer.name')?.setFilterValue(event.target.value)}
-          className="max-w-sm"
-        /> */}
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="outline" className="ml-auto">
-              {t('global.columns')} <ChevronDown />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            {table
-              .getAllColumns()
-              .filter((column) => column.getCanHide())
-              .map((column) => {
-                return (
-                  <DropdownMenuCheckboxItem
-                    key={column.id}
-                    className="capitalize"
-                    checked={column.getIsVisible()}
-                    onCheckedChange={(value) => column.toggleVisibility(!!value)}
-                  >
-                    {(column.columnDef.meta as string) || column.id}
-                  </DropdownMenuCheckboxItem>
-                );
-              })}
-          </DropdownMenuContent>
-        </DropdownMenu>
-      </div>
       <div className="rounded-md border">
         <Table>
           <TableHeader>

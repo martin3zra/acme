@@ -1,8 +1,10 @@
 package app
 
 import (
+	"fmt"
 	"log"
 
+	"github.com/martin3zra/acme/pkg/cache"
 	"github.com/martin3zra/acme/pkg/i18n"
 	"github.com/martin3zra/acme/pkg/routing"
 )
@@ -29,40 +31,20 @@ func (s *Server) expensesHandler(ctx *routing.Context) {
 		"categories":   categories,
 	}
 
-	// uuid := ctx.Query("id")
-	// if uuid != "" {
-	// 	c := cache.NewPgCache(s.db)
-	// 	key := fmt.Sprintf("preview:expense:%s", uuid)
-	// 	data, err := cache.Remember(ctx.Request.Context(), c, key, func() (map[string]any, error) {
-	// 		payment, err := s.findPaymentByUUID(ctx.Request.Context(), uuid)
-	// 		if err != nil {
-	// 			return nil, err
-	// 		}
-
-	// 		lines, err := s.findPaymentLines(ctx.Request.Context(), payment.ID)
-	// 		if err != nil {
-	// 			return nil, err
-	// 		}
-
-	// 		uri := fmt.Sprintf("%s/expenses/%s/print/%s", s.config.host, uuid, foundation.NewHashable().Sha1(uuid))
-	// 		pdfURL, err := routing.PermanentSignedURL(uri, map[string]string{}, string(s.config.secretKey))
-	// 		if err != nil {
-	// 			return nil, err
-	// 		}
-
-	// 		return map[string]any{
-	// 			"header": payment,
-	// 			"lines":  lines,
-	// 			"pdfURL": pdfURL,
-	// 		}, nil
-	// 	})
-	// 	if err != nil {
-	// 		ctx.Error(err)
-	// 		return
-	// 	}
-	// 	props["expense"] = data
-	// 	props["showExpense"] = true
-	// }
+	uuid := ctx.Query("id")
+	if uuid != "" {
+		c := cache.NewPgCache(s.db)
+		key := fmt.Sprintf("preview:expense:%s", uuid)
+		data, err := cache.Remember(ctx.Request.Context(), c, key, func() (*expense, error) {
+			return s.findExpenseByUUID(ctx.Request.Context(), uuid)
+		})
+		if err != nil {
+			ctx.Error(err)
+			return
+		}
+		props["expense"] = data
+		props["openState"] = true
+	}
 
 	ctx.Render("Expenses/Index", props)
 }
@@ -78,6 +60,44 @@ func (s *Server) storeExpenseHandler() routing.HandlerFunc {
 		}
 
 		ctx.Flash("success", s.trans("global.wasCreated", i18n.Replacements{"subject": "@global.expense"}))
+
+		ctx.Redirect("/expenses")
+	})
+}
+
+func (s *Server) deleteExpenseHandler() routing.HandlerFunc {
+	return routing.WithRequest(func(ctx *routing.Context, form *ConfirmsPasswords) {
+
+		err := s.deleteExpense(ctx.Request.Context(), ctx.Param("id"))
+		if err != nil {
+			log.Printf("Error deleting expense: %v", err)
+			ctx.BackWith("current_password", s.trans("global.wasNotDeleted", i18n.Replacements{"subject": "@global.expense"}))
+			return
+		}
+
+		ctx.Flash("success", s.trans("global.wasDeleted", i18n.Replacements{"subject": "@global.expense"}))
+
+		ctx.Redirect("/expenses")
+	})
+}
+
+func (s *Server) updateExpenseHandler() routing.HandlerFunc {
+	return routing.WithRequest(func(ctx *routing.Context, form *StoreExpenseForm) {
+
+		err := s.updateExpense(ctx.Request.Context(), ctx.Param("id"), form)
+		if err != nil {
+			log.Printf("Error updating expense: %v", err)
+			ctx.BackWith("status", s.trans("global.wasNotUpdated", i18n.Replacements{"subject": "@global.expense"}))
+			return
+		}
+
+		c := cache.NewPgCache(s.db)
+		key := fmt.Sprintf("preview:expense:%s", ctx.Param("id"))
+		if err = c.Delete(ctx.Request.Context(), key); err != nil {
+			log.Printf("Error deleting cache: %v", err)
+		}
+
+		ctx.Flash("success", s.trans("global.wasUpdated", i18n.Replacements{"subject": "@global.expense"}))
 
 		ctx.Redirect("/expenses")
 	})

@@ -1,3 +1,5 @@
+import ActionSection from '@/components/action-section';
+import { ConfirmsPassword } from '@/components/confirms-password';
 import { DatePickerField } from '@/components/date-picker';
 import FormSection from '@/components/form-section';
 import InputError from '@/components/input-error';
@@ -27,7 +29,7 @@ type CreateFormProps = {
 
 type ExpenseForm = {
   id: number | undefined;
-  date: Date;
+  date: Date | undefined;
   amount: number;
   category: string;
   notes: string;
@@ -41,13 +43,15 @@ export default function CreateForm({ onFinish, params }: CreateFormProps) {
   const { errors: propsErrors } = usePage<PageProps>().props;
   const { data, setData, post, put, errors, reset, processing } = useForm<Required<ExpenseForm>>({
     id: params.expense?.id,
-    date: new Date(),
-    amount: 0,
+    date: params.expense?.date || new Date(),
+    amount: params.expense?.amount || 0,
     category: params.expense?.category?.uuid || '',
-    notes: '',
+    notes: params.expense?.notes || '',
   });
 
   const viewMode = params.action === 'view';
+  const isDisabled = params.expense?.deleted_at !== undefined;
+  const verbName = useVerb().action(params.action);
 
   const options = {
     ...headers,
@@ -57,8 +61,6 @@ export default function CreateForm({ onFinish, params }: CreateFormProps) {
       onFinish();
     },
   };
-
-  const verbName = useVerb().action(params.action);
 
   const submit = () => {
     if (params.action === 'create') post('/expenses', options);
@@ -114,6 +116,8 @@ export default function CreateForm({ onFinish, params }: CreateFormProps) {
                   value={data.date}
                   placeholder={t('global.datePlaceholder')}
                   onChange={handleDateChange}
+                  disabled={viewMode}
+                  error={errors.date}
                 />
               </div>
             </div>
@@ -128,6 +132,7 @@ export default function CreateForm({ onFinish, params }: CreateFormProps) {
                   className="focus:no-data-focus:outline-none block resize-none rounded-lg border px-3 py-1.5 text-sm/6 data-focus:outline-2 data-focus:-outline-offset-2 data-focus:outline-white/25"
                   defaultValue={data.notes}
                   onChange={(e) => setData('notes', e.target.value)}
+                  readOnly={viewMode}
                 />
               </div>
             </div>
@@ -142,12 +147,44 @@ export default function CreateForm({ onFinish, params }: CreateFormProps) {
                   {t('global.saving')}
                 </>
               ) : (
-                t('global.save')
+                <>
+                  {t(`global.actions.${verbName}`)} {t('global.expense')}
+                </>
               )}
             </Button>
           </FormSection.Actions>
         )}
       </FormSection>
+
+      {viewMode && (
+        <ActionSection>
+          <ActionSection.Title>{t(`expenses.${isDisabled ? 'unarchive' : 'archive'}.title`)}</ActionSection.Title>
+          <ActionSection.Description>{t(`expenses.${isDisabled ? 'unarchive' : 'archive'}.description`)}</ActionSection.Description>
+          <ActionSection.Content>
+            <div className={`space-y-4 rounded-lg border ${isDisabled ? 'border-primary-100 bg-primary-50' : 'border-red-100 bg-red-50'} p-4`}>
+              <div className={`relative space-y-0.5 ${isDisabled ? 'text-primary' : 'text-red-600'}`}>
+                <p className="font-medium">{t('global.warning.title')}</p>
+                <p className="text-sm">{t('global.warning.description')}</p>
+              </div>
+              <Button variant={isDisabled ? 'default' : 'destructive'} onClick={() => setDialogOpen(true)}>
+                {t(`expenses.${isDisabled ? 'unarchive' : 'archive'}.title`)}
+              </Button>
+
+              <ConfirmsPassword
+                title={t(`expenses.confirmsPassword.title`, {
+                  expense: params.expense?.category.name || '',
+                })}
+                description={t(`expenses.confirmsPassword.description`, { total: currency(params.expense?.amount || 0) })}
+                action={t(`expenses.confirmsPassword.confirm`)}
+                verb={params.expense?.deleted_at === undefined ? 'destroy' : 'update'}
+                path={`/expenses/${params.expense?.uuid}`}
+                open={dialogOpen}
+                onOpenChange={setDialogOpen}
+              />
+            </div>
+          </ActionSection.Content>
+        </ActionSection>
+      )}
     </div>
   );
 }

@@ -12,13 +12,12 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { Expense, PaymentVerb, Replacements } from '@/types';
+import { Expense, Replacements, Verb } from '@/types';
 import { ColumnDef } from '@tanstack/react-table';
-import { MessageCircleMore, MoreHorizontal } from 'lucide-react';
+import { MoreHorizontal } from 'lucide-react';
 
 type Props = {
-  onDidClick: (item: Expense, action: PaymentVerb) => void;
+  onDidClick: (item: Expense, action: Verb) => void;
   t: (key: string, replacements?: Replacements) => string;
 };
 
@@ -38,60 +37,35 @@ export const getColumns = ({ onDidClick, t }: Props): ColumnDef<Expense>[] => {
       enableHiding: false,
     },
     {
-      accessorKey: 'id',
-      meta: t('global.number'),
+      accessorKey: 'category.name',
+      meta: t('global.category'),
       // size: 880,
       header: (props) => {
-        return <HeaderCell title={t('global.number')} alignment="left" columnWidth={props.column.getSize()} />;
+        return <HeaderCell title={t('global.category')} alignment="left" columnWidth={props.column.getSize()} />;
       },
       cell: (props) => {
-        const hasNotes = !!props.row.original.notes;
         return (
-          <div className="[&_[data-slot=has-notes]]:-px-6 relative flex [&_[data-slot=has-notes]]:block [&_[data-slot=has-notes]]:text-red-500">
+          <div className="[&_[data-slot=has-notes]]:-px-6 relative flex">
             <TextCell columnWidth={props.column.getSize()} value={props.getValue() as string} />
-            <TooltipProvider>
-              <Tooltip>
-                <TooltipTrigger>
-                  <MessageCircleMore
-                    className="absolute inset-0 -top-0 left-[90%] hidden size-5 -translate-x-1/2 -translate-y-1/2 transform cursor-pointer"
-                    data-slot={hasNotes ? 'has-notes' : 'default'}
-                  />
-                </TooltipTrigger>
-                <TooltipContent>{props.row.original.notes}</TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
           </div>
         );
       },
     },
-    // {
-    //   accessorKey: 'customer.name',
-    //   id: 'customer.name',
-    //   meta: t('global.customer'),
-    //   header: ({ column }) => {
-    //     return <HeaderSortCell<Payment> title={t('global.customer')} column={column} />;
-    //   },
-    //   cell: (props) => {
-    //     return (
-    //       <LinkCell
-    //         href={`/customers?id=${props.row.original.customer.uuid}`}
-    //         columnWidth={props.column.getSize()}
-    //         value={props.getValue() as string}
-    //       />
-    //     );
-    //   },
-    // },
-    // {
-    //   accessorKey: 'customer.amount_due',
-    //   meta: t('global.balance'),
-    //   // size: 880,
-    //   header: (props) => {
-    //     return <HeaderCell title={t('global.balance')} alignment="right" columnWidth={props.column.getSize()} />;
-    //   },
-    //   cell: (props) => {
-    //     return <CurrencyCell columnWidth={props.column.getSize()} value={props.getValue() as string} />;
-    //   },
-    // },
+    {
+      accessorKey: 'notes',
+      meta: t('global.notes'),
+      // size: 880,
+      header: (props) => {
+        return <HeaderCell title={t('global.notes')} alignment="left" columnWidth={props.column.getSize()} />;
+      },
+      cell: (props) => {
+        return (
+          <div className="[&_[data-slot=has-notes]]:-px-6 relative flex">
+            <TextCell columnWidth={props.column.getSize()} value={props.getValue() as string} />
+          </div>
+        );
+      },
+    },
     {
       accessorKey: 'date',
       meta: t('global.date'),
@@ -114,33 +88,11 @@ export const getColumns = ({ onDidClick, t }: Props): ColumnDef<Expense>[] => {
         return <CurrencyCell columnWidth={props.column.getSize()} value={props.getValue() as string} />;
       },
     },
-    // {
-    //   accessorKey: 'invoices',
-    //   meta: t('global.navMain.invoices'),
-    //   // size: 880,
-    //   header: (props) => {
-    //     return <HeaderCell title={t('global.navMain.invoices')} alignment="right" columnWidth={props.column.getSize()} />;
-    //   },
-    //   cell: (props) => {
-    //     return <NumericCell columnWidth={props.column.getSize()} value={props.getValue() as string} />;
-    //   },
-    // },
-    // {
-    //   accessorKey: 'status',
-    //   meta: t('global.status'),
-    //   size: 70,
-    //   header: (props) => {
-    //     return <HeaderCell title={t('global.status')} alignment="center" columnWidth={props.column.getSize()} />;
-    //   },
-    //   cell: (props) => {
-    //     return <StatusBadge type="payment" status={props.row.original.status} />;
-    //   },
-    // },
     {
       id: 'actions',
       enableHiding: false,
       cell: (props) => {
-        const disabled = false; // props.row.original.status === 'void';
+        const isDeleted = Boolean(props.row.original.deleted_at);
         return (
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
@@ -149,21 +101,21 @@ export const getColumns = ({ onDidClick, t }: Props): ColumnDef<Expense>[] => {
                 <MoreHorizontal />
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="[&_[data-slot=dropdown-menu-item]]:cursor-pointer">
+            <DropdownMenuContent align="end" className="**:data-[slot=dropdown-menu-item]:cursor-pointer">
               <DropdownMenuLabel>{t('global.actions.title')}</DropdownMenuLabel>
               <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={() => onDidClick(props.row.original, 'view')}>{t('payments.viewPayment.title')}</DropdownMenuItem>
-              {/* {props.row.original.status !== 'void' && (
+              <DropdownMenuItem onClick={() => onDidClick(props.row.original, 'view')}>{t('expenses.viewExpense.title')}</DropdownMenuItem>
+              {!isDeleted && (
                 <>
-                  <DropdownMenuItem onClick={() => onDidClick(props.row.original, 'edit')} disabled={disabled}>
-                    {t('payments.editPayment.title')}
+                  <DropdownMenuItem onClick={() => onDidClick(props.row.original, 'edit')} disabled={isDeleted}>
+                    {t('expenses.editExpense.title')}
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={() => onDidClick(props.row.original, 'void')} disabled={disabled}>
-                    {t('payments.voidPayment.title')}
+                  <DropdownMenuItem onClick={() => onDidClick(props.row.original, 'trash')} disabled={isDeleted}>
+                    {t('expenses.trashExpense.title')}
                   </DropdownMenuItem>
                 </>
-              )} */}
+              )}
             </DropdownMenuContent>
           </DropdownMenu>
         );

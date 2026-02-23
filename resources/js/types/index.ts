@@ -105,6 +105,7 @@ export interface OpenBalance {
   date: Date;
   amount: number;
 }
+
 export interface Customer {
   id: number;
   uuid: string;
@@ -120,7 +121,7 @@ export interface Customer {
   amount_due: number;
   credit_limited: boolean;
   credit_limit: number;
-  customer_type: 'individual' | 'business';
+  customer_type: CustomerType;
   tax_receipt: number;
   open_balance: OpenBalance;
   open_balance_as_of: Date;
@@ -582,7 +583,7 @@ export type Expense = {
   amount: number;
   notes: string;
   receipt_url: string;
-  date: string;
+  date: Date;
   category: ExpenseCategory;
   created_at: string;
   updated_at: string;

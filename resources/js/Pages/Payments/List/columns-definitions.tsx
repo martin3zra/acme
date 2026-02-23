@@ -37,7 +37,22 @@ export const getColumns = ({ onDidClick, t }: Props): ColumnDef<Payment>[] => {
           aria-label="Select all"
         />
       ),
-      cell: ({ row }) => <Checkbox checked={row.getIsSelected()} onCheckedChange={(value) => row.toggleSelected(!!value)} aria-label="Select row" />,
+      cell: ({ row }) => {
+        const hasNotes = !!row.original.notes;
+        return (
+          <div className="flex items-center space-x-2 **:data-[slot=has-notes]:block **:data-[slot=has-notes]:text-red-500">
+            <Checkbox checked={row.getIsSelected()} onCheckedChange={(value) => row.toggleSelected(!!value)} aria-label="Select row" />
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger>
+                  <MessageCircleMore className="size-4 cursor-pointer" data-slot={hasNotes ? 'has-notes' : 'default'} />
+                </TooltipTrigger>
+                <TooltipContent>{row.original.notes}</TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          </div>
+        );
+      },
       enableSorting: false,
       enableHiding: false,
     },
@@ -49,21 +64,9 @@ export const getColumns = ({ onDidClick, t }: Props): ColumnDef<Payment>[] => {
         return <HeaderCell title={t('global.number')} alignment="left" columnWidth={props.column.getSize()} />;
       },
       cell: (props) => {
-        const hasNotes = !!props.row.original.notes;
         return (
-          <div className="[&_[data-slot=has-notes]]:-px-6 relative flex [&_[data-slot=has-notes]]:block [&_[data-slot=has-notes]]:text-red-500">
+          <div className="[&_[data-slot=has-notes]]:-px-6 relative flex **:data-[slot=has-notes]:block **:data-[slot=has-notes]:text-red-500">
             <TextCell columnWidth={props.column.getSize()} value={props.getValue() as string} />
-            <TooltipProvider>
-              <Tooltip>
-                <TooltipTrigger>
-                  <MessageCircleMore
-                    className="absolute inset-0 -top-0 left-[90%] hidden size-5 -translate-x-1/2 -translate-y-1/2 transform cursor-pointer"
-                    data-slot={hasNotes ? 'has-notes' : 'default'}
-                  />
-                </TooltipTrigger>
-                <TooltipContent>{props.row.original.notes}</TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
           </div>
         );
       },
@@ -153,7 +156,7 @@ export const getColumns = ({ onDidClick, t }: Props): ColumnDef<Payment>[] => {
                 <MoreHorizontal />
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="[&_[data-slot=dropdown-menu-item]]:cursor-pointer">
+            <DropdownMenuContent align="end" className="**:data-[slot=dropdown-menu-item]:cursor-pointer">
               <DropdownMenuLabel>{t('global.actions.title')}</DropdownMenuLabel>
               <DropdownMenuSeparator />
               <DropdownMenuItem onClick={() => onDidClick(props.row.original, 'view')}>{t('payments.viewPayment.title')}</DropdownMenuItem>

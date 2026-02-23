@@ -26,9 +26,34 @@ type expense struct {
 	foundation.Timestamps
 }
 
+func (s *Server) findExpenseByUUID(ctx context.Context, uuid string) (*expense, error) {
+	var c expense
+	err := s.db.QueryRow(`
+   select expenses.id, expenses.uuid, expenses.amount, expenses.notes, expenses.date, expenses.created_at, expenses.updated_at, expenses.deleted_at,
+    expenses_categories.id, expenses_categories.uuid, expenses_categories.name
+    from expenses
+    inner join expenses_categories on (expenses.company_id = expenses_categories.company_id AND expenses.category_id = expenses_categories.id)
+    where expenses.company_id = $1
+    and expenses.uuid = $2
+  `, CurrentCompany(ctx).ID, uuid).Scan(
+		&c.ID,
+		&c.UUID,
+		&c.Amount,
+		&c.Notes,
+		&c.Date,
+		&c.CreatedAt,
+		&c.UpdatedAt,
+		&c.DeletedAt,
+		&c.Category.ID,
+		&c.Category.UUID,
+		&c.Category.Name,
+	)
+	return &c, err
+}
+
 func (s *Server) findExpenses(ctx context.Context) ([]*expense, error) {
 	rows, err := s.db.Query(`
-    select expenses.id, expenses.uuid, expenses.amount, expenses.notes, expenses.created_at, expenses.updated_at, expenses.deleted_at,
+    select expenses.id, expenses.uuid, expenses.amount, expenses.notes, expenses.date, expenses.created_at, expenses.updated_at, expenses.deleted_at,
     expenses_categories.id, expenses_categories.uuid, expenses_categories.name
     from expenses
     inner join expenses_categories on (expenses.company_id = expenses_categories.company_id AND expenses.category_id = expenses_categories.id)
@@ -48,6 +73,7 @@ func (s *Server) findExpenses(ctx context.Context) ([]*expense, error) {
 			&i.UUID,
 			&i.Amount,
 			&i.Notes,
+			&i.Date,
 			&i.CreatedAt,
 			&i.UpdatedAt,
 			&i.DeletedAt,
@@ -123,5 +149,29 @@ func (s *Server) storeExpense(ctx context.Context, form *StoreExpenseForm) error
 
 	_, err = s.db.Exec("INSERT INTO expenses (company_id, category_id, date, amount, notes) VALUES($1, $2, $3, $4, $5)",
 		CurrentCompany(ctx).ID, c.ID, form.Date, form.Amount, form.Notes)
+	return err
+}
+
+func (s *Server) deleteExpense(ctx context.Context, expenseID string) error {
+	_, err := s.db.Exec(
+		"UPDATE expenses SET deleted_at = now(), updated_at = now() WHERE company_id = $1 AND uuid = $2",
+		CurrentCompany(ctx).ID, expenseID,
+	)
+
+	return err
+}
+
+func (s *Server) updateExpense(ctx context.Context, expenseID string, form *StoreExpenseForm) error {
+
+	c, err := s.findExpenseCategory(ctx, form.Category)
+	if err != nil {
+		return err
+	}
+
+	_, err = s.db.Exec(
+		"UPDATE expenses SET date = $1, amount = $2, notes = $3, category_id = $4 WHERE company_id = $5 AND uuid = $6",
+		form.Date, form.Amount, form.Notes, c.ID, CurrentCompany(ctx).ID, expenseID,
+	)
+
 	return err
 }
