@@ -103,13 +103,41 @@ func (s *Server) findLatestEstimates(ctx context.Context) ([]*dueInvoice, error)
 
 func (s *Server) findLastProfitOfLast12Months(ctx context.Context) ([]*ChartData, error) {
 	rows, err := s.db.Query(`
-    SELECT TO_CHAR(date, 'YYYY/Mon') AS year_month, SUM(CASE WHEN status = 'closed' THEN total ELSE 0 END) AS sales, SUM(0) AS expenses -- placeholder until expenses table exists 
-    FROM invoices 
-    WHERE company_id = $1
-    AND transaction_kind = 'invoice'
-    AND date >= (CURRENT_DATE - INTERVAL '12 months') 
-    GROUP BY TO_CHAR(date, 'YYYY/Mon')
-    ORDER BY MIN(date);
+    WITH months AS (
+        SELECT generate_series(
+            DATE_TRUNC('month', CURRENT_DATE - INTERVAL '11 months'),
+            DATE_TRUNC('month', CURRENT_DATE),
+            interval '1 month'
+        ) AS month
+    ),
+    invoice_totals AS (
+        SELECT 
+            DATE_TRUNC('month', date) AS month,
+            SUM(CASE WHEN status = 'closed' THEN total ELSE 0 END) AS sales
+        FROM invoices
+        WHERE company_id = $1
+          AND transaction_kind = 'invoice'
+          AND date >= (CURRENT_DATE - INTERVAL '12 months')
+        GROUP BY DATE_TRUNC('month', date)
+    ),
+    expense_totals AS (
+        SELECT 
+            DATE_TRUNC('month', date) AS month,
+            SUM(amount) AS expenses
+        FROM expenses
+        WHERE company_id = $1
+          AND deleted_at IS NULL
+          AND date >= (CURRENT_DATE - INTERVAL '12 months')
+        GROUP BY DATE_TRUNC('month', date)
+    )
+    SELECT 
+        TO_CHAR(m.month, 'YYYY/Mon') AS year_month,
+        COALESCE(i.sales, 0) AS sales,
+        COALESCE(e.expenses, 0) AS expenses
+    FROM months m
+    LEFT JOIN invoice_totals i ON m.month = i.month
+    LEFT JOIN expense_totals e ON m.month = e.month
+    ORDER BY m.month;
   `, CurrentCompany(ctx).ID)
 	if err != nil {
 		return nil, err
@@ -130,8 +158,8 @@ func (s *Server) findTotalsProfitOfLast12Months(ctx context.Context) (*Totals, e
 	err := s.db.QueryRow(`
     SELECT
       COALESCE(SUM(CASE WHEN status = 'closed' THEN total ELSE 0 END), 0) AS total_sales,
-      0 AS total_receipts, -- placeholder until receipts logic/table exists 
-      0 AS total_expenses, -- placeholder until expenses table exists
+      (SELECT COALESCE(SUM(r.amount), 0) FROM receivables_income r WHERE r.company_id = $1 AND r.date >= (CURRENT_DATE - INTERVAL '12 months') AND r.deleted_at IS NULL) AS total_receipts,
+      (SELECT COALESCE(SUM(amount), 0) FROM expenses e WHERE e.company_id = $1 AND e.deleted_at IS NULL) AS total_expenses,
       COALESCE(SUM(CASE WHEN status = 'closed' THEN total ELSE 0 END), 0) - COALESCE(SUM(0), 0) AS net_income
     FROM invoices 
     WHERE company_id = $1
@@ -143,16 +171,41 @@ func (s *Server) findTotalsProfitOfLast12Months(ctx context.Context) (*Totals, e
 
 func (s *Server) findLastProfitOfYear(ctx context.Context, year int) ([]*ChartData, error) {
 	rows, err := s.db.Query(`
-    SELECT
-      TO_CHAR(date, 'YYYY/Mon') AS year_month,
-      COALESCE(SUM(CASE WHEN status = 'closed' THEN total ELSE 0 END), 0) AS sales,
-      SUM(0) AS expenses
-    FROM invoices
-    WHERE company_id = $1
-    AND transaction_kind = 'invoice'
-    AND EXTRACT(YEAR FROM date) = $2
-    GROUP BY TO_CHAR(date, 'YYYY/Mon')
-    ORDER BY MIN(date);
+    WITH months AS (
+        SELECT generate_series(
+          make_date($2, 1, 1),
+          make_date($2 + 1, 1, 1) - interval '1 month',
+          interval '1 month'
+      )::date AS month
+    ),
+    invoice_totals AS (
+        SELECT 
+            DATE_TRUNC('month', date) AS month,
+            SUM(CASE WHEN status = 'closed' THEN total ELSE 0 END) AS sales
+        FROM invoices
+        WHERE company_id = $1
+          AND transaction_kind = 'invoice'
+          AND EXTRACT(YEAR FROM date) = $2
+        GROUP BY DATE_TRUNC('month', date)
+    ),
+    expense_totals AS (
+        SELECT 
+            DATE_TRUNC('month', date) AS month,
+            SUM(amount) AS expenses
+        FROM expenses
+        WHERE company_id = $1
+          AND deleted_at IS NULL
+          AND EXTRACT(YEAR FROM date) = $2
+        GROUP BY DATE_TRUNC('month', date)
+    )
+    SELECT 
+        TO_CHAR(m.month, 'YYYY/Mon') AS year_month,
+        COALESCE(i.sales, 0) AS sales,
+        COALESCE(e.expenses, 0) AS expenses
+    FROM months m
+    LEFT JOIN invoice_totals i ON m.month = i.month
+    LEFT JOIN expense_totals e ON m.month = e.month
+    ORDER BY m.month;
   `, CurrentCompany(ctx).ID, year)
 	if err != nil {
 		return nil, err
@@ -173,8 +226,8 @@ func (s *Server) findTotalsProfitOfYear(ctx context.Context, year int) (*Totals,
 	err := s.db.QueryRow(`
     SELECT
       COALESCE(SUM(CASE WHEN status = 'closed' THEN total ELSE 0 END), 0) AS total_sales,
-      COALESCE(SUM(0), 0) AS total_receipts,
-      COALESCE(SUM(0), 0) AS total_expenses,
+      (SELECT COALESCE(SUM(r.amount), 0) FROM receivables_income r WHERE r.company_id = $1 AND EXTRACT(YEAR FROM r.date) = $2 AND r.deleted_at IS NULL) AS total_receipts,
+      (SELECT COALESCE(SUM(amount), 0) FROM expenses e WHERE e.company_id = $1 AND EXTRACT(YEAR FROM date) = $2 AND e.deleted_at IS NULL) AS total_expenses,
       COALESCE(SUM(CASE WHEN status = 'closed' THEN total ELSE 0 END), 0) - COALESCE(SUM(0), 0) AS net_income
     FROM invoices
     WHERE company_id = $1

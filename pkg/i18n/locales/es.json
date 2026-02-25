@@ -249,6 +249,13 @@
       "page": "Página",
       "selectedOf": ":rows de :total seleccionadas"
     },
+    "navGroups": {
+      "overview": "Resumen", 
+      "sales": "Ventas", 
+      "customersCatalog": "Clientes y Catálogo", 
+      "finance": "Finanzas", 
+      "analytics": "Análisis"
+    },
     "navMain": {
       "dashboard": "Panel",
       "invoices": "Facturas",
@@ -455,7 +462,7 @@
       "description": "Detalles del usuario seleccionado."
     },
     "newUser": {
-      "title": "Nuevo usuario",
+      "title": "+ Nuevo usuario",
       "description": "Crea un nuevo usuario."
     },
     "editUser": {
@@ -469,6 +476,10 @@
     "permissionUser": {
       "title": "Permisos",
       "description": "Maneja los permisos del usuario seleccionado."
+    },
+    "emptyState": {
+      "title": "Empieza agregando tu primer usuario",
+      "description": "Tu lista de usuarios está vacía. Añade un nuevo usuario para comenzar a gestionar y colaborar."
     }
   },
   "auth": {
@@ -1033,6 +1044,14 @@
         "taxSequences": {
           "title": "Secuencias de impuestos",
           "description": "Gestione las secuencias de impuestos de su empresa."
+        },
+        "expenseCategories": {
+          "title": "Categoria de gastos",
+          "description": "Se requieren categorías para agregar entradas de gastos. Puede agregar o eliminar estas categorías según sus preferencias."
+        },
+        "units": {
+          "title": "Unidades",
+          "description": "Antes de comenzar a vender o registrar inventario, necesitas establecer la unidad de medida de tu producto. Esto asegura claridad en precios, cantidades y reportes (por ejemplo: pieza, caja, litro, kilogramo)."
         },
         "redirectPreferences":{
           "title": "Preferencias de redirección",

@@ -102,6 +102,12 @@ func (s *Server) bootRoutes() {
 					route.POST("/taxes", s.storeTaxes())
 					route.PUT("/taxes/:id", s.updateTaxes())
 
+					route.POST("/expense-categories", s.storeExpenseCategoryHandler())
+					route.PUT("/expense-categories/:id", s.updateExpenseCategoryHandler())
+
+					route.POST("/units", s.storeUnitHandler())
+					route.PUT("/units/:id", s.updateUnitHandler())
+
 					route.POST("/uploads/init", s.startUploadChunkHandler())
 					route.POST("/uploads/chunks", s.uploadChunkHandler())
 					route.POST("/uploads/complete", s.completeUploadChunkHandler())

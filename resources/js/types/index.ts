@@ -70,6 +70,8 @@ export interface Company {
   sequences: Sequences;
   redirect_preferences: RedirectPreference;
   tax_receipts: TaxReceiptForSetup[];
+  expense_categories: ExpenseCategory[];
+  units: Unit[];
   created_at: string;
   updated_at: string;
 }
@@ -181,6 +183,8 @@ export interface TaxWithAmount extends Tax {
 export interface Unit {
   id: number;
   name: string;
+  base_qty: number;
+  created_at: string;
 }
 
 export type DiscountType = {

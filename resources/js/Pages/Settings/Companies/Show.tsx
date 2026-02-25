@@ -2,10 +2,12 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useTranslation } from '@/hooks/use-translation';
 import { Company } from '@/types';
 import { useEffect, useState } from 'react';
+import ExpenseCategoryList from '../Shared/expense-categories';
 import Overview from '../Shared/overview';
 import { RedirectPreferences } from '../Shared/redirect-preferences';
 import TaxList from '../Shared/tax-list';
 import { TaxReceipts } from '../Shared/tax-receipts';
+import UnitList from '../Shared/units';
 import SequenceView from './Sequences';
 
 export type Props = {
@@ -36,6 +38,8 @@ export default function Show({ company }: Props) {
         <TabsTrigger value="sequences">{t('profile.companies.viewCompany.sequences')}</TabsTrigger>
         <TabsTrigger value="taxes">{t('profile.companies.viewCompany.taxes.title')}</TabsTrigger>
         <TabsTrigger value="taxSequences">{t('profile.companies.viewCompany.taxSequences.title')}</TabsTrigger>
+        <TabsTrigger value="expenseCategories">{t('profile.companies.viewCompany.expenseCategories.title')}</TabsTrigger>
+        <TabsTrigger value="units">{t('profile.companies.viewCompany.units.title')}</TabsTrigger>
         <TabsTrigger value="redirectPreferences">{t('profile.companies.viewCompany.redirectPreferences.title')}</TabsTrigger>
       </TabsList>
       <TabsContent value="overview">
@@ -49,6 +53,12 @@ export default function Show({ company }: Props) {
       </TabsContent>
       <TabsContent value="taxSequences" className="min-h-0 flex-1 overflow-y-auto py-0">
         <TaxReceipts uuid={company.uuid} taxReceipts={company.tax_receipts} />
+      </TabsContent>
+      <TabsContent value="expenseCategories" className="min-h-0 flex-1 overflow-y-auto py-0">
+        <ExpenseCategoryList categories={company.expense_categories} />
+      </TabsContent>
+      <TabsContent value="units" className="min-h-0 flex-1 overflow-y-auto py-0">
+        <UnitList units={company.units} />
       </TabsContent>
       <TabsContent value="redirectPreferences">
         <RedirectPreferences uuid={company.uuid} preferences={company.redirect_preferences} />

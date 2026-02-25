@@ -1261,6 +1261,32 @@ func (TaxReceiptsForm) Rules() map[string]any {
 	}
 }
 
+type StoreExpenseCategoryForm struct {
+	support.FormRequest
+	Name        string `json:"name"`
+	Description string `json:"description"`
+}
+
+func (StoreExpenseCategoryForm) Rules() map[string]any {
+	return map[string]any{
+		"name":        "required|min:1",
+		"description": "required|min:1",
+	}
+}
+
+type StoreUnitForm struct {
+	support.FormRequest
+	Name    string `json:"name"`
+	BaseQty int    `json:"base_qty"`
+}
+
+func (StoreUnitForm) Rules() map[string]any {
+	return map[string]any{
+		"name":     "required|min:1",
+		"base_qty": "required|min:1",
+	}
+}
+
 type Missing struct {
 	Key     string `json:"key"`
 	Message string `json:"message"`

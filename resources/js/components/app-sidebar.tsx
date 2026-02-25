@@ -2,6 +2,7 @@ import { NavMain } from '@/components/nav-main';
 import { NavSecondary } from '@/components/nav-secondary';
 import { NavUser } from '@/components/nav-user';
 import { Sidebar, SidebarContent, SidebarFooter, SidebarHeader, SidebarMenu, SidebarMenuButton, SidebarMenuItem } from '@/components/ui/sidebar';
+import { buildNavGroups } from '@/lib/utils';
 import { NavItem, PageProps } from '@/types';
 import { Link, usePage } from '@inertiajs/react';
 import {
@@ -13,6 +14,7 @@ import {
   LayoutListIcon,
   Receipt,
   SettingsIcon,
+  ShoppingCartIcon,
   UsersIcon,
 } from 'lucide-react';
 import * as React from 'react';
@@ -40,7 +42,7 @@ const navMain: NavItem[] = [
   {
     title: 'global.navMain.orders',
     url: '/orders',
-    icon: ClipboardList,
+    icon: ShoppingCartIcon,
     requiredAbility: 'viewAny:order',
   },
   {
@@ -97,6 +99,7 @@ const navSecondary: NavItem[] = [
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const { auth } = usePage<PageProps>().props;
+  const groups = buildNavGroups(navMain);
   return (
     <Sidebar variant="inset" {...props}>
       <SidebarHeader>
@@ -117,7 +120,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         </SidebarMenu>
       </SidebarHeader>
       <SidebarContent>
-        <NavMain items={navMain} />
+        <NavMain groups={groups} />
         <NavSecondary items={navSecondary} className="mt-auto" />
       </SidebarContent>
       <SidebarFooter>

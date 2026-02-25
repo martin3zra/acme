@@ -1,4 +1,4 @@
-import { Months, PaymentMethod, PaymentMethods, PaymentTermValue, Recurrent } from '@/types';
+import { Months, NavItem, PaymentMethod, PaymentMethods, PaymentTermValue, Recurrent } from '@/types';
 import { clsx, type ClassValue } from 'clsx';
 import { formatDate } from 'date-fns';
 import { twMerge } from 'tailwind-merge';
@@ -193,4 +193,33 @@ export function recurrenceCaption(data: Recurrent): string {
 export function parseLocalDate(dateStr: string) {
   const [y, m, d] = dateStr.split('-').map(Number);
   return new Date(y, m - 1, d);
+}
+const groupMap: Record<string, string> = {
+  'global.navMain.dashboard': 'global.navGroups.overview',
+  'global.navMain.invoices': 'global.navGroups.sales',
+  'global.navMain.estimates': 'global.navGroups.sales',
+  'global.navMain.orders': 'global.navGroups.sales',
+  'global.navMain.customers': 'global.navGroups.customersCatalog',
+  'global.navMain.items': 'global.navGroups.customersCatalog',
+  'global.navMain.payments': 'global.navGroups.finance',
+  'global.navMain.expenses': 'global.navGroups.finance',
+  'global.navMain.reports': 'global.navGroups.analytics',
+};
+
+export function buildNavGroups(navMain: NavItem[]) {
+  const groups: { group: string; items: NavItem[] }[] = [];
+
+  navMain.forEach((item) => {
+    const groupKey = groupMap[item.title];
+    if (!groupKey) return;
+
+    let group = groups.find((g) => g.group === groupKey);
+    if (!group) {
+      group = { group: groupKey, items: [] };
+      groups.push(group);
+    }
+    group.items.push(item);
+  });
+
+  return groups;
 }

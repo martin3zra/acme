@@ -7,7 +7,7 @@ import (
 	"github.com/martin3zra/acme/pkg/foundation"
 )
 
-type category struct {
+type expenseCategory struct {
 	ID          int    `json:"id"`
 	UUID        string `json:"uuid"`
 	Name        string `json:"name"`
@@ -16,13 +16,13 @@ type category struct {
 }
 
 type expense struct {
-	ID         int       `json:"id"`
-	UUID       string    `json:"uuid"`
-	Date       time.Time `json:"date"`
-	Amount     float64   `json:"amount"`
-	Notes      string    `json:"notes"`
-	ReceiptURL string    `json:"receipt_url"`
-	Category   category  `json:"category"`
+	ID         int             `json:"id"`
+	UUID       string          `json:"uuid"`
+	Date       time.Time       `json:"date"`
+	Amount     float64         `json:"amount"`
+	Notes      string          `json:"notes"`
+	ReceiptURL string          `json:"receipt_url"`
+	Category   expenseCategory `json:"category"`
 	foundation.Timestamps
 }
 
@@ -89,7 +89,7 @@ func (s *Server) findExpenses(ctx context.Context) ([]*expense, error) {
 	return data, nil
 }
 
-func (s *Server) findExpensesCategories(ctx context.Context) ([]*category, error) {
+func (s *Server) findExpensesCategories(ctx context.Context) ([]*expenseCategory, error) {
 	rows, err := s.db.Query(`
     select id, uuid, name, description, created_at, updated_at, deleted_at
     from expenses_categories
@@ -100,9 +100,9 @@ func (s *Server) findExpensesCategories(ctx context.Context) ([]*category, error
 	if err != nil {
 		return nil, err
 	}
-	data := make([]*category, 0)
+	data := make([]*expenseCategory, 0)
 	for rows.Next() {
-		i := new(category)
+		i := new(expenseCategory)
 
 		if err = rows.Scan(
 			&i.ID,
@@ -121,8 +121,8 @@ func (s *Server) findExpensesCategories(ctx context.Context) ([]*category, error
 	return data, nil
 }
 
-func (s *Server) findExpenseCategory(ctx context.Context, uuid string) (*category, error) {
-	var c category
+func (s *Server) findExpenseCategory(ctx context.Context, uuid string) (*expenseCategory, error) {
+	var c expenseCategory
 	err := s.db.QueryRow(`
    select id, uuid, name, description, created_at, updated_at, deleted_at
     from expenses_categories
@@ -173,5 +173,17 @@ func (s *Server) updateExpense(ctx context.Context, expenseID string, form *Stor
 		form.Date, form.Amount, form.Notes, c.ID, CurrentCompany(ctx).ID, expenseID,
 	)
 
+	return err
+}
+
+func (s *Server) storeExpenseCategory(ctx context.Context, form *StoreExpenseCategoryForm) error {
+	_, err := s.db.Exec("INSERT INTO expenses_categories (company_id, name, description) VALUES($1, $2, $3)",
+		CurrentCompany(ctx).ID, form.Name, form.Description)
+	return err
+}
+
+func (s *Server) updateExpenseCategory(ctx context.Context, uuid string, form *StoreExpenseCategoryForm) error {
+	_, err := s.db.Exec("UPDATE expenses_categories SET name = $3, description = $4, updated_at = NOW() WHERE company_id = $1 AND uuid = $2",
+		CurrentCompany(ctx).ID, uuid, form.Name, form.Description)
 	return err
 }

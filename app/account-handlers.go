@@ -327,11 +327,27 @@ func (s *Server) accountProfileHandler(ctx *routing.Context) {
 			return
 		}
 
+		categories, err := s.findExpensesCategories(ctx.Request.Context())
+		if err != nil {
+			log.Printf("Error fetching tax receipts for setup: %v", err)
+			ctx.Back()
+			return
+		}
+
+		units, err := s.findUnits(ctx.Request.Context())
+		if err != nil {
+			log.Printf("Error fetching units: %v", err)
+			ctx.Back()
+			return
+		}
+
 		company.Sequences = &sequences.Sequence
 		company.SeqLastUpdatedAt = &sequences.UpdatedAt
 		company.Taxes = taxes
 		company.RedirectPreferences = preferences.Redirect
 		company.TaxReceipts = taxReceipts
+		company.ExpenseCategories = categories
+		company.Units = units
 		props["company"] = company
 
 		props["initialState"] = true

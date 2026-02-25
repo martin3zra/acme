@@ -31,6 +31,8 @@ type Company struct {
 	SeqLastUpdatedAt    *time.Time          `json:"seq_last_updated_at"`
 	RedirectPreferences RedirectPreferences `json:"redirect_preferences"`
 	TaxReceipts         []*taxReceipt       `json:"tax_receipts"`
+	ExpenseCategories   []*expenseCategory  `json:"expense_categories"`
+	Units               []*unit             `json:"units"`
 	UserRole            string              `json:"_"`
 	foundation.Timestamps
 }

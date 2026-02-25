@@ -1,4 +1,5 @@
 import CreateCompanyForm, { CreateFormParams } from '@/components/create-company-form';
+import { EmptyState } from '@/components/empty-state';
 import { StatusBadge } from '@/components/status-badge';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
@@ -185,15 +186,22 @@ export default function Account({
           </div>
           <div className="basis-[68vw] space-y-6">
             {hasCompanies && <CompanyList data={companies} onSelectCompany={onSelectCompany} />}
-            {hasUsers && (
+            {hasUsers ? (
               <>
                 <Separator /> <UserList data={users} onSelectUser={onSelectUser} onAddNewUser={onAddNewUser} />
               </>
+            ) : (
+              <EmptyState
+                title={t('users.emptyState.title')}
+                description={t('users.emptyState.description')}
+                onAction={onAddNewUser}
+                actionLabel={t('users.newUser.title')}
+              />
             )}
           </div>
         </div>
         <Sheet open={state.sheetState} onOpenChange={onOpenChange}>
-          <SheetContent side="right" className="m-4 flex h-[calc(100vh-2rem)] w-full flex-col rounded-md sm:max-w-[1380px] md:max-w-4xl">
+          <SheetContent side="right" className="m-4 flex h-[calc(100vh-2rem)] w-full flex-col rounded-md sm:max-w-446 md:max-w-5xl">
             <SheetHeader className="pb-0">
               <SheetTitle>{option.title}</SheetTitle>
             </SheetHeader>
