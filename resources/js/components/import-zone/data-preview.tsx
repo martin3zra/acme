@@ -1,3 +1,4 @@
+import { Replacements } from '@/types';
 import { CsvPreview } from '.';
 import { Button } from '../ui/button';
 
@@ -6,9 +7,10 @@ type Props = {
   preview: CsvPreview | null;
   encoding: string | null;
   handleOnClear: () => void;
+  t: (key: string, replacements?: Replacements) => string;
 };
 
-export function DropZonePreview({ totalRows, preview, encoding, handleOnClear }: Props) {
+export function DropZonePreview({ totalRows, preview, encoding, handleOnClear, t }: Props) {
   if (preview === null) {
     return <></>;
   }
@@ -17,9 +19,9 @@ export function DropZonePreview({ totalRows, preview, encoding, handleOnClear }:
       {preview.headers.length > 0 && (
         <div className="space-y-2">
           <div className="flex w-full justify-between">
-            <p className="text-sm font-medium">Preview</p>
+            <p className="text-sm font-medium">{t('global.import.preview')}</p>
             <Button variant={'outline'} onClick={handleOnClear}>
-              Clear
+              {t('global.import.clear')}
             </Button>
           </div>
 
@@ -48,14 +50,12 @@ export function DropZonePreview({ totalRows, preview, encoding, handleOnClear }:
               </tbody>
             </table>
           </div>
-          <p className="text-xs text-green-600">Header row detected • {preview.headers.length} columns found</p>
+          <p className="text-xs text-green-600">{t('global.import.headerRowsDetected', { columns: preview.rows.length })}</p>
 
-          <p className="text-muted-foreground text-xs">
-            Showing first {preview.rows.length} of {totalRows} rows
-          </p>
+          <p className="text-muted-foreground text-xs">{t('global.import.showingFirstOf', { start: preview.rows.length, total: totalRows })}</p>
           {encoding && (
             <p className="text-muted-foreground text-xs">
-              Encoding detected: <strong>{encoding}</strong>
+              {t('global.import.encodingDetected')} <strong>{encoding}</strong>
               {encoding !== 'UTF-8' && ' (converted to UTF-8)'}
             </p>
           )}

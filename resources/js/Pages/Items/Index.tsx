@@ -105,9 +105,14 @@ export default function Index({
               <h4 className="text-2xl">{t('items.emptyState.title')}</h4>
               <p className="text-sm text-gray-400">{t('items.emptyState.description')}</p>
               <Deferred data={open ? [] : ['taxes', 'units']} fallback={<div>Loading...</div>}>
-                <Button onClick={onCreateNewItem}>
-                  <Plus /> {t('items.newItem.title')}
-                </Button>
+                <div className="flex space-x-3">
+                  <Button onClick={onCreateNewItem}>
+                    <Plus /> {t('items.newItem.title')}
+                  </Button>
+                  <Button onClick={() => setImportSheetOpen(true)}>
+                    <FileUp /> {t('global.actions.import')}
+                  </Button>
+                </div>
               </Deferred>
             </div>
           </>
@@ -124,7 +129,7 @@ export default function Index({
 
         {!loadingItem && (
           <Sheet open={open} onOpenChange={onOpenChange}>
-            <SheetContent side="right" className="m-4 flex h-[calc(~'(100%-var(--spacing)*4)/3')] w-full flex-col rounded-md sm:max-w-7xl">
+            <SheetContent side="right" className="m-4 flex h-[calc(~'(100%_-_var(--spacing)_*_4)_/_3')] w-full flex-col rounded-md sm:max-w-7xl">
               <SheetHeader>
                 <SheetTitle>
                   {t(`global.actions.${verbName}`)} {t('global.item')}

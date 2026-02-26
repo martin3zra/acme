@@ -141,12 +141,18 @@ export default function Index({
 
         {!hasCustomers && (
           <>
-            <div className="absolute top-1/2 left-1/2 flex h-[244px] min-w-3xl -translate-x-1/2 -translate-y-1/2 flex-col items-center gap-4 rounded-[16px] bg-white p-[40px] shadow-[0px_8px_12px_-4px_rgba(16,12,12,0.08),0px_0px_2px_rgba(16,12,12,0.1),0px_1px_2px_rgba(16,12,12,0.1)]">
+            <div className="absolute top-1/2 left-1/2 flex h-61 min-w-3xl -translate-x-1/2 -translate-y-1/2 flex-col items-center gap-4 rounded-[16px] bg-white p-[40px] shadow-[0px_8px_12px_-4px_rgba(16,12,12,0.08),0px_0px_2px_rgba(16,12,12,0.1),0px_1px_2px_rgba(16,12,12,0.1)]">
               <h4 className="text-2xl">{t('customers.emptyState.title')}</h4>
               <p className="text-sm text-gray-400">{t('customers.emptyState.description')}</p>
-              <Button onClick={onCreateNewCustomer}>
-                <Plus /> {t('customers.newCustomer.title')}
-              </Button>
+              <div className="flex space-x-3">
+                <Button onClick={onCreateNewCustomer}>
+                  <Plus /> {t('customers.newCustomer.title')}
+                </Button>
+
+                <Button onClick={() => setImportSheetOpen(true)}>
+                  <FileUp /> {t('global.actions.import')}
+                </Button>
+              </div>
             </div>
           </>
         )}
@@ -162,7 +168,7 @@ export default function Index({
 
         {!loadingCustomer && (
           <Sheet open={open} onOpenChange={onOpenChange}>
-            <SheetContent side="right" className="m-4 flex h-[calc(~'(100%-var(--spacing)*4)/3')] w-full flex-col rounded-md sm:max-w-7xl">
+            <SheetContent side="right" className="m-4 flex h-[calc(~'(100%_-_var(--spacing)_*_4)_/_3')] w-full flex-col rounded-md sm:max-w-7xl">
               <SheetHeader>
                 <SheetTitle>
                   {t(`global.actions.${verbName}`)} {t(`global.customer`).toLocaleLowerCase()}

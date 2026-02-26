@@ -724,6 +724,7 @@ func (form *StoreInvoiceForm) Compute() {
 
 	form.dueOn = nil
 	if form.Kind == TransactionKinds.Estimate || form.Kind == TransactionKinds.Template {
+		form.status = InvoiceStatuses.Sent
 		form.paidStatus = PaidStatuses.UnPaid
 		return
 	}

@@ -110,6 +110,44 @@
     "taxReceipt": "Tipo NCF",
     "days": "días",
     "type": "Tipo",
+    "import": {
+      "sampleFiles": "Utilice nuestro archivo de muestra para garantizar el formato correcto.",
+      "downloadCsv": "Descargar muestra CSV",
+      "downloadTxt": "Descargar muestra TXT",
+      "selectAnDelimiter": "Seleccione un delimitador",
+      "detectedDelimiter": "Delimitador detectado:",
+      "wrongDelimiter": "¿Incorrecto? Elige una opción diferente a continuación.",
+      "footnote": "Los archivos grandes pueden tardar unos minutos en importarse.",
+      "preview": "Vistas previas",
+      "clear": "Limpiar vista previa",
+      "upload": "Haga clic para cargar",
+      "dragAndDrop": "o arrastrar y soltar",
+      "headerRowsDetected": "Filas de encabezado detectadas • :columns columnas encontradas",
+      "showingFirstOf": "Mostrando las primeros :start de :total filas",
+      "encodingDetected": "Codificación detectada:",
+      "delimiters": {
+        "autoDetect": "Detección automática",
+        "comma": "Coma (,)",
+        "semicolon": "Punto y coma (;)",
+        "tab": "Tabulación (\t)",
+        "pipe": "Pipe (|)"
+      },
+      "states": {
+        "initializing": "Preparando la carga",
+        "uploading": "Subiendo…",
+        "processing": "Procesando CSV…",
+        "done": "Importación completada",
+        "queued": "Preparando la importación…",
+        "completed": "Importación completada",
+        "failed": "Error en la importación"
+      },
+      "phase": {
+        "reading_file": "Leyendo archivo…",
+        "normalizing_encoding": "Arreglando la codificación de texto…",
+        "mapping_columns": "Mapeo de columnas…",
+        "importing_rows": "Importando filas…"
+      }
+    },
     "convertToInvoice": "Convertir a factura",
     "duplicateInvoice": "Duplicar factura",
     "duplicateAlert": {
@@ -756,6 +794,10 @@
     "paymentTerms": "Condiciones de pago",
     "taxReceipt": "Tipo NCF",
     "issueInvoice": "Facturar",
+    "import": {
+      "title": "Importación Masiva de Clientes",
+      "description": "Sube tu archivo de clientes, asigna cada columna a los campos del sistema y revisa los posibles errores o advertencias antes de procesar los registros. Ideal para migraciones o actualizaciones masivas."
+    },
     "single": {
       "title": "Cliente",
       "description": "Proporcione los detalles necesarios para configurar el cliente. Esta información le ayudará a identificar y gestionar dentro de su catalogo en el sistema.",
@@ -832,6 +874,10 @@
     "paidStatus": "Pagada",
     "paymentTerms": "Condiciones de pago",
     "taxReceipt": "Tipo NCF",
+    "import": {
+      "title": "Importación Masiva de Productos",
+      "description": "Carga grandes volúmenes de artículos con validación automática, detección de duplicados y registro detallado del proceso. Compatible con actualización de registros existentes."
+    },
     "line": {
       "form": {
         "placeholder": "Referencia o presione ⌘K",

@@ -2,6 +2,7 @@ import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { Sheet, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { useHeader } from '@/composables/use-headers';
+import { useTranslation } from '@/hooks/use-translation';
 import { ErrorResponse } from '@/types';
 import axios from 'axios';
 import { useEffect, useRef, useState } from 'react';
@@ -54,12 +55,6 @@ interface ImportError {
 const CHUNK_SIZE = 5 * 1024 * 1024; // 5MB
 const MAX_RETRIES = 3;
 const MAX_PREVIEW_ROWS = 8;
-const phaseLabel = {
-  reading_file: 'Reading file…',
-  normalizing_encoding: 'Fixing text encoding…',
-  mapping_columns: 'Mapping columns…',
-  importing_rows: 'Importing rows…',
-};
 const IMPORT_TOAST_ID = 'import-progress';
 
 export type CsvPreview = {
@@ -78,6 +73,7 @@ type Props = {
 
 export function ImportDrawer({ source, openImportDrawer, setImportDrawer }: Props) {
   const headers = useHeader().headers;
+  const t = useTranslation().trans;
   const [fileText, setFileText] = useState<string>('');
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<CsvPreview | null>(null);
@@ -467,33 +463,23 @@ export function ImportDrawer({ source, openImportDrawer, setImportDrawer }: Prop
           onInteractOutside={(e) => e.preventDefault()}
           onPointerDownOutside={(e) => e.preventDefault()}
           onEscapeKeyDown={(e) => e.preventDefault()}
-          className="m-4 flex h-[calc(~'(100%-var(--spacing)*4)/3')] w-full flex-col rounded-md sm:max-w-7xl [&>button]:hidden"
+          className="m-4 flex h-[calc(~'(100%_-_var(--spacing)_*_4)_/_3')] w-full flex-col rounded-md sm:max-w-7xl [&>button]:hidden"
         >
           <SheetHeader>
-            <SheetTitle>Import Customers</SheetTitle>
-            <SheetDescription>Upload a CSV or TXT file to import your data.</SheetDescription>
+            <SheetTitle>{t(`${source}.import.title`)}</SheetTitle>
+            <SheetDescription>{t(`${source}.import.description`)}</SheetDescription>
           </SheetHeader>
 
           <Separator className="my-4" />
           <div className="flex flex-col px-6">
             {/* Sample file */}
-            <DownloadableSampleSection />
+            <DownloadableSampleSection source={source} t={t} />
 
             {state !== 'idle' && state !== 'previewing' && (
               <>
-                <p className="text-muted-foreground text-sm">
-                  {state === 'initializing' && 'Preparing upload…'}
-                  {state === 'uploading' && `Uploading… ${progress}%`}
-                  {state === 'processing' && 'Processing CSV…'}
-                  {state === 'done' && 'Import completed'}
-                </p>
+                <p className="text-muted-foreground text-sm">{t(`global.import.states.${state}`)}</p>
                 <div className="space-y-2 py-6">
-                  <p className="text-muted-foreground text-sm">
-                    {state === 'queued' && 'Preparing import…'}
-                    {phase && phaseLabel[phase]}
-                    {state === 'completed' && 'Import completed'}
-                    {state === 'failed' && 'Import failed'}
-                  </p>
+                  <p className="text-muted-foreground text-sm">{phase && t(`global.import.states.${phase}`)}</p>
                 </div>
               </>
             )}
@@ -511,20 +497,19 @@ export function ImportDrawer({ source, openImportDrawer, setImportDrawer }: Prop
             <div className="relative max-h-64">
               <div className="mb-3 max-w-sm">
                 <label htmlFor="countries" className="text-heading mb-2.5 block text-sm font-medium">
-                  Select an delimiter
+                  {t('global.import.selectAnDelimiter')}
                 </label>
                 <select
                   value={delimiter}
                   onChange={(e) => setDelimiter(e.target.value as Delimiter)}
                   id="countries"
                   className="border-default-medium text-heading focus:ring-brand focus:border-brand placeholder:text-body block w-full rounded-md border px-3 py-2.5 text-sm shadow-xs"
-                  defaultValue={delimiter}
                 >
-                  <option value="auto">Auto detect</option>
-                  <option value=",">Comma (,)</option>
-                  <option value=";">Semicolon (;)</option>
-                  <option value="\t">Tab</option>
-                  <option value="|">Pipe (|)</option>
+                  <option value="auto">{t('global.import.delimiters.autoDetect')}</option>
+                  <option value=",">{t('global.import.delimiters.comma')}</option>
+                  <option value=";">{t('global.import.delimiters.semicolon')}</option>
+                  <option value="\t">{t('global.import.delimiters.tab')}</option>
+                  <option value="|">{t('global.import.delimiters.pipe')}</option>
                 </select>
               </div>
               <input
@@ -539,16 +524,16 @@ export function ImportDrawer({ source, openImportDrawer, setImportDrawer }: Prop
               <div className={preview !== null ? 'opacity-100' : 'pointer-events-none opacity-0'}>
                 {delimiter === 'auto' && preview && (
                   <p className="text-muted-foreground text-sm">
-                    Detected delimiter: <strong>{delimiterLabel(detectedDelimiter)}</strong>
+                    {t('global.import.detectedDelimiter')} <strong>{delimiterLabel(detectedDelimiter)}</strong>
                     <br />
-                    <span className="text-xs">Wrong? Choose a different one below.</span>
+                    <span className="text-xs">{t('global.import.wrongDelimiter')}</span>
                   </p>
                 )}
-                <DropZonePreview totalRows={totalRows} preview={preview} encoding={encoding} handleOnClear={handleOnClear} />
+                <DropZonePreview t={t} totalRows={totalRows} preview={preview} encoding={encoding} handleOnClear={handleOnClear} />
               </div>
 
               <div className={preview === null ? 'opacity-100' : 'pointer-events-none opacity-0'}>
-                <DropZone handleZoneClick={() => fileInputRef.current?.click()} handleFileSelect={handleFileSelect} />
+                <DropZone t={t} handleZoneClick={() => fileInputRef.current?.click()} handleFileSelect={handleFileSelect} />
               </div>
             </div>
           </div>
@@ -556,16 +541,16 @@ export function ImportDrawer({ source, openImportDrawer, setImportDrawer }: Prop
           {/* Footer */}
           <SheetFooter className="border-t pt-4">
             <div className="flex w-full items-center justify-between">
-              <p className="text-muted-foreground text-xs">Large files may take a few minutes to import.</p>
+              <p className="text-muted-foreground text-xs">{t('global.import.footnote')}</p>
 
               <div className="flex gap-2">
                 <Button variant="ghost" onClick={() => setImportDrawer(false)}>
-                  Cancel
+                  {t('global.actions.cancel')}
                 </Button>
 
                 <Button disabled={importDisabled} onClick={onStartUpload}>
                   {(state === 'uploading' || state === 'processing') && <Spinner />}
-                  Import file
+                  {t('global.actions.import')}
                 </Button>
               </div>
             </div>

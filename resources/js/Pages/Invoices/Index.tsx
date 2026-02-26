@@ -239,14 +239,13 @@ export default function Index({
                         />
                       </>
                     )}
-                    <Link
-                      as="button"
-                      href={invoice.pdfURL}
+                    <Button
+                      onClick={() => window.open(invoice.pdfURL, '_blank')}
+                      rel="noopener noreferrer"
                       className="flex items-center gap-x-3 rounded-sm bg-indigo-600 px-4 py-1 text-white hover:bg-indigo-700"
-                      target="_blank"
                     >
                       <Printer className="size-4" /> {t('global.actions.print')}
-                    </Link>
+                    </Button>
                   </div>
                 </div>
               </SheetHeader>

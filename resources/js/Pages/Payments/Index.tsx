@@ -116,14 +116,13 @@ export default function Index({
                       </>
                     )}
 
-                    <a
-                      href={payment.pdfURL}
-                      className="bg-primary flex items-center gap-x-3 rounded-sm px-4 text-white"
-                      target="_blank"
-                      rel="noreferrer"
+                    <Button
+                      onClick={() => window.open(payment.pdfURL, '_blank')}
+                      rel="noopener noreferrer"
+                      className="flex items-center gap-x-3 rounded-sm bg-indigo-600 px-4 py-1 text-white hover:bg-indigo-700"
                     >
-                      <Printer /> {t('global.actions.print')}
-                    </a>
+                      <Printer className="size-4" /> {t('global.actions.print')}
+                    </Button>
                   </div>
                 </div>
               </SheetHeader>

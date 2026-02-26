@@ -1,11 +1,13 @@
+import { Replacements } from '@/types';
 import { HardDriveUpload } from 'lucide-react';
 
 type Props = {
   handleZoneClick: () => void;
   handleFileSelect: (file: File | null) => void;
+  t: (key: string, replacements?: Replacements) => string;
 };
 
-export function DropZone({ handleZoneClick, handleFileSelect }: Props) {
+export function DropZone({ handleZoneClick, handleFileSelect, t }: Props) {
   // 1. Prevent browser from opening the file
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
@@ -46,7 +48,7 @@ export function DropZone({ handleZoneClick, handleFileSelect }: Props) {
         <div className="text-body flex flex-col items-center justify-center pt-5 pb-6">
           <HardDriveUpload className="size-8" />
           <p className="mb-2 text-sm">
-            <span className="font-semibold">Click to upload</span> or drag and drop
+            <span className="font-semibold">{t('global.import.upload')}</span> {t('global.import.dragAndDrop')}
           </p>
           <p className="text-xs">CSV or TXT (MAX. 10MB)</p>
         </div>
