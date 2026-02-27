@@ -1,6 +1,7 @@
 package app
 
 import (
+	"log"
 	"net/http"
 	"time"
 
@@ -53,6 +54,34 @@ func (s *Server) reportProfitLostHandler(ctx *routing.Context) {
 	})
 }
 
+func (s *Server) generateProfitLostReportHandler() routing.HandlerFunc {
+	return routing.WithRequest(func(ctx *routing.Context, form *ReportForm) {
+		report, _ := NewProfitLostReportPDF(s.translator, form)
+		totalSales, err := s.findTotalSales(ctx.Request.Context(), form.From, form.To)
+		if err != nil {
+			log.Println("error generating profit and lost reports:", err)
+			ctx.JSON(http.StatusInternalServerError, map[string]any{"status": "error", "message": err.Error()})
+			return
+		}
+		expenses, err := s.findExpensesByCategories(ctx.Request.Context(),
+			WithDateRange(form.From, form.To),
+		)
+		if err != nil {
+			log.Println("error generating profit and lost reports:", err)
+			ctx.JSON(http.StatusInternalServerError, map[string]any{"status": "error", "message": err.Error()})
+			return
+		}
+
+		report.RenderReport(ctx.Request.Context(), totalSales, expenses, form.From, form.To, s.config.appName)
+		if err := report.pdf.Output(ctx.Response); err != nil {
+			ctx.JSON(http.StatusInternalServerError, map[string]any{
+				"status":  "error",
+				"message": err.Error(),
+			})
+		}
+	})
+}
+
 func (s *Server) reportExpensesHandler(ctx *routing.Context) {
 	initialRange := DateRange{
 		From: time.Now().AddDate(0, 0, -7).Format("2006-01-02"), // 7 days ago
@@ -63,6 +92,28 @@ func (s *Server) reportExpensesHandler(ctx *routing.Context) {
 		"initialRange":  initialRange,
 		"dateRanges":    DateRangePresets(),
 		"initialPreset": "this_week",
+	})
+}
+
+func (s *Server) generateExpensesReportHandler() routing.HandlerFunc {
+	return routing.WithRequest(func(ctx *routing.Context, form *ReportForm) {
+		report, _ := NewExpensesReportPDF(s.translator, form)
+		expenses, err := s.findExpensesByCategories(ctx.Request.Context(),
+			WithDateRange(form.From, form.To),
+		)
+		if err != nil {
+			log.Println("error generating expense reports:", err)
+			ctx.JSON(http.StatusInternalServerError, map[string]any{"status": "error", "message": err.Error()})
+			return
+		}
+
+		report.RenderReport(ctx.Request.Context(), expenses, form.From, form.To, s.config.appName)
+		if err := report.pdf.Output(ctx.Response); err != nil {
+			ctx.JSON(http.StatusInternalServerError, map[string]any{
+				"status":  "error",
+				"message": err.Error(),
+			})
+		}
 	})
 }
 

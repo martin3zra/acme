@@ -1544,3 +1544,16 @@ func (form StoreExpenseForm) Rules() map[string]any {
 		"amount":   "required|min:0",
 	}
 }
+
+type Date struct {
+	time.Time
+}
+
+func (d Date) MarshalJSON() ([]byte, error) {
+	if d.Time.IsZero() {
+		return []byte("null"), nil
+	}
+
+	formatted := d.Format("2006-01-02")
+	return []byte(`"` + formatted + `"`), nil
+}

@@ -194,6 +194,11 @@ func formatDate(t time.Time) string {
 	return t.Format("2006-01-02")
 }
 
+func dateWithTimeZone(date time.Time) time.Time {
+	loc, _ := time.LoadLocation("America/Santo_Domingo")
+	return date.In(loc)
+}
+
 func nowWithTimeZone() time.Time {
 	loc, _ := time.LoadLocation("America/Santo_Domingo")
 	return time.Now().In(loc)
@@ -340,4 +345,23 @@ func redirectAfterCreate(kind string, id string, pref RedirectPreferencesValue) 
 		// fallback to list
 		return fmt.Sprintf("/%ss", kind)
 	}
+}
+
+func debugSQL(query string, args []any) string {
+	for i, arg := range args {
+		placeholder := fmt.Sprintf("$%d", i+1)
+
+		var value string
+		switch v := arg.(type) {
+		case string:
+			value = fmt.Sprintf("'%s'", v)
+		case time.Time:
+			value = fmt.Sprintf("'%s'", v.Format("2006-01-02"))
+		default:
+			value = fmt.Sprintf("%v", v)
+		}
+
+		query = strings.ReplaceAll(query, placeholder, value)
+	}
+	return query
 }

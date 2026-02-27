@@ -93,11 +93,16 @@ func (s *Server) bootRoutes() {
 					route.PUT("/expenses/:id", s.updateExpenseHandler())
 
 					route.GET("/reports/sales", s.reportSalesHandler).Can("viewAny:reports")
-					route.POST("/reports/sales", s.generateSalesReportHandler()) // .Can("viewAny:reports")
+					route.POST("/reports/sales", s.generateSalesReportHandler())
+
 					route.GET("/reports/profit-lost", s.reportProfitLostHandler).Can("viewAny:reports")
+					route.POST("/reports/profit-lost", s.generateProfitLostReportHandler())
+
 					route.GET("/reports/expenses", s.reportExpensesHandler).Can("viewAny:reports")
+					route.POST("/reports/expenses", s.generateExpensesReportHandler())
+
 					route.GET("/reports/taxes", s.reportTaxesHandler).Can("viewAny:reports")
-					route.POST("/reports/taxes", s.generateTaxesReportHandler()) // .Can("viewAny:reports")
+					route.POST("/reports/taxes", s.generateTaxesReportHandler())
 
 					route.POST("/taxes", s.storeTaxes())
 					route.PUT("/taxes/:id", s.updateTaxes())

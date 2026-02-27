@@ -2,7 +2,7 @@ import ActionButton from '@/Pages/Reports/Shared/action-button';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { type BreadcrumbItem as BreadcrumbItemType, Replacements, SlotProps, User } from '@/types';
-import { Link } from '@inertiajs/react';
+import { router } from '@inertiajs/react';
 import { Download } from 'lucide-react';
 import React, { JSX } from 'react';
 import { DateRange } from 'react-day-picker';
@@ -104,6 +104,19 @@ export default class ReportLayout extends React.Component<Props, State> {
     }
   };
 
+  handleTabChange = (value: string) => {
+    const { activeTab } = this.props;
+
+    if (activeTab === value) {
+      return; // 🚀 already on this tab → do nothing
+    }
+
+    router.visit(`/reports/${value}`, {
+      preserveState: true,
+      preserveScroll: true,
+    });
+  };
+
   render() {
     const { user, breadcrumbs, children, trans, activeTab } = this.props;
     const { processing, pdfUrl } = this.state;
@@ -130,20 +143,16 @@ export default class ReportLayout extends React.Component<Props, State> {
         </AppLayout.Actions>
         <div className="flex h-full space-x-6">
           <div className="flex h-screen flex-col">
-            <Tabs defaultValue={activeTab} className="[&_[data-slot=tabs-trigger]:not([data-state=active])]:cursor-pointer">
+            <Tabs
+              defaultValue={activeTab}
+              onValueChange={this.handleTabChange}
+              className="[&_[data-slot=tabs-trigger]:not([data-state=active])]:cursor-pointer"
+            >
               <TabsList>
-                <TabsTrigger value="sales" asChild>
-                  <Link href="/reports/sales">{trans('reports.sales')}</Link>
-                </TabsTrigger>
-                <TabsTrigger value="profit-lost" asChild>
-                  <Link href="/reports/profit-lost">{trans('reports.profit-lost')}</Link>
-                </TabsTrigger>
-                <TabsTrigger value="expenses" asChild>
-                  <Link href="/reports/expenses">{trans('reports.expenses')}</Link>
-                </TabsTrigger>
-                <TabsTrigger value="taxes" asChild>
-                  <Link href="/reports/taxes">{trans('reports.taxes')}</Link>
-                </TabsTrigger>
+                <TabsTrigger value="sales">{trans('reports.sales')}</TabsTrigger>
+                <TabsTrigger value="profit-lost">{trans('reports.profit-lost')}</TabsTrigger>
+                <TabsTrigger value="expenses">{trans('reports.expenses')}</TabsTrigger>
+                <TabsTrigger value="taxes">{trans('reports.taxes')}</TabsTrigger>
               </TabsList>
               <div className="py-4">{filterSection ? (filterSection as JSX.Element) : null}</div>
               <TabsContent value={activeTab}>{contentSection ? (contentSection as JSX.Element) : null}</TabsContent>

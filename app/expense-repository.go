@@ -2,28 +2,70 @@ package app
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/martin3zra/acme/pkg/foundation"
 )
 
 type expenseCategory struct {
-	ID          int    `json:"id"`
-	UUID        string `json:"uuid"`
-	Name        string `json:"name"`
-	Description string `json:"description"`
+	ID          int     `json:"id"`
+	UUID        string  `json:"uuid"`
+	Name        string  `json:"name"`
+	Description string  `json:"description"`
+	TotalAmount float64 `json:"total_amount,omitempty"`
 	foundation.Timestamps
 }
 
 type expense struct {
 	ID         int             `json:"id"`
 	UUID       string          `json:"uuid"`
-	Date       time.Time       `json:"date"`
+	Date       Date            `json:"date"`
 	Amount     float64         `json:"amount"`
 	Notes      string          `json:"notes"`
 	ReceiptURL string          `json:"receipt_url"`
 	Category   expenseCategory `json:"category"`
 	foundation.Timestamps
+}
+
+type ExpenseFilter struct {
+	FromDate       *time.Time
+	ToDate         *time.Time
+	CategoryID     *int64
+	IncludeDeleted bool
+}
+
+type ExpenseOption func(*ExpenseFilter)
+
+func WithDateRange(from, to time.Time) ExpenseOption {
+	return func(f *ExpenseFilter) {
+		f.FromDate = &from
+		f.ToDate = &to
+	}
+}
+
+func WithFromDate(from time.Time) ExpenseOption {
+	return func(f *ExpenseFilter) {
+		f.FromDate = &from
+	}
+}
+
+func WithToDate(to time.Time) ExpenseOption {
+	return func(f *ExpenseFilter) {
+		f.ToDate = &to
+	}
+}
+
+func WithCategory(categoryID int64) ExpenseOption {
+	return func(f *ExpenseFilter) {
+		f.CategoryID = &categoryID
+	}
+}
+
+func IncludeDeleted() ExpenseOption {
+	return func(f *ExpenseFilter) {
+		f.IncludeDeleted = true
+	}
 }
 
 func (s *Server) findExpenseByUUID(ctx context.Context, uuid string) (*expense, error) {
@@ -40,7 +82,7 @@ func (s *Server) findExpenseByUUID(ctx context.Context, uuid string) (*expense, 
 		&c.UUID,
 		&c.Amount,
 		&c.Notes,
-		&c.Date,
+		&c.Date.Time,
 		&c.CreatedAt,
 		&c.UpdatedAt,
 		&c.DeletedAt,
@@ -51,16 +93,55 @@ func (s *Server) findExpenseByUUID(ctx context.Context, uuid string) (*expense, 
 	return &c, err
 }
 
-func (s *Server) findExpenses(ctx context.Context) ([]*expense, error) {
-	rows, err := s.db.Query(`
+func (s *Server) findExpenses(ctx context.Context, opts ...ExpenseOption) ([]*expense, error) {
+	companyID := CurrentCompany(ctx).ID
+
+	// Default filter
+	filter := ExpenseFilter{}
+
+	// Apply options
+	for _, opt := range opts {
+		opt(&filter)
+	}
+
+	query := `
     select expenses.id, expenses.uuid, expenses.amount, expenses.notes, expenses.date, expenses.created_at, expenses.updated_at, expenses.deleted_at,
     expenses_categories.id, expenses_categories.uuid, expenses_categories.name
     from expenses
     inner join expenses_categories on (expenses.company_id = expenses_categories.company_id AND expenses.category_id = expenses_categories.id)
     where expenses.company_id = $1
     AND expenses.deleted_at IS NULL
-    ORDER BY expenses.id DESC
-  `, CurrentCompany(ctx).ID)
+  `
+	args := []any{companyID}
+	argPos := 2
+
+	// Soft delete handling
+	if !filter.IncludeDeleted {
+		query += " AND expenses.deleted_at IS NULL"
+	}
+
+	// Date filters
+	if filter.FromDate != nil {
+		query += fmt.Sprintf(" AND expenses.date >= $%d", argPos)
+		args = append(args, *filter.FromDate)
+		argPos++
+	}
+
+	if filter.ToDate != nil {
+		query += fmt.Sprintf(" AND expenses.date <= $%d", argPos)
+		args = append(args, *filter.ToDate)
+		argPos++
+	}
+
+	// Category filter
+	if filter.CategoryID != nil {
+		query += fmt.Sprintf(" AND expenses.category_id = $%d", argPos)
+		args = append(args, *filter.CategoryID)
+		argPos++
+	}
+
+	query += " ORDER BY expenses.id DESC"
+	rows, err := s.db.QueryContext(ctx, query, args...)
 	if err != nil {
 		return nil, err
 	}
@@ -73,13 +154,94 @@ func (s *Server) findExpenses(ctx context.Context) ([]*expense, error) {
 			&i.UUID,
 			&i.Amount,
 			&i.Notes,
-			&i.Date,
+			&i.Date.Time,
 			&i.CreatedAt,
 			&i.UpdatedAt,
 			&i.DeletedAt,
 			&i.Category.ID,
 			&i.Category.UUID,
 			&i.Category.Name,
+		); err != nil {
+			return nil, err
+		}
+
+		data = append(data, i)
+	}
+	return data, nil
+}
+
+func (s *Server) findExpensesByCategories(ctx context.Context, opts ...ExpenseOption) ([]*expenseCategory, error) {
+	companyID := CurrentCompany(ctx).ID
+
+	// Default filter
+	filter := ExpenseFilter{}
+
+	// Apply options
+	for _, opt := range opts {
+		opt(&filter)
+	}
+
+	query := `
+    select expenses_categories.id,
+		expenses_categories.name,
+		COALESCE(SUM(expenses.amount), 0) as total_amount
+    from expenses
+    inner join expenses_categories on (expenses.company_id = expenses_categories.company_id AND expenses.category_id = expenses_categories.id)
+    where expenses.company_id = $1
+  `
+	args := []any{companyID}
+	argPos := 2
+
+	// Soft delete handling
+	if !filter.IncludeDeleted {
+		query += " AND expenses.deleted_at IS NULL"
+	}
+
+	// Date filters
+	if filter.FromDate != nil && filter.ToDate != nil {
+		query += fmt.Sprintf(" AND expenses.date BETWEEN $%d AND $%d", argPos, argPos+1)
+		args = append(args, *filter.FromDate)
+		args = append(args, *filter.ToDate)
+		argPos += 2
+	} else {
+
+		if filter.FromDate != nil {
+			query += fmt.Sprintf(" AND expenses.date >= $%d::date", argPos)
+			args = append(args, *filter.FromDate)
+			argPos++
+		}
+
+		if filter.ToDate != nil {
+			query += fmt.Sprintf(" AND expenses.date <= $%d::date", argPos)
+			args = append(args, *filter.ToDate)
+			argPos++
+		}
+	}
+
+	// Category filter
+	if filter.CategoryID != nil {
+		query += fmt.Sprintf(" AND expenses.category_id = $%d", argPos)
+		args = append(args, *filter.CategoryID)
+		argPos++
+	}
+
+	query += `
+    GROUP BY expenses_categories.id, expenses_categories.name
+    ORDER BY total_amount DESC
+`
+
+	rows, err := s.db.QueryContext(ctx, query, args...)
+	if err != nil {
+		return nil, err
+	}
+	data := make([]*expenseCategory, 0)
+	for rows.Next() {
+		i := new(expenseCategory)
+
+		if err = rows.Scan(
+			&i.ID,
+			&i.Name,
+			&i.TotalAmount,
 		); err != nil {
 			return nil, err
 		}

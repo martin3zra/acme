@@ -33,14 +33,14 @@ export default function Index({
     ? { from: initialRange.from ? new Date(initialRange.from) : undefined, to: initialRange.to ? new Date(initialRange.to) : undefined }
     : undefined;
 
-  const [request, setRequest] = useState<ReportRequest>({
+  const [request, setRequest] = useState<ReportRequest>(() => ({
     endpoint: 'sales',
     reportType: initialReportType,
     dateRange: initialDateRange,
     presetKey: initialPreset,
     showInvoices: false,
     csrfToken: csrf_token,
-  });
+  }));
 
   const t = useTranslation().trans;
 

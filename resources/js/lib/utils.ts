@@ -194,6 +194,12 @@ export function parseLocalDate(dateStr: string) {
   const [y, m, d] = dateStr.split('-').map(Number);
   return new Date(y, m - 1, d);
 }
+
+export function clampISODate(value: string | undefined | null): string {
+  if (!value) return '';
+  return value.split('T')[0]; // "2026-02-27"
+}
+
 const groupMap: Record<string, string> = {
   'global.navMain.dashboard': 'global.navGroups.overview',
   'global.navMain.invoices': 'global.navGroups.sales',

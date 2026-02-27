@@ -64,6 +64,20 @@ func (d DateGroup) TotalAmount() float64 {
 	return d.Total
 }
 
+func (s *Server) findTotalSales(ctx context.Context, From, To time.Time) (float64, error) {
+	var total float64
+	err := s.db.QueryRow(`
+    SELECT
+      COALESCE(SUM(CASE WHEN status = 'closed' THEN total ELSE 0 END), 0) AS total_sales
+    FROM invoices 
+    WHERE company_id = $1
+    AND transaction_kind = 'invoice'
+    AND date BETWEEN $2 AND $3;`, CurrentCompany(ctx).ID, From, To).
+		Scan(&total)
+
+	return total, err
+}
+
 func (s *Server) findItemWiseSales(ctx context.Context, From, To time.Time) ([]ItemGroup, error) {
 	rows, err := s.db.Query(`
 		SELECT i.id AS item_id, i.name AS item_name,  SUM(s.total) AS total_amount

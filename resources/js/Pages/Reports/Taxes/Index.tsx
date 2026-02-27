@@ -24,13 +24,13 @@ export default function Index({ auth, csrf_token, initialRange, initialPreset }:
     ? { from: initialRange.from ? new Date(initialRange.from) : undefined, to: initialRange.to ? new Date(initialRange.to) : undefined }
     : undefined;
 
-  const [request, setRequest] = useState<ReportRequest>({
+  const [request, setRequest] = useState<ReportRequest>(() => ({
     endpoint: 'taxes',
     reportType: 'taxes',
     dateRange: initialDateRange,
     presetKey: initialPreset,
     csrfToken: csrf_token,
-  });
+  }));
 
   function updateRequest<K extends keyof ReportRequest>(key: K, value: ReportRequest[K]) {
     setRequest((prev) => ({
