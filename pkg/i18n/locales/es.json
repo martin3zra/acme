@@ -798,6 +798,7 @@
   "customers": {
     "title": "Clientes",
     "description": "Todos los clientes creados se muestran aquí.",
+    "viewAll": "Ver todos los clientes",
     "paidStatus": "Pagada",
     "paymentTerms": "Condiciones de pago",
     "taxReceipt": "Tipo NCF",
@@ -840,8 +841,18 @@
       "description": "Borra los detalles del cliente seleccionado."
     },
     "emptyState": {
-      "title": "Crea tu primer cliente",
-      "description": "Una vez que cree su cliente, aparecerá aquí."
+      "all": {
+        "title": "Crea tu primer cliente",
+        "description": "Una vez que cree su cliente, aparecerá aquí."
+      },
+      "individual": {
+        "title": "No hay resultados para este filtro",
+        "description": "No se encontraron clientes individuales. ¿Deseas ver la lista completa?"
+      },
+      "business": {
+        "title": "No hay resultados para este filtro",
+        "description": "No se encontraron clientes empresariales. ¿Deseas ver la lista completa?"
+      }
     },
     "confirmsPassword": {
       "title": "¿Estás seguro que deseas borrar a :customer?",
@@ -879,6 +890,7 @@
   "items": {
     "title": "Productos",
     "description": "Todos los productos creados se muestran aquí.",
+    "viewAll": "Ver todos los productos",
     "paidStatus": "Pagada",
     "paymentTerms": "Condiciones de pago",
     "taxReceipt": "Tipo NCF",
@@ -918,8 +930,18 @@
       "description": "Borra los detalles del cliente seleccionado."
     },
     "emptyState": {
-      "title": "Crea tu primer producto",
-      "description": "Una vez que cree tus productos, aparecerán aquí."
+      "all": {
+        "title": "Crea tu primer producto/servicio",
+        "description": "Una vez que cree tus productos/servicios, aparecerán aquí."
+      },
+      "service": {
+        "title": "No hay resultados para este filtro",
+        "description": "No se encontraron servicios. ¿Deseas ver la lista completa?"
+      },
+      "product": {
+        "title": "No hay resultados para este filtro",
+        "description": "No se encontraron productos. ¿Deseas ver la lista completa?"
+      }
     },
     "confirmsPassword": {
       "title": "¿Estás seguro que deseas borrar a :item?",

@@ -59,7 +59,7 @@ func (i *InvoicePDF) Header(company *Company) {
 	// Company Info (top left)
 	i.pdf.SetFont("DejaVu", "", 10)
 	i.pdf.SetXY(50, 10)
-	i.pdf.MultiCell(80, 5, fmt.Sprintf("%s\n%s\n%s", company.Name, company.Address, ""), "", "", false)
+	i.pdf.MultiCell(80, 5, fmt.Sprintf("%s\n%s\n%s", company.Name, company.Address+"\n"+company.City, ""), "", "", false)
 	i.pdf.SetXY(50, 25)
 	i.pdf.CellFormat(80, 6, fmt.Sprintf("%s: %s", i.t("companies.single.rnc_short"), company.Identifier), "", 1, "", false, 0, "")
 
@@ -129,7 +129,7 @@ func (i *InvoicePDF) Lines() {
 	i.pdf.SetFillColor(240, 240, 255)
 	headers := []string{i.t("global.reference"), i.t("global.item"), i.t("global.unit"), i.t("global.qtyAbrev"), i.t("global.price"), i.t("global.tax"), i.t("global.amount")}
 	aligns := []string{"", "", "C", "C", "R", "R", "R"}
-	widths := []float64{30, 45, 15, 15, 25, 25, 25}
+	widths := []float64{33, 45, 15, 15, 25, 22, 25}
 
 	for idx, h := range headers {
 		i.pdf.CellFormat(widths[idx], 8, h, "1", 0, aligns[idx], true, 0, "")
@@ -137,7 +137,7 @@ func (i *InvoicePDF) Lines() {
 	i.pdf.Ln(-1)
 
 	// Table Body
-	i.pdf.SetFont("DejaVu", "", 10)
+	i.pdf.SetFont("DejaVu", "", 9)
 	var subtotal, totalTax float64
 	for _, line := range i.lines {
 		lineTotal := float64(line.Qty)*line.Price + line.Tax.Amount
@@ -168,6 +168,7 @@ func (i *InvoicePDF) Lines() {
 
 func (i *InvoicePDF) Totals(subtotal, totalTax float64) {
 
+	i.pdf.SetFont("DejaVu", "B", 10)
 	// Totals (Right-aligned)
 	rightX := 195.0
 	labelW := 30.0
@@ -180,8 +181,6 @@ func (i *InvoicePDF) Totals(subtotal, totalTax float64) {
 	i.pdf.Ln(2)
 
 	if strings.TrimSpace(i.invoice.Notes) != "" {
-		// pdf.Ln(10)
-		i.pdf.SetFont("DejaVu", "B", 10)
 		i.pdf.CellFormat(labelW, 8, i.t("global.notes"), "", 0, "L", false, 0, "")
 		i.pdf.Ln(6)
 		i.pdf.SetFont("DejaVu", "", 10)

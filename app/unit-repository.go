@@ -14,6 +14,13 @@ type unit struct {
 	foundation.Timestamps
 }
 
+func (s *Server) findUnitByBasedQty(companyID int) (int, error) {
+	var id int
+	err := s.db.QueryRow(`SELECT id FROM units WHERE company_id = $1 AND base_qty = 1`, companyID).Scan(&id)
+
+	return id, err
+}
+
 func (s *Server) findUnits(ctx context.Context) ([]*unit, error) {
 	rows, err := s.db.Query("SELECT id, name, base_qty, created_at, updated_at, deleted_at FROM units WHERE company_id = $1", CurrentCompany(ctx).ID)
 	if err != nil {

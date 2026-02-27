@@ -503,9 +503,15 @@ func (s *Server) processRows(
 	failed := 0
 	var err error
 	var taxes []*tax
+	var unitID = 0
 	warnings := []ImportIssue{}
 
 	if source == "items" {
+		unitID, err = s.findUnitByBasedQty(companyID)
+		if err != nil {
+			return err
+		}
+
 		taxes, err = s.findTaxesInternal(companyID)
 		if err != nil {
 			return err
@@ -543,7 +549,7 @@ func (s *Server) processRows(
 		}
 
 		if source == "items" {
-			if err := s.storeItemFromRecord(companyID, taxes, importID, row, rowNum, record, &warnings); err != nil {
+			if err := s.storeItemFromRecord(companyID, unitID, taxes, importID, row, rowNum, record, &warnings); err != nil {
 				failed++
 				continue
 			}
@@ -597,8 +603,8 @@ func (s *Server) processRows(
 	return nil
 }
 
-func (s *Server) storeItemFromRecord(companyID int, taxes []*tax, importID string, row []string, rowNum int, record map[string]any, warnings *[]ImportIssue) error {
-	form, err := mapToStoreItemForm(rowNum, record, taxes, warnings)
+func (s *Server) storeItemFromRecord(companyID, unitID int, taxes []*tax, importID string, row []string, rowNum int, record map[string]any, warnings *[]ImportIssue) error {
+	form, err := mapToStoreItemForm(rowNum, record, unitID, taxes, warnings)
 	if form == nil {
 		if err := database.WithTransaction(s.db, func(tx *sql.Tx) error {
 			return s.saveRowIssue(tx, importID, ImportIssue{

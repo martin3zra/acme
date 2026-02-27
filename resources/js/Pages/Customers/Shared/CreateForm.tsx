@@ -98,6 +98,7 @@ export default function CreateForm({ onFinish, params }: CreateFormProps) {
             <div className="flex flex-col gap-2">
               <Label htmlFor="customer_type">{t('customers.single.type')}</Label>
               <RadioGroup
+                disabled={viewMode}
                 id="customer_type"
                 className="grid grid-cols-3 gap-6"
                 value={data.customer_type as CustomerType}

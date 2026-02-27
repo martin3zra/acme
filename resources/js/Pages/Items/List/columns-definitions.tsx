@@ -34,7 +34,14 @@ export const getColumns = ({ onDidClick, t }: Props): ColumnDef<Item>[] => {
           aria-label="Select all"
         />
       ),
-      cell: ({ row }) => <Checkbox checked={row.getIsSelected()} onCheckedChange={(value) => row.toggleSelected(!!value)} aria-label="Select row" />,
+      cell: (props) => {
+        return (
+          <div className="flex items-center space-x-2">
+            <Checkbox checked={props.row.getIsSelected()} onCheckedChange={(value) => props.row.toggleSelected(!!value)} aria-label="Select row" />
+            {props.row.original.item_type === 'service' ? <Wrench className="size-4" /> : <Package className="size-4" />}
+          </div>
+        );
+      },
       enableSorting: false,
       enableHiding: false,
     },
@@ -113,20 +120,6 @@ export const getColumns = ({ onDidClick, t }: Props): ColumnDef<Item>[] => {
       },
       cell: (props) => {
         return <TextCell columnWidth={props.column.getSize()} value={props.getValue() as string} />;
-      },
-    },
-    {
-      accessorKey: 'item_type',
-      meta: t('items.single.type'),
-      size: 45,
-      header: (props) => {
-        return <HeaderCell title={t('items.single.type')} alignment="left" columnWidth={props.column.getSize()} />;
-      },
-      cell: (props) => {
-        if (props.row.original.item_type === 'service') {
-          return <Wrench />;
-        }
-        return <Package />;
       },
     },
     {

@@ -41,7 +41,7 @@ var (
 	ErrInvalidNum  = errors.New("invalid number")
 )
 
-func mapToStoreItemForm(rowNum int, data map[string]any, taxes []*tax, warnings *[]ImportIssue) (*StoreItemForm, error) {
+func mapToStoreItemForm(rowNum int, data map[string]any, unitID int, taxes []*tax, warnings *[]ImportIssue) (*StoreItemForm, error) {
 	// Required fields
 	name, ok := getString(data, "name")
 	if !ok {
@@ -114,7 +114,7 @@ func mapToStoreItemForm(rowNum int, data map[string]any, taxes []*tax, warnings 
 		Price:       price,
 		Description: derefOrEmpty(getStringPtr(data, "description")),
 		TaxID:       taxID,
-		UnitID:      1,
+		UnitID:      unitID,
 		ItemType:    itemType,
 		Identifiers: ItemIdentifiers{
 			Reference:       getStringPtr(data, "reference"),

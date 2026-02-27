@@ -12,7 +12,7 @@ export const breadcrumbs: BreadcrumbItem[] = [
   ...defaultBreadcrumbs,
   {
     title: 'reports.title',
-    href: '/reports',
+    href: '/reports/sales',
   },
   {
     title: 'reports.sales',

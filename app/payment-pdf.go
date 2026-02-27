@@ -61,7 +61,7 @@ func (p *PaymentPDF) Header(ctx context.Context) {
 	// Company Info (top left)
 	p.pdf.SetFont("DejaVu", "", 10)
 	p.pdf.SetXY(50, 10)
-	p.pdf.MultiCell(80, 5, fmt.Sprintf("%s\n%s\n%s", company.Name, company.Address, ""), "", "", false)
+	p.pdf.MultiCell(80, 5, fmt.Sprintf("%s\n%s\n%s", company.Name, company.Address+"\n"+company.City, ""), "", "", false)
 	p.pdf.SetXY(50, 25)
 	p.pdf.CellFormat(80, 6, fmt.Sprintf("%s: %s", p.t("companies.single.rnc_short"), company.Identifier), "", 1, "", false, 0, "")
 
@@ -155,7 +155,7 @@ func (p *PaymentPDF) Lines() {
 	p.pdf.Ln(-1)
 
 	// Table Body
-	p.pdf.SetFont("DejaVu", "", 10)
+	p.pdf.SetFont("DejaVu", "", 9)
 	for _, line := range p.lines {
 		p.pdf.CellFormat(widths[0], 8, line.Invoice.Code, "1", 0, "", false, 0, "")
 		p.pdf.CellFormat(widths[1], 8, line.Invoice.Date.Format("2006-01-02"), "1", 0, "", false, 0, "")
