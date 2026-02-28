@@ -3,7 +3,6 @@ package app
 import (
 	"bytes"
 	"context"
-	"encoding/base64"
 	"fmt"
 	"net/http"
 	"strings"
@@ -18,10 +17,15 @@ type PaymentPDF struct {
 	trans   *i18n.Translator
 	payment *payment
 	lines   []*paymentLine
+	logo    []byte
 }
 
 func NewPaymentPDF(trans *i18n.Translator, p *payment, lines []*paymentLine) (*PaymentPDF, error) {
 
+	logo, err := decodeLogo()
+	if err != nil {
+		return nil, err
+	}
 	pdf := fpdf.New("P", "mm", "A4", "")
 	pdf.SetMargins(15, 20, 15)
 	pdf.SetAutoPageBreak(true, 25)
@@ -35,7 +39,7 @@ func NewPaymentPDF(trans *i18n.Translator, p *payment, lines []*paymentLine) (*P
 
 	pdf.SetFont("DejaVu", "", 11)
 
-	return &PaymentPDF{pdf: pdf, trans: trans, payment: p, lines: lines}, pdf.Error()
+	return &PaymentPDF{pdf: pdf, trans: trans, payment: p, lines: lines, logo: logo}, pdf.Error()
 }
 
 func (p *PaymentPDF) t(key string, replacements ...i18n.Replacements) string {
@@ -43,15 +47,13 @@ func (p *PaymentPDF) t(key string, replacements ...i18n.Replacements) string {
 }
 
 func (p *PaymentPDF) AddLogo() {
-	logoBytes, err := base64.StdEncoding.DecodeString(logoBase64)
-	if err == nil {
-		p.pdf.RegisterImageOptionsReader("logo", fpdf.ImageOptions{
-			ImageType: "PNG",
-		}, bytes.NewReader(logoBytes))
-		p.pdf.ImageOptions("logo", 15, 10, 30, 0, false, fpdf.ImageOptions{
-			ImageType: "PNG",
-		}, 0, "")
-	}
+
+	p.pdf.RegisterImageOptionsReader("logo", fpdf.ImageOptions{
+		ImageType: "PNG",
+	}, bytes.NewReader(p.logo))
+	p.pdf.ImageOptions("logo", 15, 10, 30, 0, false, fpdf.ImageOptions{
+		ImageType: "PNG",
+	}, 0, "")
 }
 
 func (p *PaymentPDF) Header(ctx context.Context) {

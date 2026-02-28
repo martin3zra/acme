@@ -35,12 +35,17 @@ fi
 EXT=""
 [ "$TARGET_OS" = "windows" ] && EXT=".exe"
 
+export GOOS="$TARGET_OS"
+export GOARCH="$TARGET_ARCH"
+export CGO_ENABLED=0
+
 # Go app build
 echo "Building Golang application..."
-GOOS="$TARGET_OS" GOARCH="$TARGET_ARCH" \
-go build -tags prod -o "bin/acme-${TARGET_OS}-${TARGET_ARCH}${EXT}"
+go build -tags prod -ldflags="-s -w" -o "bin/acme-${TARGET_OS}-${TARGET_ARCH}${EXT}" .
+go build -tags prod -ldflags="-s -w" -o "bin/acme-cli-${TARGET_OS}-${TARGET_ARCH}${EXT}" ./cmd/cli
 
 echo "=============================="
 echo " Build complete!"
 echo " Output: bin/acme-${TARGET_OS}-${TARGET_ARCH}${EXT}"
+echo " Output: bin/acme-cli-${TARGET_OS}-${TARGET_ARCH}${EXT}"
 echo "=============================="

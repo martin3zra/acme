@@ -19,7 +19,7 @@ import (
 type MailDriver string
 
 const (
-	STMP MailDriver = "smtp"
+	SMTP MailDriver = "smtp"
 	API  MailDriver = "api"
 )
 
@@ -69,7 +69,7 @@ func (m Mailer) To(email, name string) Mailer {
 }
 
 func (m Mailer) Send(mailable Mailable) {
-	if m.cfg.Driver == STMP {
+	if m.cfg.Driver == SMTP {
 		m.sendViaSMTP(mailable)
 		return
 	}

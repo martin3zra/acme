@@ -24,7 +24,11 @@ func (s *Server) reportSalesHandler(ctx *routing.Context) {
 
 func (s *Server) generateSalesReportHandler() routing.HandlerFunc {
 	return routing.WithRequest(func(ctx *routing.Context, form *ReportSalesForm) {
-		report, _ := NewSalesReportPDF(s.translator, form)
+		report, err := NewSalesReportPDF(s.translator, form)
+		if err != nil {
+			ctx.Error(err)
+			return
+		}
 		groups, err := s.fetchSalesGroups(ctx.Request.Context(), form)
 		if err != nil {
 			ctx.JSON(http.StatusInternalServerError, map[string]any{"status": "error", "message": err.Error()})
@@ -56,7 +60,11 @@ func (s *Server) reportProfitLostHandler(ctx *routing.Context) {
 
 func (s *Server) generateProfitLostReportHandler() routing.HandlerFunc {
 	return routing.WithRequest(func(ctx *routing.Context, form *ReportForm) {
-		report, _ := NewProfitLostReportPDF(s.translator, form)
+		report, err := NewProfitLostReportPDF(s.translator, form)
+		if err != nil {
+			ctx.Error(err)
+			return
+		}
 		totalSales, err := s.findTotalSales(ctx.Request.Context(), form.From, form.To)
 		if err != nil {
 			log.Println("error generating profit and lost reports:", err)
@@ -97,7 +105,11 @@ func (s *Server) reportExpensesHandler(ctx *routing.Context) {
 
 func (s *Server) generateExpensesReportHandler() routing.HandlerFunc {
 	return routing.WithRequest(func(ctx *routing.Context, form *ReportForm) {
-		report, _ := NewExpensesReportPDF(s.translator, form)
+		report, err := NewExpensesReportPDF(s.translator, form)
+		if err != nil {
+			ctx.Error(err)
+			return
+		}
 		expenses, err := s.findExpensesByCategories(ctx.Request.Context(),
 			WithDateRange(form.From, form.To),
 		)

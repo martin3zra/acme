@@ -3,7 +3,6 @@ package app
 import (
 	"bytes"
 	"context"
-	"encoding/base64"
 	"fmt"
 	"time"
 
@@ -18,9 +17,15 @@ type TaxesReportPDF struct {
 	form         *ReportForm
 	bottomMargin float64
 	topBuffer    float64 // 🔑 new: default spacing below header
+	logo         []byte
 }
 
 func NewTaxesReportPDF(trans *i18n.Translator, form *ReportForm) (*TaxesReportPDF, error) {
+
+	logo, err := decodeLogo()
+	if err != nil {
+		return nil, err
+	}
 	pdf := fpdf.New("P", "mm", "A4", "")
 	pdf.SetMargins(15, 20, 15)
 	pdf.SetAutoPageBreak(true, 25)
@@ -40,19 +45,18 @@ func NewTaxesReportPDF(trans *i18n.Translator, form *ReportForm) (*TaxesReportPD
 		form:         form,
 		bottomMargin: 25,
 		topBuffer:    5, // 🔑 default buffer spacing
+		logo:         logo,
 	}, pdf.Error()
 }
 
 func (r *TaxesReportPDF) AddLogo() {
-	logoBytes, err := base64.StdEncoding.DecodeString(logoBase64)
-	if err == nil {
-		r.pdf.RegisterImageOptionsReader("logo", fpdf.ImageOptions{
-			ImageType: "PNG",
-		}, bytes.NewReader(logoBytes))
-		r.pdf.ImageOptions("logo", 15, 10, 30, 0, false, fpdf.ImageOptions{
-			ImageType: "PNG",
-		}, 0, "")
-	}
+
+	r.pdf.RegisterImageOptionsReader("logo", fpdf.ImageOptions{
+		ImageType: "PNG",
+	}, bytes.NewReader(r.logo))
+	r.pdf.ImageOptions("logo", 15, 10, 30, 0, false, fpdf.ImageOptions{
+		ImageType: "PNG",
+	}, 0, "")
 }
 
 func (r *TaxesReportPDF) Header(ctx context.Context) {

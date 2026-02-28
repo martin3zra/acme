@@ -2,7 +2,7 @@ package app
 
 import (
 	"bytes"
-	"encoding/base64"
+	_ "embed"
 	"fmt"
 	"net/http"
 	"strconv"
@@ -13,15 +13,23 @@ import (
 	"github.com/martin3zra/acme/pkg/i18n"
 )
 
+//go:embed assets/logo.b64
+var logoBase64 []byte
+
 type InvoicePDF struct {
 	pdf     *fpdf.Fpdf
 	trans   *i18n.Translator
 	invoice *invoice
 	lines   []*line
+	logo    []byte
 }
 
 func NewInvoicePDF(trans *i18n.Translator, i *invoice, lines []*line) (*InvoicePDF, error) {
 
+	logo, err := decodeLogo()
+	if err != nil {
+		return nil, err
+	}
 	pdf := fpdf.New("P", "mm", "A4", "")
 	pdf.SetMargins(15, 20, 15)
 	pdf.SetAutoPageBreak(true, 25)
@@ -34,7 +42,7 @@ func NewInvoicePDF(trans *i18n.Translator, i *invoice, lines []*line) (*InvoiceP
 	}
 
 	pdf.SetFont("DejaVu", "", 11)
-	return &InvoicePDF{pdf: pdf, trans: trans, invoice: i, lines: lines}, pdf.Error()
+	return &InvoicePDF{pdf: pdf, trans: trans, invoice: i, lines: lines, logo: logo}, pdf.Error()
 }
 
 func (i *InvoicePDF) t(key string, replacements ...i18n.Replacements) string {
@@ -42,15 +50,12 @@ func (i *InvoicePDF) t(key string, replacements ...i18n.Replacements) string {
 }
 
 func (i *InvoicePDF) AddLogo() {
-	logoBytes, err := base64.StdEncoding.DecodeString(logoBase64)
-	if err == nil {
-		i.pdf.RegisterImageOptionsReader("logo", fpdf.ImageOptions{
-			ImageType: "PNG",
-		}, bytes.NewReader(logoBytes))
-		i.pdf.ImageOptions("logo", 15, 10, 30, 0, false, fpdf.ImageOptions{
-			ImageType: "PNG",
-		}, 0, "")
-	}
+	i.pdf.RegisterImageOptionsReader("logo", fpdf.ImageOptions{
+		ImageType: "PNG",
+	}, bytes.NewReader(i.logo))
+	i.pdf.ImageOptions("logo", 15, 10, 30, 0, false, fpdf.ImageOptions{
+		ImageType: "PNG",
+	}, 0, "")
 }
 
 func (i *InvoicePDF) Header(company *Company) {

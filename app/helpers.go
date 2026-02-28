@@ -1,10 +1,10 @@
 package app
 
 import (
+	_ "embed"
 	"encoding/json"
 	"fmt"
 	"math"
-	"path/filepath"
 	"regexp"
 	"strconv"
 	"strings"
@@ -152,26 +152,31 @@ type Font struct {
 	Path  string
 }
 
-func registerFonts(pdf *fpdf.Fpdf) error {
-	fonts := []Font{
-		{"DejaVu", "", "/fonts/DejaVuSans.ttf"},
-		{"DejaVu", "I", "/fonts/DejaVu-Oblique.ttf"},
-		{"DejaVu", "B", "/fonts/DejaVu-Bold.ttf"},
-	}
-	for _, font := range fonts {
-		absPath, err := filepath.Abs(font.Path)
-		if err != nil {
-			return err
-		}
-		pdf.AddUTF8Font(font.Name, font.Style, absPath)
-		if pdf.Error() != nil {
-			return pdf.Error()
-		}
-	}
+//go:embed fonts/DejaVuSans.ttf
+var dejavuRegular []byte
 
+//go:embed fonts/DejaVu-Oblique.ttf
+var dejavuItalic []byte
+
+//go:embed fonts/DejaVu-Bold.ttf
+var dejavuBold []byte
+
+func registerFonts(pdf *fpdf.Fpdf) error {
+	pdf.AddUTF8FontFromBytes("DejaVu", "", dejavuRegular)
 	if pdf.Error() != nil {
 		return pdf.Error()
 	}
+
+	pdf.AddUTF8FontFromBytes("DejaVu", "I", dejavuItalic)
+	if pdf.Error() != nil {
+		return pdf.Error()
+	}
+
+	pdf.AddUTF8FontFromBytes("DejaVu", "B", dejavuBold)
+	if pdf.Error() != nil {
+		return pdf.Error()
+	}
+
 	return nil
 }
 

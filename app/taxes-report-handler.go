@@ -22,7 +22,11 @@ func (s *Server) reportTaxesHandler(ctx *routing.Context) {
 
 func (s *Server) generateTaxesReportHandler() routing.HandlerFunc {
 	return routing.WithRequest(func(ctx *routing.Context, form *ReportForm) {
-		report, _ := NewTaxesReportPDF(s.translator, form)
+		report, err := NewTaxesReportPDF(s.translator, form)
+		if err != nil {
+			ctx.Error(err)
+			return
+		}
 		groups, err := s.findTaxesWiseSales(ctx.Request.Context(), form.From, form.To)
 		if err != nil {
 			ctx.JSON(http.StatusInternalServerError, map[string]any{"status": "error", "message": err.Error()})
