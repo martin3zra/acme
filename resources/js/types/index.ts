@@ -425,10 +425,17 @@ export type ReceivableInvoiceForm = ReceivableInvoice & {
   action: LineAction;
 };
 
+export type PaymentTotals = {
+  totalPayment: number;
+  totalDiscount: number;
+  totalRemaining: number;
+};
+
 export type PaymentForm = {
   header: PaymentHeaderForm;
   lines: ReceivableInvoiceForm[];
   payment: PaymentMethodsForm;
+  totals: PaymentTotals;
 };
 
 export interface Receivable {
@@ -473,7 +480,7 @@ export interface PaymentWithLines {
   pdfURL: string;
 }
 
-export type onValueChangeType = (inputId: string, newValue: string | number) => void;
+export type onValueChangeType = (rowId: string, columnId: string, newValue: string | number) => void;
 
 export function mapPaymentLineToReceivableInvoice(paymentLine: PaymentLine): ReceivableInvoiceForm {
   const { invoice } = paymentLine;

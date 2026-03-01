@@ -15,10 +15,6 @@ func NewInvoiceMail(invoice map[string]any, attachment []byte) InvoiceMail {
 
 func (w InvoiceMail) Subject() string { return "A new invoice is available in your account" }
 
-func (w InvoiceMail) From() mailer.Individual {
-	return mailer.Individual{Name: "Alfredo", Email: "martin3zra@gmail.com"}
-}
-
 func (w InvoiceMail) To() []mailer.Individual {
 	return []mailer.Individual{}
 }

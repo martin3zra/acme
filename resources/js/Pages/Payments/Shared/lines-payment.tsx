@@ -1,10 +1,9 @@
 import { SkeletonRow } from '@/components/data-table/skeleton-row';
 import { Button } from '@/components/ui/button';
 import { DropdownMenu, DropdownMenuCheckboxItem, DropdownMenuContent, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { useNumber } from '@/composables/use-number';
+import { Table, TableBody, TableCell, TableFooter, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useTranslation } from '@/hooks/use-translation';
-import { onValueChangeType, PaymentVerb, ReceivableInvoiceForm } from '@/types';
+import { onValueChangeType, PaymentTotals, PaymentVerb, ReceivableInvoiceForm } from '@/types';
 import {
   ColumnFiltersState,
   flexRender,
@@ -12,6 +11,7 @@ import {
   getFilteredRowModel,
   getPaginationRowModel,
   getSortedRowModel,
+  RowData,
   RowSelectionState,
   SortingState,
   useReactTable,
@@ -19,11 +19,17 @@ import {
 } from '@tanstack/react-table';
 import { ChevronDown } from 'lucide-react';
 import { FC, useState } from 'react';
-import { calculateTotals } from '../build-receivables-state';
 import { getColumns } from './columns-definitions';
+
+declare module '@tanstack/react-table' {
+  interface TableMeta<TData extends RowData> {
+    updateData?: (rowId: string, columnId: string, value: string | number) => void;
+  }
+}
 
 type Props = {
   data: ReceivableInvoiceForm[];
+  totals: PaymentTotals;
   rowSelection: RowSelectionState;
   loading: boolean;
   setRowSelection: React.Dispatch<React.SetStateAction<RowSelectionState>>;
@@ -34,6 +40,7 @@ type Props = {
 
 export const List: FC<Props> = ({
   data,
+  totals,
   rowSelection,
   loading,
   setRowSelection,
@@ -41,13 +48,11 @@ export const List: FC<Props> = ({
   onValueChange,
   onSelectionChange,
 }) => {
-  const currency = useNumber().currency;
   const t = useTranslation().trans;
   const [sorting, setSorting] = useState<SortingState>([]);
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
   const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({});
-  const totals = calculateTotals(data);
-  const columns = getColumns({ onDidClick: onSelectPayment, t });
+  const columns = getColumns({ totals, onDidClick: onSelectPayment, t });
 
   const table = useReactTable({
     data: data,
@@ -66,8 +71,8 @@ export const List: FC<Props> = ({
       setRowSelection(nextSelection);
     },
     meta: {
-      updateData: (inputId: string, rowIndex: number, columnId: string, value: string) => {
-        onValueChange?.(inputId, value);
+      updateData: (rowId: string, columnId: string, value: string | number) => {
+        onValueChange?.(rowId, columnId, value);
       },
     },
     state: {
@@ -106,7 +111,7 @@ export const List: FC<Props> = ({
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
-      <div className="rounded-md border [&_[data-type=number]]:text-right">
+      <div className="rounded-md border **:data-[type=number]:text-right">
         <Table>
           <TableHeader>
             {table.getHeaderGroups().map((headerGroup) => (
@@ -140,14 +145,17 @@ export const List: FC<Props> = ({
               </TableRow>
             )}
           </TableBody>
-          <tfoot>
-            <TableRow>
-              <TableCell colSpan={columns.length - 4} />
-              <TableCell className="pr-4 text-end text-base font-semibold">{currency(totals.totalPayment)}</TableCell>
-              <TableCell className="pr-4 text-end text-base font-semibold">{currency(totals.totalDiscount)}</TableCell>
-              <TableCell className="pr-4 text-end text-base font-semibold">{currency(totals.totalRemaining)}</TableCell>
-            </TableRow>
-          </tfoot>
+          <TableFooter>
+            {table.getFooterGroups().map((footerGroup) => (
+              <TableRow key={footerGroup.id}>
+                {footerGroup.headers.map((header) => (
+                  <TableCell key={header.id}>
+                    {header.isPlaceholder ? null : flexRender(header.column.columnDef.footer, header.getContext())}
+                  </TableCell>
+                ))}
+              </TableRow>
+            ))}
+          </TableFooter>
         </Table>
       </div>
       <div className="flex items-center justify-end space-x-2 py-4">

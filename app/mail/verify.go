@@ -15,10 +15,6 @@ func NewVerification(account map[string]any, signeUrl string) Verify {
 
 func (w Verify) Subject() string { return "Verify Account" }
 
-func (w Verify) From() mailer.Individual {
-	return mailer.Individual{Name: "Alfredo", Email: "martin3zra@gmail.com"}
-}
-
 func (w Verify) To() []mailer.Individual {
 	return []mailer.Individual{}
 }

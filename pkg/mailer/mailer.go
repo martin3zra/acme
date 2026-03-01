@@ -24,13 +24,14 @@ const (
 )
 
 type Config struct {
-	Driver     MailDriver
-	Host       string
-	Port       string
-	From       string
-	Username   string
-	Password   string
-	Encryption string
+	Driver      MailDriver
+	Host        string
+	Port        string
+	FromAddress string
+	FromName    string
+	Username    string
+	Password    string
+	Encryption  string
 }
 
 type Individual struct {
@@ -46,7 +47,6 @@ type Attachment struct {
 
 type Mailable interface {
 	Subject() string
-	From() Individual
 	To() []Individual
 	Content() string
 	Data() map[string]any
@@ -95,7 +95,7 @@ func (m Mailer) sendViaAPI(mailable Mailable) {
 	}
 
 	emailData := map[string]any{
-		"from":        map[string]string{"email": m.cfg.From, "name": "Alfredo"},
+		"from":        map[string]string{"email": m.cfg.FromAddress, "name": m.cfg.FromName},
 		"to":          to,
 		"subject":     mailable.Subject(),
 		"html":        m.composeHTML(mailable.Content(), mailable.Data()),
@@ -120,7 +120,7 @@ func (m Mailer) sendViaAPI(mailable Mailable) {
 }
 
 func (m Mailer) sendViaSMTP(mailable Mailable) {
-	from := fmt.Sprintf("%s <%s>", mailable.From().Name, mailable.From().Email)
+	from := fmt.Sprintf("%s <%s>", m.cfg.FromName, m.cfg.FromAddress)
 	to := []string{fmt.Sprintf("%s <%s>", m.to.Name, m.to.Email)}
 	for _, t := range mailable.To() {
 		to = append(to, fmt.Sprintf("%s <%s>", t.Name, t.Email))
@@ -177,7 +177,7 @@ func (m Mailer) sendViaSMTP(mailable Mailable) {
 	}
 
 	addr := fmt.Sprintf("%s:%s", m.cfg.Host, m.cfg.Port)
-	err := smtp.SendMail(addr, smtp.PlainAuth("", m.cfg.Username, m.cfg.Password, m.cfg.Host), m.cfg.From, []string{m.to.Email}, msg.Bytes())
+	err := smtp.SendMail(addr, smtp.PlainAuth("", m.cfg.Username, m.cfg.Password, m.cfg.Host), m.cfg.FromAddress, []string{m.to.Email}, msg.Bytes())
 	if err != nil {
 		log.Fatalf("failed to send email: %v", err)
 	}

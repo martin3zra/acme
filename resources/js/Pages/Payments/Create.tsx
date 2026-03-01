@@ -158,18 +158,40 @@ export default function Create({
     });
   };
 
-  const handleCellChange = (inputId: string, newValue: string | number) => {
-    const index = paymentForm.lines.findIndex((l: ReceivableInvoiceForm) => l.uuid === inputId);
-    if (index === -1) return;
+  const handleCellChange = (rowId: string, columnId: string, newValue: string | number) => {
+    setPaymentForm((prev) => {
+      const lines = prev.lines.map((line) => {
+        if (line.id.toString() === rowId) {
+          const payment = columnId === 'payment' ? Number(newValue) : line.payment || 0;
+          const discount = columnId === 'discount' ? Number(newValue) : line.discount || 0;
 
+          return {
+            ...line,
+            [columnId]: columnId === 'payment' || columnId === 'discount' ? Number(newValue) : newValue,
+            remaining: (line.amount_due || 0) - payment - discount,
+          };
+        }
+        return line;
+      });
+
+      // recompute totals from updated lines
+      const totals = lines.reduce(
+        (acc, line) => {
+          acc.totalPayment += line.payment || 0;
+          acc.totalDiscount += line.discount || 0;
+          acc.totalRemaining += line.remaining || 0;
+          return acc;
+        },
+        { totalPayment: 0, totalDiscount: 0, totalRemaining: 0 },
+      );
+
+      return { ...prev, lines, totals };
+    });
+
+    // auto-select the row when edited
     setRowSelection((prev) => ({
       ...prev,
-      [`${paymentForm.lines[index].id.toString()}`]: true,
-    }));
-    paymentForm.lines[index].payment = Number(newValue);
-    setPaymentForm((prev) => ({
-      ...prev,
-      lines: [...paymentForm.lines],
+      [rowId]: true,
     }));
   };
 
@@ -339,6 +361,7 @@ export default function Create({
           <List
             loading={loading}
             data={paymentForm.lines}
+            totals={paymentForm.totals}
             rowSelection={rowSelection}
             setRowSelection={setRowSelection}
             onSelectPaymentLine={() => {}}

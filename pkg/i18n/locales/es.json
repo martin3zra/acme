@@ -43,6 +43,7 @@
     "total": "Total",
     "balance": "Balance",
     "remainingBalance": "Saldo restante",
+    "amount_due": "Monto Adeudado",
     "totalPaymentApplied": "Total de pagos aplicados",
     "totalToBeCollected": "Total a cobrar",
     "totalReceived": "Total recibido",
@@ -203,7 +204,8 @@
         "order_sequence": "La secuencia de pedidos no está configurada.",
         "units": "Debe existir al menos una unidad.",
         "taxes": "Debe existir al menos una tasa impositiva.",
-        "invoices": "Debe existir al menos una factura."
+        "invoices": "Debe existir al menos una factura.",
+        "expenses_categories": "Debe existir al menos una categoria de gastos."
       },
       "actions": {
         "goToSettings": "Ir a ajustes",

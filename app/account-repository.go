@@ -19,6 +19,7 @@ type account struct {
 	Owner  struct {
 		ID    int    `json:"id"`
 		Email string `json:"email"`
+		Name  string `json:"name"`
 	} `json:"owner"`
 	VerifiedAt *time.Time `json:"verified_at"`
 	foundation.Timestamps
@@ -56,7 +57,7 @@ func (a account) SendAccountVerificationNotification(notify mailer.Mailer, attri
 	}
 
 	notify.
-		To(a.GetEmailAddressForAccountVerification(), a.Owner.Email).
+		To(a.GetEmailAddressForAccountVerification(), a.Owner.Name).
 		Send(mail.NewVerification(foundation.AsMap(a), url))
 }
 
@@ -69,12 +70,12 @@ func (s *Server) findAccountByIDUsingTx(tx *sql.Tx, accountID int) (*account, er
 
 	if err := tx.QueryRow(`
     SELECT accounts.id, accounts.uuid, accounts.verified_at, accounts.status, accounts.created_at, accounts.updated_at, accounts.deleted_at,
-    users.id, users.email
+    users.id, users.email, users.name
     FROM accounts
     INNER JOIN users ON (accounts.owner_id = users.id)
     WHERE accounts.id = $1
   `, accountID).Scan(
-		&a.ID, &a.UUID, &a.VerifiedAt, &a.Status, &a.CreatedAt, &a.UpdatedAt, &a.DeletedAt, &a.Owner.ID, &a.Owner.Email,
+		&a.ID, &a.UUID, &a.VerifiedAt, &a.Status, &a.CreatedAt, &a.UpdatedAt, &a.DeletedAt, &a.Owner.ID, &a.Owner.Email, &a.Owner.Name,
 	); err != nil {
 		return nil, err
 	}
@@ -87,12 +88,12 @@ func (s *Server) findAccountByUUID(uuid string) (*account, error) {
 
 	if err := s.db.QueryRow(`
     SELECT accounts.id, accounts.uuid, accounts.verified_at, accounts.status, accounts.created_at, accounts.updated_at, accounts.deleted_at,
-    users.id, users.email
+    users.id, users.email, users.name
     FROM accounts
     INNER JOIN users ON (accounts.owner_id = users.id)
     WHERE accounts.uuid = $1
   `, uuid).Scan(
-		&a.ID, &a.UUID, &a.VerifiedAt, &a.Status, &a.CreatedAt, &a.UpdatedAt, &a.DeletedAt, &a.Owner.ID, &a.Owner.Email,
+		&a.ID, &a.UUID, &a.VerifiedAt, &a.Status, &a.CreatedAt, &a.UpdatedAt, &a.DeletedAt, &a.Owner.ID, &a.Owner.Email, &a.Owner.Name,
 	); err != nil {
 		return nil, err
 	}
@@ -105,12 +106,12 @@ func (s *Server) findAccountByOwnerEmailAddress(email string) (*account, error) 
 
 	if err := s.db.QueryRow(`
     SELECT accounts.id, accounts.uuid, accounts.verified_at, accounts.status, accounts.created_at, accounts.updated_at, accounts.deleted_at,
-    users.id, users.email
+    users.id, users.email, users.name
     FROM accounts
     INNER JOIN users ON (accounts.owner_id = users.id)
     WHERE users.email = $1
   `, email).Scan(
-		&a.ID, &a.UUID, &a.VerifiedAt, &a.Status, &a.CreatedAt, &a.UpdatedAt, &a.DeletedAt, &a.Owner.ID, &a.Owner.Email,
+		&a.ID, &a.UUID, &a.VerifiedAt, &a.Status, &a.CreatedAt, &a.UpdatedAt, &a.DeletedAt, &a.Owner.ID, &a.Owner.Email, &a.Owner.Name,
 	); err != nil {
 		return nil, err
 	}

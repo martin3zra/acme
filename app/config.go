@@ -102,13 +102,14 @@ func LoadConfig() *Config {
 			httpOnly: true,
 		},
 		mail: Mail{
-			Driver:     MailDriver(os.Getenv("MAIL_DRIVER")),
-			Host:       os.Getenv("MAIL_HOST"),
-			Port:       os.Getenv("MAIL_PORT"),
-			From:       os.Getenv("MAIL_FROM"),
-			Username:   os.Getenv("MAIL_USERNAME"),
-			Password:   os.Getenv("MAIL_PASSWORD"),
-			Encryption: os.Getenv("MAIL_ENCRYPTION"),
+			Driver:      MailDriver(os.Getenv("MAIL_DRIVER")),
+			Host:        os.Getenv("MAIL_HOST"),
+			Port:        os.Getenv("MAIL_PORT"),
+			FromAddress: os.Getenv("MAIL_FROM_ADDRESS"),
+			FromName:    os.Getenv("MAIL_FROM_NAME"),
+			Username:    os.Getenv("MAIL_USERNAME"),
+			Password:    os.Getenv("MAIL_PASSWORD"),
+			Encryption:  os.Getenv("MAIL_ENCRYPTION"),
 		},
 	}
 }
@@ -155,23 +156,25 @@ const (
 )
 
 type Mail struct {
-	Driver     MailDriver
-	Host       string
-	Port       string
-	From       string
-	Username   string
-	Password   string
-	Encryption string
+	Driver      MailDriver
+	Host        string
+	Port        string
+	FromAddress string
+	FromName    string
+	Username    string
+	Password    string
+	Encryption  string
 }
 
 func (m Mail) asMailConfig() mailer.Config {
 	return mailer.Config{
-		Driver:     mailer.MailDriver(m.Driver),
-		Host:       m.Host,
-		Port:       m.Port,
-		From:       m.From,
-		Username:   m.Username,
-		Password:   m.Password,
-		Encryption: m.Encryption,
+		Driver:      mailer.MailDriver(m.Driver),
+		Host:        m.Host,
+		Port:        m.Port,
+		FromAddress: m.FromAddress,
+		FromName:    m.FromName,
+		Username:    m.Username,
+		Password:    m.Password,
+		Encryption:  m.Encryption,
 	}
 }
