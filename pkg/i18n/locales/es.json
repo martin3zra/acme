@@ -10,6 +10,8 @@
     "delete": "Eliminar",
     "edit": "Editar",
     "save": "Guardar",
+    "saving": "Guardando...",
+    "confirmAndSave": "Confirmar y Guardar",
     "verified": "Verificado",
     "link": "Vinculado",
     "email": "Correo electronico",
@@ -27,9 +29,11 @@
     "addedAt": "Creado en",
     "payDate": "Pagado en",
     "datePlaceholder": "Elige una fecha",
+    "dangerZone": "Zona de peligro",
     "status": "Estado",
     "amount": "Monto",
     "payment": "Pago",
+    "expense": "Gasto",
     "discount": "Descuento",
     "bulkDiscount": "Descuento masivo",
     "bulkPayment": "Pago masivo",
@@ -39,6 +43,7 @@
     "total": "Total",
     "balance": "Balance",
     "remainingBalance": "Saldo restante",
+    "amount_due": "Monto Adeudado",
     "totalPaymentApplied": "Total de pagos aplicados",
     "totalToBeCollected": "Total a cobrar",
     "totalReceived": "Total recibido",
@@ -47,10 +52,16 @@
     "user": "Usuario",
     "company": "Compañia",
     "invoice": "Factura",
+    "template": "Factura currente",
+    "invoiced": "Facturado",
+    "estimate": "Cotización",
+    "order": "Pedido",
     "receiptOfPayment": "Recibo de Ingreso",
     "weHaveReceivedFrom": "Hemos recibido de",
     "address": "Dirección",
-    "billTo": "Facturado A",
+    "invoiceTo": "Facturado A",
+    "estimateTo": "Cotizado A",
+    "orderTo": "Pedido A",
     "item": "Producto",
     "contact": "Contacto",
     "profile": "Perfil",
@@ -68,6 +79,7 @@
     "price": "Precio",
     "notes": "Notas",
     "noNotesWasLeft": "No se dejó ninguna nota.",
+    "category": "Categoria",
     "createdBy": "Creado por",
     "paymentSummary": "Resumen de pago",
     "limitReached": "Límite alcanzado",
@@ -80,6 +92,16 @@
     "wasDeleted": ":subject fue eliminad@action con éxito!",
     "wasNotVoided": "No se anulo :subject. Algo salió mal.",
     "wasVoided": ":subject fue anulad@action con éxito!",
+    "somethingWentWrong": "Algo salió mal. Por favor, inténtalo de nuevo.",
+    "pendingVerification": "Ya tienes pendiente un cambio de correo electrónico a :email. Verifícalo antes de solicitar uno nuevo.",
+    "onlyCsvOrTxtAllowed": "Solo se permiten archivos CSV o TXT.",
+    "invalid": {
+      "totalChunkSize": "El tamaño total del archivo excede el límite permitido.",
+      "uploadId": "ID de carga no válido.",
+      "uploadAlreadyCompleted": "Esta carga ya ha sido completada.",
+      "missingChunks": "No se han subido todos los fragmentos.",
+      "notFoundChunks": "No se han subido ningún los fragmento."
+    },
     "visit": "Visita :to ",
     "city": "Ciudad",
     "credit_limit": "Limite de credito",
@@ -89,6 +111,50 @@
     "taxReceipt": "Tipo NCF",
     "days": "días",
     "type": "Tipo",
+    "import": {
+      "sampleFiles": "Utilice nuestro archivo de muestra para garantizar el formato correcto.",
+      "downloadCsv": "Descargar muestra CSV",
+      "downloadTxt": "Descargar muestra TXT",
+      "selectAnDelimiter": "Seleccione un delimitador",
+      "detectedDelimiter": "Delimitador detectado:",
+      "wrongDelimiter": "¿Incorrecto? Elige una opción diferente a continuación.",
+      "footnote": "Los archivos grandes pueden tardar unos minutos en importarse.",
+      "preview": "Vistas previas",
+      "clear": "Limpiar vista previa",
+      "upload": "Haga clic para cargar",
+      "dragAndDrop": "o arrastrar y soltar",
+      "headerRowsDetected": "Filas de encabezado detectadas • :columns columnas encontradas",
+      "showingFirstOf": "Mostrando las primeros :start de :total filas",
+      "encodingDetected": "Codificación detectada:",
+      "delimiters": {
+        "autoDetect": "Detección automática",
+        "comma": "Coma (,)",
+        "semicolon": "Punto y coma (;)",
+        "tab": "Tabulación (\t)",
+        "pipe": "Pipe (|)"
+      },
+      "states": {
+        "initializing": "Preparando la carga",
+        "uploading": "Subiendo…",
+        "processing": "Procesando CSV…",
+        "done": "Importación completada",
+        "queued": "Preparando la importación…",
+        "completed": "Importación completada",
+        "failed": "Error en la importación"
+      },
+      "phase": {
+        "reading_file": "Leyendo archivo…",
+        "normalizing_encoding": "Arreglando la codificación de texto…",
+        "mapping_columns": "Mapeo de columnas…",
+        "importing_rows": "Importando filas…"
+      }
+    },
+    "convertToInvoice": "Convertir a factura",
+    "duplicateInvoice": "Duplicar factura",
+    "duplicateAlert": {
+      "title": "Esta es una copia",
+      "description": "Esta es una copia de una factura. Revísela según sea necesario y guárdela."
+    },
     "nouns": {
       "customer": {
         "gender":"m"
@@ -103,12 +169,10 @@
       "yet": "No disponible aún"
     },
     "paidStatuses": {
-      "paid": "Pagada",
       "unpaid": "No pagada",
       "partial": "Parcialmente",
-      "overpaid": "Pagado en exceso",
-      "pending": "Pendiente",
-      "removed": "Eliminado",
+      "paid": "Pagada",
+      "refund": "Reembolsado",
       "completed": "Completo"
     },
     "paymentLinesPaidStatuses": {
@@ -123,6 +187,30 @@
     "warning": {
       "title": "Advertencia",
       "description": "Proceda con precaución, esto no es permanente."
+    },
+    "prerequisites": {
+      "title": "Acción bloqueada",
+      "description": "Antes de continuar con :resource, los siguientes elementos deben estar configurados u existir:",
+      "resources": {
+        "estimate": "la Cotización",
+        "invoice": "la Factura",
+        "item": "el Producto ó Servicio",
+        "payment": "el Recibo de Ingreso"
+      },
+      "missing": {
+        "customers": "Debe existir al menos un cliente.",
+        "items": "Debe existir al menos un producto ó servicio.",
+        "tax_sequence": "La secuencia de impuestos de la factura no está configurada.",
+        "order_sequence": "La secuencia de pedidos no está configurada.",
+        "units": "Debe existir al menos una unidad.",
+        "taxes": "Debe existir al menos una tasa impositiva.",
+        "invoices": "Debe existir al menos una factura.",
+        "expenses_categories": "Debe existir al menos una categoria de gastos."
+      },
+      "actions": {
+        "goToSettings": "Ir a ajustes",
+        "goToHome": "Ir al Panel"
+      }
     },
     "actions": {
       "title": "Acciones",
@@ -142,7 +230,10 @@
       "cancel": "Cancelar",
       "save": "Salvar",
       "checkout": "Metodo de pago",
-      "create": "Crear"
+      "create": "Crear",
+      "markAsRecurrent": "Marcar como recurrente",
+      "import": "Importar",
+      "mismatch": "El :subject no coincide"
     },
     "paymentMethods": {
       "primary": "Método primario",
@@ -178,6 +269,7 @@
     },
     "paymentTermsOptions": {
       "pia": "Pago por adelantado",
+      "net0": "Pago contra entrega",
       "net7": "7 días",
       "net10": "10 días",
       "net15": "15 días",
@@ -197,12 +289,22 @@
       "page": "Página",
       "selectedOf": ":rows de :total seleccionadas"
     },
+    "navGroups": {
+      "overview": "Resumen", 
+      "sales": "Ventas", 
+      "customersCatalog": "Clientes y Catálogo", 
+      "finance": "Finanzas", 
+      "analytics": "Análisis"
+    },
     "navMain": {
       "dashboard": "Panel",
       "invoices": "Facturas",
+      "estimates": "Cotizaciones",
+      "orders": "Pedidos",
       "customers": "Clientes",
       "items": "Productos",
       "payments": "Pagos",
+      "expenses": "Gastos",
       "reports": "Reportes"
     },
     "navSecondary": {
@@ -229,15 +331,89 @@
   },
   "dashboard": {
     "due_invoices": "Facturas vencidas",
+    "estimates": "Cotizaciones recientes",
+    "welcomeBoard": {
+      "title": "🚀 Tu recorrido de configuración",
+      "description": "Ya todo está listo para comenzar. Empieza creando un cliente o un producto y luego continúa con la emisión de facturas y la creación de presupuestos.",
+      "steps": {
+        "items": {
+          "customer": {
+            "name": "Crear un cliente",
+            "description": "Añade tu primer cliente."
+          },
+          "item": {
+            "name": "Agregar productos",
+            "description": "Define qué vendes."
+          },
+          "invoice": {
+            "name": "Iniciar facturación",
+            "description": "Generar facturas."
+          },
+          "estimate": {
+            "name": "Crear estimaciones",
+            "description": "Proporcionar cotizaciones por adelantado."
+          }
+        },
+        "completed": "Has completado :completed de :total pasos",
+        "done": "Completado",
+        "pending": "Pendiente"
+      }
+    },
     "stats": {
       "total_amount_due": "Monto total vencido",
       "customers": "Clientes",
-      "invoices": "Facturas"
+      "invoices": "Facturas",
+      "estimates": "Cotizaciones"
+    },
+    "chart": {
+      "title": "Ventas y gastos",
+      "last12Months": "Últimos 12 meses",
+      "legend": {
+        "sales": "Ventas",
+        "expenses": "Gastos"
+      },
+      "summary": {
+        "sales": "Total Ventas",
+        "expenses": "Total Gastos",
+        "receipts": "Total Ingresos",
+        "netIncome": "Total Ingresos netos"
+      },
+      "months": {
+        "jan": "Ene",
+        "feb": "Feb",
+        "mar": "Mar",
+        "apr": "Abr",
+        "may": "May",
+        "jun": "Jun",
+        "jul": "Jul",
+        "aug": "Ago",
+        "sep": "Sep",
+        "oct": "Oct",
+        "nov": "Nov",
+        "dec": "Dic"
+      }
+    },
+    "emptyState": {
+      "title": "No hay datos gráficos disponibles",
+      "description": "Intente seleccionar otro período o agregar facturas.",
+      "action": "Crear mi primera factura"
+    },
+    "statuses": {
+      "draft": "Borrador",
+      "sent": "Enviada",
+      "closed": "Cerrada"
     },
     "viewItem": {
       "invoice": {
         "title": "Ver Factura",
         "description": "Detalles de la factura seleccionada."
+      },
+      "estimate": {
+        "title": "Ver Cotización",
+        "description": "Detalles de la cotización seleccionada.",
+        "convertToInvoice": "Convertir a factura",
+        "markAsAccepted": "Marcar como aceptada",
+        "markAsRejected": "Marcar como rechazada"
       },
       "customer": {
         "title": "Ver Cliente",
@@ -315,6 +491,8 @@
     }
   },
   "users": {
+    "title": "Usuarios",
+    "description": "Administra tus usuarios y detalles de permisos.",
     "single": {
       "title": "Crear un nuevo usuario",
       "description": "Proporcione los detalles necesarios para configurar el usuario. Esta información le ayudará a identificar y gestionar dentro de su equipo el sistema."
@@ -324,8 +502,8 @@
       "description": "Detalles del usuario seleccionado."
     },
     "newUser": {
-      "title": "Nueva usuario",
-      "description": "Crea una nueva usuario."
+      "title": "+ Nuevo usuario",
+      "description": "Crea un nuevo usuario."
     },
     "editUser": {
       "title": "Editar usuario",
@@ -338,6 +516,10 @@
     "permissionUser": {
       "title": "Permisos",
       "description": "Maneja los permisos del usuario seleccionado."
+    },
+    "emptyState": {
+      "title": "Empieza agregando tu primer usuario",
+      "description": "Tu lista de usuarios está vacía. Añade un nuevo usuario para comenzar a gestionar y colaborar."
     }
   },
   "auth": {
@@ -355,7 +537,63 @@
     "sales": "Ventas",
     "expenses": "Gastos",
     "profit-lost": "Ganancias y Pérdidas",
-    "taxes": "Impuestos"
+    "taxes": "Impuestos",
+    "income": "Ingresos",
+    "pdf": {
+      "sales": {
+        "title": "Reporte de ventas: por :type",
+        "titleWithDetail": "Reporte de ventas: por :type (Detallado)",
+        "totalSales": "Total de ventas"
+      },
+      "grandTotal": "Total general",
+      "netProfit": "Beneficio neto",
+      "taxes": {
+        "title": "Reporte Fiscal"
+      },
+      "expenses": {
+        "title": "Reporte de Gastos"
+      },
+      "profit-lost": {
+        "title": "Reporte de Ganancias y Pérdidas"
+      },
+      "generatedBy": "Generado por :platform v0",
+      "noDataInRange": "No se encontraron datos para el rango seleccionado :start a :end."
+    },
+    "action": {
+      "idle": "Generar Reporte",
+      "processing": "Generando Reporte...",
+      "downloadPDF": "Descargar PDF"
+    },
+    "emptyState": {
+      "title": "Selecciona tus filtros y haz clic en generar reporte",
+      "description": "Una vez que hagas clic en <b>Generar Reporte</b>, los resultados aparecerán aquí."
+    },
+    "filters": {
+      "type": {
+        "title": "Tipo de reporte",
+        "sales_by_customer": "Ventas por cliente",
+        "sales_by_item": "Ventas por artículo",
+        "sales_by_date": "Ventas por fecha"
+      },
+      "showInvoice": {
+        "title": "Mostrar facturas",
+        "descriptionWhenAvailable": "Puede mostrar u ocultar facturas en cualquier momento",
+        "descriptionWhenNotAvailable": "Solo disponible para reportes por cliente o fecha."
+      },
+      "ranges": {
+        "today": "Hoy",
+        "this_week": "Esta semana",
+        "this_month": "Este mes",
+        "last_month": "Mes pasado",
+        "this_quarter": "Este trimestre",
+        "this_year": "Este año",
+        "previous_week": "Semana pasada",
+        "previous_month": "Mes pasado",
+        "previous_quarter": "Trimestre pasado",
+        "previous_year": "Año pasado",
+        "custom": "Personalizado"
+      }
+    }
   },
   "invoices": {
     "title": "Facturas",
@@ -363,6 +601,8 @@
     "paidStatus": "Pagada",
     "paymentTerms": "Condiciones de pago",
     "taxReceipt": "Tipo NCF",
+    "creditLimitExceeded": "Límite de crédito excedido",
+    "totalAmountDiffs": "Total de la factura no coincide con los detalles de pago",
     "line": {
       "form": {
         "placeholder": "Referencia o presione ⌘K",
@@ -410,23 +650,165 @@
       "cancel": "Cancelar"
     },
     "statuses": {
-      "open": "Abierta",
       "draft": "Borrador",
       "sent": "Enviada",
-      "viewed": "Vista",
       "overdue": "Atrasada",
-      "completed": "Terminada",
       "void": "Nula",
-      "partial": "Parcial"
+      "closed": "Cerrada",
+      "uncollectible": "Incobrable"
+    },
+    "source": {
+      "order": "Creada desde el pedido :order",
+      "estimate": "Convertido a partir de la cotización :estimate",
+      "template": "Generado automáticamente a partir de una programación recurrente",
+      "invoice": "Duplicado de la factura :invoice"
+    }
+  },
+  "estimates": {
+    "title": "Cotizaciones",
+    "description": "Aquí puedes ver y gestionar todas tus cotizaciones.",
+    "paidStatus": "Pagada",
+    "paymentTerms": "Condiciones de pago",
+    "taxReceipt": "Tipo NCF",
+    "line": {
+      "form": {
+        "placeholder": "Referencia o presione ⌘K",
+        "addNew": "Registrar nuevo artículo",
+        "search": "Escriba un nombre de artículo..."
+      }
+    },
+    "single": {
+      "title": "Cotización",
+      "description": "Detalles de la Cotización seleccionada.",
+      "payTo": "Pagar a",
+      "estimateTo": "Cotizado a",
+      "totalSummary": "Resumen total de la Cotización",
+      "closed": "Cotización convertido a :invoice ahora puedes rastrearlo como factura."
+    },
+    "viewEstimate": {
+      "title": "Ver Cotización",
+      "description": "Detalles de la cotización seleccionada."
+    },
+    "newEstimate": {
+      "title": "Nueva Cotización",
+      "description": "Crea una nueva cotización para enviar a tu cliente."
+    },
+    "editEstimate": {
+      "title": "Editar Cotización",
+      "description": "Edita los detalles de la cotización seleccionada."
+    },
+    "voidEstimate": {
+      "title": "Anular Cotización",
+      "description": "Anula los detalles de la cotización seleccionada."
+    },
+    "emptyState": {
+      "title": "Crea tu primera cotización",
+      "description": "Una vez que cree su cotización, aparecerá aquí."
+    },
+    "confirmsPassword": {
+      "title": "¿Estás seguro que deseas anular :estimate?",
+      "description": "¿Estás seguro de que deseas anular esta cotización? Esta acción no se puede deshacer. Una vez que la cotización quede nula pasará de :total a $0.00.",
+      "confirm": "Si, anular",
+      "cancel": "Cancelar"
+    },
+    "confirmsCancelation": {
+      "title": "¿Estás seguro que deseas cancelar?",
+      "description": "Esta acción no se puede deshacer. Eliminará permanentemente los cambios sin guardar de la cotización y los datos de nuestros servidores.",
+      "confirm": "Si, continuar",
+      "cancel": "Cancelar"
+    },
+    "statuses": {
+      "draft": "Borrador",
+      "sent": "Enviada",
+      "accepted": "Aceptada",
+      "rejected": "Rechazada",
+      "closed": "Terminada",
+      "void": "Nula"
+    },
+    "source": {
+      "invoice": "Convertida en factura :invoice"
+    }
+  },
+  "orders": {
+    "title": "Pedidos",
+    "description": "Aquí puedes ver y gestionar todos tus pedidos.",
+    "paidStatus": "Pagada",
+    "paymentTerms": "Condiciones de pago",
+    "taxReceipt": "Tipo NCF",
+    "line": {
+      "form": {
+        "placeholder": "Referencia o presione ⌘K",
+        "addNew": "Registrar nuevo artículo",
+        "search": "Escriba un nombre de artículo..."
+      }
+    },
+    "single": {
+      "title": "Pedido",
+      "description": "Detalles de la pedido seleccionada.",
+      "payTo": "Pagar a",
+      "invoiceTo": "Pedido a",
+      "totalSummary": "Resumen total de la pedido",
+      "closed": "Pedido facturado como :invoice ahora puedes rastrearlo como factura."
+    },
+    "viewOrder": {
+      "title": "Ver pedido",
+      "description": "Detalles de la pedido seleccionada."
+    },
+    "newOrder": {
+      "title": "Nuevo pedido",
+      "description": "Crea una nuevo pedido para enviar a tu cliente."
+    },
+    "editOrder": {
+      "title": "Editar pedido",
+      "description": "Edita los detalles de la pedido seleccionada."
+    },
+    "voidOrder": {
+      "title": "Anular pedido",
+      "description": "Anula los detalles del pedido seleccionada."
+    },
+    "emptyState": {
+      "title": "Crea tu primera pedido",
+      "description": "Una vez que cree su pedido, aparecerá aquí."
+    },
+    "confirmsPassword": {
+      "title": "¿Estás seguro que deseas anular :order?",
+      "description": "¿Estás seguro de que deseas anular este pedido? Esta acción no se puede deshacer. Una vez que la pedido quede nulo pasará de :total a $0.00.",
+      "confirm": "Si, anular",
+      "cancel": "Cancelar"
+    },
+    "confirmsCancelation": {
+      "title": "¿Estás seguro que deseas cancelar?",
+      "description": "Esta acción no se puede deshacer. Eliminará permanentemente los cambios sin guardar de la pedido y los datos de nuestros servidores.",
+      "confirm": "Si, continuar",
+      "cancel": "Cancelar"
+    },
+    "statuses": {
+      "open": "Abierto",
+      "draft": "Borrador",
+      "sent": "Enviado",
+      "viewed": "Visto",
+      "overdue": "Atrasado",
+      "completed": "Terminado",
+      "void": "Nulo",
+      "partial": "Parcial",
+      "closed": "Cerrado"
+    },
+    "source": {
+      "invoice": "Este pedido fue facturado como :invoice"
     }
   },
   "customers": {
     "title": "Clientes",
     "description": "Todos los clientes creados se muestran aquí.",
+    "viewAll": "Ver todos los clientes",
     "paidStatus": "Pagada",
     "paymentTerms": "Condiciones de pago",
     "taxReceipt": "Tipo NCF",
     "issueInvoice": "Facturar",
+    "import": {
+      "title": "Importación Masiva de Clientes",
+      "description": "Sube tu archivo de clientes, asigna cada columna a los campos del sistema y revisa los posibles errores o advertencias antes de procesar los registros. Ideal para migraciones o actualizaciones masivas."
+    },
     "single": {
       "title": "Cliente",
       "description": "Proporcione los detalles necesarios para configurar el cliente. Esta información le ayudará a identificar y gestionar dentro de su catalogo en el sistema.",
@@ -461,8 +843,18 @@
       "description": "Borra los detalles del cliente seleccionado."
     },
     "emptyState": {
-      "title": "Crea tu primer cliente",
-      "description": "Una vez que cree su cliente, aparecerá aquí."
+      "all": {
+        "title": "Crea tu primer cliente",
+        "description": "Una vez que cree su cliente, aparecerá aquí."
+      },
+      "individual": {
+        "title": "No hay resultados para este filtro",
+        "description": "No se encontraron clientes individuales. ¿Deseas ver la lista completa?"
+      },
+      "business": {
+        "title": "No hay resultados para este filtro",
+        "description": "No se encontraron clientes empresariales. ¿Deseas ver la lista completa?"
+      }
     },
     "confirmsPassword": {
       "title": "¿Estás seguro que deseas borrar a :customer?",
@@ -500,9 +892,14 @@
   "items": {
     "title": "Productos",
     "description": "Todos los productos creados se muestran aquí.",
+    "viewAll": "Ver todos los productos",
     "paidStatus": "Pagada",
     "paymentTerms": "Condiciones de pago",
     "taxReceipt": "Tipo NCF",
+    "import": {
+      "title": "Importación Masiva de Productos",
+      "description": "Carga grandes volúmenes de artículos con validación automática, detección de duplicados y registro detallado del proceso. Compatible con actualización de registros existentes."
+    },
     "line": {
       "form": {
         "placeholder": "Referencia o presione ⌘K",
@@ -535,8 +932,18 @@
       "description": "Borra los detalles del cliente seleccionado."
     },
     "emptyState": {
-      "title": "Crea tu primer producto",
-      "description": "Una vez que cree tus productos, aparecerán aquí."
+      "all": {
+        "title": "Crea tu primer producto/servicio",
+        "description": "Una vez que cree tus productos/servicios, aparecerán aquí."
+      },
+      "service": {
+        "title": "No hay resultados para este filtro",
+        "description": "No se encontraron servicios. ¿Deseas ver la lista completa?"
+      },
+      "product": {
+        "title": "No hay resultados para este filtro",
+        "description": "No se encontraron productos. ¿Deseas ver la lista completa?"
+      }
     },
     "confirmsPassword": {
       "title": "¿Estás seguro que deseas borrar a :item?",
@@ -629,6 +1036,127 @@
       "description": "Esta acción no se puede deshacer. Eliminará permanentemente los cambios sin guardar del pago y los datos de nuestros servidores.",
       "confirm": "Si, continuar",
       "cancel": "Cancelar"
+    }
+  },
+  "expenses": {
+    "title": "Gastos",
+    "description": "Todos los gastos registrados se muestran aquí.",
+    "single": {
+      "title": "Pago",
+      "description": "Detalles del pago seleccionado.",
+      "payTo": "Pagar a",
+      "paymentFrom": "Pago de",
+      "totalSummary": "Resumen total del pago",
+      "invoice": "Factura",
+      "viewInvoice": "Ver factura"
+    },
+    "viewExpense": {
+      "title": "Ver gasto",
+      "description": "Detalles del gasto seleccionado."
+    },
+    "newExpense": {
+      "title": "Nuevo gasto",
+      "description": "Registra un nuevo gasto."
+    },
+    "editExpense": {
+      "title": "Editar gasto",
+      "description": "Edita los detalles del gasto seleccionado"
+    },
+    "trashExpense": {
+      "title": "Archivar gasto",
+      "description": "Archiva los detalles del gasto seleccionado."
+    },
+    "emptyState": {
+      "title": "Registra tu primer gasto",
+      "description": "Una vez que registres tus gastos, aparecerán aquí."
+    },
+    "confirmsPassword": {
+      "title": "¿Estás seguro que deseas archivar el gasto :expense?",
+      "description": "¿Estás seguro de que deseas archivar este gasto? Esta acción no se puede deshacer. Una vez que el gasto quede archivado pasará de :total a $0.00.",
+      "confirm": "Si, archivalo",
+      "cancel": "Cancelar"
+    },
+    "archive": {
+      "title": "Archivar gasto",
+      "description": "Oculta este registro de tu vista principal sin eliminarlo. Los gastos archivados permanecen guardados y puedes desarchivarlos en cualquier momento."
+    },
+    "unarchive": {
+      "title": "Desarchivar gasto",
+      "description": "Restaura este registro a tu lista principal de gastos. El desarchivo te permite volver a ver y gestionar el gasto como de costumbre."
+    },
+    "confirmsCancelation": {
+      "title": "¿Estás seguro que deseas cancelar?",
+      "description": "Esta acción no se puede deshacer. Eliminará permanentemente los cambios sin guardar del gasto y los datos de nuestros servidores.",
+      "confirm": "Si, continuar",
+      "cancel": "Cancelar"
+    }
+  },
+  "profile": {
+    "title": "Configuraciones de la cuenta",
+    "description": "Administre la configuración de su cuenta y establezca las preferencias de correo electrónico.",
+    "memberSince": "Miembro desde",
+    "alert": {
+      "emailChangePending": "Tu cambio de correo electrónico está pendiente. Revisa tu bandeja de entrada en :email para verificar la nueva dirección."
+    },
+    "actions": {
+      "editProfile": "Editar perfil",
+      "updateProfile": "Actualizar perfil",
+      "changePassword": "Cambiar contraseña"
+    },
+    "companies": {
+      "title": "Compañias",
+      "description": "Gestionar empresas y configuraciones, secuencias y definiciones.",
+      "viewCompany": {
+        "title": "Ver compañia",
+        "description": "Detalles de la compañia seleccionada.",
+        "overview": {
+          "title": "Visión general",
+          "danger": "Si la empresa queda inhabilitada, todo lo relacionado con empleados, nóminas, ingresos, descuentos o cualquier otra acción ya no será aceptada.",
+          "dangerAction": "Inhabilitar empresa"
+        },
+        "sequences": "Secuencias",
+        "taxes": {
+          "title": "Impuestos",
+          "description": "Gestione los impuestos de su empresa y establezca preferencias de tasas."
+        },
+        "taxSequences": {
+          "title": "Secuencias de impuestos",
+          "description": "Gestione las secuencias de impuestos de su empresa."
+        },
+        "expenseCategories": {
+          "title": "Categoria de gastos",
+          "description": "Se requieren categorías para agregar entradas de gastos. Puede agregar o eliminar estas categorías según sus preferencias."
+        },
+        "units": {
+          "title": "Unidades",
+          "description": "Antes de comenzar a vender o registrar inventario, necesitas establecer la unidad de medida de tu producto. Esto asegura claridad en precios, cantidades y reportes (por ejemplo: pieza, caja, litro, kilogramo)."
+        },
+        "redirectPreferences":{
+          "title": "Preferencias de redirección",
+          "description": "Gestiona a dónde quieres ser redirigido después de la creación de una factura, un cliente, un presupuesto o un pedido.",
+          "afterCreatingInvoice": "Después de crear una factura",
+          "afterCreatingCustomer": "Después de crear un cliente",
+          "afterCreatingEstimate": "Después de crear una cotización",
+          "afterCreatingOrder": "Después de crear un pedido",
+          "afterCreatingPayment": "Después de crear un pago",
+          "afterCreatingItem": "Después de crear un producto",
+          "redirectToList": "Redirigir a la lista de :resource",
+          "redirectToDetail": "Redirigir al detalle de :resource",
+          "stayOnForm": "Permanecer en el formulario"
+        }
+      },
+      "newCompany": {
+        "title": "Nueva compañia",
+        "description": "Crea una nueva compañia para facturarle."
+      },
+      "editCompany": {
+        "title": "Editar compañia",
+        "description": "Edita los detalles de la compañia seleccionada"
+      },
+      "trashCompany": {
+        "title": "Borrar compañia",
+        "description": "Borra los detalles de la compañia seleccionada."
+      }
     }
   }
 }

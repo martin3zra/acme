@@ -4,6 +4,7 @@ export function useNumber() {
 
 // Set inCent to TRUE once the database structure is modified
 function currency(value: number | string, precision: number = 2, inCent: boolean = false): string {
+  if (value === null || value === undefined) return '';
   const formatter = new Intl.NumberFormat('en-US', {
     minimumFractionDigits: precision,
     maximumFractionDigits: precision,

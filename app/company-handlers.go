@@ -76,7 +76,35 @@ func (s *Server) companyUpdateSequences() routing.HandlerFunc {
 			return
 		}
 
-		ctx.Flash("success", "Sequences updated successfully!")
+		ctx.Flash("success", s.trans("global.wasUpdated", i18n.Replacements{"subject": "@profile.companies.viewCompany.sequences"}))
+
+		ctx.Redirect(fmt.Sprintf("/settings/%s/profile", ctx.Param("account")))
+	})
+}
+
+func (s *Server) companyUpdateRedirectPreferences() routing.HandlerFunc {
+	return routing.WithRequest(func(ctx *routing.Context, form *RedirectPreferencesForm) {
+
+		if err := s.updateRedirectPreferences(ctx.Request.Context(), ctx.Param("id"), form); err != nil {
+			ctx.Error(err)
+			return
+		}
+
+		ctx.Flash("success", s.trans("global.wasUpdated", i18n.Replacements{"subject": "@profile.companies.viewCompany.redirectPreferences.title"}))
+
+		ctx.Redirect(fmt.Sprintf("/settings/%s/profile", ctx.Param("account")))
+	})
+}
+
+func (s *Server) companyUpdateTaxReceipts() routing.HandlerFunc {
+	return routing.WithRequest(func(ctx *routing.Context, form *TaxReceiptsForm) {
+
+		if err := s.upsertTaxReceipts(ctx.Request.Context(), form); err != nil {
+			ctx.Error(err)
+			return
+		}
+
+		ctx.Flash("success", s.trans("global.wasUpdated", i18n.Replacements{"subject": "@profile.companies.viewCompany.taxSequences.title"}))
 
 		ctx.Redirect(fmt.Sprintf("/settings/%s/profile", ctx.Param("account")))
 	})

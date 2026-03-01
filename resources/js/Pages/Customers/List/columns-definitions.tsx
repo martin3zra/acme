@@ -34,7 +34,14 @@ export const getColumns = ({ onDidClick, t }: Props): ColumnDef<Customer>[] => {
           aria-label="Select all"
         />
       ),
-      cell: ({ row }) => <Checkbox checked={row.getIsSelected()} onCheckedChange={(value) => row.toggleSelected(!!value)} aria-label="Select row" />,
+      cell: (props) => {
+        return (
+          <div className="flex items-center space-x-2">
+            <Checkbox checked={props.row.getIsSelected()} onCheckedChange={(value) => props.row.toggleSelected(!!value)} aria-label="Select row" />
+            {props.row.original.customer_type === 'individual' ? <UserCheck className="size-4" /> : <Building className="size-4" />}
+          </div>
+        );
+      },
       enableSorting: false,
       enableHiding: false,
     },
@@ -49,27 +56,13 @@ export const getColumns = ({ onDidClick, t }: Props): ColumnDef<Customer>[] => {
       },
     },
     {
-      accessorKey: 'customer_type',
-      meta: t('global.type'),
-      size: 40,
-      header: (props) => {
-        return <HeaderCell title={t('global.type')} alignment="left" columnWidth={props.column.getSize()} className="px-0" />;
-      },
-      cell: (props) => {
-        if (props.row.original.customer_type === 'individual') {
-          return <UserCheck />;
-        }
-        return <Building />;
-      },
-    },
-    {
       accessorKey: 'name',
       meta: t('global.name'),
       header: ({ column }) => {
         return <HeaderSortCell<Customer> title={t('global.name')} column={column} />;
       },
       cell: (props) => {
-        return <TextCell columnWidth={props.column.getSize()} value={props.getValue() as string} />;
+        return <TextCell className="min-w-[320px] truncate" columnWidth={props.column.getSize()} value={props.getValue() as string} />;
       },
     },
     {
@@ -79,7 +72,7 @@ export const getColumns = ({ onDidClick, t }: Props): ColumnDef<Customer>[] => {
         return <HeaderCell title={t('global.contact')} alignment="left" columnWidth={props.column.getSize()} />;
       },
       cell: (props) => {
-        return <TextCell columnWidth={props.column.getSize()} value={props.getValue() as string} />;
+        return <TextCell className="min-w-[320px] truncate" columnWidth={props.column.getSize()} value={props.getValue() as string} />;
       },
     },
     {

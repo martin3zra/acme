@@ -1,10 +1,10 @@
 package app
 
 import (
+	_ "embed"
 	"encoding/json"
 	"fmt"
 	"math"
-	"path/filepath"
 	"regexp"
 	"strconv"
 	"strings"
@@ -78,7 +78,7 @@ func getNetDays(term string) int {
 		}
 	}
 
-	return 0 // Not a recognized "Net" term
+	return -1 // Not a recognized "Net" term
 }
 
 type WatermarkOpt struct {
@@ -152,26 +152,31 @@ type Font struct {
 	Path  string
 }
 
-func registerFonts(pdf *fpdf.Fpdf) error {
-	fonts := []Font{
-		{"DejaVu", "", "/fonts/DejaVuSans.ttf"},
-		{"DejaVu", "I", "/fonts/DejaVu-Oblique.ttf"},
-		{"DejaVu", "B", "/fonts/DejaVu-Bold.ttf"},
-	}
-	for _, font := range fonts {
-		absPath, err := filepath.Abs(font.Path)
-		if err != nil {
-			return err
-		}
-		pdf.AddUTF8Font(font.Name, font.Style, absPath)
-		if pdf.Error() != nil {
-			return pdf.Error()
-		}
-	}
+//go:embed fonts/DejaVuSans.ttf
+var dejavuRegular []byte
 
+//go:embed fonts/DejaVu-Oblique.ttf
+var dejavuItalic []byte
+
+//go:embed fonts/DejaVu-Bold.ttf
+var dejavuBold []byte
+
+func registerFonts(pdf *fpdf.Fpdf) error {
+	pdf.AddUTF8FontFromBytes("DejaVu", "", dejavuRegular)
 	if pdf.Error() != nil {
 		return pdf.Error()
 	}
+
+	pdf.AddUTF8FontFromBytes("DejaVu", "I", dejavuItalic)
+	if pdf.Error() != nil {
+		return pdf.Error()
+	}
+
+	pdf.AddUTF8FontFromBytes("DejaVu", "B", dejavuBold)
+	if pdf.Error() != nil {
+		return pdf.Error()
+	}
+
 	return nil
 }
 
@@ -194,113 +199,115 @@ func formatDate(t time.Time) string {
 	return t.Format("2006-01-02")
 }
 
+func dateWithTimeZone(date time.Time) time.Time {
+	loc, _ := time.LoadLocation("America/Santo_Domingo")
+	return date.In(loc)
+}
+
+func nowWithTimeZone() time.Time {
+	loc, _ := time.LoadLocation("America/Santo_Domingo")
+	return time.Now().In(loc)
+}
+
 func Today() PresetRange {
-	now := time.Now()
+	now := nowWithTimeZone()
 	return PresetRange{
-		Label: "Today",
-		Key:   "today",
-		From:  formatDate(now),
-		To:    formatDate(now),
+		Key:  "today",
+		From: formatDate(now),
+		To:   formatDate(now),
 	}
 }
 
 func ThisWeek() PresetRange {
-	now := time.Now()
-	weekday := int(now.Weekday())
-	// Go’s Weekday: Sunday=0, Monday=1...
-	start := now.AddDate(0, 0, -weekday)
+	now := nowWithTimeZone()
+	start := startOfWeek(now)
+	end := start.AddDate(0, 0, 6)
 	return PresetRange{
-		Label: "This Week",
-		Key:   "this_week",
-		From:  formatDate(start),
-		To:    formatDate(now),
+		Key:  "this_week",
+		From: formatDate(start),
+		To:   formatDate(end),
 	}
 }
 
 func ThisMonth() PresetRange {
-	now := time.Now()
+	now := nowWithTimeZone()
 	start := time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, now.Location())
 	return PresetRange{
-		Label: "This Month",
-		Key:   "this_month",
-		From:  formatDate(start),
-		To:    formatDate(now),
+		Key:  "this_month",
+		From: formatDate(start),
+		To:   formatDate(now),
 	}
 }
 
 func ThisQuarter() PresetRange {
-	now := time.Now()
-	month := (int(now.Month())-1)/3*3 + 1 // quarter start month
-	start := time.Date(now.Year(), time.Month(month), 1, 0, 0, 0, 0, now.Location())
+	now := nowWithTimeZone()
+	start := startOfQuarter(now)
 	return PresetRange{
-		Label: "This Quarter",
-		Key:   "this_quarter",
-		From:  formatDate(start),
-		To:    formatDate(now),
+		Key:  "this_quarter",
+		From: formatDate(start),
+		To:   formatDate(now),
 	}
 }
 
 func ThisYear() PresetRange {
-	now := time.Now()
+	now := nowWithTimeZone()
 	start := time.Date(now.Year(), 1, 1, 0, 0, 0, 0, now.Location())
 	return PresetRange{
-		Label: "This Year",
-		Key:   "this_year",
-		From:  formatDate(start),
-		To:    formatDate(now),
+		Key:  "this_year",
+		From: formatDate(start),
+		To:   formatDate(now),
 	}
 }
 
 func PreviousWeek() PresetRange {
-	now := time.Now()
+	now := nowWithTimeZone()
+
 	weekday := int(now.Weekday())
-	startOfThisWeek := now.AddDate(0, 0, -weekday)
+	offset := (weekday + 6) % 7 // Monday start
+
+	startOfThisWeek := now.AddDate(0, 0, -offset)
 	startOfPrevWeek := startOfThisWeek.AddDate(0, 0, -7)
-	endOfPrevWeek := startOfThisWeek.AddDate(0, 0, -1)
+	endOfPrevWeek := startOfPrevWeek.AddDate(0, 0, 6)
+
 	return PresetRange{
-		Label: "Previous Week",
-		Key:   "previous_week",
-		From:  formatDate(startOfPrevWeek),
-		To:    formatDate(endOfPrevWeek),
+		Key:  "previous_week",
+		From: formatDate(startOfPrevWeek),
+		To:   formatDate(endOfPrevWeek),
 	}
 }
 
 func PreviousMonth() PresetRange {
-	now := time.Now()
+	now := nowWithTimeZone()
 	firstOfThisMonth := time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, now.Location())
 	lastOfPrevMonth := firstOfThisMonth.AddDate(0, 0, -1)
 	startOfPrevMonth := time.Date(lastOfPrevMonth.Year(), lastOfPrevMonth.Month(), 1, 0, 0, 0, 0, now.Location())
 	return PresetRange{
-		Label: "Previous Month",
-		Key:   "previous_month",
-		From:  formatDate(startOfPrevMonth),
-		To:    formatDate(lastOfPrevMonth),
+		Key:  "previous_month",
+		From: formatDate(startOfPrevMonth),
+		To:   formatDate(lastOfPrevMonth),
 	}
 }
 
 func PreviousQuarter() PresetRange {
-	now := time.Now()
-	month := (int(now.Month())-1)/3*3 + 1
-	startOfThisQuarter := time.Date(now.Year(), time.Month(month), 1, 0, 0, 0, 0, now.Location())
+	now := nowWithTimeZone()
+	startOfThisQuarter := startOfQuarter(now)
 	startOfPrevQuarter := startOfThisQuarter.AddDate(0, -3, 0)
 	endOfPrevQuarter := startOfThisQuarter.AddDate(0, 0, -1)
 	return PresetRange{
-		Label: "Previous Quarter",
-		Key:   "previous_quarter",
-		From:  formatDate(startOfPrevQuarter),
-		To:    formatDate(endOfPrevQuarter),
+		Key:  "previous_quarter",
+		From: formatDate(startOfPrevQuarter),
+		To:   formatDate(endOfPrevQuarter),
 	}
 }
 
 func PreviousYear() PresetRange {
-	now := time.Now()
+	now := nowWithTimeZone()
 	startOfPrevYear := time.Date(now.Year()-1, 1, 1, 0, 0, 0, 0, now.Location())
 	endOfPrevYear := time.Date(now.Year()-1, 12, 31, 0, 0, 0, 0, now.Location())
 	return PresetRange{
-		Label: "Previous Year",
-		Key:   "previous_year",
-		From:  formatDate(startOfPrevYear),
-		To:    formatDate(endOfPrevYear),
+		Key:  "previous_year",
+		From: formatDate(startOfPrevYear),
+		To:   formatDate(endOfPrevYear),
 	}
 }
 
@@ -315,6 +322,51 @@ func DateRangePresets() []PresetRange {
 		PreviousMonth(),
 		PreviousQuarter(),
 		PreviousYear(),
-		{Label: "Custom", Key: "custom"},
+		{Key: "custom"},
 	}
+}
+
+func startOfWeek(t time.Time) time.Time {
+	weekday := int(t.Weekday())
+	offset := (weekday + 6) % 7 // Monday start
+	return t.AddDate(0, 0, -offset)
+}
+
+func startOfQuarter(t time.Time) time.Time {
+	month := (int(t.Month())-1)/3*3 + 1
+	return time.Date(t.Year(), time.Month(month), 1, 0, 0, 0, 0, t.Location())
+}
+
+// redirectAfterCreate builds the redirect URL based on kind, entity ID, and user preference.
+func redirectAfterCreate(kind string, id string, pref RedirectPreferencesValue) string {
+	switch pref {
+	case RedirectPreference.List:
+		return fmt.Sprintf("/%ss", kind) // e.g. /invoices
+	case RedirectPreference.Detail:
+		return fmt.Sprintf("/%ss?id=%s", kind, id) // e.g. /invoices?id=123
+	case RedirectPreference.Stay:
+		return fmt.Sprintf("/%ss/create", kind) // e.g. /invoices/create
+	default:
+		// fallback to list
+		return fmt.Sprintf("/%ss", kind)
+	}
+}
+
+func debugSQL(query string, args []any) string {
+	for i, arg := range args {
+		placeholder := fmt.Sprintf("$%d", i+1)
+
+		var value string
+		switch v := arg.(type) {
+		case string:
+			value = fmt.Sprintf("'%s'", v)
+		case time.Time:
+			value = fmt.Sprintf("'%s'", v.Format("2006-01-02"))
+		default:
+			value = fmt.Sprintf("%v", v)
+		}
+
+		query = strings.ReplaceAll(query, placeholder, value)
+	}
+	return query
 }

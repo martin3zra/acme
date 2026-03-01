@@ -1,5 +1,6 @@
 import { ConfirmsPassword } from '@/components/confirms-password';
 import HeadingSmall from '@/components/heading-small';
+import { ImportDrawer } from '@/components/import-zone';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { useVerb } from '@/composables/use-verbs';
@@ -7,7 +8,7 @@ import { useTranslation } from '@/hooks/use-translation';
 import AppLayout from '@/layouts/app-layout';
 import { Item, ItemTypeFilter, PageProps, Tax, Unit, Verb } from '@/types';
 import { Deferred, router, usePage } from '@inertiajs/react';
-import { Plus } from 'lucide-react';
+import { FileUp, Plus } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { breadcrumbs } from './constants';
 import { List } from './List/Index';
@@ -19,12 +20,14 @@ export default function Index({
   taxes,
   units,
   currentItemTypeFilter,
-}: PageProps<{ items: Item[]; taxes: Tax[]; units: Unit[]; currentItemTypeFilter: ItemTypeFilter }>) {
+  openState,
+}: PageProps<{ openState: boolean; items: Item[]; taxes: Tax[]; units: Unit[]; currentItemTypeFilter: ItemTypeFilter }>) {
   const t = useTranslation().trans;
   const page = usePage<PageProps>();
   const [loadingItem, setLoadingItem] = useState<boolean>(false);
-  const [open, setOpen] = useState(false);
-  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [open, setOpen] = useState<boolean>(openState);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState<boolean>(false);
+  const [importSheetOpen, setImportSheetOpen] = useState<boolean>(false);
   const [selectedItem, setSelectedItem] = useState<CreateFormParams>({
     item: undefined,
     taxes,
@@ -82,10 +85,15 @@ export default function Index({
             title={t('items.title')}
             description={t('items.description')}
             rightPanel={
-              <Deferred data={['taxes', 'units']} fallback={<div>Loading...</div>}>
-                <Button onClick={onCreateNewItem}>
-                  <Plus /> {t('items.newItem.title')}
-                </Button>
+              <Deferred data={open ? [] : ['taxes', 'units']} fallback={<div>Loading...</div>}>
+                <div className="flex space-x-2">
+                  <Button onClick={onCreateNewItem}>
+                    <Plus /> {t('items.newItem.title')}
+                  </Button>
+                  <Button onClick={() => setImportSheetOpen(true)}>
+                    <FileUp /> {t('global.actions.import')}
+                  </Button>
+                </div>
               </Deferred>
             }
           />
@@ -93,13 +101,23 @@ export default function Index({
 
         {!hasItems && (
           <>
-            <div className="absolute top-1/2 left-1/2 flex h-[244px] min-w-3xl -translate-x-1/2 -translate-y-1/2 flex-col items-center gap-4 rounded-[16px] bg-white p-[40px] shadow-[0px_8px_12px_-4px_rgba(16,12,12,0.08),0px_0px_2px_rgba(16,12,12,0.1),0px_1px_2px_rgba(16,12,12,0.1)]">
-              <h4 className="text-2xl">{t('items.emptyState.title')}</h4>
-              <p className="text-sm text-gray-400">{t('items.emptyState.description')}</p>
-              <Deferred data="attributes" fallback={<div>Loading...</div>}>
-                <Button onClick={onCreateNewItem}>
-                  <Plus /> {t('items.newItem.title')}
-                </Button>
+            <div className="absolute top-1/2 left-1/2 flex h-61 min-w-3xl -translate-x-1/2 -translate-y-1/2 flex-col items-center gap-4 rounded-3xl bg-white p-10 shadow-[0px_8px_12px_-4px_rgba(16,12,12,0.08),0px_0px_2px_rgba(16,12,12,0.1),0px_1px_2px_rgba(16,12,12,0.1)]">
+              <h4 className="text-2xl">{t(`items.emptyState.${currentItemTypeFilter}.title`)}</h4>
+              <p className="text-sm text-gray-400">{t(`items.emptyState.${currentItemTypeFilter}.description`)}</p>
+              <Deferred data={open ? [] : ['taxes', 'units']} fallback={<div>Loading...</div>}>
+                <div className="flex space-x-3">
+                  {currentItemTypeFilter !== 'all' && (
+                    <Button variant={'outline'} onClick={() => onItemFilterTypeChange('all')}>
+                      {t('items.viewAll')}
+                    </Button>
+                  )}
+                  <Button onClick={onCreateNewItem}>
+                    <Plus /> {t('items.newItem.title')}
+                  </Button>
+                  <Button onClick={() => setImportSheetOpen(true)}>
+                    <FileUp /> {t('global.actions.import')}
+                  </Button>
+                </div>
               </Deferred>
             </div>
           </>
@@ -114,9 +132,9 @@ export default function Index({
           />
         )}
 
-        {loadingItem && (
+        {!loadingItem && (
           <Sheet open={open} onOpenChange={onOpenChange}>
-            <SheetContent side="right" className="m-4 flex h-[calc(~'(100%-var(--spacing)*4)/3')] w-full flex-col rounded-md sm:max-w-7xl">
+            <SheetContent side="right" className="m-4 flex h-[calc(~'(100%_-_var(--spacing)_*_4)_/_3')] w-full flex-col rounded-md sm:max-w-7xl">
               <SheetHeader>
                 <SheetTitle>
                   {t(`global.actions.${verbName}`)} {t('global.item')}
@@ -141,6 +159,7 @@ export default function Index({
             onOpenChange={modalHandler}
           />
         )}
+        <ImportDrawer source="items" openImportDrawer={importSheetOpen} setImportDrawer={setImportSheetOpen} />
       </div>
     </AppLayout>
   );

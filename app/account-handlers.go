@@ -257,7 +257,7 @@ func (s *Server) accountProfileHandler(ctx *routing.Context) {
 	}
 
 	props := map[string]any{
-		"translations": trans("companies", "users"),
+		"translations": trans("companies", "users", "profile"),
 		"companies":    companies,
 		"users":        users,
 		"roles":        RoleMap,
@@ -307,8 +307,47 @@ func (s *Server) accountProfileHandler(ctx *routing.Context) {
 			return
 		}
 
+		taxes, err := s.findTaxes(ctx.Request.Context())
+		if err != nil {
+			ctx.Error(err)
+			return
+		}
+
+		preferences, err := s.findRedirectPreferences(ctx.Request.Context(), CurrentCompany(ctx.Request.Context()).UUID)
+		if err != nil {
+			log.Printf("Error fetching redirect preferences: %v", err)
+			ctx.Back()
+			return
+		}
+
+		taxReceipts, err := s.findTaxReceiptsForSetup(ctx.Request.Context())
+		if err != nil {
+			log.Printf("Error fetching tax receipts for setup: %v", err)
+			ctx.Back()
+			return
+		}
+
+		categories, err := s.findExpensesCategories(ctx.Request.Context())
+		if err != nil {
+			log.Printf("Error fetching tax receipts for setup: %v", err)
+			ctx.Back()
+			return
+		}
+
+		units, err := s.findUnits(ctx.Request.Context())
+		if err != nil {
+			log.Printf("Error fetching units: %v", err)
+			ctx.Back()
+			return
+		}
+
 		company.Sequences = &sequences.Sequence
 		company.SeqLastUpdatedAt = &sequences.UpdatedAt
+		company.Taxes = taxes
+		company.RedirectPreferences = preferences.Redirect
+		company.TaxReceipts = taxReceipts
+		company.ExpenseCategories = categories
+		company.Units = units
 		props["company"] = company
 
 		props["initialState"] = true
@@ -332,14 +371,14 @@ func (s *Server) updateAccountProfileHandler() routing.HandlerFunc {
 		uuid := ctx.Param("account")
 		user, err := s.findUserByAccountUUID(uuid)
 		if err != nil {
-			s.session.Errors("name", "Something wrong happened")
+			s.session.Errors("name", s.trans("global.somethingWentWrong"))
 			log.Println("errors", err.Error())
 			ctx.Back()
 			return
 		}
 
 		if err := s.updateProfile(uuid, form); err != nil {
-			s.session.Errors("name", "Something wrong happened")
+			s.session.Errors("name", s.trans("global.somethingWentWrong"))
 			log.Println("errors", err.Error())
 			ctx.Back()
 			return
@@ -347,7 +386,7 @@ func (s *Server) updateAccountProfileHandler() routing.HandlerFunc {
 
 		if !strings.EqualFold(user.Email, form.Email) {
 			if user.PendingEmail != nil {
-				s.session.Errors("email", fmt.Sprintf("You already have a pending email change to %s. Please verify it before requesting a new one.", *user.PendingEmail))
+				s.session.Errors("email", s.trans("global.pendingVerification", i18n.Replacements{"email": *user.PendingEmail}))
 				ctx.Back()
 				return
 			}

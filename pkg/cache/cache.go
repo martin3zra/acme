@@ -4,6 +4,8 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+
+	"github.com/martin3zra/acme/pkg/database"
 )
 
 type Cache interface {
@@ -13,17 +15,17 @@ type Cache interface {
 }
 
 type PgCache struct {
-	db *sql.DB
+	q database.Querier
 }
 
-func NewPgCache(db *sql.DB) *PgCache {
-	return &PgCache{db: db}
+func NewPgCache(q database.Querier) *PgCache {
+	return &PgCache{q: q}
 }
 
 func (c *PgCache) Get(ctx context.Context, key string) ([]byte, bool, error) {
 	var payload []byte
 
-	err := c.db.QueryRowContext(ctx, `
+	err := c.q.QueryRowContext(ctx, `
         SELECT payload
         FROM preview_cache
         WHERE key = $1
@@ -40,7 +42,7 @@ func (c *PgCache) Get(ctx context.Context, key string) ([]byte, bool, error) {
 }
 
 func (c *PgCache) Set(ctx context.Context, key string, value []byte) error {
-	_, err := c.db.ExecContext(ctx, `
+	_, err := c.q.ExecContext(ctx, `
         INSERT INTO preview_cache (key, payload)
         VALUES ($1, $2)
         ON CONFLICT (key)
@@ -51,7 +53,7 @@ func (c *PgCache) Set(ctx context.Context, key string, value []byte) error {
 }
 
 func (c *PgCache) Delete(ctx context.Context, key string) error {
-	_, err := c.db.ExecContext(ctx, `
+	_, err := c.q.ExecContext(ctx, `
         DELETE FROM preview_cache WHERE key = $1
     `, key)
 	return err

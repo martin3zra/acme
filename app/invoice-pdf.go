@@ -2,8 +2,7 @@ package app
 
 import (
 	"bytes"
-	"context"
-	"encoding/base64"
+	_ "embed"
 	"fmt"
 	"net/http"
 	"strconv"
@@ -14,15 +13,23 @@ import (
 	"github.com/martin3zra/acme/pkg/i18n"
 )
 
+//go:embed assets/logo.b64
+var logoBase64 []byte
+
 type InvoicePDF struct {
 	pdf     *fpdf.Fpdf
 	trans   *i18n.Translator
 	invoice *invoice
 	lines   []*line
+	logo    []byte
 }
 
 func NewInvoicePDF(trans *i18n.Translator, i *invoice, lines []*line) (*InvoicePDF, error) {
 
+	logo, err := decodeLogo()
+	if err != nil {
+		return nil, err
+	}
 	pdf := fpdf.New("P", "mm", "A4", "")
 	pdf.SetMargins(15, 20, 15)
 	pdf.SetAutoPageBreak(true, 25)
@@ -35,7 +42,7 @@ func NewInvoicePDF(trans *i18n.Translator, i *invoice, lines []*line) (*InvoiceP
 	}
 
 	pdf.SetFont("DejaVu", "", 11)
-	return &InvoicePDF{pdf: pdf, trans: trans, invoice: i, lines: lines}, pdf.Error()
+	return &InvoicePDF{pdf: pdf, trans: trans, invoice: i, lines: lines, logo: logo}, pdf.Error()
 }
 
 func (i *InvoicePDF) t(key string, replacements ...i18n.Replacements) string {
@@ -43,49 +50,57 @@ func (i *InvoicePDF) t(key string, replacements ...i18n.Replacements) string {
 }
 
 func (i *InvoicePDF) AddLogo() {
-	logoBytes, err := base64.StdEncoding.DecodeString(logoBase64)
-	if err == nil {
-		i.pdf.RegisterImageOptionsReader("logo", fpdf.ImageOptions{
-			ImageType: "PNG",
-		}, bytes.NewReader(logoBytes))
-		i.pdf.ImageOptions("logo", 15, 10, 30, 0, false, fpdf.ImageOptions{
-			ImageType: "PNG",
-		}, 0, "")
-	}
+	i.pdf.RegisterImageOptionsReader("logo", fpdf.ImageOptions{
+		ImageType: "PNG",
+	}, bytes.NewReader(i.logo))
+	i.pdf.ImageOptions("logo", 15, 10, 30, 0, false, fpdf.ImageOptions{
+		ImageType: "PNG",
+	}, 0, "")
 }
 
-func (i *InvoicePDF) Header(ctx context.Context) {
+func (i *InvoicePDF) Header(company *Company) {
 	i.AddLogo()
 
-	company := CurrentCompany(ctx)
 	// Company Info (top left)
 	i.pdf.SetFont("DejaVu", "", 10)
 	i.pdf.SetXY(50, 10)
-	i.pdf.MultiCell(80, 5, fmt.Sprintf("%s\n%s\n%s", company.Name, company.Address, ""), "", "", false)
+	i.pdf.MultiCell(80, 5, fmt.Sprintf("%s\n%s\n%s", company.Name, company.Address+"\n"+company.City, ""), "", "", false)
 	i.pdf.SetXY(50, 25)
 	i.pdf.CellFormat(80, 6, fmt.Sprintf("%s: %s", i.t("companies.single.rnc_short"), company.Identifier), "", 1, "", false, 0, "")
 
 	// Invoice Info (top right)
 	i.pdf.SetXY(150, 10)
-	i.pdf.CellFormat(0, 6, fmt.Sprintf("%s: %s", i.t("global.invoice"), i.invoice.Number), "", 1, "R", false, 0, "")
-	i.pdf.CellFormat(0, 6, fmt.Sprintf("NCF: %s", i.invoice.NCF), "", 1, "R", false, 0, "")
+	i.pdf.CellFormat(0, 6, fmt.Sprintf("%s: %s", i.t(fmt.Sprintf("global.%s", i.invoice.Kind)), i.invoice.Number), "", 1, "R", false, 0, "")
+	if i.invoice.Kind == TransactionKinds.Invoice {
+		i.pdf.CellFormat(0, 6, fmt.Sprintf("NCF: %s", *i.invoice.NCF), "", 1, "R", false, 0, "")
+	}
 	i.pdf.CellFormat(0, 6, fmt.Sprintf("%s: %s", i.t("global.date"), i.invoice.Date.Format("2006-01-02")), "", 1, "R", false, 0, "")
-
+	if i.invoice.Kind != TransactionKinds.Invoice {
+		i.pdf.Ln(6)
+	}
 	i.pdf.Ln(10)
 	i.pdf.Line(15, i.pdf.GetY(), 195, i.pdf.GetY())
 	i.pdf.Ln(10)
 
 	// BILL TO & PAYMENT
 	i.pdf.SetFont("DejaVu", "B", 10)
-	i.pdf.CellFormat(90, 6, strings.ToUpper(i.t("global.billTo")), "", 0, "", false, 0, "")
-	i.pdf.CellFormat(90, 6, strings.ToUpper(i.t("global.paymentTerms")), "", 1, "", false, 0, "")
+	i.pdf.CellFormat(90, 6, strings.ToUpper(i.t(fmt.Sprintf("global.%sTo", i.invoice.Kind))), "", 0, "", false, 0, "")
+	if i.invoice.Kind == TransactionKinds.Invoice {
+		i.pdf.CellFormat(90, 6, strings.ToUpper(i.t("global.paymentTerms")), "", 1, "", false, 0, "")
+	} else {
+		i.pdf.Ln(6)
+	}
 	i.pdf.SetFont("DejaVu", "", 10)
 
 	i.pdf.CellFormat(90, 6, i.invoice.Customer.Name, "", 0, "", false, 0, "")
 	if i.invoice.DueOn != nil {
 		i.pdf.CellFormat(90, 6, fmt.Sprintf("%s %s", i.t("global.dueDate"), i.invoice.DueOn.Format("2006-01-02")), "", 1, "", false, 0, "")
 	} else {
-		i.pdf.CellFormat(90, 6, strings.ToUpper(i.invoice.Terms), "", 1, "", false, 0, "")
+		if i.invoice.Kind == TransactionKinds.Invoice {
+			i.pdf.CellFormat(90, 6, strings.ToUpper(i.invoice.Terms), "", 1, "", false, 0, "")
+		} else {
+			i.pdf.Ln(6)
+		}
 	}
 	i.pdf.CellFormat(90, 6, fmt.Sprintf("%s: %s", i.t("global.email"), i.invoice.Customer.Email), "", 0, "", false, 0, "")
 	if i.invoice.DueOn != nil {
@@ -111,15 +126,6 @@ func (i *InvoicePDF) Footer(text string) {
 			0, 10, footer, "", 0, "C", false, 0, "",
 		)
 	})
-
-	if strings.TrimSpace(i.invoice.Notes) != "" {
-		i.pdf.SetY(i.pdf.GetY() + 20)
-		i.pdf.SetFont("DejaVu", "B", 10)
-		i.pdf.CellFormat(30, 8, i.t("global.notes"), "", 0, "L", false, 0, "")
-		i.pdf.Ln(6)
-		i.pdf.SetFont("DejaVu", "", 10)
-		i.pdf.CellFormat(100, 8, i.invoice.Notes, "", 0, "L", false, 0, "")
-	}
 }
 
 func (i *InvoicePDF) Lines() {
@@ -128,7 +134,7 @@ func (i *InvoicePDF) Lines() {
 	i.pdf.SetFillColor(240, 240, 255)
 	headers := []string{i.t("global.reference"), i.t("global.item"), i.t("global.unit"), i.t("global.qtyAbrev"), i.t("global.price"), i.t("global.tax"), i.t("global.amount")}
 	aligns := []string{"", "", "C", "C", "R", "R", "R"}
-	widths := []float64{30, 45, 15, 15, 25, 25, 25}
+	widths := []float64{33, 45, 15, 15, 25, 22, 25}
 
 	for idx, h := range headers {
 		i.pdf.CellFormat(widths[idx], 8, h, "1", 0, aligns[idx], true, 0, "")
@@ -136,7 +142,7 @@ func (i *InvoicePDF) Lines() {
 	i.pdf.Ln(-1)
 
 	// Table Body
-	i.pdf.SetFont("DejaVu", "", 10)
+	i.pdf.SetFont("DejaVu", "", 9)
 	var subtotal, totalTax float64
 	for _, line := range i.lines {
 		lineTotal := float64(line.Qty)*line.Price + line.Tax.Amount
@@ -160,11 +166,14 @@ func (i *InvoicePDF) Lines() {
 	i.pdf.Ln(10)
 
 	i.Totals(subtotal, totalTax)
-	i.watermark()
+	if i.invoice.Kind == TransactionKinds.Invoice {
+		i.watermark()
+	}
 }
 
 func (i *InvoicePDF) Totals(subtotal, totalTax float64) {
 
+	i.pdf.SetFont("DejaVu", "B", 10)
 	// Totals (Right-aligned)
 	rightX := 195.0
 	labelW := 30.0
@@ -177,8 +186,6 @@ func (i *InvoicePDF) Totals(subtotal, totalTax float64) {
 	i.pdf.Ln(2)
 
 	if strings.TrimSpace(i.invoice.Notes) != "" {
-		// pdf.Ln(10)
-		i.pdf.SetFont("DejaVu", "B", 10)
 		i.pdf.CellFormat(labelW, 8, i.t("global.notes"), "", 0, "L", false, 0, "")
 		i.pdf.Ln(6)
 		i.pdf.SetFont("DejaVu", "", 10)

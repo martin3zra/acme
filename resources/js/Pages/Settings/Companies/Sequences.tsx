@@ -2,6 +2,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Spinner } from '@/components/ui/spinner';
 import { useHeader } from '@/composables/use-headers';
 import { useTranslation } from '@/hooks/use-translation';
 import { PageProps, Replacements, SequenceConfig, Sequences } from '@/types';
@@ -54,7 +55,7 @@ export default function SequenceView({ uuid, sequences }: SeqProps) {
       return {
         invoice: data.sequences.invoice,
         customer: data.sequences.customer,
-        // estimate: data.sequences.estimate,
+        estimate: data.sequences.estimate,
         payment: data.sequences.payment,
       };
     });
@@ -62,27 +63,34 @@ export default function SequenceView({ uuid, sequences }: SeqProps) {
   };
 
   return (
-      <div className="max-w-4xl space-y-2 py-4 [&_[data-slot='card']]:gap-1">
-        {Object.entries(data.sequences).map(([module, value]) => (
-          <Card key={module}>
-            <CardHeader className="font-bold capitalize">{t(`global.${module}`)}</CardHeader>
-            {errors && <GroupedValidationList errors={errors} module={module} />}
-            <CardContent className="space-y-2">
-              {typeof value === 'object' && 'prefix' in value ? (
-                <SequenceRow t={t} module={module} type={null} config={value as SequenceConfig} onChange={updateField} />
-              ) : (
-                Object.entries(value as Record<string, SequenceConfig>).map(([sub, cfg]) => (
-                  <SequenceRow t={t} key={sub} module={module} type={sub} config={cfg} onChange={updateField} />
-                ))
-              )}
-            </CardContent>
-          </Card>
-        ))}
+    <div className="max-w-4xl space-y-2 py-4 **:data-[slot='card']:gap-1">
+      {Object.entries(data.sequences).map(([module, value]) => (
+        <Card key={module}>
+          <CardHeader className="font-bold capitalize">{t(`global.${module}`)}</CardHeader>
+          {errors && <GroupedValidationList errors={errors} module={module} />}
+          <CardContent className="space-y-2">
+            {typeof value === 'object' && 'prefix' in value ? (
+              <SequenceRow t={t} module={module} type={null} config={value as SequenceConfig} onChange={updateField} />
+            ) : (
+              Object.entries(value as Record<string, SequenceConfig>).map(([sub, cfg]) => (
+                <SequenceRow t={t} key={sub} module={module} type={sub} config={cfg} onChange={updateField} />
+              ))
+            )}
+          </CardContent>
+        </Card>
+      ))}
 
-        <Button onClick={handleSave} type="submit" disabled={processing} className="h-12 py-2 md:text-xl">
-          {t('global.save')}
-        </Button>
-      </div>
+      <Button onClick={handleSave} type="submit" disabled={processing} className="mt-1 py-2 md:text-xl">
+        {processing ? (
+          <>
+            <Spinner />
+            {t('global.saving')}
+          </>
+        ) : (
+          <>{t('global.save')}</>
+        )}
+      </Button>
+    </div>
   );
 }
 
@@ -91,7 +99,7 @@ type RowProps = {
   type: string | null;
   config: SequenceConfig;
   onChange: (module: string, type: string | null, field: keyof SequenceConfig, value: string | number) => void;
-  t: (key: string, replacements?: Replacements) => string
+  t: (key: string, replacements?: Replacements) => string;
 };
 
 function SequenceRow({ module, type, config, onChange, t }: RowProps) {

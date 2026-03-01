@@ -58,8 +58,26 @@ func (s *Server) bootRoutes() {
 					route.GET("/invoices/create", s.createInvoiceHandler).Can("create:invoice")
 					route.GET("/invoices/:id/edit", s.editInvoiceHandler).Can("update:invoice")
 					route.PUT("/invoices/:id/void", s.voidInvoiceHandler())
+					route.POST("/invoices/:id/recurrence", s.markInvoiceAsRecurrentHandler())
 					route.GET("/invoices/:id/print/:hash", s.printInvoiceHandler).Middleware(Signed)
 					route.PUT("/invoices/:id", s.updateInvoiceHandler())
+					route.GET("/invoices/:id", s.showInvoiceHandler)
+
+					route.GET("/estimates", s.invoicesHandler).Can("viewAny:estimate")
+					route.GET("/estimates/create", s.createInvoiceHandler).Can("create:estimate")
+					route.POST("/estimates", s.storeInvoiceHandler())
+					route.GET("/estimates/:id/edit", s.editInvoiceHandler).Can("update:estimate")
+					route.PUT("/estimates/:id/void", s.voidInvoiceHandler())
+					route.GET("/estimates/:id/print/:hash", s.printInvoiceHandler).Middleware(Signed)
+					route.PUT("/estimates/:id", s.updateInvoiceHandler())
+
+					route.GET("/orders", s.invoicesHandler).Can("viewAny:order")
+					route.GET("/orders/create", s.createInvoiceHandler).Can("create:order")
+					route.POST("/orders", s.storeInvoiceHandler())
+					route.GET("/orders/:id/edit", s.editInvoiceHandler).Can("update:order")
+					route.PUT("/orders/:id/void", s.voidInvoiceHandler())
+					route.GET("/orders/:id/print/:hash", s.printInvoiceHandler).Middleware(Signed)
+					route.PUT("/orders/:id", s.updateInvoiceHandler())
 
 					route.GET("/payments", s.paymentsHandler).Can("viewAny:payment")
 					route.POST("/payments", s.storePaymentHandler())
@@ -69,12 +87,37 @@ func (s *Server) bootRoutes() {
 					route.GET("/payments/:id/print/:hash", s.printPaymentHandler).Middleware(Signed)
 					route.PUT("/payments/:id", s.updatePaymentHandler())
 
+					route.GET("/expenses", s.expensesHandler).Can("viewAny:expense")
+					route.POST("/expenses", s.storeExpenseHandler())
+					route.DELETE("/expenses/:id", s.deleteExpenseHandler())
+					route.PUT("/expenses/:id", s.updateExpenseHandler())
+
 					route.GET("/reports/sales", s.reportSalesHandler).Can("viewAny:reports")
-					route.POST("/reports/sales", s.generateSalesReportHandler()) // .Can("viewAny:reports")
+					route.POST("/reports/sales", s.generateSalesReportHandler())
+
 					route.GET("/reports/profit-lost", s.reportProfitLostHandler).Can("viewAny:reports")
+					route.POST("/reports/profit-lost", s.generateProfitLostReportHandler())
+
 					route.GET("/reports/expenses", s.reportExpensesHandler).Can("viewAny:reports")
+					route.POST("/reports/expenses", s.generateExpensesReportHandler())
+
 					route.GET("/reports/taxes", s.reportTaxesHandler).Can("viewAny:reports")
-					route.POST("/reports/taxes", s.generateTaxesReportHandler()) // .Can("viewAny:reports")
+					route.POST("/reports/taxes", s.generateTaxesReportHandler())
+
+					route.POST("/taxes", s.storeTaxes())
+					route.PUT("/taxes/:id", s.updateTaxes())
+
+					route.POST("/expense-categories", s.storeExpenseCategoryHandler())
+					route.PUT("/expense-categories/:id", s.updateExpenseCategoryHandler())
+
+					route.POST("/units", s.storeUnitHandler())
+					route.PUT("/units/:id", s.updateUnitHandler())
+
+					route.POST("/uploads/init", s.startUploadChunkHandler())
+					route.POST("/uploads/chunks", s.uploadChunkHandler())
+					route.POST("/uploads/complete", s.completeUploadChunkHandler())
+
+					route.POST("/imports", s.startImportHandler())
 
 					route.GroupPrefix("/settings/:account", func(route *routing.Router) {
 						route.GET("/profile", s.accountProfileHandler)
@@ -82,6 +125,8 @@ func (s *Server) bootRoutes() {
 
 						route.GET("/companies", s.companyHandler).Can("viewAny:company")
 						route.PUT("/companies/:id/sequences", s.companyUpdateSequences())
+						route.PUT("/companies/:id/redirect-preferences", s.companyUpdateRedirectPreferences())
+						route.PUT("/companies/:id/tax-receipts", s.companyUpdateTaxReceipts())
 						route.POST("/users", s.storeUserHandler())
 						route.PUT("/users/:id", s.updateUserHandler())
 					})

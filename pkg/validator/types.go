@@ -1,7 +1,10 @@
 package validator
 
+import "reflect"
+
 var defaultRules = []string{
 	"required",
+	"required_if",
 	"max",
 	"min",
 	"gt",
@@ -61,6 +64,7 @@ type Validator struct {
 	ValidatesAttributes
 	errors   Errors
 	language *string
+	object   reflect.Value
 }
 
 type ConditionalRules struct {

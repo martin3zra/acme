@@ -2,6 +2,7 @@ package app
 
 import (
 	"fmt"
+	"log"
 
 	"github.com/martin3zra/acme/pkg/cache"
 	"github.com/martin3zra/acme/pkg/foundation"
@@ -33,13 +34,14 @@ func (s *Server) customersHandler(ctx *routing.Context) {
 		return
 	}
 	props := map[string]any{
+		"openState":                 ctx.Query("mode") == "creating",
 		"translations":              trans("customers"),
 		"customers":                 customers,
 		"currentCustomerTypeFilter": customerType,
 		"tax_receipts": foundation.MapSlice(taxReceipts, func(receipt *taxReceipt) map[string]any {
 			return map[string]any{
 				"id":        receipt.ID,
-				"name":      fmt.Sprintf("%s-%s", receipt.Type, receipt.Name),
+				"name":      fmt.Sprintf("%s-%s", receipt.Serie, receipt.Name),
 				"available": receipt.Current < receipt.SequenceEnd,
 			}
 		}),
@@ -55,6 +57,7 @@ func (s *Server) customersHandler(ctx *routing.Context) {
 			return
 		}
 		props["customer"] = data
+		props["openState"] = true
 	}
 
 	ctx.Render("Customers/Index", props)
@@ -87,6 +90,12 @@ func (s *Server) updateCustomerHandler() routing.HandlerFunc {
 		if err != nil {
 			ctx.BackWith("status", s.trans("global.wasNotUpdated", i18n.Replacements{"subject": "@global.customer"}))
 			return
+		}
+
+		c := cache.NewPgCache(s.db)
+		key := fmt.Sprintf("preview:customer:%s", ctx.Param("id"))
+		if err = c.Delete(ctx.Request.Context(), key); err != nil {
+			log.Printf("Error deleting cache: %v", err)
 		}
 
 		ctx.Flash("success", s.trans("global.wasUpdated", i18n.Replacements{"subject": "@global.customer"}))

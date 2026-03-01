@@ -189,33 +189,41 @@ func (s *Server) findItemsByReference(ctx context.Context, term string) (*item, 
 func (s *Server) storeItem(ctx context.Context, form *StoreItemForm) error {
 	companyID := CurrentCompany(ctx).ID
 	return database.WithTransaction(s.db, func(tx *sql.Tx) error {
-		stmt, err := tx.Prepare("INSERT INTO items (name, price, description, tax_id, item_type, identifiers, company_id) " +
-			"VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id")
-		if err != nil {
-			return err
-		}
-
-		var itemID int
-		err = stmt.QueryRow(
-			&form.Name,
-			form.Price,
-			form.Description,
-			form.TaxID,
-			form.ItemType,
-			foundation.ToJSON(form.Identifiers),
-			companyID,
-		).Scan(&itemID)
-
-		if err != nil {
-			return err
-		}
-
-		if err = s.attachItemUnit(tx, companyID, itemID, form.UnitID); err != nil {
-			return err
-		}
-
-		return nil
+		return s.storeItemInternal(tx, companyID, form)
 	})
+}
+
+func (s *Server) storeItemBackground(tx *sql.Tx, companyID int, form *StoreItemForm) error {
+	return s.storeItemInternal(tx, companyID, form)
+}
+
+func (s *Server) storeItemInternal(tx *sql.Tx, companyID int, form *StoreItemForm) error {
+	stmt, err := tx.Prepare("INSERT INTO items (name, price, description, tax_id, item_type, identifiers, company_id) " +
+		"VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id")
+	if err != nil {
+		return err
+	}
+
+	var itemID int
+	err = stmt.QueryRow(
+		&form.Name,
+		form.Price,
+		form.Description,
+		form.TaxID,
+		form.ItemType,
+		foundation.ToJSON(form.Identifiers),
+		companyID,
+	).Scan(&itemID)
+
+	if err != nil {
+		return err
+	}
+
+	if err = s.attachItemUnit(tx, companyID, itemID, form.UnitID); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func (s *Server) attachItemUnit(tx *sql.Tx, companyID, itemID, unitID int) error {

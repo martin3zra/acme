@@ -32,6 +32,7 @@ export const List: FC<Props> = ({ data, currentItemTypeFilter, onSelectItem, onI
   const [sorting, setSorting] = useState<SortingState>([]);
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
   const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({
+    description: false,
     'identifiers.code': false,
     'identifiers.sku': false,
     'identifiers.barcode': false,

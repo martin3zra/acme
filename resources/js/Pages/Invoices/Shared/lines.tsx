@@ -3,7 +3,7 @@ import { Command, CommandDialog, CommandGroup, CommandInput, CommandItem, Comman
 import { useNumber } from '@/composables/use-number';
 import { useDebounced } from '@/hooks/use-debounced';
 import { useTranslation } from '@/hooks/use-translation';
-import { Item, LineForm } from '@/types';
+import { Item, LineForm, TransactionKind } from '@/types';
 import { router } from '@inertiajs/react';
 import { LayoutListIcon } from 'lucide-react';
 import { useEffect, useState } from 'react';
@@ -12,6 +12,7 @@ import LinesForm from './lines-form';
 import Line from './lines-line';
 
 type LinesProps = {
+  kind: TransactionKind;
   items: Item[];
   lines: LineForm[];
   lineError?: string;
@@ -25,6 +26,7 @@ type LinesProps = {
   qtyInputRef: React.RefObject<HTMLInputElement | null>;
 };
 export const Lines = ({
+  kind,
   lineError,
   referenceInputRef,
   qtyInputRef,
@@ -68,11 +70,16 @@ export const Lines = ({
     handleKeyDown(event);
   };
 
+  const handleCreateNewItem = () => {
+    alert('this feature is not implemented yet. please create the item first and then add it to the invoice');
+  };
+
   return (
     <>
       <table className="w-full table-auto">
         <thead>
           <LinesForm
+            kind={kind}
             currentItem={currentItem}
             amount={amount}
             currency={currency}
@@ -102,7 +109,7 @@ export const Lines = ({
         )}
       </table>
       <CommandDialog open={open} onOpenChange={setOpen}>
-        <CommandInput placeholder={t('invoices.line.form.search')} value={typeof search === 'string' ? search : ''} onValueChange={setSearch} />
+        <CommandInput placeholder={t(`${kind}s.line.form.search`)} value={typeof search === 'string' ? search : ''} onValueChange={setSearch} />
         <Command>
           <CommandList className="min-h-40">
             <CommandGroup className="max-h-60 min-h-40 overflow-y-auto">
@@ -130,8 +137,8 @@ export const Lines = ({
           </CommandList>
         </Command>
         <div className="flex w-full items-center justify-center rounded-b-lg border bg-gray-100/25 py-2">
-          <button className="flex cursor-pointer items-center justify-center gap-x-2 text-indigo-400" onClick={() => alert('Create new item')}>
-            <LayoutListIcon className="size-4" /> {t('invoices.line.form.addNew')}
+          <button className="flex cursor-pointer items-center justify-center gap-x-2 text-indigo-400" onClick={handleCreateNewItem}>
+            <LayoutListIcon className="size-4" /> {t(`${kind}s.line.form.addNew`)}
           </button>
         </div>
       </CommandDialog>

@@ -2,17 +2,19 @@ import { NavMain } from '@/components/nav-main';
 import { NavSecondary } from '@/components/nav-secondary';
 import { NavUser } from '@/components/nav-user';
 import { Sidebar, SidebarContent, SidebarFooter, SidebarHeader, SidebarMenu, SidebarMenuButton, SidebarMenuItem } from '@/components/ui/sidebar';
+import { buildNavGroups } from '@/lib/utils';
 import { NavItem, PageProps } from '@/types';
 import { Link, usePage } from '@inertiajs/react';
 import {
   ChartArea,
   ClipboardList,
+  ClipboardPenLineIcon,
   CreditCard,
-  HelpCircleIcon,
   LayoutDashboardIcon,
   LayoutListIcon,
-  SearchIcon,
+  Receipt,
   SettingsIcon,
+  ShoppingCartIcon,
   UsersIcon,
 } from 'lucide-react';
 import * as React from 'react';
@@ -23,42 +25,55 @@ const navMain: NavItem[] = [
     title: 'global.navMain.dashboard',
     url: '/home',
     icon: LayoutDashboardIcon,
-    components: ['Home/Index'],
     requiredAbility: 'viewAny:dashboard',
   },
   {
     title: 'global.navMain.invoices',
     url: '/invoices',
     icon: ClipboardList,
-    components: ['Invoices/Index', 'Invoices/Create'],
     requiredAbility: 'viewAny:invoice',
+  },
+  {
+    title: 'global.navMain.estimates',
+    url: '/estimates',
+    icon: ClipboardPenLineIcon,
+    requiredAbility: 'viewAny:estimate',
+  },
+  {
+    title: 'global.navMain.orders',
+    url: '/orders',
+    icon: ShoppingCartIcon,
+    requiredAbility: 'viewAny:order',
   },
   {
     title: 'global.navMain.customers',
     url: '/customers',
     icon: UsersIcon,
-    components: ['Customers/Index'],
     requiredAbility: 'viewAny:customer',
   },
   {
     title: 'global.navMain.items',
     url: '/items',
     icon: LayoutListIcon,
-    components: ['Items/Index'],
     requiredAbility: 'viewAny:item',
   },
   {
     title: 'global.navMain.payments',
     url: '/payments',
     icon: CreditCard,
-    components: ['Payments/Index', 'Payments/Create'],
     requiredAbility: 'viewAny:payment',
+  },
+  {
+    title: 'global.navMain.expenses',
+    url: '/expenses',
+    icon: Receipt,
+    requiredAbility: 'viewAny:expense',
   },
   {
     title: 'global.navMain.reports',
     url: '/reports/sales',
     icon: ChartArea,
-    components: ['Reports/Sales/Index', 'Reports/ProfitLost/Index', 'Reports/Expenses/Index', 'Reports/Taxes/Index'],
+    match: ['/reports'],
     requiredAbility: 'viewAny:reports',
   },
 ];
@@ -67,25 +82,24 @@ const navSecondary: NavItem[] = [
   {
     title: 'global.navSecondary.settings',
     url: '/settings/:account/profile',
+    match: ['/settings'],
     icon: SettingsIcon,
-    components: [],
   },
-  {
-    title: 'global.navSecondary.get-help',
-    url: '#',
-    icon: HelpCircleIcon,
-    components: [],
-  },
-  {
-    title: 'global.navSecondary.search',
-    url: '#',
-    icon: SearchIcon,
-    components: [],
-  },
+  // {
+  //   title: 'global.navSecondary.get-help',
+  //   url: '#',
+  //   icon: HelpCircleIcon,
+  // },
+  // {
+  //   title: 'global.navSecondary.search',
+  //   url: '#',
+  //   icon: SearchIcon,
+  // },
 ];
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const { auth } = usePage<PageProps>().props;
+  const groups = buildNavGroups(navMain);
   return (
     <Sidebar variant="inset" {...props}>
       <SidebarHeader>
@@ -106,7 +120,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         </SidebarMenu>
       </SidebarHeader>
       <SidebarContent>
-        <NavMain items={navMain} />
+        <NavMain groups={groups} />
         <NavSecondary items={navSecondary} className="mt-auto" />
       </SidebarContent>
       <SidebarFooter>

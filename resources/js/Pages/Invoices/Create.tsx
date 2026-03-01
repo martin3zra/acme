@@ -1,4 +1,5 @@
 import { AlertDestructive } from '@/components/alert-destructive';
+import { DatePickerField } from '@/components/date-picker';
 import InputError from '@/components/input-error';
 import {
   AlertDialog,
@@ -11,45 +12,61 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
-import { Calendar } from '@/components/ui/calendar';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Separator } from '@/components/ui/separator';
+import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { useHeader } from '@/composables/use-headers';
 import { useNumber } from '@/composables/use-number';
 import { useDebounced } from '@/hooks/use-debounced';
 import { usePersistedState } from '@/hooks/use-persisted-state';
 import { useTranslation } from '@/hooks/use-translation';
 import AppLayout from '@/layouts/app-layout';
-import { addDays, cn, getNetDays, isNotEmpty, parsePaymentMethod } from '@/lib/utils';
+import { addDays, getDaysFromTerm, isNotEmpty, parsePaymentMethod } from '@/lib/utils';
 import {
   BTForm,
   CardForm,
   CashForm,
   CheckForm,
   Customer,
+  DiscountType,
   InvoiceForm,
   Item,
   LineForm,
   PageProps,
   PaymentMethod,
   PaymentTerm,
+  PaymentTermValue,
+  Recurrent,
   TaxReceipt,
+  TransactionKind,
 } from '@/types';
 import { Textarea } from '@headlessui/react';
 import { router, useForm, usePage } from '@inertiajs/react';
 import { format } from 'date-fns';
-import { CalendarIcon } from 'lucide-react';
+import { RefreshCwIcon } from 'lucide-react';
 import React, { useCallback, useEffect } from 'react';
-import { createBreadcrumbs, defaultDiscount, defaultInvoiceForm, paymentTerms } from './constants';
+import { defaultDiscount, defaultInvoiceForm, defaultReccurence, makeCreateBreadcrumbs, paymentTerms } from './constants';
 import CheckoutForm from './Shared/checkout-form';
 import { CustomerSection } from './Shared/customer-section';
 import { Lines } from './Shared/lines';
+import { RecurrenceForm } from './Shared/recurrence-form';
 
 interface InvoiceRedirectProps {
   redirectTo: string;
+}
+
+export interface InvoiceFormData {
+  customer_id: number;
+  terms: string;
+  tax_receipt: number;
+  lines: any[];
+  date: Date;
+  discount: DiscountType;
+  kind: string;
+  recurrence: Recurrent;
+  [key: string]: any;
 }
 
 export default function Create({
@@ -59,10 +76,22 @@ export default function Create({
   items,
   item,
   tax_receipts,
-}: PageProps<{ customers: Customer[]; customer: Customer; items: Item[]; item: Item; tax_receipts: TaxReceipt[] }>) {
+  kind,
+  showPaymentCTA,
+}: PageProps<{
+  customers: Customer[];
+  customer: Customer;
+  items: Item[];
+  item: Item;
+  tax_receipts: TaxReceipt[];
+  kind: TransactionKind;
+  showPaymentCTA: boolean;
+}>) {
+  const isInvoice = kind === 'invoice';
   const t = useTranslation().trans;
   const currency = useNumber().currency;
   const [open, setOpen] = React.useState(false);
+  const [markAsRecurrent, setMarkAsRecurrent] = React.useState(false);
   const [openCancelConfirmation, setCancelConfirmation] = React.useState(false);
   const [openCheckout, setCheckout] = React.useState(false);
   const [isEditing, setEditing] = React.useState(false);
@@ -71,22 +100,26 @@ export default function Create({
   const [search, setSearch] = React.useState('');
   const dedbouncedSearch = useDebounced(search, 500);
   const [amount, setAmount] = React.useState(0);
-  const [invoiceForm, setInvoiceForm, removeInvoiceForm] = usePersistedState<InvoiceForm>('invoice', {
+  const [invoiceForm, setInvoiceForm, removeInvoiceForm] = usePersistedState<InvoiceForm>(kind, {
     ...defaultInvoiceForm,
     header: { ...defaultInvoiceForm.header, customer: customer },
+    kind: kind,
   });
   const [currentItem, setCurrentItem] = React.useState<Item | undefined>(undefined);
 
   const { headers } = useHeader();
   const { errors: propsErrors } = usePage<PageProps>().props;
-  const { post, transform, processing, errors } = useForm({
+  const { setData, post, transform, processing, errors } = useForm<InvoiceFormData>({
     customer_id: 0,
     terms: 'pia',
     tax_receipt: 0,
     lines: [],
     date: new Date(),
     discount: defaultDiscount,
+    kind,
+    recurrence: defaultReccurence,
   });
+  const canEnableRecurrence = invoiceForm.header.customer !== undefined && invoiceForm.lines.length > 0;
 
   useEffect(() => setCurrentItem(item), [item]);
 
@@ -105,6 +138,7 @@ export default function Create({
   useEffect(() => {
     if (currentItem) {
       findCurrentItem();
+      qtyInputRef.current!.value = '1';
       qtyInputRef.current?.focus();
     }
   }, [currentItem, findCurrentItem]);
@@ -145,6 +179,10 @@ export default function Create({
         return;
       }
       if (event.currentTarget.name === 'qty' && currentItem != undefined) {
+        if (isNaN(event.currentTarget.valueAsNumber)) {
+          qtyInputRef.current!.value = '1';
+          setAmount(currentItem.price);
+        }
         processCurrentItem();
       }
     }
@@ -161,8 +199,12 @@ export default function Create({
       }
       setEditing(false);
     } else {
+      let amountValue = amount;
+      if (isNaN(amount)) {
+        amountValue = line.price * (qtyInputRef.current?.valueAsNumber || 0);
+      }
       // When searching for the current item, if exists on the invoice, then display current values, and update the qty
-      invoiceForm.lines.push({ ...line, qty: qtyInputRef.current?.valueAsNumber || 0, amount, action: 'added' });
+      invoiceForm.lines.push({ ...line, qty: qtyInputRef.current?.valueAsNumber || 0, amount: amountValue, action: 'added' });
     }
     setInvoiceForm(() => {
       return { ...invoiceForm, lines: [...invoiceForm.lines] };
@@ -193,8 +235,8 @@ export default function Create({
   const handleDateChange = (date: unknown) => {
     invoiceForm.header.date = date as Date;
     invoiceForm.header.due = undefined;
-    if (getNetDays(invoiceForm.header.terms) > 0) {
-      invoiceForm.header.due = addDays(invoiceForm.header.date, getNetDays(invoiceForm.header.terms));
+    if (invoiceForm.header.terms !== 'pia') {
+      invoiceForm.header.due = addDays(invoiceForm.header.date, getDaysFromTerm(invoiceForm.header.terms));
     }
 
     setInvoiceForm(() => {
@@ -202,11 +244,11 @@ export default function Create({
     });
   };
 
-  const handlePaymentTermsChange = (value: string) => {
+  const handlePaymentTermsChange = (value: PaymentTermValue) => {
     invoiceForm.header.terms = value;
 
-    if (getNetDays(invoiceForm.header.terms) > 0 && invoiceForm.header.date) {
-      invoiceForm.header.due = addDays(invoiceForm.header.date, getNetDays(invoiceForm.header.terms));
+    if (invoiceForm.header.terms !== 'pia' && invoiceForm.header.date) {
+      invoiceForm.header.due = addDays(invoiceForm.header.date, getDaysFromTerm(invoiceForm.header.terms));
     } else {
       invoiceForm.header.due = undefined;
     }
@@ -254,8 +296,10 @@ export default function Create({
 
   const performInvoiceCancelation = (event: React.MouseEvent<HTMLButtonElement>) => {
     event.preventDefault();
-    removeInvoiceForm();
-    router.get('/invoices');
+    router.get(`/${kind}s`);
+    setTimeout(() => {
+      removeInvoiceForm();
+    }, 300);
   };
 
   const handleCheckout = (event: React.MouseEvent<HTMLButtonElement>) => {
@@ -270,21 +314,59 @@ export default function Create({
     placedInvoice();
   };
 
+  const handleCancelRecurrence = () => {
+    setMarkAsRecurrent(false);
+  };
+
+  const handleRecurrenceSubmission = (recurrence: Recurrent) => {
+    setData('recurrence', { ...recurrence });
+    setInvoiceForm(() => {
+      return { ...invoiceForm, kind: 'template' };
+    });
+
+    handleCancelRecurrence();
+    placedInvoice();
+  };
+
   const placedInvoice = () => {
-    transform((data) => ({
-      ...data,
-      customer_id: invoiceForm.header.customer?.id,
-      date: invoiceForm.header.date,
-      terms: invoiceForm.header.terms,
-      tax_receipt: invoiceForm.header.taxReceipt,
-      discount: invoiceForm.header.discount,
-      notes: invoiceForm.header.notes || '',
-      lines: invoiceForm.lines.map((line) => {
-        return { id: line.id, qty: line.qty, unit: line.unit.id, price: line.price, rate: line.tax.rate, action: line.action };
-      }),
-      payment: invoiceForm.payment,
-    }));
-    post('/invoices', {
+    transform((data) => {
+      const payload: Record<string, any> = {
+        ...data,
+        customer_id: invoiceForm.header.customer?.id,
+        date: invoiceForm.header.date,
+        terms: invoiceForm.header.terms,
+        // tax_receipt: invoiceForm.header.taxReceipt,
+        discount: invoiceForm.header.discount,
+        notes: invoiceForm.header.notes || '',
+        kind: invoiceForm.kind,
+        lines: invoiceForm.lines.map((line) => {
+          return { id: line.id, qty: line.qty, unit: line.unit.id, price: line.price, rate: line.tax.rate, action: line.action };
+        }),
+        // payment: invoiceForm.payment,
+      };
+
+      if (isInvoice) {
+        // payload.terms = invoiceForm.header.terms;
+        payload.tax_receipt = invoiceForm.header.taxReceipt;
+        payload.discount = invoiceForm.header.discount;
+        payload.payment = invoiceForm.payment;
+        payload.source = invoiceForm.source;
+      } else {
+        payload.source = { type: 'template', id: '' };
+      }
+
+      if (invoiceForm.kind === 'template') {
+        payload.terms = invoiceForm.header.terms;
+        payload.tax_receipt = invoiceForm.header.taxReceipt;
+        payload.discount = invoiceForm.header.discount;
+      }
+
+      if (invoiceForm.kind !== 'template') {
+        payload.recurrence = null;
+      }
+      return payload;
+    });
+    post(`/${kind}s`, {
       ...headers,
       preserveState: 'errors',
       onSuccess: (event) => {
@@ -294,7 +376,7 @@ export default function Create({
           router.visit(page.props.redirectTo);
           return;
         }
-        router.visit('/invoices');
+        router.visit(`/${kind}s`);
       },
     });
   };
@@ -341,19 +423,38 @@ export default function Create({
     });
   };
 
+  const handleMarkAsRecurrent = (event: React.MouseEvent<HTMLButtonElement>) => {
+    setMarkAsRecurrent(true);
+  };
+
   return (
-    <AppLayout user={auth.user} breadcrumbs={createBreadcrumbs}>
+    <AppLayout user={auth.user} breadcrumbs={makeCreateBreadcrumbs(kind)}>
       <AppLayout.Actions>
         <div className="flex justify-end gap-x-6">
           <Button variant={'secondary'} onClick={() => setCancelConfirmation(true)}>
             {t('global.actions.cancel')}
           </Button>
-          <Button onClick={handleCheckout} disabled={processing || computeTotalAmount() === 0}>
-            {invoiceForm.header.terms === 'pia' ? t('global.actions.checkout') : t('global.actions.save')}
-          </Button>
+          {showPaymentCTA && (
+            <>
+              {isInvoice && (
+                <Button onClick={handleMarkAsRecurrent} disabled={processing || !canEnableRecurrence} className="bg-green-600 hover:bg-green-700">
+                  <RefreshCwIcon />
+                  {t('global.actions.markAsRecurrent')}
+                </Button>
+              )}
+              <Button onClick={handleCheckout} disabled={processing || computeTotalAmount() === 0}>
+                {invoiceForm.header.terms === 'pia' ? t('global.actions.checkout') : t('global.actions.save')}
+              </Button>
+            </>
+          )}
         </div>
       </AppLayout.Actions>
       <div className="grid h-full w-full grid-cols-12 grid-rows-[auto_1fr_auto] gap-y-4 bg-gray-50/10">
+        {invoiceForm.clonedFrom && (
+          <div className="col-span-12">
+            <AlertDestructive title={t('global.duplicateAlert.title')} description={t('global.duplicateAlert.description')} destroyable={false} />
+          </div>
+        )}
         {!openCheckout && propsErrors.status && (
           <div className="col-span-12">
             <AlertDestructive description={propsErrors.status} onDestroy={() => delete propsErrors.status} />
@@ -372,83 +473,82 @@ export default function Create({
           />
           <div className="grid grid-cols-12">
             <div className="col-span-6 flex flex-col gap-y-6">
-              <div className="flex flex-col gap-y-2">
-                <Label htmlFor="date">{t('global.date')}</Label>
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button
-                      variant={'outline'}
-                      className={cn('w-[280px] justify-start text-left font-normal', !invoiceForm.header.date && 'text-muted-foreground')}
+              <DatePickerField
+                id="date"
+                label={t('global.date')}
+                placeholder={t('global.datePlaceholder')}
+                value={invoiceForm.header.date}
+                onChange={handleDateChange}
+                error={errors.date}
+              />
+
+              {isInvoice && (
+                <div className="flex flex-col gap-y-2">
+                  <Label htmlFor="date">{t('global.dueDate')}</Label>
+                  <Label className="text-muted-foreground w-70 rounded-sm border p-2.5">
+                    {invoiceForm.header.due ? format(invoiceForm.header.due, 'PPP') : t('global.noAvailable.default')}
+                  </Label>
+                </div>
+              )}
+            </div>
+            {(isInvoice || kind === 'order') && (
+              <div className="col-span-6 flex flex-col gap-y-6">
+                <div className="flex flex-col gap-y-2">
+                  <Label htmlFor="paymentTerms">{t(`${kind}s.paymentTerms`)}</Label>
+                  <Select name="paymentTerms" onValueChange={handlePaymentTermsChange} value={invoiceForm.header.terms} required>
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="Select terms" />
+                    </SelectTrigger>
+                    <SelectContent className="">
+                      {paymentTerms.map((term: PaymentTerm) => (
+                        <SelectItem key={term.value} value={term.value}>
+                          {term.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <InputError className="mt-2" message={errors.terms} />
+                </div>
+                {isInvoice && (
+                  <div className="flex flex-col gap-y-2">
+                    <Label htmlFor="taxReceipt">{t('invoices.taxReceipt')}</Label>
+                    <Select
+                      name="taxReceipt"
+                      onValueChange={handleTaxReceiptChange}
+                      defaultValue={'0'}
+                      value={String(invoiceForm.header.taxReceipt)}
+                      required
                     >
-                      <CalendarIcon />
-                      {invoiceForm.header.date ? format(invoiceForm.header.date, 'PPP') : <span>{t('global.datePlaceholder')}</span>}
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0">
-                    <Calendar
-                      mode="single"
-                      defaultMonth={invoiceForm.header.date}
-                      selected={invoiceForm.header.date}
-                      onSelect={handleDateChange}
-                      initialFocus
-                    />
-                  </PopoverContent>
-                </Popover>
-                <InputError className="mt-2" message={errors.date} />
+                      <SelectTrigger className="w-full">
+                        <SelectValue placeholder="Select taxReceipt" />
+                      </SelectTrigger>
+                      <SelectContent className="">
+                        {tax_receipts.map((receipt) => (
+                          <SelectItem key={receipt.id} value={String(receipt.id)} disabled={!receipt.available}>
+                            {receipt.name}
+                            {!receipt.available && <span className="text-red-500">{t('global.limitReached')}</span>}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <InputError className="mt-2" message={errors.tax_receipt} />
+                  </div>
+                )}
               </div>
-              <div className="flex flex-col gap-y-2">
-                <Label htmlFor="date">{t('global.dueDate')}</Label>
-                <Label className="text-muted-foreground w-70 rounded-sm border p-2.5">
-                  {invoiceForm.header.due ? format(invoiceForm.header.due, 'PPP') : t('global.noAvailable.default')}
-                </Label>
+            )}
+            {!isInvoice && (
+              <div className="col-span-12 flex flex-col place-items-end gap-y-6">
+                <Button disabled={invoiceForm.lines.length === 0} onClick={placedInvoice}>
+                  {t('global.actions.save')}
+                </Button>
               </div>
-            </div>
-            <div className="col-span-6 flex flex-col gap-y-6">
-              <div className="flex flex-col gap-y-2">
-                <Label htmlFor="paymentTerms">{t('invoices.paymentTerms')}</Label>
-                <Select name="paymentTerms" onValueChange={handlePaymentTermsChange} value={invoiceForm.header.terms} required>
-                  <SelectTrigger className="w-full">
-                    <SelectValue placeholder="Select terms" />
-                  </SelectTrigger>
-                  <SelectContent className="">
-                    {paymentTerms.map((term: PaymentTerm) => (
-                      <SelectItem key={term.value} value={term.value}>
-                        {term.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <InputError className="mt-2" message={errors.terms} />
-              </div>
-              <div className="flex flex-col gap-y-2">
-                <Label htmlFor="taxReceipt">{t('invoices.taxReceipt')}</Label>
-                <Select
-                  name="taxReceipt"
-                  onValueChange={handleTaxReceiptChange}
-                  defaultValue={'0'}
-                  value={String(invoiceForm.header.taxReceipt)}
-                  required
-                >
-                  <SelectTrigger className="w-full">
-                    <SelectValue placeholder="Select taxReceipt" />
-                  </SelectTrigger>
-                  <SelectContent className="">
-                    {tax_receipts.map((receipt) => (
-                      <SelectItem key={receipt.id} value={String(receipt.id)} disabled={!receipt.available}>
-                        {receipt.name}
-                        {!receipt.available && <span className="text-red-500">{t('global.limitReached')}</span>}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <InputError className="mt-2" message={errors.tax_receipt} />
-              </div>
-            </div>
+            )}
           </div>
         </div>
         <div className="col-span-12">
           <div className="flex flex-col">
             <Lines
+              kind={kind}
               items={items}
               lines={invoiceForm.lines}
               lineError={errors.lines}
@@ -466,7 +566,7 @@ export default function Create({
         <div className="col-span-12 min-h-48">
           <div className="flex flex-col gap-y-2">
             <div className="grid grid-cols-12">
-              <div className="col-span-10 flex flex-col gap-y-2 p-2">
+              <div className="col-span-10 flex flex-col gap-y-2 py-2">
                 <Label className="text-sm/6 font-medium">{t('global.notes')}</Label>
                 <Textarea
                   name="notes"
@@ -540,30 +640,50 @@ export default function Create({
         <AlertDialog open={openCancelConfirmation} onOpenChange={setCancelConfirmation}>
           <AlertDialogContent>
             <AlertDialogHeader>
-              <AlertDialogTitle>{t('invoices.confirmsCancelation.title')}</AlertDialogTitle>
-              <AlertDialogDescription>{t('invoices.confirmsCancelation.description')}</AlertDialogDescription>
+              <AlertDialogTitle>{t(`${kind}s.confirmsCancelation.title`)}</AlertDialogTitle>
+              <AlertDialogDescription>{t(`${kind}s.confirmsCancelation.description`)}</AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
               <AlertDialogCancel>{t('global.cancel')}</AlertDialogCancel>
-              <AlertDialogAction onClick={performInvoiceCancelation}>{t('invoices.confirmsCancelation.confirm')}</AlertDialogAction>
+              <AlertDialogAction onClick={performInvoiceCancelation}>{t(`${kind}s.confirmsCancelation.confirm`)}</AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
-        <CheckoutForm
-          action={t('global.actions.save')}
-          openCheckout={openCheckout}
-          setCheckout={setCheckout}
-          paymentForm={invoiceForm.payment}
-          defaultPaymentForm={parsePaymentMethod(invoiceForm.header.customer?.payment_method || 'cash')}
-          totalAmount={computeTotalAmount()}
-          onCompleteCheckout={placedInvoice}
-          processing={processing}
-          setCancelConfirmation={setCancelConfirmation}
-          errors={propsErrors}
-          onCheckoutChange={handleCheckoutChange}
-          currency={currency}
-          t={t}
-        />
+        {kind === 'invoice' && (
+          <CheckoutForm
+            action={t('global.actions.save')}
+            openCheckout={openCheckout}
+            setCheckout={setCheckout}
+            paymentForm={invoiceForm.payment}
+            defaultPaymentForm={parsePaymentMethod(invoiceForm.header.customer?.payment_method || 'cash')}
+            totalAmount={computeTotalAmount()}
+            onCompleteCheckout={placedInvoice}
+            processing={processing}
+            setCancelConfirmation={setCancelConfirmation}
+            errors={propsErrors}
+            onCheckoutChange={handleCheckoutChange}
+            currency={currency}
+            t={t}
+          />
+        )}
+        {kind === 'invoice' && markAsRecurrent && (
+          <Sheet open={markAsRecurrent} onOpenChange={setMarkAsRecurrent}>
+            <SheetContent
+              onInteractOutside={(e) => e.preventDefault()}
+              onPointerDownOutside={(e) => e.preventDefault()}
+              onEscapeKeyDown={(e) => e.preventDefault()}
+              className="m-4 flex h-[calc(~'(100%-var(--spacing)*4)/3')] w-full flex-col rounded-md sm:max-w-7xl [&>button]:hidden"
+            >
+              <SheetHeader>
+                <SheetTitle>Recurrence Invoice</SheetTitle>
+                <SheetDescription className="text-[12px]">
+                  Save time by letting invoices generate automatically on the schedule you choose.
+                </SheetDescription>
+              </SheetHeader>
+              <RecurrenceForm name={invoiceForm.header.customer?.name} onSubmit={handleRecurrenceSubmission} onCancel={handleCancelRecurrence} />
+            </SheetContent>
+          </Sheet>
+        )}
       </div>
 
       {/* Command to search for customers */}

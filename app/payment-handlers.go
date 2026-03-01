@@ -225,6 +225,7 @@ func (s *Server) printPaymentHandler(ctx *routing.Context) {
 	payment, err := NewPaymentPDF(s.translator, data.Header, data.Lines)
 	if err != nil {
 		ctx.Error(err)
+		return
 	}
 	payment.Header(ctx.Request.Context())
 	payment.Lines()

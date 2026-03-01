@@ -27,7 +27,7 @@ func (s *Server) openDatabaseConnection() {
 
 func (s *Server) resolveConnectionSrtring() string {
 	return fmt.Sprintf(
-		"host=%s port=%s dbname=%s user=%s password=%s sslmode=%s",
+		"host=%s port=%s dbname=%s user=%s password=%s sslmode=%s timezone=America/Santo_Domingo",
 		s.config.db.host,
 		s.config.db.port,
 		s.config.db.name,

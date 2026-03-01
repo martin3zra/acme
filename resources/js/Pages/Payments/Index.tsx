@@ -116,13 +116,17 @@ export default function Index({
                       </>
                     )}
 
-                    <a href={payment.pdfURL}  className="bg-primary flex items-center gap-x-3 rounded-sm px-4 text-white" target="_blank" rel="noreferrer">
-                      <Printer /> {t('global.actions.print')}
-                    </a>
+                    <Button
+                      onClick={() => window.open(payment.pdfURL, '_blank')}
+                      rel="noopener noreferrer"
+                      className="flex items-center gap-x-3 rounded-sm bg-indigo-600 px-4 py-1 text-white hover:bg-indigo-700"
+                    >
+                      <Printer className="size-4" /> {t('global.actions.print')}
+                    </Button>
                   </div>
                 </div>
               </SheetHeader>
-              <div className="relative grid overflow-y-scroll gap-4 px-4 pb-4">
+              <div className="relative grid gap-4 overflow-y-scroll px-4 pb-4">
                 {payment.header.status === 'void' && (
                   <div className="absolute inset-0 flex w-full items-center justify-center overflow-y-hidden bg-transparent">
                     <h1 className="-rotate-45 border-8 border-red-500/25 p-8 text-8xl font-extrabold text-red-500/25">VOID</h1>

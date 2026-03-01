@@ -1,7 +1,6 @@
-import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { useTranslation } from '@/hooks/use-translation';
-import ReportLayout from '@/layouts/reports/layout';
+import ReportLayout, { ReportRequest } from '@/layouts/reports/layout';
 import { BreadcrumbItem, defaultBreadcrumbs, PageProps } from '@/types';
 import { useState } from 'react';
 import { DateRange } from 'react-day-picker';
@@ -11,7 +10,7 @@ export const breadcrumbs: BreadcrumbItem[] = [
   ...defaultBreadcrumbs,
   {
     title: 'reports.title',
-    href: '/reports',
+    href: '/reports/sales',
   },
   {
     title: 'reports.expenses',
@@ -19,36 +18,50 @@ export const breadcrumbs: BreadcrumbItem[] = [
   },
 ];
 
-export default function Index({ auth, initialRange, initialPreset }: PageProps<{ initialRange: DateRange; initialPreset: string }>) {
+export default function Index({ auth, csrf_token, initialRange, initialPreset }: PageProps<{ initialRange: DateRange; initialPreset: string }>) {
   const initialDateRange: DateRange | undefined = initialRange
     ? { from: initialRange.from ? new Date(initialRange.from) : undefined, to: initialRange.to ? new Date(initialRange.to) : undefined }
     : undefined;
-  const [dateRange, setDateRange] = useState<DateRange | undefined>(initialDateRange);
   const t = useTranslation().trans;
 
-  const handleSelect = (range: DateRange | undefined) => {
-    if (range?.from) {
-      setDateRange(range);
-    }
-  };
+  const [request, setRequest] = useState<ReportRequest>(() => ({
+    endpoint: 'expenses',
+    reportType: 'expenses',
+    dateRange: initialDateRange,
+    presetKey: initialPreset,
+    csrfToken: csrf_token,
+  }));
+
+  function updateRequest<K extends keyof ReportRequest>(key: K, value: ReportRequest[K]) {
+    setRequest((prev) => ({
+      ...prev,
+      [key]: value,
+    }));
+  }
   return (
-    <ReportLayout user={auth.user} breadcrumbs={breadcrumbs} trans={t} activeTab="expenses">
+    <ReportLayout user={auth.user} breadcrumbs={breadcrumbs} trans={t} activeTab="expenses" request={request}>
       <ReportLayout.FilterSection>
         <div className="flex flex-col space-y-4 gap-y-2">
           <div className="flex flex-col space-y-2">
             <Label>{t('global.dateRangePresets')}</Label>
-            <DateRangeQuickSelect initialPreset={initialPreset} onChange={setDateRange} />
+            <DateRangeQuickSelect
+              initialPreset={initialPreset}
+              onChange={(presetKey, range) => {
+                updateRequest('dateRange', range);
+                updateRequest('presetKey', presetKey);
+              }}
+            />
           </div>
           <div className="flex flex-col space-y-2">
             <Label htmlFor="date">{t('global.dateRange')}</Label>
-            <DateRangePicker dateRange={dateRange} setDateRange={handleSelect} />
+            <DateRangePicker
+              dateRange={request.dateRange}
+              disabled={request.presetKey !== 'custom'}
+              setDateRange={(range) => updateRequest('dateRange', range)}
+            />
           </div>
         </div>
       </ReportLayout.FilterSection>
-      <ReportLayout.ContentSection>Nothing to see here yet.</ReportLayout.ContentSection>
-      <ReportLayout.ActionSection>
-        <Button>Generate report</Button>
-      </ReportLayout.ActionSection>
     </ReportLayout>
   );
 }

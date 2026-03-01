@@ -1,5 +1,5 @@
 import { AlertDestructive } from '@/components/alert-destructive';
-import InputError from '@/components/input-error';
+import { DatePickerField } from '@/components/date-picker';
 import { MoneyInput } from '@/components/money-input';
 import {
   AlertDialog,
@@ -12,23 +12,18 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
-import { Calendar } from '@/components/ui/calendar';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { useHeader } from '@/composables/use-headers';
 import { useNumber } from '@/composables/use-number';
 import { useDebounced } from '@/hooks/use-debounced';
 import { usePersistedState } from '@/hooks/use-persisted-state';
 import { useTranslation } from '@/hooks/use-translation';
 import AppLayout from '@/layouts/app-layout';
-import { cn } from '@/lib/utils';
 import { BTForm, CardForm, CashForm, CheckForm, Customer, PageProps, PaymentForm, PaymentMethod, Receivable, ReceivableInvoiceForm } from '@/types';
 import { Textarea } from '@headlessui/react';
 import { router, useForm, usePage } from '@inertiajs/react';
 import { RowSelectionState } from '@tanstack/table-core/build/lib/features/RowSelection';
-import { format } from 'date-fns/format';
-import { CalendarIcon } from 'lucide-react';
 import React, { useEffect } from 'react';
 import CheckoutForm from '../Invoices/Shared/checkout-form';
 import { CustomerSection } from '../Invoices/Shared/customer-section';
@@ -80,16 +75,6 @@ export default function Create({
       lines,
     }));
   }, [receivables, invoice_uuid, setPaymentForm]);
-
-  useEffect(() => {
-    // Reset everything when switching customers
-    setRowSelection({});
-    setPaymentForm((prev) => ({
-      ...prev,
-      header: { ...prev.header, customer: undefined },
-      lines: [],
-    }));
-  }, [customer?.uuid, setPaymentForm]);
 
   useEffect(() => {
     const searchCustomer = () => {
@@ -173,18 +158,40 @@ export default function Create({
     });
   };
 
-  const handleCellChange = (inputId: string, newValue: string | number) => {
-    const index = paymentForm.lines.findIndex((l: ReceivableInvoiceForm) => l.uuid === inputId);
-    if (index === -1) return;
+  const handleCellChange = (rowId: string, columnId: string, newValue: string | number) => {
+    setPaymentForm((prev) => {
+      const lines = prev.lines.map((line) => {
+        if (line.id.toString() === rowId) {
+          const payment = columnId === 'payment' ? Number(newValue) : line.payment || 0;
+          const discount = columnId === 'discount' ? Number(newValue) : line.discount || 0;
 
+          return {
+            ...line,
+            [columnId]: columnId === 'payment' || columnId === 'discount' ? Number(newValue) : newValue,
+            remaining: (line.amount_due || 0) - payment - discount,
+          };
+        }
+        return line;
+      });
+
+      // recompute totals from updated lines
+      const totals = lines.reduce(
+        (acc, line) => {
+          acc.totalPayment += line.payment || 0;
+          acc.totalDiscount += line.discount || 0;
+          acc.totalRemaining += line.remaining || 0;
+          return acc;
+        },
+        { totalPayment: 0, totalDiscount: 0, totalRemaining: 0 },
+      );
+
+      return { ...prev, lines, totals };
+    });
+
+    // auto-select the row when edited
     setRowSelection((prev) => ({
       ...prev,
-      [`${paymentForm.lines[index].id.toString()}`]: true,
-    }));
-    paymentForm.lines[index].payment = Number(newValue);
-    setPaymentForm((prev) => ({
-      ...prev,
-      lines: [...paymentForm.lines],
+      [rowId]: true,
     }));
   };
 
@@ -205,8 +212,10 @@ export default function Create({
 
   const performPaymentCancelation = (event: React.MouseEvent<HTMLButtonElement>) => {
     event.preventDefault();
-    removePaymentForm();
     router.get('/payments');
+    setTimeout(() => {
+      removePaymentForm();
+    }, 300);
   };
 
   const handleCheckout = (event: React.MouseEvent<HTMLButtonElement>) => {
@@ -288,27 +297,14 @@ export default function Create({
             <div className="col-span-6 flex flex-col gap-y-6">
               <div className="flex flex-col gap-y-2">
                 <Label htmlFor="date">{t('global.date')}</Label>
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button
-                      variant={'outline'}
-                      className={cn('w-[280px] justify-start text-left font-normal', !paymentForm.header.date && 'text-muted-foreground')}
-                    >
-                      <CalendarIcon />
-                      {paymentForm.header.date ? format(paymentForm.header.date, 'PPP') : <span>{t('global.datePlaceholder')}</span>}
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0">
-                    <Calendar
-                      mode="single"
-                      defaultMonth={paymentForm.header.date}
-                      selected={paymentForm.header.date}
-                      onSelect={handleDateChange}
-                      initialFocus
-                    />
-                  </PopoverContent>
-                </Popover>
-                <InputError className="mt-2" message={errors.date} />
+                <DatePickerField
+                  id="date"
+                  label={t('global.date')}
+                  placeholder={t('global.datePlaceholder')}
+                  value={paymentForm.header.date}
+                  onChange={handleDateChange}
+                  error={errors.date}
+                />
               </div>
               <div className="flex flex-col">
                 <div className="flex flex-col gap-y-2">
@@ -365,6 +361,7 @@ export default function Create({
           <List
             loading={loading}
             data={paymentForm.lines}
+            totals={paymentForm.totals}
             rowSelection={rowSelection}
             setRowSelection={setRowSelection}
             onSelectPaymentLine={() => {}}

@@ -3,15 +3,20 @@ import HeadingSmall from '@/components/heading-small';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet';
+import { useHeader } from '@/composables/use-headers';
 import useCallbackState from '@/hooks/use-callback-state';
 import { useTranslation } from '@/hooks/use-translation';
 import AppLayout from '@/layouts/app-layout';
-import { Invoice, InvoiceVerb, InvoiceWithLines, PageProps } from '@/types';
+import { capitalize } from '@/lib/utils';
+import { ErrorResponse, Invoice, InvoiceTypeFilter, InvoiceVerb, InvoiceWithLines, PageProps, Recurrent, TransactionKind } from '@/types';
 import { Link, router, usePage } from '@inertiajs/react';
-import { Ban, DollarSign, NotebookPen, Printer } from 'lucide-react';
-import { breadcrumbs } from './constants';
+import { Ban, DollarSign, NotebookPen, Printer, RefreshCwIcon } from 'lucide-react';
+import { toast } from 'sonner';
+import { makeBreadcrumbs } from './constants';
 import { List } from './List/Index';
 import { AddNewInvoice } from './Shared/AddNewInvoice';
+import { ConvertToInvoiceAction } from './Shared/convert-to-invoice-action';
+import { RecurrenceForm } from './Shared/recurrence-form';
 import Show from './Show';
 
 export default function Index({
@@ -20,7 +25,17 @@ export default function Index({
   invoice,
   showInvoice,
   currentInvoiceTypeFilter,
-}: PageProps<{ invoices: Invoice[]; invoice: InvoiceWithLines; showInvoice: boolean; currentInvoiceTypeFilter: 'all' | 'cash' | 'credit' }>) {
+  kind,
+}: PageProps<{
+  invoices: Invoice[];
+  invoice: InvoiceWithLines;
+  showInvoice: boolean;
+  currentInvoiceTypeFilter: InvoiceTypeFilter;
+  kind: TransactionKind;
+}>) {
+  const { headers } = useHeader();
+  const isInvoice = kind === 'invoice';
+  const [markAsRecurrent, setMarkAsRecurrent] = useCallbackState<boolean>(false);
   const [loadingInvoice, setLoadingInvoice] = useCallbackState<boolean>(false);
   const [open, setOpen] = useCallbackState<boolean>(showInvoice);
   const [selectedInvoice, setSelectedInvoice] = useCallbackState<Invoice | undefined>(undefined);
@@ -29,19 +44,33 @@ export default function Index({
   const hasInvoices = invoices.length > 0;
   const t = useTranslation().trans;
 
+  const screen = {
+    invoice: { key: 'invoices', title: t('invoices.newInvoice.title'), url: '/invoices/create' },
+    template: { key: 'invoices', title: t('invoices.newInvoice.title'), url: '/invoices/create' },
+    estimate: { key: 'estimates', title: t('estimates.newEstimate.title'), url: '/estimates/create' },
+    order: { key: 'orders', title: t('orders.newOrder.title'), url: '/orders/create' },
+  }[kind];
+
   const onSelectInvoice = (invoice: Invoice, action: InvoiceVerb): void => {
     setSelectedInvoice(invoice);
-
-    if (action === 'record-payment') {
-      router.visit(`/payments/create`, { data: { customer_id: invoice.customer.uuid, invoice_id: invoice.uuid } });
-      return;
+    if (isInvoice) {
+      if (action === 'record-payment') {
+        router.visit(`/payments/create`, { data: { customer_id: invoice.customer.uuid, invoice_id: invoice.uuid } });
+        return;
+      }
+      if (action === 'mark-as-recurrent') {
+        setMarkAsRecurrent(true);
+        return;
+      }
     }
+
     if (action === 'void') {
       setDeleteDialogOpen(true);
       return;
     }
+
     if (action === 'edit') {
-      router.visit(`/invoices/${invoice.uuid}/edit`);
+      router.visit(`/${kind}s/${invoice.uuid}/edit`);
       return;
     }
     if (action !== 'view') return;
@@ -78,7 +107,7 @@ export default function Index({
     }
   };
 
-  const onInvoiceFilterTypeChange = (value: 'all' | 'credit' | 'cash') => {
+  const onInvoiceFilterTypeChange = (value: InvoiceTypeFilter) => {
     router.visit(page.url, {
       data: { invoiceType: value },
       preserveScroll: true,
@@ -92,33 +121,67 @@ export default function Index({
     onOpenChange(open);
     setDeleteDialogOpen(open);
   };
+
+  const handleMarkAsRecurrent = () => {
+    setMarkAsRecurrent(true);
+  };
+
+  const handleCancelRecurrence = () => {
+    setMarkAsRecurrent(false);
+    localStorage.removeItem('recurrence');
+  };
+
+  const handleRecurrenceSubmission = async (recurrence: Recurrent) => {
+    const response = await fetch(`/invoices/${selectedInvoice?.uuid}/recurrence`, {
+      method: 'POST',
+      headers: {
+        ...headers.headers,
+        'Content-Type': 'application/json',
+        Accept: 'application/json',
+      },
+      credentials: 'include',
+      body: JSON.stringify(recurrence),
+    });
+    if (!response.ok) {
+      const error: ErrorResponse = await response.json();
+      toast.error(error.status);
+      throw new Error('Failed marking invoice as recurrent.', error.data);
+    }
+    handleCancelRecurrence();
+    const data = await response.json();
+    toast.success(data.message);
+  };
+
   return (
-    <AppLayout user={auth.user} breadcrumbs={breadcrumbs}>
+    <AppLayout user={auth.user} breadcrumbs={makeBreadcrumbs(kind)}>
       <div className="space-y-6">
-        {hasInvoices && <HeadingSmall title={t('invoices.title')} description={t('invoices.description')} rightPanel={<AddNewInvoice />} />}
+        {hasInvoices && (
+          <HeadingSmall
+            title={t(`${screen.key}.title`)}
+            description={t(`${screen.key}.description`)}
+            rightPanel={<AddNewInvoice title={screen.title} url={screen.url} />}
+          />
+        )}
 
         {!hasInvoices && (
           <>
             <div className="absolute top-1/2 left-1/2 flex h-[244px] min-w-3xl -translate-x-1/2 -translate-y-1/2 flex-col items-center gap-4 rounded-[16px] bg-white p-[40px] shadow-[0px_8px_12px_-4px_rgba(16,12,12,0.08),0px_0px_2px_rgba(16,12,12,0.1),0px_1px_2px_rgba(16,12,12,0.1)]">
-              <h4 className="text-2xl">{t('invoices.emptyState.title')}</h4>
-              <p className="text-sm text-gray-400">{t('invoices.emptyState.description')}</p>
-              <AddNewInvoice />
+              <h4 className="text-2xl">{t(`${screen.key}.emptyState.title`)}</h4>
+              <p className="text-sm text-gray-400">{t(`${screen.key}.emptyState.description`)}</p>
+              <AddNewInvoice title={screen.title} url={screen.url} />
             </div>
           </>
         )}
 
         {hasInvoices && (
           <List
+            kind={kind}
             data={invoices}
             currentInvoiceTypeFilter={currentInvoiceTypeFilter}
             onSelectInvoice={onSelectInvoice}
             onInvoiceTypeFilterChanges={onInvoiceFilterTypeChange}
           />
         )}
-
-        {/* {invoice !== undefined && invoice.pdfURL && (
-          <iframe src={invoice.pdfURL} width="100%" height="600" className="rounded border" title="Invoice Preview"></iframe>
-        )} */}
 
         {invoice && !loadingInvoice && (
           <Sheet open={open} onOpenChange={onOpenChange}>
@@ -127,21 +190,21 @@ export default function Index({
                 <div className="mr-6 flex items-start justify-between">
                   <div className="flex flex-col">
                     <SheetTitle>{page.props.auth.company.name}</SheetTitle>
-                    <SheetDescription className="text-[12px]">{t('invoices.viewInvoice.description')}</SheetDescription>
+                    <SheetDescription className="text-[12px]">{t(`${kind}s.view${capitalize(kind)}.description`)}</SheetDescription>
                   </div>
                   <div className="mx-4 flex gap-x-3">
-                    {invoice.header.status !== 'void' && (
+                    {invoice.header.status !== 'void' && invoice.header.status !== 'closed' && (
                       <>
                         <Button variant={'destructive'} onClick={() => onSelectInvoice(invoice.header, 'void')}>
                           <Ban /> {t('global.actions.void')}
                         </Button>
                         <Separator orientation="vertical" />
                         <Button asChild disabled={invoice.header.status === 'void'}>
-                          <Link href={`/invoices/${invoice.header.uuid}/edit`} as="button">
+                          <Link href={`/${kind}s/${invoice.header.uuid}/edit`} as="button">
                             <NotebookPen /> {t('global.actions.edit')}
                           </Link>
                         </Button>
-                        {(invoice.header.paid_status === 'unpaid' || invoice.header.paid_status === 'partial') && (
+                        {isInvoice && (invoice.header.paid_status === 'unpaid' || invoice.header.paid_status === 'partial') && (
                           <Button asChild disabled={invoice.header.status === 'void'}>
                             <Link href={`/payments/create?customer_id=${invoice.header.customer.uuid}&invoice_id=${invoice.header.uuid}`} as="button">
                               <DollarSign /> {t('global.actions.recordPayment')}
@@ -151,9 +214,38 @@ export default function Index({
                       </>
                     )}
 
-                    <a href={invoice.pdfURL} className="bg-primary flex items-center gap-x-3 rounded-sm px-4 text-white" target="_blank">
+                    {kind === 'estimate' ||
+                      (kind === 'order' && invoice.header.status !== 'void' && invoice.header.status !== 'closed' && (
+                        <ConvertToInvoiceAction
+                          id={invoice.header.uuid}
+                          title={t('global.convertToInvoice')}
+                          renderedAs="button"
+                          kind={kind}
+                          source={invoice}
+                        />
+                      ))}
+                    {isInvoice && invoice.header.status !== 'void' && (
+                      <>
+                        <Button onClick={handleMarkAsRecurrent} className="bg-green-600 hover:bg-green-700">
+                          <RefreshCwIcon />
+                          {t('global.actions.markAsRecurrent')}
+                        </Button>
+                        <ConvertToInvoiceAction
+                          mode="duplicate"
+                          title={t('global.duplicateInvoice')}
+                          renderedAs="button"
+                          kind={kind}
+                          source={invoice}
+                        />
+                      </>
+                    )}
+                    <Button
+                      onClick={() => window.open(invoice.pdfURL, '_blank')}
+                      rel="noopener noreferrer"
+                      className="flex items-center gap-x-3 rounded-sm bg-indigo-600 px-4 py-1 text-white hover:bg-indigo-700"
+                    >
                       <Printer className="size-4" /> {t('global.actions.print')}
-                    </a>
+                    </Button>
                   </div>
                 </div>
               </SheetHeader>
@@ -165,7 +257,7 @@ export default function Index({
                     </h1>
                   </div>
                 )}
-                <Show invoice={invoice} auth={auth} />
+                <Show kind={kind} invoice={invoice} auth={auth} />
               </div>
             </SheetContent>
           </Sheet>
@@ -173,14 +265,33 @@ export default function Index({
 
         {selectedInvoice && (
           <ConfirmsPassword
-            title={t('invoices.confirmsPassword.title', { invoice: selectedInvoice.number })}
-            description={t('invoices.confirmsPassword.description', { total: selectedInvoice.total })}
-            action={t('invoices.confirmsPassword.confirm')}
+            title={t(`${kind}s.confirmsPassword.title`, { [kind]: selectedInvoice.number })}
+            description={t(`${kind}s.confirmsPassword.description`, { total: selectedInvoice.total })}
+            action={t(`${kind}s.confirmsPassword.confirm`)}
             verb={'update'}
-            path={`/invoices/${selectedInvoice.uuid}/void`}
+            path={`/${kind}s/${selectedInvoice.uuid}/void`}
             open={deleteDialogOpen}
             onOpenChange={modalHandler}
           />
+        )}
+
+        {kind === 'invoice' && selectedInvoice && markAsRecurrent && (
+          <Sheet open={markAsRecurrent} onOpenChange={setMarkAsRecurrent}>
+            <SheetContent
+              onInteractOutside={(e) => e.preventDefault()}
+              onPointerDownOutside={(e) => e.preventDefault()}
+              onEscapeKeyDown={(e) => e.preventDefault()}
+              className="m-4 flex h-[calc(~'(100%-var(--spacing)*4)/3')] w-full flex-col rounded-md sm:max-w-7xl [&>button]:hidden"
+            >
+              <SheetHeader>
+                <SheetTitle>Recurrence Invoice</SheetTitle>
+                <SheetDescription className="text-[12px]">
+                  Save time by letting invoices generate automatically on the schedule you choose.
+                </SheetDescription>
+              </SheetHeader>
+              <RecurrenceForm name={selectedInvoice.customer.name} onSubmit={handleRecurrenceSubmission} onCancel={handleCancelRecurrence} />
+            </SheetContent>
+          </Sheet>
         )}
       </div>
     </AppLayout>

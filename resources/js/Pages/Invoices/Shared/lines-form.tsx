@@ -1,9 +1,10 @@
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useTranslation } from '@/hooks/use-translation';
-import { currencySignature, Item } from '@/types';
+import { currencySignature, Item, TransactionKind } from '@/types';
 
 type Props = {
+  kind: TransactionKind;
   amount: number;
   currency: currencySignature;
   currentItem: Item | undefined;
@@ -13,7 +14,16 @@ type Props = {
   qtyInputRef: React.RefObject<HTMLInputElement | null>;
 };
 
-export default function LinesForm({ referenceInputRef, qtyInputRef, currentItem, amount, currency, handleOnKeyDown, computedItemAmount }: Props) {
+export default function LinesForm({
+  kind,
+  referenceInputRef,
+  qtyInputRef,
+  currentItem,
+  amount,
+  currency,
+  handleOnKeyDown,
+  computedItemAmount,
+}: Props) {
   const t = useTranslation().trans;
   return (
     <tr>
@@ -22,7 +32,7 @@ export default function LinesForm({ referenceInputRef, qtyInputRef, currentItem,
           name="reference"
           ref={referenceInputRef}
           data-reset={false}
-          placeholder={t('invoices.line.form.placeholder')}
+          placeholder={t(`${kind}s.line.form.placeholder`)}
           onKeyDown={handleOnKeyDown}
           className="rounded-none border-none focus-visible:border-none focus-visible:ring-[2px]"
           tabIndex={0}

@@ -4,18 +4,21 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Separator } from '@/components/ui/separator';
 import { useNumber } from '@/composables/use-number';
 import { useTranslation } from '@/hooks/use-translation';
-import { cn, isNotEmpty } from '@/lib/utils';
-import { Auth, InvoiceWithLines, PaidStatuses } from '@/types';
+import { capitalize, cn, isNotEmpty } from '@/lib/utils';
+import { Auth, InvoiceWithLines, PaidStatuses, TransactionKind } from '@/types';
+import { Link } from '@inertiajs/react';
 import { format } from 'date-fns';
-import { Calendar1, CircleCheckIcon, CircleDollarSignIcon, CreditCardIcon, UserPen } from 'lucide-react';
+import { Calendar1, CircleCheckIcon, CircleDollarSignIcon, CreditCardIcon, FileText, UserPen } from 'lucide-react';
 import PaymentSummary from './Shared/payment-summary';
 
 type Props = {
+  kind: TransactionKind;
   invoice: InvoiceWithLines;
   auth: Auth;
 };
 
-export default function Show({ invoice, auth }: Props) {
+export default function Show({ kind, invoice, auth }: Props) {
+  const isInvoice = kind === 'invoice';
   const t = useTranslation().trans;
   const { currency } = useNumber();
 
@@ -26,15 +29,26 @@ export default function Show({ invoice, auth }: Props) {
         <div className="flex justify-between py-6 [&_[data-slot=label]]:text-base/2 [&_[data-slot=label]]:font-medium">
           <div className="col-span-6 flex items-center gap-x-6 [&>div]:flex [&>div]:gap-x-2">
             <div>
-              <Label>{t('invoices.single.title')}</Label>
+              <Label>{t(`${kind}s.single.title`)}</Label>
               <Label>#{invoice.header.number}</Label>
             </div>
-            <div>
-              <Label>NCF</Label>
-              <Label>{invoice.header.ncf}</Label>
-            </div>
+            {isInvoice && (
+              <div>
+                <Label>NCF</Label>
+                <Label>{invoice.header.ncf}</Label>
+              </div>
+            )}
           </div>
           <div className="col-span-6 flex items-center gap-x-2 [&_[data-slot=label]]:font-normal">
+            {!isInvoice && invoice.header.status === 'closed' && invoice.header.source && (
+              <Link
+                href={`/invoices?id=${invoice.header.source.id}`}
+                className="flex items-center space-x-2 rounded bg-red-200 px-2 py-1 text-sm text-red-500"
+              >
+                <FileText className="mr-2 size-4" />
+                {t(`${kind}s.single.closed`, { invoice: invoice.header.source.code })}
+              </Link>
+            )}
             <Label>{t('global.date')}</Label>
             <Label className="">{format(invoice.header.date, 'dd-MM-yyyy')}</Label>
           </div>
@@ -46,7 +60,7 @@ export default function Show({ invoice, auth }: Props) {
         <div className="col-span-12 grid grid-cols-12">
           <div className="col-span-6">
             <div className="w-56">
-              <Label className="font-bold">{t('invoices.single.payTo')}:</Label>
+              <Label className="font-bold">{t(`${kind}s.single.payTo`)}:</Label>
               <div className="pt-2">
                 <span className="text-sm font-semibold">{auth.company.name}</span>
                 <address className="text-muted-foreground text-sm font-normal">{auth.company.address}</address>
@@ -56,7 +70,7 @@ export default function Show({ invoice, auth }: Props) {
           </div>
           <div className="col-span-6 place-items-end">
             <div className="w-56">
-              <Label className="font-bold">{t('invoices.single.invoiceTo')}:</Label>
+              <Label className="font-bold">{t(`${kind}s.single.${kind}To`)}:</Label>
               <div className="pt-2">
                 <span className="text-sm font-semibold">{invoice.header.customer.name}</span>
                 <address className="text-muted-foreground text-sm font-normal">{invoice.header.customer.address}</address>
@@ -128,7 +142,7 @@ export default function Show({ invoice, auth }: Props) {
             </div>
           </div>
           <div className="col-span-5 rounded-md border p-4">
-            <Label>{t('invoices.single.totalSummary')}</Label>
+            <Label>{t(`${kind}s.single.totalSummary`)}</Label>
             <div
               className={cn(
                 'flex flex-col gap-y-3 py-4',
@@ -176,23 +190,25 @@ export default function Show({ invoice, auth }: Props) {
       </div>
       {/* side panel with summary */}
       <div className="col-span-4 flex flex-col gap-y-3 rounded-lg border p-3">
-        <StatusBadge type="paid" variant="alert" prefix={`${t('invoices.paidStatus')}:`} status={invoice.header.paid_status} />
-        <Label>{t('invoices.single.description')}</Label>
+        {isInvoice && <StatusBadge type="paid" variant="alert" prefix={`${t('invoices.paidStatus')}:`} status={invoice.header.paid_status} />}
+        <Label>{t(`${kind}s.single.description`)}</Label>
         <Separator />
         <div className="flex items-center justify-between">
           <Label className="text-lg">{currency(invoice.header.total)}</Label>
-          <Select name="paid_status" defaultValue={'0'} value={invoice.header.paid_status} required disabled={invoice.header.status === 'void'}>
-            <SelectTrigger className="w-46">
-              <SelectValue placeholder="Paid status" />
-            </SelectTrigger>
-            <SelectContent className="w-46">
-              {PaidStatuses.map((status) => (
-                <SelectItem key={status} value={status}>
-                  {t(`global.paidStatuses.${status}`)}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          {isInvoice && (
+            <Select name="paid_status" defaultValue={'0'} value={invoice.header.paid_status} required disabled={invoice.header.status === 'void'}>
+              <SelectTrigger className="w-46">
+                <SelectValue placeholder="Paid status" />
+              </SelectTrigger>
+              <SelectContent className="w-46">
+                {PaidStatuses.map((status) => (
+                  <SelectItem key={status} value={status}>
+                    {t(`global.paidStatuses.${status}`)}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
         </div>
         <Separator />
         <div className="flex items-center gap-x-1 text-sm">
@@ -212,10 +228,12 @@ export default function Show({ invoice, auth }: Props) {
           <span className="font-medium">{t('global.currency')}:</span>
           <span className="text-muted-foreground">Domincan Peso</span>
         </div>
-        <div className="flex items-center gap-x-1 text-sm">
-          <CreditCardIcon size={14} />
-          <span className="font-medium">{t('global.paymentSummary')}</span>
-        </div>
+        {isInvoice && (
+          <div className="flex items-center gap-x-1 text-sm">
+            <CreditCardIcon size={14} />
+            <span className="font-medium">{t('global.paymentSummary')}</span>
+          </div>
+        )}
         {invoice.header.due_on !== null && <span className="text-muted-foreground -m-1.5 block px-1.5 text-sm">{t('global.noAvailable.yet')}</span>}
         <PaymentSummary paymentData={invoice.header.payment} />
         <Separator />
@@ -233,24 +251,26 @@ export default function Show({ invoice, auth }: Props) {
             <li>
               <div>
                 <CircleCheckIcon />
-                <div>Invoice created</div>
+                <div>{capitalize(kind)} created</div>
               </div>
               <Label>{format(invoice.header.date, 'P')}</Label>
             </li>
             <li>
               <div>
                 <CircleCheckIcon />
-                <div>Invoice sent</div>
+                <div>{capitalize(kind)} sent</div>
               </div>
               <Label>{format(invoice.header.date, 'P')}</Label>
             </li>
-            <li>
-              <div>
-                <CircleCheckIcon data-status="pending" />
-                <div>Invoice paid</div>
-              </div>
-              <Label>{format(invoice.header.date, 'P')}</Label>
-            </li>
+            {isInvoice && (
+              <li>
+                <div>
+                  <CircleCheckIcon data-status="pending" />
+                  <div>Invoice paid</div>
+                </div>
+                <Label>{format(invoice.header.date, 'P')}</Label>
+              </li>
+            )}
           </ol>
         </div>
       </div>

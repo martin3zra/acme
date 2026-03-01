@@ -1,7 +1,8 @@
 import { useHeader } from '@/composables/use-headers';
 import { useTranslation } from '@/hooks/use-translation';
-import { Company, Verb } from '@/types';
-import { useForm } from '@inertiajs/react';
+import { Company, PageProps, Verb } from '@/types';
+import { useForm, usePage } from '@inertiajs/react';
+import { AlertDestructive } from './alert-destructive';
 import FormSection from './form-section';
 import InputError from './input-error';
 import { Button } from './ui/button';
@@ -28,6 +29,7 @@ export type CreateFormProps = {
 export default function CreateCompanyForm({ onFinish, params }: CreateFormProps) {
   const t = useTranslation().trans;
   const { headers } = useHeader();
+  const { errors: propsErrors } = usePage<PageProps>().props;
   const { data, setData, errors, processing, post, transform, reset } = useForm<Required<CompanyForm>>({
     name: params.company?.name || '',
     identifier: params.company?.identifier || '',
@@ -57,6 +59,11 @@ export default function CreateCompanyForm({ onFinish, params }: CreateFormProps)
         <FormSection.Title>{t('companies.single.title')}</FormSection.Title>
         <FormSection.Description>{t('companies.single.description')}</FormSection.Description>
         <FormSection.Form>
+          {propsErrors.status && (
+            <div className="col-span-12">
+              <AlertDestructive description={propsErrors.status} onDestroy={() => delete propsErrors.status} />
+            </div>
+          )}
           <div className="col-span-6 space-y-2">
             <Label htmlFor="name" className="text-end">
               {t('companies.single.name')}

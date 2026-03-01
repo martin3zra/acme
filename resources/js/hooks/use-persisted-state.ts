@@ -6,15 +6,20 @@ export function usePersistedState<T>(key: string, initialValue: T, forceInitial:
   const [value, setValue] = useState<T>(() => {
     if (forceInitial) return initialValue;
     const item = getItem();
-    return (item as T) || initialValue;
+    return (item as T) ?? initialValue;
   });
 
   const removeItem = () => {
     deleteItem();
+    setValue(undefined as unknown as T);
   };
 
   useEffect(() => {
-    setItem(value);
+    if (value === undefined || value === null) {
+      deleteItem();
+    } else {
+      setItem(value);
+    }
   }, [value, setItem]);
 
   return [value, setValue, removeItem] as const;

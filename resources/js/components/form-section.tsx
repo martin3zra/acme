@@ -1,5 +1,5 @@
 import { SlotProps } from '@/types';
-import React, { FormEvent } from 'react';
+import React from 'react';
 import SectionTitle from './section-title';
 
 function Title({ children }: SlotProps) {
@@ -29,7 +29,7 @@ class FormSection extends React.Component<Props> {
   static Form = Form;
   static Actions = Actions;
 
-  onSubmit = (event: FormEvent<HTMLFormElement>) => {
+  onSubmit = (event: React.SubmitEvent<HTMLFormElement>) => {
     event.preventDefault();
     this.props.onSubmit();
   };
@@ -51,7 +51,9 @@ class FormSection extends React.Component<Props> {
         <div className="mt-5 md:col-span-2 md:mt-0">
           <form onSubmit={this.onSubmit}>
             <div className={`bg-white px-4 py-5 shadow sm:p-6 dark:bg-gray-800 ${actions ? 'sm:rounded-tl-md sm:rounded-tr-md' : 'sm:rounded-md'}`}>
-              <div className="grid grid-cols-6 gap-6">{form}</div>
+              <div data-form className="grid grid-cols-6 gap-6">
+                {form}
+              </div>
             </div>
             {actions && (
               <div className="flex items-center justify-end gap-6 bg-gray-50 px-4 py-3 text-end shadow sm:rounded-br-md sm:rounded-bl-md sm:px-6 dark:bg-gray-800">

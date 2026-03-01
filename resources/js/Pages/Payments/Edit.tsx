@@ -1,5 +1,5 @@
 import { AlertDestructive } from '@/components/alert-destructive';
-import InputError from '@/components/input-error';
+import { DatePickerField } from '@/components/date-picker';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -11,16 +11,13 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
-import { Calendar } from '@/components/ui/calendar';
 import { Label } from '@/components/ui/label';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { useHeader } from '@/composables/use-headers';
 import { useNumber } from '@/composables/use-number';
 import { useDebounced } from '@/hooks/use-debounced';
 import { usePersistedState } from '@/hooks/use-persisted-state';
 import { useTranslation } from '@/hooks/use-translation';
 import AppLayout from '@/layouts/app-layout';
-import { cn } from '@/lib/utils';
 import {
   BTForm,
   CardForm,
@@ -39,8 +36,6 @@ import {
 import { Textarea } from '@headlessui/react';
 import { router, useForm, usePage } from '@inertiajs/react';
 import { RowSelectionState } from '@tanstack/table-core/build/lib/features/RowSelection';
-import { format } from 'date-fns/format';
-import { CalendarIcon } from 'lucide-react';
 import React, { useEffect } from 'react';
 import CheckoutForm from '../Invoices/Shared/checkout-form';
 import { CustomerSection } from '../Invoices/Shared/customer-section';
@@ -298,28 +293,15 @@ export default function Edit({
           <div className="grid grid-cols-12">
             <div className="col-span-6 flex flex-col gap-y-6">
               <div className="flex flex-col gap-y-2">
-                <Label htmlFor="date">{t('global.date')}</Label>
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button
-                      variant={'outline'}
-                      className={cn('w-[280px] justify-start text-left font-normal', !paymentForm.header.date && 'text-muted-foreground')}
-                    >
-                      <CalendarIcon />
-                      {paymentForm.header.date ? format(paymentForm.header.date, 'PPP') : <span>Pick a date</span>}
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0">
-                    <Calendar
-                      mode="single"
-                      defaultMonth={paymentForm.header.date}
-                      selected={paymentForm.header.date}
-                      onSelect={handleDateChange}
-                      initialFocus
-                    />
-                  </PopoverContent>
-                </Popover>
-                <InputError className="mt-2" message={errors.date} />
+                <DatePickerField
+                  id="date"
+                  label={t('global.date')}
+                  placeholder={t('global.datePlaceholder')}
+                  value={paymentForm.header.date}
+                  onChange={handleDateChange}
+                  error={errors.date}
+                  className="w-52"
+                />
               </div>
               <div className="flex flex-col">
                 <div className="flex flex-col gap-y-2">

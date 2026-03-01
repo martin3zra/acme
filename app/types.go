@@ -8,6 +8,8 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"mime/multipart"
+	"sync"
 	"time"
 
 	"github.com/martin3zra/acme/app/mail"
@@ -18,7 +20,11 @@ import (
 	"github.com/martin3zra/acme/pkg/routing"
 	"github.com/martin3zra/acme/pkg/support"
 	"github.com/martin3zra/acme/pkg/validator"
+	"golang.org/x/text/encoding"
+	"golang.org/x/text/encoding/charmap"
 )
+
+const PaymentTermsMax = 120 // net120
 
 type LoginFormRequest struct {
 	support.FormRequest
@@ -130,6 +136,43 @@ func (form UpdateCustomerForm) Rules() map[string]any {
 		"tax_receipt":        "sometimes|exists:tax_receipts,id",
 		"open_balance":       "sometimes|min:0",
 		"open_balance_as_of": "sometimes",
+	}
+}
+
+type StoreRecurrenceForm struct {
+	support.FormRequest
+	Recurrence
+}
+
+func (form StoreRecurrenceForm) Rules() map[string]any {
+	return map[string]any{
+		"recurrence":              "bail|required",
+		"recurrence.enabled":      "bail|sometimes",
+		"recurrence.name":         "required|max:100",
+		"recurrence.start_date":   "nullable|date",
+		"recurrence.until":        "nullable|date|after_or_equal:start_date",
+		"recurrence.frequency":    "required|in:daily,weekly,monthly,quarterly,yearly",
+		"recurrence.interval":     "required|integer|min:1",
+		"recurrence.weekdays":     "required_if:frequency,weekly|min:1",
+		"recurrence.day_of_month": "required_if:frequency,monthly,quarterly,yearly|min:1|max:31",
+		"recurrence.month":        "required_if:frequency,yearly|min:1|max:12",
+	}
+}
+
+func (form StoreRecurrenceForm) AsRecurrence() *Recurrence {
+	return &Recurrence{
+		Enabled:    form.Enabled,
+		Name:       form.Name,
+		Type:       form.Type,
+		SendEmail:  form.SendEmail,
+		Frequency:  form.Frequency,
+		Interval:   form.Interval,
+		Timezone:   form.Timezone,
+		StartDate:  form.StartDate,
+		Until:      form.Until,
+		DayOfMonth: form.DayOfMonth,
+		Weekdays:   form.Weekdays,
+		Month:      form.Month,
 	}
 }
 
@@ -289,58 +332,165 @@ var RoleMap = []map[string]any{
 	{"id": string(Roles.Standard), "label": Roles.Standard, "description": "Regular user with core feature access"},
 }
 
+type TransactionKind string
+
+const (
+	_TRANSACTION_KIND_INVOICE  TransactionKind = "invoice"
+	_TRANSACTION_KIND_ESTIMATE TransactionKind = "estimate"
+	_TRANSACTION_KIND_ORDER    TransactionKind = "order"
+	_TRANSACTION_KIND_TEMPLATE TransactionKind = "template"
+)
+
+var TransactionKinds = struct {
+	Invoice  TransactionKind
+	Estimate TransactionKind
+	Order    TransactionKind
+	Template TransactionKind
+}{
+	Invoice:  _TRANSACTION_KIND_INVOICE,
+	Estimate: _TRANSACTION_KIND_ESTIMATE,
+	Order:    _TRANSACTION_KIND_ORDER,
+	Template: _TRANSACTION_KIND_TEMPLATE,
+}
+
+type TransactionSource struct {
+	Type TransactionKind `json:"type,omitempty"`
+	ID   string          `json:"id,omitempty"`
+	Code string          `json:"code,omitempty"`
+}
+
+func (d *TransactionSource) Value() (driver.Value, error) {
+	return json.Marshal(d)
+}
+
+func (d *TransactionSource) Scan(value any) error {
+	if value == nil {
+		return nil
+	}
+
+	b, ok := value.([]byte)
+	if !ok {
+		return errors.New("type assertion to []byte failed")
+	}
+
+	return json.Unmarshal(b, &d)
+}
+
+type FrequencyType string
+
+const (
+	_FREQUENCY_WEEKLY   FrequencyType = "weekly"
+	_FREQUENCY_MONTHLY  FrequencyType = "monthly"
+	_FREQUENCY_QUARTELY FrequencyType = "quarterly"
+	_FREQUENCY_YEARLY   FrequencyType = "yearly"
+)
+
+var Frequency = struct {
+	Weekly    FrequencyType
+	Monthly   FrequencyType
+	Quarterly FrequencyType
+	Yearly    FrequencyType
+}{
+	Weekly:    _FREQUENCY_WEEKLY,
+	Monthly:   _FREQUENCY_MONTHLY,
+	Quarterly: _FREQUENCY_QUARTELY,
+	Yearly:    _FREQUENCY_YEARLY,
+}
+
+type Recurrence struct {
+	Enabled   bool       `json:"enabled"`
+	Name      string     `json:"name"`
+	Type      string     `json:"type"` // schedule, reminder
+	SendEmail bool       `json:"send_email"`
+	Frequency string     `json:"frequency"` // daily, weekly, monthly, quarterly, yearly
+	Interval  int        `json:"interval"`
+	Timezone  string     `json:"timezone,omitempty"`
+	StartDate *time.Time `json:"start_date,omitempty"`
+	Until     *time.Time `json:"until"`
+
+	// Optional fields depending on frequency
+	DayOfMonth      int        `json:"day_of_month,omitempty"`
+	Weekdays        []string   `json:"weekdays,omitempty"`
+	Month           int        `json:"month,omitempty"`
+	LastGeneratedAt *time.Time `json:"last_generated_at"`
+	NextRunAt       *time.Time `json:"next_run_at"`
+}
+
+func (d *Recurrence) Value() (driver.Value, error) {
+	return json.Marshal(d)
+}
+
+func (d *Recurrence) Scan(value any) error {
+	if value == nil {
+		return nil
+	}
+
+	b, ok := value.([]byte)
+	if !ok {
+		return errors.New("type assertion to []byte failed")
+	}
+
+	return json.Unmarshal(b, &d)
+}
+
+// Paid Status (Financial Settlement)
+// Unpaid → no payment received.
+// Partially Paid → some payment received, balance remains.
+// Paid → fully settled.
+// Refunded → money returned to customer.
 type PaidStatus string
 
 const (
-	_PAID_UNPAID  PaidStatus = "unpaid"
-	_PAID_PARTIAL PaidStatus = "partial"
-	_PAID_PAID    PaidStatus = "paid"
-	_PAID_REMOVED PaidStatus = "removed"
+	_PAID_UNPAID   PaidStatus = "unpaid"
+	_PAID_PARTIAL  PaidStatus = "partial"
+	_PAID_PAID     PaidStatus = "paid"
+	_PAID_REFUNDED PaidStatus = "refunded"
 )
 
 var PaidStatuses = struct {
-	UnPaid  PaidStatus
-	Partial PaidStatus
-	Paid    PaidStatus
-	Removed PaidStatus
+	UnPaid   PaidStatus
+	Partial  PaidStatus
+	Paid     PaidStatus
+	Refunded PaidStatus
 }{
-	UnPaid:  _PAID_UNPAID,
-	Partial: _PAID_PARTIAL,
-	Paid:    _PAID_PAID,
-	Removed: _PAID_REMOVED,
+	UnPaid:   _PAID_UNPAID,
+	Partial:  _PAID_PARTIAL,
+	Paid:     _PAID_PAID,
+	Refunded: _PAID_REFUNDED,
 }
 
+// Document Status (Lifecycle)
+// Draft → invoice is being prepared, editable.
+// Sent/Open → finalized and delivered to customer, awaiting payment.
+// Overdue → past due date, still unpaid.
+// Void → canceled, no longer valid.
+// Uncollectible → written off as bad debt.
+// Closed → invoice has reached its end state (usually after payment or cancellation).
 type InvoiceStatus string
 
 const (
-	_INVOICE_DRAFT     InvoiceStatus = "draft"
-	_INVOICE_OPEN      InvoiceStatus = "open"
-	_INVOICE_SENT      InvoiceStatus = "sent"
-	_INVOICE_VIEWED    InvoiceStatus = "viewed"
-	_INVOICE_OVERDUE   InvoiceStatus = "overdue"
-	_INVOICE_COMPLETED InvoiceStatus = "completed"
-	_INVOICE_VOID      InvoiceStatus = "void"
-	_INVOICE_PARTIAL   InvoiceStatus = "partial"
+	_INVOICE_DRAFT         InvoiceStatus = "draft"
+	_INVOICE_SENT          InvoiceStatus = "sent"
+	_INVOICE_OVERDUE       InvoiceStatus = "overdue"
+	_INVOICE_VOID          InvoiceStatus = "void"
+	_INVOICE_UNCOLLECTIBLE InvoiceStatus = "uncollectible"
+	_INVOICE_CLOSED        InvoiceStatus = "closed"
 )
 
 var InvoiceStatuses = struct {
-	Open      InvoiceStatus
-	Draft     InvoiceStatus
-	Sent      InvoiceStatus
-	Viewed    InvoiceStatus
-	Overdue   InvoiceStatus
-	Completed InvoiceStatus
-	Void      InvoiceStatus
-	Partial   InvoiceStatus
+	Draft         InvoiceStatus
+	Sent          InvoiceStatus
+	Overdue       InvoiceStatus
+	Void          InvoiceStatus
+	Uncollectible InvoiceStatus
+	Closed        InvoiceStatus
 }{
-	Open:      _INVOICE_OPEN,
-	Draft:     _INVOICE_DRAFT,
-	Sent:      _INVOICE_SENT,
-	Viewed:    _INVOICE_VIEWED,
-	Overdue:   _INVOICE_OVERDUE,
-	Completed: _INVOICE_COMPLETED,
-	Void:      _INVOICE_VOID,
-	Partial:   _INVOICE_PARTIAL,
+	Draft:         _INVOICE_DRAFT,
+	Sent:          _INVOICE_SENT,
+	Overdue:       _INVOICE_OVERDUE,
+	Void:          _INVOICE_VOID,
+	Uncollectible: _INVOICE_UNCOLLECTIBLE,
+	Closed:        _INVOICE_CLOSED,
 }
 
 type PaymentStatus string
@@ -364,11 +514,31 @@ var PaymentStatuses = struct {
 	Failed:    _PAYMENT_FAILED,
 }
 
+type RedirectPreferencesValue string
+
+const (
+	_STAY   RedirectPreferencesValue = "stay"
+	_LIST   RedirectPreferencesValue = "list"
+	_DETAIL RedirectPreferencesValue = "detail"
+)
+
 type RedirectPreferences struct {
-	Invoice  string `json:"invoice"`
-	Customer string `json:"customer"`
-	Product  string `json:"product"`
-	Payment  string `json:"payment"`
+	Invoice  RedirectPreferencesValue `json:"invoice"`
+	Estimate RedirectPreferencesValue `json:"estimate"`
+	Customer RedirectPreferencesValue `json:"customer"`
+	Item     RedirectPreferencesValue `json:"item"`
+	Payment  RedirectPreferencesValue `json:"payment"`
+	Order    RedirectPreferencesValue `json:"order"`
+}
+
+var RedirectPreference = struct {
+	Stay   RedirectPreferencesValue
+	List   RedirectPreferencesValue
+	Detail RedirectPreferencesValue
+}{
+	Stay:   _STAY,
+	List:   _LIST,
+	Detail: _DETAIL,
 }
 
 type LineAction string
@@ -480,20 +650,24 @@ type Line struct {
 
 type StoreInvoiceForm struct {
 	support.FormRequest
-	CustomerID int       `json:"customer_id"`
-	Date       time.Time `json:"date"`
-	Terms      string    `json:"terms"`
-	TaxReceipt int       `json:"tax_receipt"`
-	Discount   Discount  `json:"discount"`
-	Notes      string    `json:"notes"`
-	Lines      []*Line   `json:"lines"`
-	Payment    Payment   `json:"payment"`
+	CustomerID int                `json:"customer_id"`
+	Date       time.Time          `json:"date"`
+	Terms      string             `json:"terms"`
+	TaxReceipt int                `json:"tax_receipt"`
+	Discount   Discount           `json:"discount"`
+	Notes      string             `json:"notes"`
+	Lines      []*Line            `json:"lines"`
+	Payment    Payment            `json:"payment"`
+	Kind       TransactionKind    `json:"kind"`
+	Source     *TransactionSource `json:"source"`
+	Recurrence *Recurrence        `json:"recurrence"`
 	// considere these fields as protected
 	amount     float64
 	amountDue  float64
 	tax        float64
 	total      float64
 	paidStatus PaidStatus
+	status     InvoiceStatus
 	dueOn      *time.Time
 	termType   TermType
 }
@@ -504,18 +678,31 @@ func (form StoreInvoiceForm) Authorize() bool {
 
 func (form StoreInvoiceForm) Rules() map[string]any {
 	return map[string]any{
-		"customer_id":    "bail|required|exists:customers,id",
-		"date":           "bail|required|date|after:yesterday",
-		"terms":          "bail|required|min:1",
-		"tax_receipt":    "bail|required|exists:tax_receipts,id",
-		"lines":          "required|min:1",
-		"lines.*.id":     "required|exists:items,id",
-		"lines.*.unit":   "required|exists:units,id",
-		"lines.*.qty":    "required|min:1",
-		"lines.*.price":  "required",
-		"lines.*.rate":   "required",
-		"lines.*.action": "required|in:added",
-		"discount":       "required",
+		"customer_id":             "bail|required|exists:customers,id",
+		"kind":                    "bail|required|in:invoice,estimate,order,template",
+		"recurrence":              "bail|sometimes",
+		"recurrence.enabled":      "bail|sometimes",
+		"recurrence.name":         "required|max:100",
+		"recurrence.start_date":   "nullable|date",
+		"recurrence.until":        "nullable|date|after_or_equal:start_date",
+		"recurrence.frequency":    "required|in:daily,weekly,monthly,quarterly,yearly",
+		"recurrence.interval":     "required|integer|min:1",
+		"recurrence.weekdays":     "required_if:frequency,weekly|min:1",
+		"recurrence.day_of_month": "required_if:frequency,monthly,quarterly,yearly|min:1|max:31",
+		"recurrence.month":        "required_if:frequency,yearly|min:1|max:12",
+		"source":                  "sometimes",
+		"source.type":             "bail|sometimes|in:estimate,order,template",
+		"date":                    "bail|sometimes|required_if:kind,invoice,estimate|date|after:yesterday",
+		"terms":                   "bail|required_if:kind,invoice,order,template|min:1",
+		"tax_receipt":             "bail|sometimes|required_if:kind,invoice|exists:tax_receipts,id",
+		"lines":                   "required|min:1",
+		"lines.*.id":              "required|exists:items,id",
+		"lines.*.unit":            "required|exists:units,id",
+		"lines.*.qty":             "required|min:1",
+		"lines.*.price":           "required",
+		"lines.*.rate":            "required",
+		"lines.*.action":          "required|in:added",
+		"discount":                "required",
 		"discount.value": []any{
 			"sometimes",
 			validator.Rule{}.When(form.Discount.Type == "percentage", "between:0,100", "min:0"),
@@ -531,21 +718,38 @@ func (StoreInvoiceForm) Messages() map[string]string {
 	}
 }
 
-func (form *StoreInvoiceForm) PassedValidation() {
+func (form *StoreInvoiceForm) Compute() {
 	// compute tax for each line
 	form.computeTax()
 
 	form.dueOn = nil
+	if form.Kind == TransactionKinds.Estimate || form.Kind == TransactionKinds.Template {
+		form.status = InvoiceStatuses.Sent
+		form.paidStatus = PaidStatuses.UnPaid
+		return
+	}
+	form.status = InvoiceStatuses.Closed
 	form.paidStatus = PaidStatuses.Paid
 	form.termType = InvoiceTermType.Cash
 	termInDays := getNetDays(form.Terms)
-	if termInDays > 1 {
+	if termInDays >= 0 {
 		form.amountDue = form.total
+		form.status = InvoiceStatuses.Sent
 		form.paidStatus = PaidStatuses.UnPaid
 		form.termType = InvoiceTermType.Credit
 
 		dueDate := form.Date.AddDate(0, 0, termInDays)
 		form.dueOn = &dueDate
+	}
+}
+
+func (form *StoreInvoiceForm) PassedValidation() {
+	form.Compute()
+}
+
+func (form *StoreInvoiceForm) PrepareForValidation() {
+	if form.Kind != TransactionKinds.Template {
+		form.Recurrence = nil
 	}
 }
 
@@ -569,7 +773,7 @@ func (form *StoreInvoiceForm) computeTax() {
 		if line.Action == LineActions.Deleted {
 			continue
 		}
-		// We can store the line discoun on the database
+		// We can store the line discount on the database
 		// We can add a discount value amount to the invoice.
 		line.amount = round(line.Price*float64(line.Qty), 2)
 		line.discount = round(line.amount*(discountPercentage/100), 2)
@@ -588,15 +792,15 @@ type UpdateInvoiceForm struct {
 }
 
 func (form UpdateInvoiceForm) Authorize() bool {
-	return Can(form.User(), "update:invoice")
+	return Can(form.User(), fmt.Sprintf("update:%s", form.Kind))
 }
 
 func (form UpdateInvoiceForm) Rules() map[string]any {
 	return map[string]any{
 		"customer_id":    "bail|required|exists:customers,id",
 		"date":           "bail|required|date",
-		"terms":          "bail|required|min:1",
-		"tax_receipt":    "bail|required|exists:tax_receipts,id",
+		"terms":          "bail|sometimes|required_if:kind,invoice,order|min:1",
+		"tax_receipt":    "bail|sometimes|required_if:kind,invoice|exists:tax_receipts,id",
 		"lines":          "required|min:1",
 		"lines.*.id":     "required|exists:items,id",
 		"lines.*.unit":   "required|exists:units,id",
@@ -979,9 +1183,10 @@ type InvoiceSequence struct {
 
 type CompanySequence struct {
 	Invoice  InvoiceSequence `json:"invoice"`
+	Template SequenceConfig  `json:"template"`
 	Customer SequenceConfig  `json:"customer"`
-	// Estimate SequenceConfig  `json:"estimate"`
-	Payment SequenceConfig `json:"payment"`
+	Estimate SequenceConfig  `json:"estimate"`
+	Payment  SequenceConfig  `json:"payment"`
 }
 
 type SequenceForm struct {
@@ -1001,12 +1206,15 @@ func (SequenceForm) Rules() map[string]any {
 		"customer":                "required",
 		"customer.padding":        "required|min:3",
 		"customer.next":           "required|min:1",
-		// "estimate":                "required",
-		// "estimate.padding":        "required|min:3",
-		// "estimate.next":           "required|min:1",
-		"payment":         "required",
-		"payment.padding": "required|min:3",
-		"payment.next":    "required|min:1",
+		"estimate":                "required",
+		"estimate.padding":        "required|min:3",
+		"estimate.next":           "required|min:1",
+		"payment":                 "required",
+		"payment.padding":         "required|min:3",
+		"payment.next":            "required|min:1",
+		"template":                "sometimes",
+		"template.padding":        "sometimes|min:3",
+		"template.next":           "sometimes|min:1",
 	}
 }
 
@@ -1014,13 +1222,82 @@ func (form SequenceForm) Authorize() bool {
 	return Can(form.User(), "update:company:sequence")
 }
 
+type RedirectPreferencesForm struct {
+	support.FormRequest
+	Invoice  string `json:"invoice"`
+	Estimate string `json:"estimate"`
+	Customer string `json:"customer"`
+	Order    string `json:"order"`
+	Item     string `json:"item"`
+	Payment  string `json:"payment"`
+}
+
+func (RedirectPreferencesForm) Rules() map[string]any {
+	return map[string]any{
+		"invoice":  "required|in:list,detail,stay",
+		"estimate": "required|in:list,detail,stay",
+		"customer": "required|in:list,detail,stay",
+		"order":    "required|in:list,detail,stay",
+		"item":     "required|in:list,detail,stay",
+		"payment":  "required|in:list,detail,stay",
+	}
+}
+
+type TaxReceiptSequenceForm struct {
+	ID    int `json:"id"`
+	Start int `json:"start"`
+	End   int `json:"end"`
+}
+type TaxReceiptsForm struct {
+	support.FormRequest
+	Receipts []TaxReceiptSequenceForm `json:"receipts"`
+}
+
+func (TaxReceiptsForm) Rules() map[string]any {
+	return map[string]any{
+		"receipts":         "required|min:1",
+		"receipts.*.id":    "required|exists:shared_tax_receipts,id",
+		"receipts.*.start": "required|min:1",
+		"receipts.*.end":   "required|min:1|gt:start",
+	}
+}
+
+type StoreExpenseCategoryForm struct {
+	support.FormRequest
+	Name        string `json:"name"`
+	Description string `json:"description"`
+}
+
+func (StoreExpenseCategoryForm) Rules() map[string]any {
+	return map[string]any{
+		"name":        "required|min:1",
+		"description": "required|min:1",
+	}
+}
+
+type StoreUnitForm struct {
+	support.FormRequest
+	Name    string `json:"name"`
+	BaseQty int    `json:"base_qty"`
+}
+
+func (StoreUnitForm) Rules() map[string]any {
+	return map[string]any{
+		"name":     "required|min:1",
+		"base_qty": "required|min:1",
+	}
+}
+
+type Missing struct {
+	Key     string `json:"key"`
+	Message string `json:"message"`
+	URL     string `json:"url,omitempty"`
+}
+
 type PrerequisiteResult struct {
-	Resource string `json:"resource"`
-	Ok       bool   `json:"ok"`
-	Missing  []struct {
-		Key     string `json:"key"`
-		Message string `json:"message"`
-	} `json:"missing"`
+	Resource string    `json:"resource"`
+	Ok       bool      `json:"ok"`
+	Missing  []Missing `json:"missing"`
 }
 
 type prereqCacheKeyType struct{}
@@ -1041,10 +1318,9 @@ type DateRange struct {
 }
 
 type PresetRange struct {
-	Label string `json:"label"`
-	Key   string `json:"key"`
-	From  string `json:"from,omitempty"`
-	To    string `json:"to,omitempty"`
+	Key  string `json:"key"`
+	From string `json:"from,omitempty"`
+	To   string `json:"to,omitempty"`
 }
 
 type ReportForm struct {
@@ -1128,4 +1404,156 @@ func (t ItemType) Validate() error {
 	default:
 		return fmt.Errorf("invalid item type: %s", t)
 	}
+}
+
+type StoreTaxForm struct {
+	support.FormRequest
+	Name string  `json:"name"`
+	Rate float64 `json:"rate"`
+}
+
+func (StoreTaxForm) Rules() map[string]any {
+	return map[string]any{
+		"name": "required|min:2",
+		"rate": "required|min:0|max:99",
+	}
+}
+
+type UploadSessionForm struct {
+	support.FormRequest
+	Filename  string `json:"filename"`
+	Size      int64  `json:"size"`
+	Mime      string `json:"mime"`
+	Delimiter string `json:"delimiter"`
+	Encoding  string `json:"encoding"`
+}
+
+func (UploadSessionForm) Rules() map[string]any {
+	return map[string]any{
+		"mime":      "required",
+		"filename":  "required",
+		"size":      "required",
+		"delimiter": "required",
+		"encoding":  "required",
+	}
+}
+
+type UploadChunkForm struct {
+	support.FormRequest
+	UploadId    string         `json:"upload_id"`
+	ChunkIndex  int            `json:"chunk_index"`
+	TotalChunks int            `json:"total_chunks"`
+	Filename    string         `json:"filename"`
+	Chunk       multipart.File `json:"chunk"`
+}
+
+func (UploadChunkForm) Rules() map[string]any {
+	return map[string]any{
+		"upload_id": "required",
+		// "chunk_index":  "required|min:0",
+		"total_chunks": "required",
+		"filename":     "required",
+		// "chunk":        "required",
+	}
+}
+
+type CompleteUploadForm struct {
+	support.FormRequest
+	UploadID string `json:"upload_id"`
+	Filename string `json:"filename"`
+}
+
+func (CompleteUploadForm) Rules() map[string]any {
+	return map[string]any{
+		"upload_id": "required",
+		"filename":  "required",
+	}
+}
+
+type UploadSession struct {
+	ID        string `json:"id"`
+	UserID    int64  `json:"user_id"`
+	Filename  string `json:"filename"`
+	FileSize  int64  `json:"file_size"`
+	Delimiter string `json:"delimiter"`
+	Encoding  string `json:"encoding"`
+	// Type           string         `json:"records_type"`
+	Status         string         `json:"status"`
+	TotalChunks    sql.NullInt64  `json:"total_chunks"`
+	UploadedChunks int            `json:"uploaded_chunks"`
+	ErrorMessage   sql.NullString `json:"error_message"`
+	CreatedAt      time.Time      `json:"created_at"`
+	UpdatedAt      time.Time      `json:"updated_at"`
+}
+
+type ImportForm struct {
+	support.FormRequest
+	UploadID string `json:"upload_id"`
+	Type     string `json:"type"`
+}
+
+func (ImportForm) Rules() map[string]any {
+	return map[string]any{
+		"upload_id": "required",
+		"type":      "required|in:items,customers",
+	}
+}
+
+type ImportEvent struct {
+	Type string `json:"type"`
+	Data any    `json:"data"`
+}
+
+var importStreams = sync.Map{} // importID → chan ImportEvent
+
+type ImportOptions struct {
+	Delimiter rune
+}
+
+type UploadEncoding string
+
+const (
+	EncodingUTF8    UploadEncoding = "utf-8"
+	EncodingLatin1  UploadEncoding = "latin-1"
+	EncodingWin1252 UploadEncoding = "windows-1252"
+)
+
+var encodingDecoders = map[UploadEncoding]*encoding.Decoder{
+	EncodingUTF8:    nil, // no-op
+	EncodingLatin1:  charmap.ISO8859_1.NewDecoder(),
+	EncodingWin1252: charmap.Windows1252.NewDecoder(),
+}
+
+type StoreExpenseForm struct {
+	support.FormRequest
+	Category string    `json:"category"`
+	Date     time.Time `json:"date"`
+	Notes    string    `json:"notes"`
+	Amount   float64   `json:"amount"`
+}
+
+func (form StoreExpenseForm) Authorize() bool {
+	return Can(form.User(), "create:expense")
+}
+
+func (form StoreExpenseForm) Rules() map[string]any {
+	return map[string]any{
+		"category": "bail|required|exists:expenses_categories,uuid",
+		"date":     "bail|required|date",
+		"notes":    "sometime",
+		"amount":   "required|min:0",
+	}
+}
+
+type Date struct {
+	time.Time
+}
+
+func (d Date) MarshalJSON() ([]byte, error) {
+	if d.Time.IsZero() {
+		return []byte("null"), nil
+	}
+
+	formatted := d.Format("2006-01-02")
+	return []byte(`"` + formatted + `"`), nil
 }

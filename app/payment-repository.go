@@ -243,7 +243,7 @@ func (s *Server) attachPaymentLines(tx *sql.Tx, ctx context.Context, paymentId i
 	companyId := CurrentCompany(ctx).ID
 	vals := []any{}
 	for _, line := range form.Lines {
-		invoice, err := s.findInvoicesByUUID(ctx, line.Uuid)
+		invoice, err := s.findInvoicesByUUID(ctx, TransactionKinds.Invoice, companyId, line.Uuid)
 		if err != nil {
 			return err
 		}
@@ -350,7 +350,7 @@ func (s *Server) processPaymentLines(tx *sql.Tx, ctx context.Context, paymentId 
 		return err
 	}
 
-	companyId := CurrentCompany(ctx).ID
+	companyID := CurrentCompany(ctx).ID
 	lines := s.filterPaymentLines(form.Lines, ADDED, UPDATED, DELETED)
 	for _, line := range lines {
 		pLines := filter(paymentLines, func(pl *paymentLine) bool { return pl.ID == line.ID })
@@ -359,24 +359,24 @@ func (s *Server) processPaymentLines(tx *sql.Tx, ctx context.Context, paymentId 
 		}
 		switch line.Action {
 		case ADDED:
-			invoice, err := s.findInvoicesByUUID(ctx, line.Uuid)
+			invoice, err := s.findInvoicesByUUID(ctx, TransactionKinds.Invoice, companyID, line.Uuid)
 			if err != nil {
 				return err
 			}
 			_, err = tx.Exec(
 				"INSERT INTO receivables_income_items (company_id, receivable_income_id, date, invoice_id, amount_due, payment_amount) VALUES ($1, $2, $3, $4, $5, $6)",
-				companyId, paymentId, form.Date, invoice.ID, line.AmountDue, line.Payment)
+				companyID, paymentId, form.Date, invoice.ID, line.AmountDue, line.Payment)
 			if err != nil {
 				return err
 			}
-			if err = s.updateInvoiceBalance(tx, companyId, invoice.ID, -line.Payment); err != nil {
+			if err = s.updateInvoiceBalance(tx, companyID, invoice.ID, -line.Payment); err != nil {
 				return err
 			}
-			if err = s.updateCustomerAmountDue(tx, companyId, invoice.Customer.ID, -line.Payment); err != nil {
+			if err = s.updateCustomerAmountDue(tx, companyID, invoice.Customer.ID, -line.Payment); err != nil {
 				return err
 			}
 		case UPDATED:
-			invoice, err := s.findInvoicesByID(ctx, pLines[0].Invoice.ID)
+			invoice, err := s.findInvoicesByID(companyID, pLines[0].Invoice.ID)
 			if err != nil {
 				return err
 			}
@@ -389,28 +389,28 @@ func (s *Server) processPaymentLines(tx *sql.Tx, ctx context.Context, paymentId 
 
 			_, err = tx.Exec(
 				"UPDATE receivables_income_items SET payment_amount = $4, amount_due = $5 WHERE company_id = $1 AND receivable_income_id = $2 AND id = $3",
-				companyId, paymentId, line.ID, line.Payment, invoice.AmountDue)
+				companyID, paymentId, line.ID, line.Payment, invoice.AmountDue)
 			if err != nil {
 				return err
 			}
-			if err = s.updateInvoiceBalance(tx, companyId, pLines[0].Invoice.ID, diff); err != nil {
+			if err = s.updateInvoiceBalance(tx, companyID, pLines[0].Invoice.ID, diff); err != nil {
 				return err
 			}
 
-			if err = s.updateCustomerAmountDue(tx, companyId, customer.ID, diff); err != nil {
+			if err = s.updateCustomerAmountDue(tx, companyID, customer.ID, diff); err != nil {
 				return err
 			}
 		case DELETED:
 			_, err := tx.Exec(
 				"DELETE FROM receivables_income_items WHERE company_id = $1 AND receivable_income_id = $2 AND id = $3",
-				companyId, paymentId, line.ID)
+				companyID, paymentId, line.ID)
 			if err != nil {
 				return err
 			}
-			if err = s.updateInvoiceBalance(tx, companyId, pLines[0].Invoice.ID, line.Payment); err != nil {
+			if err = s.updateInvoiceBalance(tx, companyID, pLines[0].Invoice.ID, line.Payment); err != nil {
 				return err
 			}
-			if err = s.updateCustomerAmountDue(tx, companyId, customer.ID, line.Payment); err != nil {
+			if err = s.updateCustomerAmountDue(tx, companyID, customer.ID, line.Payment); err != nil {
 				return err
 			}
 		default:

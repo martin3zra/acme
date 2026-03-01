@@ -1,10 +1,16 @@
 import { LucideIcon } from 'lucide-react';
 import { IconName } from './icons';
 
+export interface ErrorResponse {
+  status: string;
+  data?: any;
+}
+
 export interface LinkedCompany {
   uuid: string;
   role: string;
 }
+
 export interface User {
   id: number;
   uuid: string;
@@ -60,7 +66,12 @@ export interface Company {
   address: string;
   identifier: string;
   city: string;
+  taxes: Tax[];
   sequences: Sequences;
+  redirect_preferences: RedirectPreference;
+  tax_receipts: TaxReceiptForSetup[];
+  expense_categories: ExpenseCategory[];
+  units: Unit[];
   created_at: string;
   updated_at: string;
 }
@@ -89,11 +100,14 @@ export type CustomerTypeFilter = CustomerType | 'all';
 
 export type InvoiceTypeFilter = 'all' | 'cash' | 'credit';
 
+export type TransactionKind = 'invoice' | 'estimate' | 'order' | 'template';
+
 export interface OpenBalance {
   invoice_id: number;
   date: Date;
   amount: number;
 }
+
 export interface Customer {
   id: number;
   uuid: string;
@@ -105,11 +119,11 @@ export interface Customer {
   address: string;
   status: string;
   payment_method: string;
-  payment_terms: string;
+  payment_terms: PaymentTermValue;
   amount_due: number;
   credit_limited: boolean;
   credit_limit: number;
-  customer_type: 'individual' | 'business';
+  customer_type: CustomerType;
   tax_receipt: number;
   open_balance: OpenBalance;
   open_balance_as_of: Date;
@@ -156,8 +170,10 @@ export interface InvoiceLine extends Item {
 
 export interface Tax {
   id: number;
+  uuid: string;
   name: string;
   rate: number;
+  created_at: string;
 }
 
 export interface TaxWithAmount extends Tax {
@@ -167,6 +183,8 @@ export interface TaxWithAmount extends Tax {
 export interface Unit {
   id: number;
   name: string;
+  base_qty: number;
+  created_at: string;
 }
 
 export type DiscountType = {
@@ -185,7 +203,7 @@ export type PaidStatus = (typeof PaidStatuses)[number];
 export const Statuses = ['enabled', 'disabled'] as const;
 export type Status = (typeof Statuses)[number];
 
-export type StatusType = 'paid' | 'invoice' | 'status' | 'payment';
+export type StatusType = 'paid' | 'invoice' | 'status' | 'payment' | 'dashboard';
 
 export interface Invoice {
   id: number;
@@ -195,7 +213,7 @@ export interface Invoice {
   customer: Customer;
   date: string;
   due_on?: string;
-  terms: number;
+  terms: PaymentTermValue;
   tax_receipt_id: number;
   amount: number;
   discount: DiscountType;
@@ -206,6 +224,8 @@ export interface Invoice {
   status: string;
   paid_status: PaidStatus;
   notes: string;
+  kind: TransactionKind;
+  source: InvoiceSource;
 }
 
 export interface InvoiceWithLines {
@@ -221,7 +241,7 @@ export interface BreadcrumbItem {
 
 export type Verb = 'create' | 'view' | 'edit' | 'trash';
 
-export type InvoiceVerb = Exclude<Verb, 'trash'> | 'void' | 'record-payment';
+export type InvoiceVerb = Exclude<Verb, 'trash'> | 'void' | 'record-payment' | 'mark-as-recurrent';
 
 export type PaymentVerb = Verb | 'void';
 
@@ -268,8 +288,10 @@ export type PaymentMethodType = {
   autoFocus?: boolean;
 };
 
+export type PaymentTermValue = 'pia' | 'net0' | 'net7' | 'net10' | 'net15' | 'net30' | 'net60' | 'net90' | 'net120';
+
 export type PaymentTerm = {
-  value: string;
+  value: PaymentTermValue;
   label: string;
 };
 
@@ -295,22 +317,79 @@ export interface TaxReceipt extends Nameable {
   available: boolean;
 }
 
+export interface TaxReceiptForSetup extends Nameable {
+  serie: string;
+  type: 'Fiscal' | 'Especial' | 'e-CF';
+  sequence_start: number;
+  sequence_end: number;
+  current: number;
+}
+
 export type currencySignature = (value: number | string, precision?: number, inCent?: boolean) => string;
 
 export type HeaderForm = {
   customer: Customer | undefined;
   date: Date | undefined;
   due: Date | undefined;
-  terms: string;
+  terms: PaymentTermValue;
   taxReceipt: number;
   notes: string | undefined;
   discount: DiscountType;
+};
+
+export type InvoiceSource = {
+  type: TransactionKind;
+  id: string | number;
+  code: string;
+};
+
+export const Months = [
+  'January',
+  'February',
+  'March',
+  'April',
+  'May',
+  'June',
+  'July',
+  'August',
+  'September',
+  'October',
+  'November',
+  'December',
+] as const;
+
+export type Month = (typeof Months)[number];
+
+export const WeekDays = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+export type WeekDay = (typeof WeekDays)[number];
+export type Frequency = 'daily' | 'weekly' | 'monthly' | 'quarterly' | 'yearly';
+export type RecurrentType = 'schedule' | 'reminder';
+
+export type Recurrent = {
+  enabled: boolean; // toggle
+  name: string; // e.g. "Maintenance"
+  type: RecurrentType; // "schedule" | "reminder"
+  send_email: boolean; // notify user
+  frequency: Frequency; // "daily" | "weekly" | "monthly" | "yearly";
+  interval: number; // e.g. every 2 weeks
+  timezone?: string; // IANA TZ string
+  start_date?: Date; // ISO date
+  until?: Date; // optional ISO date
+
+  // Optional fields depending on frequency
+  day_of_month?: number; // 1–31 only for monthly
+  weekdays?: WeekDay[];
+  month?: number; // 1–12 (for yearly)
 };
 
 export type InvoiceForm = {
   header: HeaderForm;
   lines: LineForm[];
   payment: PaymentMethodsForm;
+  kind: TransactionKind;
+  source: InvoiceSource;
+  clonedFrom?: number;
+  recurrence?: Recurrent;
 };
 
 export type Payment = {
@@ -346,10 +425,17 @@ export type ReceivableInvoiceForm = ReceivableInvoice & {
   action: LineAction;
 };
 
+export type PaymentTotals = {
+  totalPayment: number;
+  totalDiscount: number;
+  totalRemaining: number;
+};
+
 export type PaymentForm = {
   header: PaymentHeaderForm;
   lines: ReceivableInvoiceForm[];
   payment: PaymentMethodsForm;
+  totals: PaymentTotals;
 };
 
 export interface Receivable {
@@ -394,7 +480,7 @@ export interface PaymentWithLines {
   pdfURL: string;
 }
 
-export type onValueChangeType = (inputId: string, newValue: string | number) => void;
+export type onValueChangeType = (rowId: string, columnId: string, newValue: string | number) => void;
 
 export function mapPaymentLineToReceivableInvoice(paymentLine: PaymentLine): ReceivableInvoiceForm {
   const { invoice } = paymentLine;
@@ -414,6 +500,7 @@ export function mapPaymentLineToReceivableInvoice(paymentLine: PaymentLine): Rec
     payment: paymentLine.payment,
     discount: 0,
     balance: 0,
+    remaining: 0,
     action: 'unchanged', // Placeholder, as the action is not defined in PaymentLine
   };
 }
@@ -433,7 +520,8 @@ export interface NavItem {
   icon?: LucideIcon | null;
   isActive?: boolean;
   requiredAbility?: string;
-  components: string[];
+  match?: string[];
+  // components: string[];
 }
 
 export type Role = {
@@ -457,6 +545,7 @@ export interface StatItem {
 
 export interface DueInvoice {
   uuid: string;
+  status: string;
   due_on: string;
   customer: {
     uuid: string;
@@ -477,3 +566,37 @@ export interface Totals {
   totalExpenses: number;
   netIncome: number;
 }
+
+export type RedirectPreferenceValue = 'detail' | 'list' | 'stay';
+
+export interface RedirectPreference {
+  invoice: RedirectPreferenceValue;
+  payment: RedirectPreferenceValue;
+  estimate: RedirectPreferenceValue;
+  order: RedirectPreferenceValue;
+  customer: RedirectPreferenceValue;
+  item: RedirectPreferenceValue;
+}
+
+export type ExpenseCategory = {
+  id: number;
+  uuid: string;
+  name: string;
+  description: string;
+  created_at: string;
+  updated_at: string;
+  deleted_at: string;
+};
+
+export type Expense = {
+  id: number;
+  uuid: string;
+  amount: number;
+  notes: string;
+  receipt_url: string;
+  date: Date;
+  category: ExpenseCategory;
+  created_at: string;
+  updated_at: string;
+  deleted_at?: string;
+};

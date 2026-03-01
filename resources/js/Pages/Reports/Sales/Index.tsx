@@ -12,7 +12,7 @@ export const breadcrumbs: BreadcrumbItem[] = [
   ...defaultBreadcrumbs,
   {
     title: 'reports.title',
-    href: '/reports',
+    href: '/reports/sales',
   },
   {
     title: 'reports.sales',
@@ -33,13 +33,14 @@ export default function Index({
     ? { from: initialRange.from ? new Date(initialRange.from) : undefined, to: initialRange.to ? new Date(initialRange.to) : undefined }
     : undefined;
 
-  const [request, setRequest] = useState<ReportRequest>({
+  const [request, setRequest] = useState<ReportRequest>(() => ({
     endpoint: 'sales',
     reportType: initialReportType,
     dateRange: initialDateRange,
+    presetKey: initialPreset,
     showInvoices: false,
     csrfToken: csrf_token,
-  });
+  }));
 
   const t = useTranslation().trans;
 
@@ -56,31 +57,41 @@ export default function Index({
         <div className="flex flex-col space-y-4 gap-y-2">
           <div className="flex flex-col space-y-2">
             <Label>{t('global.dateRangePresets')}</Label>
-            <DateRangeQuickSelect initialPreset={initialPreset} onChange={(range) => updateRequest('dateRange', range)} />
+            <DateRangeQuickSelect
+              initialPreset={initialPreset}
+              onChange={(presetKey, range) => {
+                updateRequest('dateRange', range);
+                updateRequest('presetKey', presetKey);
+              }}
+            />
           </div>
           <div className="flex flex-col space-y-2">
             <Label htmlFor="date">{t('global.dateRange')}</Label>
-            <DateRangePicker dateRange={request.dateRange} setDateRange={(range) => updateRequest('dateRange', range)} />
+            <DateRangePicker
+              disabled={request.presetKey !== 'custom'}
+              dateRange={request.dateRange}
+              setDateRange={(range) => updateRequest('dateRange', range)}
+            />
           </div>
         </div>
       </ReportLayout.FilterSection>
       <ReportLayout.ContentSection>
         <div>
           <div className="flex flex-col space-y-2">
-            <Label>Select Report Type</Label>
+            <Label>{t('reports.filters.type.title')}</Label>
             <Select onValueChange={(value) => updateRequest('reportType', value)} defaultValue={request.reportType}>
-              <SelectTrigger className="w-[280px]">
-                <SelectValue placeholder="Select report type" />
+              <SelectTrigger className="w-70">
+                <SelectValue placeholder={t('reports.filters.type.title')} />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="sales_by_customer">Sales by Customer</SelectItem>
-                <SelectItem value="sales_by_item">Sales by Item</SelectItem>
-                <SelectItem value="sales_by_date">Sales by Date</SelectItem>
+                <SelectItem value="sales_by_customer">{t('reports.filters.type.sales_by_customer')}</SelectItem>
+                <SelectItem value="sales_by_item">{t('reports.filters.type.sales_by_item')}</SelectItem>
+                <SelectItem value="sales_by_date">{t('reports.filters.type.sales_by_date')}</SelectItem>
               </SelectContent>
             </Select>
           </div>
           <div className="py-4">
-            <Label className="hover:bg-accent/50 has-[[aria-checked=true]]:border-primary flex cursor-pointer items-start gap-3 rounded-lg border p-3 has-[:disabled]:cursor-not-allowed has-[[aria-checked=true]]:bg-blue-50 dark:has-[[aria-checked=true]]:border-blue-900 dark:has-[[aria-checked=true]]:bg-blue-950">
+            <Label className="hover:bg-accent/50 has-aria-checked:border-primary flex cursor-pointer items-start gap-3 rounded-lg border p-3 has-[:disabled]:cursor-not-allowed has-[[aria-checked=true]]:bg-blue-50 dark:has-[[aria-checked=true]]:border-blue-900 dark:has-[[aria-checked=true]]:bg-blue-950">
               <Checkbox
                 id="showInvoices"
                 checked={request.showInvoices as boolean}
@@ -92,11 +103,11 @@ export default function Index({
                 className="data-[state=checked]:border-primary data-[state=checked]:bg-primary dark:data-[state=checked]:bg-primary dark:data-[state=checked]:border-primary disabled:cursor-not-allowed data-[state=checked]:text-white"
               />
               <div className="grid gap-1.5 font-normal">
-                <p className="text-sm leading-none font-medium">Display invoices</p>
+                <p className="text-sm leading-none font-medium">{t('reports.filters.showInvoice.title')}</p>
                 {!invoicesAllowed.includes(request.reportType) ? (
-                  <p className="text-muted-foreground text-sm italic">Only available for customer/date-based reports.</p>
+                  <p className="text-muted-foreground text-sm italic">{t('reports.filters.showInvoice.descriptionWhenNotAvailable')}</p>
                 ) : (
-                  <p className="text-muted-foreground text-sm">You can show or hide invoices at any time.</p>
+                  <p className="text-muted-foreground text-sm">{t('reports.filters.showInvoice.descriptionWhenAvailable')}</p>
                 )}
               </div>
             </Label>

@@ -34,7 +34,14 @@ export const getColumns = ({ onDidClick, t }: Props): ColumnDef<Item>[] => {
           aria-label="Select all"
         />
       ),
-      cell: ({ row }) => <Checkbox checked={row.getIsSelected()} onCheckedChange={(value) => row.toggleSelected(!!value)} aria-label="Select row" />,
+      cell: (props) => {
+        return (
+          <div className="flex items-center space-x-2">
+            <Checkbox checked={props.row.getIsSelected()} onCheckedChange={(value) => props.row.toggleSelected(!!value)} aria-label="Select row" />
+            {props.row.original.item_type === 'service' ? <Wrench className="size-4" /> : <Package className="size-4" />}
+          </div>
+        );
+      },
       enableSorting: false,
       enableHiding: false,
     },
@@ -42,6 +49,7 @@ export const getColumns = ({ onDidClick, t }: Props): ColumnDef<Item>[] => {
       id: 'identifiers.reference',
       accessorFn: (row) => row.identifiers?.reference ?? '', // prevent undefined
       meta: t('global.reference'),
+      size: 100,
       header: (props) => {
         return <HeaderCell title={t('global.reference')} alignment="left" columnWidth={props.column.getSize()} />;
       },
@@ -52,6 +60,7 @@ export const getColumns = ({ onDidClick, t }: Props): ColumnDef<Item>[] => {
     {
       accessorKey: 'name',
       meta: t('global.name'),
+      size: 320,
       header: ({ column }) => {
         return <HeaderSortCell<Item> title={t('global.name')} column={column} />;
       },
@@ -114,21 +123,9 @@ export const getColumns = ({ onDidClick, t }: Props): ColumnDef<Item>[] => {
       },
     },
     {
-      accessorKey: 'item_type',
-      meta: t('items.single.type'),
-      header: (props) => {
-        return <HeaderCell title={t('items.single.type')} alignment="left" columnWidth={props.column.getSize()} />;
-      },
-      cell: (props) => {
-        if (props.row.original.item_type === 'service') {
-          return <Wrench />;
-        }
-        return <Package />;
-      },
-    },
-    {
       accessorKey: 'unit.name',
       meta: t('global.unit'),
+      size: 84,
       header: (props) => {
         return <HeaderCell title={t('global.unit')} alignment="left" columnWidth={props.column.getSize()} />;
       },
@@ -139,6 +136,7 @@ export const getColumns = ({ onDidClick, t }: Props): ColumnDef<Item>[] => {
     {
       accessorKey: 'tax.name',
       meta: t('global.taxRate'),
+      size: 105,
       header: (props) => {
         return <HeaderCell title={t('global.taxRate')} alignment="left" columnWidth={props.column.getSize()} />;
       },

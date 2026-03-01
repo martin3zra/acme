@@ -1,3 +1,4 @@
+import { useTranslation } from '@/hooks/use-translation';
 import { TooltipProps } from 'recharts';
 
 interface PayloadEntry {
@@ -30,14 +31,21 @@ export const tooltipLabelStyle = {
 };
 
 export const CustomTooltip: React.FC<CustomTooltipProps> = ({ payload, label, formatter }) => {
+  if (label === undefined || label === null) return null;
   if (!payload || payload.length === 0) return null;
+  const t = useTranslation().trans;
+  // Split into [year, monthNumber]
+  const [year, monthStr] = label.split('/');
+  if (!year || !monthStr) return '';
   const filtered = payload.filter((p) => p.dataKey !== 'salesFill');
   return (
     <div className="rounded border bg-gray-50 p-2 text-xs">
-      <div className="mb-1 font-semibold text-gray-800">{label}</div>
+      <div className="mb-1 font-semibold text-gray-800">
+        {year}/{t(`dashboard.chart.months.${monthStr.toLowerCase()}`)}
+      </div>
       {filtered.map((entry, i) => (
         <div key={i} style={{ color: entry.color }}>
-          <span className="capitalize">{entry.name}</span>: {formatter ? formatter(entry.value) : entry.value}
+          <span className="capitalize">{t(`dashboard.chart.legend.${entry.name}`)}</span>: {formatter ? formatter(entry.value) : entry.value}
         </div>
       ))}
     </div>

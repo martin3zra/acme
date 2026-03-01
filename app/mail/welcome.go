@@ -9,10 +9,6 @@ type Welcome struct {
 
 func (w Welcome) Subject() string { return "Welcome to Acme!" }
 
-func (w Welcome) From() mailer.Individual {
-	return mailer.Individual{Name: "Alfredo", Email: "alfredo@example.com"}
-}
-
 func (w Welcome) To() []mailer.Individual {
 	return []mailer.Individual{
 		{Name: "Massiel", Email: "massiel@example.com"},
@@ -32,4 +28,8 @@ func (w Welcome) Data() map[string]any {
 		"CTAURL":  "http://localhost:8092",
 		"Year":    2025,
 	}
+}
+
+func (i Welcome) Attachments() []mailer.Attachment {
+	return make([]mailer.Attachment, 0)
 }

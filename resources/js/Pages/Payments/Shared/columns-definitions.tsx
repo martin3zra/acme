@@ -14,17 +14,18 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { PaymentVerb, ReceivableInvoiceForm, Replacements } from '@/types';
+import { PaymentTotals, PaymentVerb, ReceivableInvoiceForm, Replacements } from '@/types';
 import { Link } from '@inertiajs/react';
 import { ColumnDef } from '@tanstack/react-table';
 import { MoreHorizontal } from 'lucide-react';
 
 type Props = {
+  totals: PaymentTotals;
   onDidClick: (item: ReceivableInvoiceForm, action: PaymentVerb) => void;
   t: (key: string, replacements?: Replacements) => string;
 };
 
-export const getColumns = ({ onDidClick, t }: Props): ColumnDef<ReceivableInvoiceForm, string | number>[] => {
+export const getColumns = ({ totals, onDidClick, t }: Props): ColumnDef<ReceivableInvoiceForm, string | number>[] => {
   return [
     {
       id: 'select',
@@ -38,38 +39,43 @@ export const getColumns = ({ onDidClick, t }: Props): ColumnDef<ReceivableInvoic
       cell: ({ row }) => <Checkbox checked={row.getIsSelected()} onCheckedChange={(value) => row.toggleSelected(!!value)} aria-label="Select row" />,
       enableSorting: false,
       enableHiding: false,
+      footer: () => null,
     },
     {
       accessorKey: 'number',
       meta: t('payments.single.invoice'),
+      size: 120,
       header: ({ column }) => {
         return <HeaderSortCell<ReceivableInvoiceForm> title={t('payments.single.invoice')} column={column} />;
       },
       cell: (props) => {
         return <TextCell columnWidth={props.column.getSize()} value={props.getValue() as string} />;
       },
+      footer: () => null,
     },
     {
       accessorKey: 'ncf',
       meta: 'NCF',
-      // size: 880,
+      size: 100,
       header: (props) => {
         return <HeaderCell title="NCF" alignment="left" columnWidth={props.column.getSize()} />;
       },
       cell: (props) => {
         return <TextCell columnWidth={props.column.getSize()} value={props.getValue() as string} />;
       },
+      footer: () => null,
     },
     {
       accessorKey: 'date',
       meta: t('global.date'),
-      // size: 880,
+      size: 100,
       header: (props) => {
         return <HeaderCell title={t('global.date')} alignment="left" columnWidth={props.column.getSize()} />;
       },
       cell: (props) => {
         return <DateCell columnWidth={props.column.getSize()} value={props.getValue() as string} />;
       },
+      footer: () => null,
     },
     {
       accessorKey: 'due_on',
@@ -81,6 +87,7 @@ export const getColumns = ({ onDidClick, t }: Props): ColumnDef<ReceivableInvoic
       cell: (props) => {
         return <DateCell columnWidth={props.column.getSize()} value={props.getValue() as string} />;
       },
+      footer: () => null,
     },
     {
       accessorKey: 'total',
@@ -92,15 +99,17 @@ export const getColumns = ({ onDidClick, t }: Props): ColumnDef<ReceivableInvoic
       cell: (props) => {
         return <CurrencyCell columnWidth={props.column.getSize()} value={props.getValue() as string} />;
       },
+      footer: () => null,
     },
     {
-      accessorKey: 'balance',
-      meta: t('global.balance'),
+      accessorKey: 'amount_due',
+      meta: t('global.amount_due'),
       // size: 880,
       header: (props) => {
-        return <HeaderCell title={t('global.balance')} alignment="right" columnWidth={props.column.getSize()} />;
+        return <HeaderCell title={t('global.amount_due')} alignment="right" columnWidth={props.column.getSize()} />;
       },
       cell: (props) => <CurrencyCell columnWidth={props.column.getSize()} value={props.row.original.amount_due as unknown as string} />,
+      footer: () => null,
     },
     {
       accessorKey: 'payment',
@@ -112,6 +121,7 @@ export const getColumns = ({ onDidClick, t }: Props): ColumnDef<ReceivableInvoic
       cell: (props) => {
         return <EditableCell {...props} identifier={props.row.original.uuid} inputType="number" />;
       },
+      footer: (props) => <CurrencyCell columnWidth={props.column.getSize()} value={totals.totalPayment as unknown as string} />,
     },
     {
       accessorKey: 'discount',
@@ -123,6 +133,7 @@ export const getColumns = ({ onDidClick, t }: Props): ColumnDef<ReceivableInvoic
       cell: (props) => {
         return <CurrencyCell columnWidth={props.column.getSize()} value={props.getValue() as string} />;
       },
+      footer: (props) => <CurrencyCell columnWidth={props.column.getSize()} value={totals.totalDiscount as unknown as string} />,
     },
     {
       accessorKey: 'remaining',
@@ -134,6 +145,7 @@ export const getColumns = ({ onDidClick, t }: Props): ColumnDef<ReceivableInvoic
       cell: (props) => {
         return <CurrencyCell columnWidth={props.column.getSize()} value={props.row.original.remaining as unknown as string} />;
       },
+      footer: (props) => <CurrencyCell columnWidth={props.column.getSize()} value={totals.totalRemaining as unknown as string} />,
     },
     {
       id: 'actions',
@@ -147,7 +159,7 @@ export const getColumns = ({ onDidClick, t }: Props): ColumnDef<ReceivableInvoic
                 <MoreHorizontal />
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="[&_[data-slot=dropdown-menu-item]]:cursor-pointer">
+            <DropdownMenuContent align="end" className="**:data-[slot=dropdown-menu-item]:cursor-pointer">
               <DropdownMenuLabel>{t('global.actions.title')}</DropdownMenuLabel>
               <DropdownMenuSeparator />
               <DropdownMenuItem>
@@ -158,6 +170,7 @@ export const getColumns = ({ onDidClick, t }: Props): ColumnDef<ReceivableInvoic
           </DropdownMenu>
         );
       },
+      footer: () => null,
     },
   ];
 };
