@@ -8,7 +8,7 @@ const breadcrumbs: BreadcrumbItem[] = [
     href: '/settings/profile',
   },
 ];
-export default function Profile({ mustVerifyEmail, status }: { mustVerifyEmail: boolean; status?: string }) {
+export default function Profile() {
   const { auth } = usePage<PageProps>().props;
   return (
     <AppLayout breadcrumbs={breadcrumbs} user={auth.user}>

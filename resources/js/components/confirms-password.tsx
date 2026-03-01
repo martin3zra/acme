@@ -7,8 +7,9 @@ import { useDocument } from '@/composables/use-document';
 import { useHeader } from '@/composables/use-headers';
 import { useTranslation } from '@/hooks/use-translation';
 import { useForm } from '@inertiajs/react';
-import { FC, FormEventHandler, useRef } from 'react';
+import { FC, useRef } from 'react';
 import { AlertDestructive } from './alert-destructive';
+import { Spinner } from './ui/spinner';
 
 export type Props = {
   title: string;
@@ -44,7 +45,7 @@ export const ConfirmsPassword: FC<Props> = ({ title, description, action, verb, 
     onFinish: () => reset(),
   };
 
-  const onSubmit: FormEventHandler = (e) => {
+  const onSubmit = (e: React.SubmitEvent<HTMLFormElement>) => {
     e.preventDefault();
 
     if (verb == 'destroy') destroy(path, { ...options, preserveState: 'errors' });
@@ -90,8 +91,9 @@ export const ConfirmsPassword: FC<Props> = ({ title, description, action, verb, 
                   {t('global.actions.cancel')}
                 </Button>
               </DialogClose>
-              <Button variant="destructive" disabled={processing} asChild className="uppercase">
-                <button type="submit">{action}</button>
+              <Button variant="destructive" type="submit" disabled={processing} className="uppercase">
+                {processing && <Spinner />}
+                {action}
               </Button>
             </DialogFooter>
           </form>

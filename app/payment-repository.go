@@ -14,7 +14,7 @@ import (
 type payment struct {
 	ID       int       `json:"id"`
 	UUID     string    `json:"uuid"`
-	Number   string    `json:"number"`
+	Code     string    `json:"code"`
 	Date     time.Time `json:"date"`
 	Amount   float64   `json:"amount"`
 	Notes    string    `json:"notes"`
@@ -25,6 +25,7 @@ type payment struct {
 		Email     string  `json:"email"`
 		AmountDue float64 `json:"amount_due"`
 		Address   string  `json:"address"`
+		Phone     string  `json:"phone"`
 	} `json:"customer"`
 	Invoices int           `json:"invoices"`
 	Payment  Payment       `json:"payment"`
@@ -38,7 +39,7 @@ type paymentLine struct {
 	Invoice struct {
 		ID         int        `json:"_"`
 		UUID       string     `json:"uuid"`
-		Number     string     `json:"number"`
+		Code       string     `json:"code"`
 		Date       time.Time  `json:"date"`
 		DueOn      *time.Time `json:"due_on"`
 		PaidStatus PaidStatus `json:"paid_status"`
@@ -54,7 +55,7 @@ type paymentLine struct {
 func (s *Server) findPayments(ctx context.Context) ([]*payment, error) {
 	rows, err := s.db.Query(`
     SELECT
-    receivables_income.id, receivables_income.uuid, receivables_income.date, receivables_income.amount,
+    receivables_income.id, receivables_income.uuid, receivables_income.code, receivables_income.date, receivables_income.amount,
     receivables_income.payment, receivables_income.status, receivables_income.notes, receivables_income.created_at, receivables_income.updated_at,
     (select count(*) from receivables_income_items
     where receivables_income.company_id = receivables_income_items.company_id
@@ -65,7 +66,7 @@ func (s *Server) findPayments(ctx context.Context) ([]*payment, error) {
     INNER JOIN customers ON (receivables_income.company_id = customers.company_id AND receivables_income.customer_id = customers.id)
     WHERE receivables_income.company_id = $1
     AND receivables_income.deleted_at IS NULL
-    ORDER BY receivables_income.id
+    ORDER BY receivables_income.id DESC
   `, CurrentCompany(ctx).ID)
 	if err != nil {
 		return nil, err
@@ -77,6 +78,7 @@ func (s *Server) findPayments(ctx context.Context) ([]*payment, error) {
 		if err = rows.Scan(
 			&i.ID,
 			&i.UUID,
+			&i.Code,
 			&i.Date,
 			&i.Amount,
 			&i.Payment,
@@ -92,8 +94,6 @@ func (s *Server) findPayments(ctx context.Context) ([]*payment, error) {
 			return nil, err
 		}
 
-		i.Number = s.generatePrefixedPaymentNumber(i.ID)
-
 		data = append(data, i)
 	}
 	return data, nil
@@ -104,7 +104,7 @@ func (s *Server) findPaymentByUUID(ctx context.Context, uuid string) (*payment, 
 	i := new(payment)
 	err := s.db.QueryRow(`
     SELECT
-    receivables_income.id, receivables_income.uuid, receivables_income.date, receivables_income.amount,
+    receivables_income.id, receivables_income.uuid, receivables_income.code, receivables_income.date, receivables_income.amount,
     receivables_income.payment, receivables_income.status, receivables_income.notes, receivables_income.created_at, receivables_income.updated_at,
     (select count(*) from receivables_income_items
     where receivables_income.company_id = receivables_income_items.company_id
@@ -118,6 +118,7 @@ func (s *Server) findPaymentByUUID(ctx context.Context, uuid string) (*payment, 
   `, CurrentCompany(ctx).ID, uuid).Scan(
 		&i.ID,
 		&i.UUID,
+		&i.Code,
 		&i.Date,
 		&i.Amount,
 		&i.Payment,
@@ -137,7 +138,6 @@ func (s *Server) findPaymentByUUID(ctx context.Context, uuid string) (*payment, 
 	}
 
 	i.Customer.Address = "LOUISVILLE, Selby 3864 Johnson Street, United States of America"
-	i.Number = s.generatePrefixedPaymentNumber(i.ID)
 
 	return i, nil
 }
@@ -147,8 +147,9 @@ func (s *Server) findPaymentLines(ctx context.Context, paymentID int) ([]*paymen
     select receivables_income_items.id, receivables_income_items.payment_amount,
     receivables_income_items.created_at, receivables_income_items.updated_at,
     receivables_income_items.deleted_at,
-    invoices.id, invoices.uuid, invoices.date, invoices.due_on, invoices.total, receivables_income_items.amount_due,
-    invoices.paid_status, tax_receipts.series || tax_receipts.type || LPAD(invoices.tax_receipt_sequence::varchar,8,'0') as NCF, invoices.note
+    invoices.id, invoices.uuid, invoices.code, invoices.date, invoices.due_on, invoices.total, receivables_income_items.amount_due,
+    CASE WHEN (receivables_income_items.amount_due - receivables_income_items.payment_amount) = 0 THEN 'paid' ELSE 'partial' END AS paid_status,
+	invoices.tax_number, invoices.note
     from receivables_income_items
     inner join companies on receivables_income_items.company_id = companies.id
     inner join receivables_income on receivables_income_items.company_id = receivables_income.company_id and receivables_income_items.receivable_income_id = receivables_income.id
@@ -172,6 +173,7 @@ func (s *Server) findPaymentLines(ctx context.Context, paymentID int) ([]*paymen
 			&i.DeletedAt,
 			&i.Invoice.ID,
 			&i.Invoice.UUID,
+			&i.Invoice.Code,
 			&i.Invoice.Date,
 			&i.Invoice.DueOn,
 			&i.Invoice.Amount,
@@ -182,8 +184,6 @@ func (s *Server) findPaymentLines(ctx context.Context, paymentID int) ([]*paymen
 		); err != nil {
 			return nil, err
 		}
-
-		i.Invoice.Number = s.generatePrefixedInvoiceNumber(i.Invoice.ID)
 
 		data = append(data, i)
 	}
@@ -198,22 +198,29 @@ func (s *Server) storePayment(ctx context.Context, form *StorePaymentForm) error
 	}
 
 	return database.WithTransaction(s.db, func(tx *sql.Tx) error {
-		stmt, err := tx.Prepare("INSERT INTO receivables_income (company_id, customer_id, date, amount, notes, payment, status) " +
-			"VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id")
+		stmt, err := tx.Prepare("INSERT INTO receivables_income (company_id, customer_id, date, amount, notes, payment, status, code) " +
+			"VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id")
 		if err != nil {
 			return err
 		}
 
-		companyId := CurrentCompany(ctx).ID
+		companyID := CurrentCompany(ctx).ID
+
+		seqInfo, err := GetNextSequence(tx, companyID, "payment")
+		if err != nil {
+			return err
+		}
+
 		var paymentID int
 		err = stmt.QueryRow(
-			companyId,
+			companyID,
 			customer.ID,
 			form.Date,
 			form.Amount,
 			form.Notes,
 			foundation.ToJSON(form.Payment),
 			PaymentStatuses.Completed,
+			seqInfo.Code,
 		).Scan(&paymentID)
 
 		if err != nil {
@@ -224,7 +231,7 @@ func (s *Server) storePayment(ctx context.Context, form *StorePaymentForm) error
 			return err
 		}
 
-		if err = s.updateCustomerAmountDue(tx, companyId, customer.ID, -form.Amount); err != nil {
+		if err = s.updateCustomerAmountDue(tx, companyID, customer.ID, -form.Amount); err != nil {
 			return err
 		}
 
@@ -236,7 +243,7 @@ func (s *Server) attachPaymentLines(tx *sql.Tx, ctx context.Context, paymentId i
 	companyId := CurrentCompany(ctx).ID
 	vals := []any{}
 	for _, line := range form.Lines {
-		invoice, err := s.findInvoicesByUUID(ctx, line.Uuid)
+		invoice, err := s.findInvoicesByUUID(ctx, TransactionKinds.Invoice, companyId, line.Uuid)
 		if err != nil {
 			return err
 		}
@@ -254,10 +261,6 @@ func (s *Server) attachPaymentLines(tx *sql.Tx, ctx context.Context, paymentId i
 	_, err := tx.Exec(stmt, vals...)
 
 	return err
-}
-
-func (s *Server) generatePrefixedPaymentNumber(value int) string {
-	return foundation.GeneratePrefixedNumber("PAY-", 10, value)
 }
 
 func (s *Server) voidPayment(ctx context.Context, uuid string) error {
@@ -347,7 +350,7 @@ func (s *Server) processPaymentLines(tx *sql.Tx, ctx context.Context, paymentId 
 		return err
 	}
 
-	companyId := CurrentCompany(ctx).ID
+	companyID := CurrentCompany(ctx).ID
 	lines := s.filterPaymentLines(form.Lines, ADDED, UPDATED, DELETED)
 	for _, line := range lines {
 		pLines := filter(paymentLines, func(pl *paymentLine) bool { return pl.ID == line.ID })
@@ -356,24 +359,24 @@ func (s *Server) processPaymentLines(tx *sql.Tx, ctx context.Context, paymentId 
 		}
 		switch line.Action {
 		case ADDED:
-			invoice, err := s.findInvoicesByUUID(ctx, line.Uuid)
+			invoice, err := s.findInvoicesByUUID(ctx, TransactionKinds.Invoice, companyID, line.Uuid)
 			if err != nil {
 				return err
 			}
 			_, err = tx.Exec(
 				"INSERT INTO receivables_income_items (company_id, receivable_income_id, date, invoice_id, amount_due, payment_amount) VALUES ($1, $2, $3, $4, $5, $6)",
-				companyId, paymentId, form.Date, invoice.ID, line.AmountDue, line.Payment)
+				companyID, paymentId, form.Date, invoice.ID, line.AmountDue, line.Payment)
 			if err != nil {
 				return err
 			}
-			if err = s.updateInvoiceBalance(tx, companyId, invoice.ID, -line.Payment); err != nil {
+			if err = s.updateInvoiceBalance(tx, companyID, invoice.ID, -line.Payment); err != nil {
 				return err
 			}
-			if err = s.updateCustomerAmountDue(tx, companyId, invoice.Customer.ID, -line.Payment); err != nil {
+			if err = s.updateCustomerAmountDue(tx, companyID, invoice.Customer.ID, -line.Payment); err != nil {
 				return err
 			}
 		case UPDATED:
-			invoice, err := s.findInvoicesByID(ctx, pLines[0].Invoice.ID)
+			invoice, err := s.findInvoicesByID(companyID, pLines[0].Invoice.ID)
 			if err != nil {
 				return err
 			}
@@ -386,28 +389,28 @@ func (s *Server) processPaymentLines(tx *sql.Tx, ctx context.Context, paymentId 
 
 			_, err = tx.Exec(
 				"UPDATE receivables_income_items SET payment_amount = $4, amount_due = $5 WHERE company_id = $1 AND receivable_income_id = $2 AND id = $3",
-				companyId, paymentId, line.ID, line.Payment, invoice.AmountDue)
+				companyID, paymentId, line.ID, line.Payment, invoice.AmountDue)
 			if err != nil {
 				return err
 			}
-			if err = s.updateInvoiceBalance(tx, companyId, pLines[0].Invoice.ID, diff); err != nil {
+			if err = s.updateInvoiceBalance(tx, companyID, pLines[0].Invoice.ID, diff); err != nil {
 				return err
 			}
 
-			if err = s.updateCustomerAmountDue(tx, companyId, customer.ID, diff); err != nil {
+			if err = s.updateCustomerAmountDue(tx, companyID, customer.ID, diff); err != nil {
 				return err
 			}
 		case DELETED:
 			_, err := tx.Exec(
 				"DELETE FROM receivables_income_items WHERE company_id = $1 AND receivable_income_id = $2 AND id = $3",
-				companyId, paymentId, line.ID)
+				companyID, paymentId, line.ID)
 			if err != nil {
 				return err
 			}
-			if err = s.updateInvoiceBalance(tx, companyId, pLines[0].Invoice.ID, line.Payment); err != nil {
+			if err = s.updateInvoiceBalance(tx, companyID, pLines[0].Invoice.ID, line.Payment); err != nil {
 				return err
 			}
-			if err = s.updateCustomerAmountDue(tx, companyId, customer.ID, line.Payment); err != nil {
+			if err = s.updateCustomerAmountDue(tx, companyID, customer.ID, line.Payment); err != nil {
 				return err
 			}
 		default:

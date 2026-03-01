@@ -1,6 +1,7 @@
 import { CurrencyCell } from '@/components/data-table/currency-cell';
 import { DateCell } from '@/components/data-table/date-cell';
 import { HeaderCell } from '@/components/data-table/header-cell';
+import { HeaderSortCell } from '@/components/data-table/header-sort-cell';
 import { TextCell } from '@/components/data-table/text-cell';
 import { StatusBadge } from '@/components/status-badge';
 import { Button } from '@/components/ui/button';
@@ -15,7 +16,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Customer, CustomerVerb, Replacements } from '@/types';
 import { ColumnDef } from '@tanstack/react-table';
-import { ArrowUpDown, MoreHorizontal } from 'lucide-react';
+import { Building, MoreHorizontal, UserCheck } from 'lucide-react';
 
 type Props = {
   onDidClick: (customer: Customer, action: CustomerVerb) => void;
@@ -33,7 +34,14 @@ export const getColumns = ({ onDidClick, t }: Props): ColumnDef<Customer>[] => {
           aria-label="Select all"
         />
       ),
-      cell: ({ row }) => <Checkbox checked={row.getIsSelected()} onCheckedChange={(value) => row.toggleSelected(!!value)} aria-label="Select row" />,
+      cell: (props) => {
+        return (
+          <div className="flex items-center space-x-2">
+            <Checkbox checked={props.row.getIsSelected()} onCheckedChange={(value) => props.row.toggleSelected(!!value)} aria-label="Select row" />
+            {props.row.original.customer_type === 'individual' ? <UserCheck className="size-4" /> : <Building className="size-4" />}
+          </div>
+        );
+      },
       enableSorting: false,
       enableHiding: false,
     },
@@ -51,14 +59,10 @@ export const getColumns = ({ onDidClick, t }: Props): ColumnDef<Customer>[] => {
       accessorKey: 'name',
       meta: t('global.name'),
       header: ({ column }) => {
-        return (
-          <Button className="uppercase" variant="ghost" onClick={() => column.toggleSorting(column.getIsSorted() === 'asc')}>
-            {t('global.name')} <ArrowUpDown />
-          </Button>
-        );
+        return <HeaderSortCell<Customer> title={t('global.name')} column={column} />;
       },
       cell: (props) => {
-        return <TextCell columnWidth={props.column.getSize()} value={props.getValue() as string} />;
+        return <TextCell className="min-w-[320px] truncate" columnWidth={props.column.getSize()} value={props.getValue() as string} />;
       },
     },
     {
@@ -68,7 +72,7 @@ export const getColumns = ({ onDidClick, t }: Props): ColumnDef<Customer>[] => {
         return <HeaderCell title={t('global.contact')} alignment="left" columnWidth={props.column.getSize()} />;
       },
       cell: (props) => {
-        return <TextCell columnWidth={props.column.getSize()} value={props.getValue() as string} />;
+        return <TextCell className="min-w-[320px] truncate" columnWidth={props.column.getSize()} value={props.getValue() as string} />;
       },
     },
     {
@@ -85,11 +89,7 @@ export const getColumns = ({ onDidClick, t }: Props): ColumnDef<Customer>[] => {
       accessorKey: 'email',
       meta: t('global.email'),
       header: ({ column }) => {
-        return (
-          <Button className="uppercase" variant="ghost" onClick={() => column.toggleSorting(column.getIsSorted() === 'asc')}>
-            {t('global.email')} <ArrowUpDown />
-          </Button>
-        );
+        return <HeaderSortCell<Customer> title={t('global.email')} column={column} />;
       },
       cell: (props) => {
         return <TextCell columnWidth={props.column.getSize()} value={props.getValue() as string} />;
@@ -151,19 +151,20 @@ export const getColumns = ({ onDidClick, t }: Props): ColumnDef<Customer>[] => {
                 <MoreHorizontal />
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
+            <DropdownMenuContent align="end" className="[&_[data-slot=dropdown-menu-item]]:cursor-pointer">
               <DropdownMenuLabel>{t('global.actions.title')}</DropdownMenuLabel>
               <DropdownMenuSeparator />
               <DropdownMenuItem onClick={() => onDidClick(props.row.original, 'view')}>{t('customers.viewCustomer.title')}</DropdownMenuItem>
               <DropdownMenuItem onClick={() => onDidClick(props.row.original, 'edit')}>{t('customers.editCustomer.title')}</DropdownMenuItem>
               <DropdownMenuItem onClick={() => onDidClick(props.row.original, 'trash')}>{t('customers.trashCustomer.title')}</DropdownMenuItem>
+              {(props.row.original.status !== 'disabled' || props.row.original.amount_due > 0) && <DropdownMenuSeparator />}
+              {props.row.original.status !== 'disabled' && (
+                <DropdownMenuItem onClick={() => onDidClick(props.row.original, 'issue-invoice')}>{t('customers.issueInvoice')}</DropdownMenuItem>
+              )}
               {props.row.original.amount_due > 0 && (
-                <>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={() => onDidClick(props.row.original, 'record-payment')} disabled={props.row.original.amount_due === 0}>
-                    {t('global.actions.makePayment')}
-                  </DropdownMenuItem>
-                </>
+                <DropdownMenuItem onClick={() => onDidClick(props.row.original, 'record-payment')} disabled={props.row.original.amount_due === 0}>
+                  {t('global.actions.makePayment')}
+                </DropdownMenuItem>
               )}
             </DropdownMenuContent>
           </DropdownMenu>

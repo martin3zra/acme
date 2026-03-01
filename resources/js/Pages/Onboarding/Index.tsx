@@ -29,7 +29,9 @@ export default function Index({ csrf_token, status }: PageProps<{ status: string
             {t('global.navUser.logout')}
           </Link>
         </div>
-        <div className="col-span-9 py-16">{status === 'success' ? <Congrats /> : <CreateCompanyForm />}</div>
+        <div className="col-span-9 py-16">
+          {status === 'success' ? <Congrats /> : <CreateCompanyForm params={{ company: undefined, action: 'create' }} onFinish={() => {}} />}
+        </div>
       </div>
     </AppSimpleLayout>
   );

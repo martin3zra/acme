@@ -61,14 +61,14 @@ func (s *Server) findItemByID(ctx context.Context, itemID int) (*item, error) {
 	return &i, nil
 }
 
-func (s *Server) findItems(ctx context.Context) ([]*item, error) {
+func (s *Server) findItems(ctx context.Context, itemType ItemType) ([]*item, error) {
 
 	is, err := s.db.Query("SELECT i.id, i.uuid, i.name, i.price, i.description, i.tax_id, t.name, t.rate, i.status, "+
 		"i.item_type, i.identifiers, i.created_at, i.updated_at, i.deleted_at, iu.unit_id, iu.name as unit_name "+
 		"FROM items i "+
 		"INNER JOIN taxes t ON(i.company_id = t.company_id AND i.tax_id = t.id) "+
 		"LEFT JOIN LATERAL (SELECT iu.unit_id, u.name FROM items_units iu INNER JOIN units u ON (iu.unit_id = u.id) WHERE iu.item_id = i.id limit 1) iu ON true "+
-		"WHERE i.company_id = $1 AND i.deleted_at IS NULL ORDER BY i.name", CurrentCompany(ctx).ID)
+		"WHERE i.company_id = $1 AND i.deleted_at IS NULL  AND ($2 = 'all' OR i.item_type = $2::item_type) ORDER BY i.name", CurrentCompany(ctx).ID, itemType)
 	if err != nil {
 		return nil, err
 	}
@@ -189,33 +189,41 @@ func (s *Server) findItemsByReference(ctx context.Context, term string) (*item, 
 func (s *Server) storeItem(ctx context.Context, form *StoreItemForm) error {
 	companyID := CurrentCompany(ctx).ID
 	return database.WithTransaction(s.db, func(tx *sql.Tx) error {
-		stmt, err := tx.Prepare("INSERT INTO items (name, price, description, tax_id, item_type, identifiers, company_id) " +
-			"VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id")
-		if err != nil {
-			return err
-		}
-
-		var itemID int
-		err = stmt.QueryRow(
-			&form.Name,
-			form.Price,
-			form.Description,
-			form.TaxID,
-			form.ItemType,
-			foundation.ToJSON(form.Identifiers),
-			companyID,
-		).Scan(&itemID)
-
-		if err != nil {
-			return err
-		}
-
-		if err = s.attachItemUnit(tx, companyID, itemID, form.UnitID); err != nil {
-			return err
-		}
-
-		return nil
+		return s.storeItemInternal(tx, companyID, form)
 	})
+}
+
+func (s *Server) storeItemBackground(tx *sql.Tx, companyID int, form *StoreItemForm) error {
+	return s.storeItemInternal(tx, companyID, form)
+}
+
+func (s *Server) storeItemInternal(tx *sql.Tx, companyID int, form *StoreItemForm) error {
+	stmt, err := tx.Prepare("INSERT INTO items (name, price, description, tax_id, item_type, identifiers, company_id) " +
+		"VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id")
+	if err != nil {
+		return err
+	}
+
+	var itemID int
+	err = stmt.QueryRow(
+		&form.Name,
+		form.Price,
+		form.Description,
+		form.TaxID,
+		form.ItemType,
+		foundation.ToJSON(form.Identifiers),
+		companyID,
+	).Scan(&itemID)
+
+	if err != nil {
+		return err
+	}
+
+	if err = s.attachItemUnit(tx, companyID, itemID, form.UnitID); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func (s *Server) attachItemUnit(tx *sql.Tx, companyID, itemID, unitID int) error {

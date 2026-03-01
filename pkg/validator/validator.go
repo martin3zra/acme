@@ -21,13 +21,13 @@ func (v *Validator) Validate(ctx context.Context, object any, rules map[string]a
 
 	v.ctx = ctx
 
-	v.validateAttributes(object, rules)
+	v.validateAttributes(object, rules, "")
 
 	return len(v.errors) == 0
 }
 
 // Validate a given struct/object/attribute against a rule set
-func (v *Validator) validateAttributes(object any, rules map[string]any) {
+func (v *Validator) validateAttributes(object any, rules map[string]any, prefix string) {
 	val := reflect.ValueOf(object)
 	if val.Kind() == reflect.Ptr {
 		val = val.Elem()
@@ -42,54 +42,67 @@ func (v *Validator) validateAttributes(object any, rules map[string]any) {
 		}
 	}
 
-	for i := range val.NumField() {
-		v.currentPosition = i
-		key := v.resolveKeyBasedOnJsonTag(val.Type(), i)
-		f := val.Field(i)
-		switch f.Kind() {
-		case reflect.Struct:
-			if f.Type() == reflect.TypeOf(time.Time{}) {
-				v.resetParentKey()
-				fieldRule, ok := rules[key]
-				if !ok {
-					continue
-				}
+	// Ensure struct
+	if val.Kind() != reflect.Struct {
+		return
+	}
 
-				v.compileRuleSet(key, val.Field(i), v.resolveRuleComponents(fieldRule))
+	for i := 0; i < val.NumField(); i++ {
+		field := val.Field(i)
+		fieldType := val.Type().Field(i)
+
+		// Skip unexported fields
+		if !field.CanInterface() {
+			continue
+		}
+
+		key := v.resolveKeyBasedOnJsonTag(fieldType)
+		isStruct := field.Kind() == reflect.Struct && field.Type() != reflect.TypeOf(time.Time{})
+		isSlice := field.Kind() == reflect.Slice
+
+		// Build fullKey with prefix
+		var fullKey string
+		if key != "" {
+			if prefix != "" {
+				fullKey = prefix + "." + key
+			} else {
+				fullKey = key
+			}
+		} else if fieldType.Anonymous {
+			// Embedded/anonymous struct inherits prefix
+			v.validateAttributes(field.Interface(), rules, prefix)
+			continue
+		} else {
+			// Skip unnamed fields that are not anonymous
+			continue
+		}
+
+		switch {
+		case isStruct:
+			if field.Type() == reflect.TypeOf(time.Time{}) {
+				if rule, ok := rules[fullKey]; ok {
+					v.compileRuleSet(fullKey, field, v.resolveRuleComponents(rule))
+				}
 				continue
 			}
+			v.validateAttributes(field.Interface(), rules, fullKey)
 
-			v.setParentKey(key)
-			v.setKeySeparator(".")
-			v.validateAttributes(f.Interface(), rules)
-		case reflect.Slice:
-			// If the Slice is empty compile any specified rule.
-			if f.Len() == 0 {
-				v.resetParentKey()
-				fieldRule, ok := rules[key]
-				if !ok {
-					continue
+		case isSlice:
+			if field.Len() == 0 {
+				if rule, ok := rules[fullKey]; ok {
+					v.compileRuleSet(fullKey, field, v.resolveRuleComponents(rule))
 				}
-				v.compileRuleSet(key, val.Field(i), v.resolveRuleComponents(fieldRule))
 				continue
 			}
-
-			v.setParentKey(key)
-			v.setKeySeparator(".*.")
-			for j := range f.Len() {
-				v.validateAttributes(f.Index(j).Interface(), rules)
+			for j := 0; j < field.Len(); j++ {
+				v.validateAttributes(field.Index(j).Interface(), rules, fullKey+"[*]")
 			}
-			v.resetParentKey()
+
 		default:
-			ruleIdx := key
-			if v.hasParentKey() {
-				ruleIdx = fmt.Sprintf("%s%s%s", v.parentKey, v.keySeparator, key)
+			if rule, ok := rules[fullKey]; ok {
+				v.object = val
+				v.compileRuleSet(fullKey, field, v.resolveRuleComponents(rule))
 			}
-			fieldRule, ok := rules[ruleIdx]
-			if !ok {
-				continue
-			}
-			v.compileRuleSet(key, val.Field(i), v.resolveRuleComponents(fieldRule))
 		}
 	}
 }
@@ -179,8 +192,16 @@ func (v *Validator) ensureRuleExists(rule string) bool {
 	return slices.Contains(defaultRules, rule)
 }
 
-func (v *Validator) resolveKeyBasedOnJsonTag(field reflect.Type, index int) string {
-	return strings.Split(field.Field(index).Tag.Get("json"), ",")[0]
+// func (v *Validator) resolveKeyBasedOnJsonTag(field reflect.Type, index int) string {
+// 	return strings.Split(field.Field(index).Tag.Get("json"), ",")[0]
+// }
+
+func (v *Validator) resolveKeyBasedOnJsonTag(f reflect.StructField) string {
+	tag := f.Tag.Get("json")
+	if tag == "" || tag == "-" {
+		return ""
+	}
+	return strings.Split(tag, ",")[0]
 }
 
 func (v *Validator) resolveRuleComponents(data any) []string {
@@ -282,9 +303,28 @@ func (v *Validator) evaluateRuleWithValues(key string, ruleComponents []string, 
 }
 
 func (v *Validator) evaluateDateRule(rule string, ruleValue string, value time.Time) bool {
-	if rule == "after" {
+	now := time.Now()
+	switch rule {
+	case "after":
 		if ruleValue == "yesterday" {
-			return value.After(time.Now().AddDate(0, 0, -1))
+			return value.After(now.AddDate(0, 0, -1))
+		}
+		if ruleValue == "today" {
+			return value.After(time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location()))
+		}
+	case "before":
+		if ruleValue == "yesterday" {
+			return value.Before(now.AddDate(0, 0, -1))
+		}
+		if ruleValue == "today" {
+			return value.Before(time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location()))
+		}
+	case "before_or_equals":
+		if ruleValue == "yesterday" {
+			return !value.After(now.AddDate(0, 0, -1))
+		}
+		if ruleValue == "today" {
+			return !value.After(time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location()))
 		}
 	}
 
@@ -300,16 +340,22 @@ func (v *Validator) evaluateMultipleValueRule(key, rule string, value reflect.Va
 		fieldValue = reflect.ValueOf(digits(int(value.Int())))
 	}
 
-	if !v.validateBetween(fieldValue, attributes) {
-		kind := ""
-		switch value.Kind() {
-		case reflect.Float32, reflect.Float64, reflect.Int32, reflect.Int64:
-			kind = "int"
-		default:
-			kind = "string"
+	if rule == "required_if" {
+		siblingValue, e := getFieldValueByJSONTag(v.object, attributes[0])
+		if !e {
+			return
 		}
+		if !slices.Contains(attributes[1:], siblingValue) {
+			return
+		}
+		if !v.validateRuleWithoutAttributes("required", value) {
+			v.record(key, v.messages(key, "required", getDataTypeUsingReflection(value), attributes[0], attributes[1]))
+		}
+		return
+	}
 
-		v.record(key, v.messages(key, rule, kind, attributes[0], attributes[1]))
+	if !v.validateBetween(fieldValue, attributes) {
+		v.record(key, v.messages(key, rule, getDataTypeUsingReflection(value), attributes[0], attributes[1]))
 	}
 }
 
@@ -326,7 +372,7 @@ func (v *Validator) evaluateSingleValueRule(key, rule string, ruleValue any, val
 	case reflect.Slice:
 		v.evaluateSliceRules(key, rule, value, castedRuleValue)
 	default:
-		fmt.Println("data type not supported yet!", value.Type())
+		fmt.Println("data type not supported yet!", value.Type(), key)
 	}
 
 }
@@ -382,4 +428,37 @@ func (v *Validator) resolveMessages() map[string]any {
 	}
 
 	return locale.EnglishMessages()
+}
+
+func getFieldValueByJSONTag(v reflect.Value, tag string) (string, bool) {
+	// If v is a pointer, resolve it
+	if v.Kind() == reflect.Ptr {
+		v = v.Elem()
+	}
+
+	if v.Kind() != reflect.Struct {
+		return "", false
+	}
+
+	t := v.Type()
+	for i := 0; i < t.NumField(); i++ {
+		field := t.Field(i)
+		jsonTag := field.Tag.Get("json")
+		// Handle omitempty etc.
+		jsonTag = strings.Split(jsonTag, ",")[0]
+
+		if jsonTag == tag {
+			return v.Field(i).String(), true
+		}
+	}
+	return "", false
+}
+
+func getDataTypeUsingReflection(value reflect.Value) string {
+	switch value.Kind() {
+	case reflect.Float32, reflect.Float64, reflect.Int32, reflect.Int64:
+		return "int"
+	default:
+		return "string"
+	}
 }

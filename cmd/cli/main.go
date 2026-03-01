@@ -1,14 +1,18 @@
 package main
 
 import (
+	"context"
+	"embed"
 	"fmt"
 	"io"
 	"log"
 	"os"
+	"path/filepath"
 
 	"github.com/joho/godotenv"
 	"github.com/martin3zra/acme/app"
 	"github.com/martin3zra/acme/pkg/foundation/str"
+	"github.com/martin3zra/acme/resources"
 )
 
 const (
@@ -19,16 +23,13 @@ const (
 
 func main() {
 	if len(os.Args) < 2 {
-		fmt.Println("Usage: mycli <command> [arguments]")
+		fmt.Println("Usage: Acme CLI <command> [arguments]")
 		return
 	}
 
-	err := godotenv.Load(os.ExpandEnv("../../.env"))
-	if err != nil {
-		panic(err)
-	}
+	loadEnv()
 
-	err = os.Setenv("TZ", "America/Santo_Domingo")
+	err := os.Setenv("TZ", "America/Santo_Domingo")
 	if err != nil {
 		log.Fatalf("Error setting TZ env %v\n", err)
 	}
@@ -46,9 +47,28 @@ func main() {
 
 }
 
+func loadEnv() {
+	// Try current working directory
+	wd, _ := os.Getwd()
+	envPath := filepath.Join(wd, ".env")
+
+	if err := godotenv.Load(envPath); err == nil {
+		return
+	}
+
+	// Fallback: relative to binary (useful in production builds)
+	exePath, _ := os.Executable()
+	rootPath := filepath.Join(filepath.Dir(exePath), "..", "..")
+	envPath = filepath.Join(rootPath, ".env")
+
+	if err := godotenv.Load(envPath); err != nil {
+		log.Fatalf("Error loading .env file: %v", err)
+	}
+}
+
 func run(args []string, stdout io.Writer) error {
 	// If the file doesn't exist, create it or append to the file
-	file, err := os.OpenFile("../../acme.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0666)
+	file, err := os.OpenFile("acme.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0666)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -57,17 +77,21 @@ func run(args []string, stdout io.Writer) error {
 	log.SetFlags(log.Lshortfile | log.LstdFlags)
 	log.SetOutput(file)
 
-	server := app.NewServer(nil, nil)
+	var assets embed.FS
+	server := app.NewServer(assets, resources.Views)
 	server.Boot()
 
-	defer func() {
-		server.Shutdown()
-		log.Println("Stopping the server")
-	}()
+	// Create a root context with cancel
+	shutdownCtx, shutdownCancel := context.WithCancel(context.Background())
+	defer shutdownCancel()
 
 	log.Println("Starting the server")
 
 	menu(args, server)
+
+	if err := server.Shutdown(shutdownCtx); err != nil {
+		log.Printf("server shutdown error: %v", err)
+	}
 
 	return nil
 }
@@ -87,7 +111,7 @@ func menu(args []string, server *app.Server) {
 			fmt.Println("Hello, world!")
 		}
 	case "version":
-		fmt.Println("mycli version 1.0.0")
+		fmt.Println("Acme CLI version 1.0.0")
 	case "generate:key":
 		fmt.Println("generate key", str.GenerateRandom())
 	case "setup:account":

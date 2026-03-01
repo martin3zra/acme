@@ -1,14 +1,21 @@
 package app
 
 import (
+	"fmt"
 	"log"
 
+	"github.com/martin3zra/acme/pkg/cache"
+	"github.com/martin3zra/acme/pkg/foundation"
 	"github.com/martin3zra/acme/pkg/i18n"
 	"github.com/martin3zra/acme/pkg/routing"
 	inertia "github.com/romsar/gonertia/v2"
 )
 
 func (s *Server) paymentsHandler(ctx *routing.Context) {
+	if s.abortWhenPrerequisiteMissing(ctx, "payment") {
+		return
+	}
+
 	payments, err := s.findPayments(ctx.Request.Context())
 	if err != nil {
 		ctx.Error(err)
@@ -21,21 +28,36 @@ func (s *Server) paymentsHandler(ctx *routing.Context) {
 
 	uuid := ctx.Query("id")
 	if uuid != "" {
-		payment, err := s.findPaymentByUUID(ctx.Request.Context(), uuid)
-		if err != nil {
-			ctx.Error(err)
-			return
-		}
+		c := cache.NewPgCache(s.db)
+		key := fmt.Sprintf("preview:payment:%s", uuid)
+		data, err := cache.Remember(ctx.Request.Context(), c, key, func() (map[string]any, error) {
+			payment, err := s.findPaymentByUUID(ctx.Request.Context(), uuid)
+			if err != nil {
+				return nil, err
+			}
 
-		lines, err := s.findPaymentLines(ctx.Request.Context(), payment.ID)
+			lines, err := s.findPaymentLines(ctx.Request.Context(), payment.ID)
+			if err != nil {
+				return nil, err
+			}
+
+			uri := fmt.Sprintf("%s/payments/%s/print/%s", s.config.host, uuid, foundation.NewHashable().Sha1(uuid))
+			pdfURL, err := routing.PermanentSignedURL(uri, map[string]string{}, string(s.config.secretKey))
+			if err != nil {
+				return nil, err
+			}
+
+			return map[string]any{
+				"header": payment,
+				"lines":  lines,
+				"pdfURL": pdfURL,
+			}, nil
+		})
 		if err != nil {
 			ctx.Error(err)
 			return
 		}
-		props["payment"] = map[string]any{
-			"header": payment,
-			"lines":  lines,
-		}
+		props["payment"] = data
 		props["showPayment"] = true
 	}
 
@@ -163,4 +185,56 @@ func (s *Server) updatePaymentHandler() routing.HandlerFunc {
 
 		ctx.Redirect("/payments")
 	})
+}
+
+func (s *Server) printPaymentHandler(ctx *routing.Context) {
+	uuid := ctx.Param("id")
+	hash := ctx.Param("hash")
+	if !foundation.NewHashable().Sha1Equals(uuid, hash) {
+		ctx.BackWith("status", "The hash does not match")
+		return
+	}
+
+	type paymentData struct {
+		Header *payment       `json:"header"`
+		Lines  []*paymentLine `json:"lines"`
+	}
+	c := cache.NewPgCache(s.db)
+	key := fmt.Sprintf("preview:payment:%s", uuid)
+	data, err := cache.Remember(ctx.Request.Context(), c, key, func() (paymentData, error) {
+		payment, err := s.findPaymentByUUID(ctx.Request.Context(), uuid)
+		if err != nil {
+			return paymentData{}, err
+		}
+
+		lines, err := s.findPaymentLines(ctx.Request.Context(), payment.ID)
+		if err != nil {
+			return paymentData{}, err
+		}
+
+		return paymentData{
+			Header: payment,
+			Lines:  lines,
+		}, nil
+	})
+	if err != nil {
+		ctx.Error(err)
+		return
+	}
+
+	payment, err := NewPaymentPDF(s.translator, data.Header, data.Lines)
+	if err != nil {
+		ctx.Error(err)
+		return
+	}
+	payment.Header(ctx.Request.Context())
+	payment.Lines()
+	payment.Footer(s.config.appName)
+
+	ctx.Response.Header().Set("Content-Type", "application/pdf")
+	ctx.Response.Header().Set("Content-Disposition", fmt.Sprintf("inline; filename=%s.pdf", data.Header.Code))
+
+	if err := payment.Output(ctx.Response); err != nil {
+		ctx.Error(err)
+	}
 }

@@ -15,15 +15,11 @@ func NewVerification(account map[string]any, signeUrl string) Verify {
 
 func (w Verify) Subject() string { return "Verify Account" }
 
-func (w Verify) From() mailer.Individual {
-	return mailer.Individual{Name: "Alfredo", Email: "martin3zra@gmail.com"}
-}
-
 func (w Verify) To() []mailer.Individual {
 	return []mailer.Individual{}
 }
 
-func (w Verify) Content() string { return "resources/views/mail/verify.html" }
+func (w Verify) Content() string { return "views/mail/verify.html" }
 
 func (w Verify) Data() map[string]any {
 
@@ -35,4 +31,8 @@ func (w Verify) Data() map[string]any {
 		"CTAURL":  w.signedUrl,
 		"Year":    2025,
 	}
+}
+
+func (i Verify) Attachments() []mailer.Attachment {
+	return make([]mailer.Attachment, 0)
 }

@@ -3,6 +3,7 @@ package app
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"net/http"
 	"strings"
@@ -145,6 +146,7 @@ func AuthenticatedMiddleware(next routing.HandlerFunc) routing.HandlerFunc {
 				next(ctx)
 				return
 			}
+			sess.Put("intended", ctx.Request.RequestURI)
 			ctx.Redirect("/login", http.StatusSeeOther)
 			return
 		}
@@ -163,6 +165,10 @@ func AuthenticatedMiddleware(next routing.HandlerFunc) routing.HandlerFunc {
 		cc, _ := getCurrentCompany(attrsMap)
 
 		acCtx := context.WithValue(userCtx, support.AccountKey{}, ac)
+		if cc == nil {
+			next(ctx.WithContext(acCtx))
+			return
+		}
 		ccCtx := context.WithValue(acCtx, support.CompanyKey{}, cc)
 
 		ctxWithProps := context.WithValue(ccCtx, routing.PermissionKey{}, permissions(cc.UserRole))
@@ -202,6 +208,30 @@ func RestrictedAccess(next routing.HandlerFunc) routing.HandlerFunc {
 	}
 }
 
+func AutoResourcePrerequisiteMiddleware(next routing.HandlerFunc) routing.HandlerFunc {
+	return func(ctx *routing.Context) {
+		resource, ok := resourceFromPath(ctx.Request.URL.Path, true)
+		if !ok {
+			next(ctx)
+			return
+		}
+
+		company := CurrentCompany(ctx.Request.Context())
+		if company == nil {
+			next(ctx)
+			return
+		}
+
+		rCtx, err := CheckResourcePrerequisites(ctx.Request.Context(), resource, company.ID)
+		if err != nil && !errors.Is(err, ErrPrerequisitesMissing) {
+			ctx.Error(err, http.StatusPreconditionFailed)
+			return
+		}
+
+		next(ctx.WithContext(rCtx))
+	}
+}
+
 func getCurrentCompany(attrs map[string]any) (*Company, error) {
 	raw, ok := attrs["current_company"]
 	if !ok {
@@ -237,4 +267,21 @@ func getAccount(attrs map[string]any) map[string]any {
 	}
 
 	return accountMap
+}
+
+func resourceFromPath(path string, base bool) (string, bool) {
+	parts := strings.Split(strings.Trim(path, "/"), "/")
+	if len(parts) < 1 {
+		return "", false
+	}
+
+	var resource string
+	if base {
+		resource = parts[0] // first child
+	} else {
+		resource = parts[len(parts)-1] // last child
+	}
+
+	resource = strings.TrimSuffix(resource, "s")
+	return resource, true
 }

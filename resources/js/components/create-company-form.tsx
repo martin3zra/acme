@@ -1,7 +1,8 @@
 import { useHeader } from '@/composables/use-headers';
 import { useTranslation } from '@/hooks/use-translation';
-import { Company, Verb } from '@/types';
-import { useForm } from '@inertiajs/react';
+import { Company, PageProps, Verb } from '@/types';
+import { useForm, usePage } from '@inertiajs/react';
+import { AlertDestructive } from './alert-destructive';
 import FormSection from './form-section';
 import InputError from './input-error';
 import { Button } from './ui/button';
@@ -28,7 +29,8 @@ export type CreateFormProps = {
 export default function CreateCompanyForm({ onFinish, params }: CreateFormProps) {
   const t = useTranslation().trans;
   const { headers } = useHeader();
-  const { data, setData, errors, processing, post, reset } = useForm<Required<CompanyForm>>({
+  const { errors: propsErrors } = usePage<PageProps>().props;
+  const { data, setData, errors, processing, post, transform, reset } = useForm<Required<CompanyForm>>({
     name: params.company?.name || '',
     identifier: params.company?.identifier || '',
     city: params.company?.city || '',
@@ -39,6 +41,10 @@ export default function CreateCompanyForm({ onFinish, params }: CreateFormProps)
   };
 
   const submit = () => {
+    transform((data) => ({
+      ...data,
+      rnc: data.identifier,
+    }));
     post('/companies', {
       ...headers,
       onFinish: () => {
@@ -53,6 +59,11 @@ export default function CreateCompanyForm({ onFinish, params }: CreateFormProps)
         <FormSection.Title>{t('companies.single.title')}</FormSection.Title>
         <FormSection.Description>{t('companies.single.description')}</FormSection.Description>
         <FormSection.Form>
+          {propsErrors.status && (
+            <div className="col-span-12">
+              <AlertDestructive description={propsErrors.status} onDestroy={() => delete propsErrors.status} />
+            </div>
+          )}
           <div className="col-span-6 space-y-2">
             <Label htmlFor="name" className="text-end">
               {t('companies.single.name')}
@@ -61,8 +72,15 @@ export default function CreateCompanyForm({ onFinish, params }: CreateFormProps)
             <InputError message={errors.name} />
           </div>
           <div className="col-span-3 space-y-2 sm:col-span-3">
-            <Label htmlFor="rnc">{t('companies.single.rnc')}</Label>
-            <Input type="text" name="rnc" maxLength={11} className="h-12 text-start md:text-xl" value={data.identifier} onChange={handleChange} />
+            <Label htmlFor="identifier">{t('companies.single.rnc')}</Label>
+            <Input
+              type="text"
+              name="identifier"
+              maxLength={11}
+              className="h-12 text-start md:text-xl"
+              value={data.identifier}
+              onChange={handleChange}
+            />
             <InputError message={errors.identifier} />
           </div>
           <div className="col-span-6 space-y-2">

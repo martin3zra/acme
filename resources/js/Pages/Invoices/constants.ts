@@ -1,8 +1,20 @@
 import { defaultBTForm, defaultCardForm, defaultCashForm, defaultCheckForm } from '@/constants';
-import { BreadcrumbItem, defaultBreadcrumbs, DiscountType, HeaderForm, InvoiceForm, PaymentMethodsForm, PaymentTerm } from '@/types';
+import { capitalize } from '@/lib/utils';
+import {
+  BreadcrumbItem,
+  defaultBreadcrumbs,
+  DiscountType,
+  HeaderForm,
+  InvoiceForm,
+  PaymentMethodsForm,
+  PaymentTerm,
+  Recurrent,
+  TransactionKind,
+} from '@/types';
 
 export const paymentTerms: PaymentTerm[] = [
   { value: 'pia', label: 'Payment In Advance' },
+  { value: 'net0', label: 'Due on Receipt' },
   { value: 'net7', label: 'Net 7' },
   { value: 'net10', label: 'Net 10' },
   { value: 'net15', label: 'Net 15' },
@@ -12,26 +24,26 @@ export const paymentTerms: PaymentTerm[] = [
   { value: 'net120', label: 'Net 120' },
 ];
 
-export const breadcrumbs: BreadcrumbItem[] = [
+export const makeBreadcrumbs = (kind: TransactionKind): BreadcrumbItem[] => [
   ...defaultBreadcrumbs,
   {
-    title: 'invoices.title',
-    href: '/invoices',
+    title: `${kind}s.title`, // e.g. "invoices.title", "estimates.title"
+    href: `/${kind}s`,
   },
 ];
 
-export const createBreadcrumbs: BreadcrumbItem[] = [
-  ...breadcrumbs,
+export const makeCreateBreadcrumbs = (kind: TransactionKind): BreadcrumbItem[] => [
+  ...makeBreadcrumbs(kind),
   {
-    title: 'invoices.newInvoice.title',
-    href: '/invoices/create',
+    title: `${kind}s.new${capitalize(kind)}.title`,
+    href: `${kind}s/create`,
   },
 ];
 
-export const editBreadcrumbs: BreadcrumbItem[] = [
-  ...breadcrumbs,
+export const makeEditBreadcrumbs = (kind: TransactionKind): BreadcrumbItem[] => [
+  ...makeBreadcrumbs(kind),
   {
-    title: 'invoices.editInvoice.title',
+    title: `${kind}s.edit${capitalize(kind)}.title`,
     href: '',
   },
 ];
@@ -42,15 +54,31 @@ export const defaultPaymentMethodsForm: PaymentMethodsForm = {
   card: defaultCardForm,
   bt: defaultBTForm,
 };
+export const defaultReccurence: Recurrent = {
+  enabled: false,
+  name: '',
+  type: 'schedule',
+  frequency: 'monthly',
+  send_email: false,
+  interval: 1,
+  day_of_month: 1,
+  timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+};
 export const defaultDiscount: DiscountType = { value: 0, type: 'fixed' };
 export const defaultHeaderForm: HeaderForm = {
   customer: undefined,
   date: undefined,
   due: undefined,
-  terms: 0,
+  terms: 'pia',
   taxReceipt: 0,
   notes: undefined,
   discount: defaultDiscount,
 };
 
-export const defaultInvoiceForm: InvoiceForm = { header: defaultHeaderForm, lines: [], payment: defaultPaymentMethodsForm };
+export const defaultInvoiceForm: InvoiceForm = {
+  header: defaultHeaderForm,
+  lines: [],
+  payment: defaultPaymentMethodsForm,
+  kind: 'invoice',
+  source: { id: '', type: 'invoice' },
+};

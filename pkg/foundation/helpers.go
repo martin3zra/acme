@@ -9,6 +9,10 @@ import (
 	"net/http"
 	"reflect"
 	"strings"
+
+	"github.com/google/uuid"
+	"golang.org/x/text/language"
+	"golang.org/x/text/message"
 )
 
 func GetIpAddress(r *http.Request) (string, error) {
@@ -72,6 +76,15 @@ func ToJSON(m any) string {
 	return strings.ReplaceAll(string(js), ",", ", ")
 }
 
+func AsJSON(m any) []byte {
+	js, err := json.Marshal(m)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	return js
+}
+
 func MapSlice[T, U any](s []T, f func(T) U) []U {
 	result := make([]U, len(s))
 	for i, v := range s {
@@ -88,4 +101,29 @@ func ResolveError(err error) error {
 		}
 		err = unw
 	}
+}
+
+type AmountFormat struct {
+	Amount float64
+	Symbol string
+}
+
+func FormatAmount(amount float64, options ...string) string {
+	p := message.NewPrinter(language.English)
+	symbol := "$"
+	if len(options) > 0 {
+		symbol = options[0]
+	}
+	return p.Sprintf("%s%.2f", symbol, amount) // "$1,234,567.89"
+}
+
+func AsUUID(s string) (uuid.UUID, error) {
+	if s == "" {
+		return uuid.Nil, nil
+	}
+	u, err := uuid.Parse(s)
+	if err != nil {
+		return uuid.Nil, err
+	}
+	return u, nil
 }

@@ -56,7 +56,15 @@ func (s *Session) Delete(key string) {
 }
 
 func (s *Session) Flash(name string, value any) {
-	s.payload["flash"] = map[string]any{name: value}
+	// Ensure flash map exists
+	flash, ok := s.payload["flash"].(map[string]any)
+	if !ok || flash == nil {
+		flash = make(map[string]any)
+		s.payload["flash"] = flash
+	}
+
+	// Add or overwrite a single key
+	flash[name] = value
 }
 
 func (s *Session) Errors(name string, value string) {

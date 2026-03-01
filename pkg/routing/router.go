@@ -43,7 +43,7 @@ func hasPermission(next HandlerFunc, permission string) HandlerFunc {
 	return func(ctx *Context) {
 		userPerms := ctx.Request.Context().Value(PermissionKey{}).(map[string]bool)
 
-		if !userPerms[permission] {
+		if !userPerms[permission] && !userPerms["*"] {
 			ctx.Error(foundation.Unauthorized{})
 			return
 		}

@@ -1,12 +1,11 @@
 import ActionSection from '@/components/action-section';
 import { ConfirmsPassword } from '@/components/confirms-password';
+import { DatePickerField } from '@/components/date-picker';
 import FormSection from '@/components/form-section';
 import InputError from '@/components/input-error';
 import { Button } from '@/components/ui/button';
-import { Calendar } from '@/components/ui/calendar';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Separator } from '@/components/ui/separator';
 import { useHeader } from '@/composables/use-headers';
@@ -16,10 +15,9 @@ import { useTranslation } from '@/hooks/use-translation';
 import { cn } from '@/lib/utils';
 import { paymentTerms } from '@/Pages/Invoices/constants';
 import { Customer, CustomerType, CustomerTypes, PageProps, PaymentMethods, TaxReceipt, Verb } from '@/types';
-import { Field, Radio, RadioGroup } from '@headlessui/react';
+import { Field, Radio, RadioGroup, Switch } from '@headlessui/react';
 import { useForm, usePage } from '@inertiajs/react';
-import { format } from 'date-fns/format';
-import { CalendarIcon, CheckCircleIcon } from 'lucide-react';
+import { CheckCircleIcon } from 'lucide-react';
 import { useState } from 'react';
 
 export type CreateFormParams = {
@@ -41,6 +39,7 @@ type CustomerForm = {
   phone: string;
   payment_method?: string;
   payment_terms?: string;
+  credit_limited: boolean;
   credit_limit?: number;
   customer_type: string;
   tax_receipt: number;
@@ -62,6 +61,7 @@ export default function CreateForm({ onFinish, params }: CreateFormProps) {
     phone: params.customer?.phone || '',
     payment_method: params.customer?.payment_method || '',
     payment_terms: params.customer?.payment_terms || '',
+    credit_limited: params.customer?.credit_limited || false,
     credit_limit: params.customer?.credit_limit || 0,
     customer_type: params.customer?.customer_type || 'business',
     tax_receipt: params.customer?.tax_receipt || 0,
@@ -71,6 +71,7 @@ export default function CreateForm({ onFinish, params }: CreateFormProps) {
 
   const viewMode = params.action === 'view';
   const isDisabled = params.customer?.status === 'disabled';
+  const verbName = useVerb().action(params.action);
 
   const options = {
     ...headers,
@@ -80,8 +81,6 @@ export default function CreateForm({ onFinish, params }: CreateFormProps) {
       onFinish();
     },
   };
-
-  const verbName = useVerb().action(params.action);
 
   const submit = () => {
     if (params.action === 'create') post('/customers', options);
@@ -99,9 +98,10 @@ export default function CreateForm({ onFinish, params }: CreateFormProps) {
             <div className="flex flex-col gap-2">
               <Label htmlFor="customer_type">{t('customers.single.type')}</Label>
               <RadioGroup
+                disabled={viewMode}
                 id="customer_type"
                 className="grid grid-cols-3 gap-6"
-                value={data.customer_type}
+                value={data.customer_type as CustomerType}
                 onChange={(type: CustomerType) => setData('customer_type', type)}
               >
                 {CustomerTypes.map((type: CustomerType) => (
@@ -221,17 +221,38 @@ export default function CreateForm({ onFinish, params }: CreateFormProps) {
           </div>
           <div className="col-span-2">
             <Label htmlFor="credit_limit">{t('global.credit_limit')}</Label>
-            <Input
-              id="credit_limit"
-              type="number"
-              className="mt-2 block w-full text-end"
-              value={data.credit_limit}
-              onChange={(e) => setData('credit_limit', e.target.valueAsNumber)}
-              required
-              placeholder={t('global.credit_limit')}
-              readOnly={viewMode}
-            />
-            <InputError className="mt-2" message={errors.credit_limit} />
+            <div className="mt-2 flex space-x-6">
+              <Switch
+                className={cn(
+                  'relative inline-flex h-8 w-20 cursor-pointer items-center rounded-full transition',
+                  data.credit_limited ? 'bg-primary' : 'bg-gray-300',
+                )}
+                disabled={viewMode}
+                checked={data.credit_limited}
+                onChange={(checked: boolean) => {
+                  setData('credit_limited', checked);
+                  if (!checked) setData('credit_limit', 0);
+                }}
+              >
+                <span
+                  className={cn(
+                    'inline-block h-6 w-6 transform rounded-full bg-white transition',
+                    data.credit_limited ? 'translate-x-6' : 'translate-x-1',
+                  )}
+                />
+              </Switch>
+              <Input
+                id="credit_limit"
+                type="number"
+                className="text-end"
+                value={data.credit_limit}
+                onChange={(e) => setData('credit_limit', e.target.valueAsNumber)}
+                disabled={!data.credit_limited}
+                placeholder={t('global.credit_limit')}
+                readOnly={viewMode}
+              />
+              <InputError className="mt-2" message={errors.credit_limit} />
+            </div>
           </div>
           <Separator className="col-span-6" />
           <div className="col-span-6">
@@ -282,28 +303,15 @@ export default function CreateForm({ onFinish, params }: CreateFormProps) {
                   <InputError className="mt-2" message={errors.open_balance} />
                 </div>
                 <div className="col-span-3">
-                  <Label>{t('customers.single.openBalanceAsOf')}</Label>
-                  <Popover>
-                    <PopoverTrigger asChild>
-                      <Button
-                        variant={'outline'}
-                        className={cn('mt-2 w-[200px] justify-start text-left font-normal', !data.open_balance_as_of && 'text-muted-foreground')}
-                      >
-                        <CalendarIcon />
-                        {data.open_balance_as_of ? format(data.open_balance_as_of, 'PPP') : <span>{t('global.datePlaceholder')}</span>}
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="pointer-events-auto w-auto p-0">
-                      <Calendar
-                        mode="single"
-                        defaultMonth={data.open_balance_as_of}
-                        selected={data.open_balance_as_of}
-                        onSelect={(value) => setData('open_balance_as_of', value)}
-                        initialFocus
-                      />
-                    </PopoverContent>
-                  </Popover>
-                  <InputError className="mt-2" message={errors.open_balance_as_of} />
+                  <DatePickerField
+                    id="date"
+                    label={t('customers.single.openBalanceAsOf')}
+                    placeholder={t('global.datePlaceholder')}
+                    value={data.open_balance_as_of}
+                    onChange={(value) => setData('open_balance_as_of', value)}
+                    error={errors.open_balance_as_of}
+                    className="w-52"
+                  />
                 </div>
               </>
             )}

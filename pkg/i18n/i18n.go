@@ -69,6 +69,21 @@ func NewTranslator(translations map[string]string) *Translator {
 	return &Translator{Translations: translations}
 }
 
+func (t *Translator) Load(namespaces ...string) error {
+	translations, err := LoadTranslations("es", "en", namespaces...)
+	if err != nil {
+		return fmt.Errorf("load translations: %w", err)
+	}
+	t.mergeMaps(t.Translations, translations)
+	return nil
+}
+
+func (t *Translator) mergeMaps(dst, src map[string]string) {
+	for k, v := range src {
+		dst[k] = v
+	}
+}
+
 // Trans returns the translated string with replacements
 func (t *Translator) Trans(key string, replacements ...Replacements) string {
 	translation, ok := t.Translations[key]

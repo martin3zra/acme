@@ -10,3 +10,8 @@ require (
 	github.com/lib/pq v1.10.9
 	golang.org/x/crypto v0.1.0
 )
+
+require (
+	codeberg.org/go-pdf/fpdf v0.11.1
+	golang.org/x/text v0.26.0
+)

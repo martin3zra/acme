@@ -1,5 +1,6 @@
 import { DateCell } from '@/components/data-table/date-cell';
 import { HeaderCell } from '@/components/data-table/header-cell';
+import { HeaderSortCell } from '@/components/data-table/header-sort-cell';
 import { TextCell } from '@/components/data-table/text-cell';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -13,7 +14,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Company, Replacements, Verb } from '@/types';
 import { ColumnDef } from '@tanstack/react-table';
-import { ArrowUpDown, MoreHorizontal } from 'lucide-react';
+import { MoreHorizontal } from 'lucide-react';
 
 type Props = {
   onDidClick: (company: Company, action: Verb) => void;
@@ -39,11 +40,7 @@ export const getColumns = ({ onDidClick, t }: Props): ColumnDef<Company>[] => {
       accessorKey: 'name',
       meta: t('global.name'),
       header: ({ column }) => {
-        return (
-          <Button className="uppercase" variant="ghost" onClick={() => column.toggleSorting(column.getIsSorted() === 'asc')}>
-            {t('global.name')} <ArrowUpDown />
-          </Button>
-        );
+        return <HeaderSortCell<Company> title={t('global.name')} column={column} />;
       },
       cell: (props) => {
         return <TextCell columnWidth={props.column.getSize()} value={props.getValue() as string} />;
@@ -94,7 +91,7 @@ export const getColumns = ({ onDidClick, t }: Props): ColumnDef<Company>[] => {
                 <MoreHorizontal />
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
+            <DropdownMenuContent align="end" className="[&_[data-slot=dropdown-menu-item]]:cursor-pointer">
               <DropdownMenuLabel>{t('global.actions.title')}</DropdownMenuLabel>
               <DropdownMenuSeparator />
               <DropdownMenuItem onClick={() => onDidClick(props.row.original, 'view')}>{t('companies.viewCompany.title')}</DropdownMenuItem>

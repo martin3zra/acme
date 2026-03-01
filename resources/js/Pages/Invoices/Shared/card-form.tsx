@@ -1,4 +1,5 @@
 import FormSection from '@/components/form-section';
+import { MoneyInput } from '@/components/money-input';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -22,10 +23,6 @@ export const CardFormView = ({ last4, brand, amount, reference, onChange }: Card
       }
       onChange(event.currentTarget.valueAsNumber, event.currentTarget.name);
       return;
-    }
-
-    if (event.currentTarget.name === 'amount') {
-      onChange(event.currentTarget.valueAsNumber, 'amount');
     }
 
     onChange(event.currentTarget.value, event.currentTarget.name as CardFormInput);
@@ -79,13 +76,11 @@ export const CardFormView = ({ last4, brand, amount, reference, onChange }: Card
             <Label htmlFor="amount" className="text-end">
               {t('global.amount')}
             </Label>
-            <Input
-              type="number"
-              inputMode="numeric"
+            <MoneyInput
               name="amount"
               pattern="[0-9]*"
               className="h-12 text-end md:text-xl"
-              onChange={handleChange}
+              onChange={(c) => onChange(c, 'amount')}
               value={amount}
             />
           </div>

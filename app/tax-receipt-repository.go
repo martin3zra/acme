@@ -11,7 +11,7 @@ import (
 type taxReceipt struct {
 	ID            int    `json:"id"`
 	Name          string `json:"name"`
-	Series        string `json:"series"`
+	Serie         string `json:"serie"`
 	Type          string `json:"type"`
 	SequenceStart int    `json:"sequence_start"`
 	SequenceEnd   int    `json:"sequence_end"`
@@ -20,9 +20,20 @@ type taxReceipt struct {
 	foundation.Timestamps
 }
 
-func (s *Server) findTaxesReceipts(ctx context.Context) ([]*taxReceipt, error) {
-	rows, err := s.db.Query("SELECT id, name, series, type, sequence_start, sequence_end, current, created_at, updated_at, deleted_at "+
-		"FROM tax_receipts WHERE company_id = $1 ORDER BY id", CurrentCompany(ctx).ID)
+type taxReceiptSeq struct {
+	Seq    int64
+	Number string
+}
+
+func (s *Server) findTaxReceiptsForSetup(ctx context.Context) ([]*taxReceipt, error) {
+	rows, err := s.db.Query(`
+    SELECT s.id, s.name, s.serie, s.type, COALESCE(b.sequence_start, 0), COALESCE(b.sequence_end, 0), COALESCE(b.current, 0), b.created_at, b.updated_at, b.deleted_at
+    FROM shared_tax_receipts s
+    LEFT JOIN tax_receipts b
+      ON s.id = b.id
+      AND b.company_id = $1
+    ORDER by id;
+  `, CurrentCompany(ctx).ID)
 	if err != nil {
 		return nil, err
 	}
@@ -33,7 +44,7 @@ func (s *Server) findTaxesReceipts(ctx context.Context) ([]*taxReceipt, error) {
 		if err = rows.Scan(
 			&t.ID,
 			&t.Name,
-			&t.Series,
+			&t.Serie,
 			&t.Type,
 			&t.SequenceStart,
 			&t.SequenceEnd,
@@ -51,23 +62,57 @@ func (s *Server) findTaxesReceipts(ctx context.Context) ([]*taxReceipt, error) {
 	return data, nil
 }
 
-func (s *Server) grabTaxReceiptSequence(tx *sql.Tx, companyId, taxReceiptID int) (int64, error) {
-	var sequence, sequenceEnd int64
-	row := tx.QueryRow("SELECT current, sequence_end FROM tax_receipts WHERE company_id = $1 AND id = $2", companyId, taxReceiptID)
-	err := row.Scan(&sequence, &sequenceEnd)
+func (s *Server) findTaxesReceipts(ctx context.Context) ([]*taxReceipt, error) {
+	rows, err := s.db.Query("SELECT id, name, serie, type, sequence_start, sequence_end, current, created_at, updated_at, deleted_at "+
+		"FROM tax_receipts WHERE company_id = $1 ORDER BY id", CurrentCompany(ctx).ID)
 	if err != nil {
-		return 0, err
+		return nil, err
+	}
+
+	data := make([]*taxReceipt, 0)
+	for rows.Next() {
+		t := new(taxReceipt)
+		if err = rows.Scan(
+			&t.ID,
+			&t.Name,
+			&t.Serie,
+			&t.Type,
+			&t.SequenceStart,
+			&t.SequenceEnd,
+			&t.Current,
+			&t.CreatedAt,
+			&t.UpdatedAt,
+			&t.DeletedAt,
+		); err != nil {
+			return nil, err
+		}
+
+		data = append(data, t)
+	}
+
+	return data, nil
+}
+
+func (s *Server) grabTaxReceiptSequence(tx *sql.Tx, companyId, taxReceiptID int) (*taxReceiptSeq, error) {
+	var sequence, sequenceEnd int64
+	var serie string
+	row := tx.QueryRow("SELECT serie, current, sequence_end FROM tax_receipts WHERE company_id = $1 AND id = $2", companyId, taxReceiptID)
+	err := row.Scan(&serie, &sequence, &sequenceEnd)
+	if err != nil {
+		return nil, err
 	}
 
 	// abort the transaction when the current sequence is equals to the end sequence
 	if sequence == sequenceEnd {
-		return 0, errors.New("tax receipt reach end") //new(ErrTaxReceiptReachEnd)
+		return nil, errors.New("tax receipt reach end") //new(ErrTaxReceiptReachEnd)
 	}
 
 	_, err = tx.Exec("UPDATE tax_receipts SET current = $3 WHERE company_id = $1 AND id = $2", companyId, taxReceiptID, sequence+1)
 	if err != nil {
-		return 0, err
+		return nil, err
 	}
 
-	return sequence, nil
+	taxNumber := foundation.GeneratePrefixedNumber(serie, 8, int(sequence))
+
+	return &taxReceiptSeq{Seq: sequence, Number: taxNumber}, nil
 }

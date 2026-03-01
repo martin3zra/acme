@@ -1,4 +1,5 @@
-import { FC } from 'react';
+import { cn } from '@/lib/utils';
+import { ComponentProps, FC } from 'react';
 
 type Props = {
   title: string;
@@ -6,9 +7,19 @@ type Props = {
   alignment: 'left' | 'center' | 'right';
 };
 
-export const HeaderCell: FC<Props> = ({ title, columnWidth, alignment }) => {
+export const HeaderCell: FC<Props & ComponentProps<'div'>> = ({ title, columnWidth, alignment, className = '', ...props }) => {
   return (
-    <div className={`p-1.5 font-semibold text-${alignment} uppercase`} style={{ width: columnWidth }}>
+    <div
+      className={cn(
+        'p-1.5 font-semibold uppercase',
+        alignment === 'left' && 'text-start',
+        alignment === 'center' && 'text-center',
+        alignment === 'right' && 'text-end',
+        className,
+      )}
+      style={{ width: columnWidth }}
+      {...props}
+    >
       {title}
     </div>
   );

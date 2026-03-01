@@ -3,10 +3,10 @@ import { Breadcrumbs } from '@/components/breadcrumbs';
 import { Separator } from '@/components/ui/separator';
 import { SidebarInset, SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar';
 import { Toaster } from '@/components/ui/sonner';
-import { type BreadcrumbItem as BreadcrumbItemType, User } from '@/types';
+import { type BreadcrumbItem as BreadcrumbItemType, SlotProps, User } from '@/types';
 import React, { JSX } from 'react';
 
-function Actions({ children }: React.ReactNode): JSX.Element {
+function Actions({ children }: SlotProps): JSX.Element {
   return <>{children}</>;
 }
 
@@ -20,8 +20,15 @@ export default class AppLayout extends React.Component<Props> {
   static Actions = Actions;
   render() {
     const { user, breadcrumbs = [], children } = this.props;
-    const actions = (React.Children.toArray(children) as React.ReactNode).find((children: React.ReactNode) => children.type === Actions);
-    const content = (React.Children.toArray(children) as React.ReactNode).filter((children: React.ReactNode) => children.type !== Actions);
+    const array = React.Children.toArray(children);
+    const actions = array.find(
+      (child): child is React.ReactElement =>
+        React.isValidElement(child) && (child.type as React.JSXElementConstructor<SlotProps>) === AppLayout.Actions,
+    );
+    const content = array.find(
+      (child): child is React.ReactElement =>
+        React.isValidElement(child) && (child.type as React.JSXElementConstructor<SlotProps>) !== AppLayout.Actions,
+    );
 
     return (
       <SidebarProvider>

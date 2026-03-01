@@ -46,6 +46,11 @@ func (va *ValidatesAttributes) hasParentKey() bool {
 	return va.parentKey != ""
 }
 
+func (v *ValidatesAttributes) onStructEnd(path string) {
+	fmt.Println("✅ Finished processing:", path)
+	// Optional: push to log, call hook, etc.
+}
+
 func (va *ValidatesAttributes) Ignore(ignore any, column ...string) {
 	va.ignore = ignore
 	if len(column) == 0 {
@@ -107,6 +112,9 @@ func (va *ValidatesAttributes) validateBetween(value reflect.Value, params []str
 func (va *ValidatesAttributes) validateRuleWithoutAttributes(rule string, value reflect.Value) bool {
 
 	if rule == "required" {
+		if value.Kind() == reflect.Bool {
+			return true
+		}
 		return !value.IsZero()
 	}
 

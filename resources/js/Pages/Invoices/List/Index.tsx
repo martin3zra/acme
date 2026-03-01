@@ -1,8 +1,9 @@
 import { Button } from '@/components/ui/button';
 import { DropdownMenu, DropdownMenuCheckboxItem, DropdownMenuContent, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useTranslation } from '@/hooks/use-translation';
-import { Invoice, InvoiceVerb } from '@/types';
+import { Invoice, InvoiceTypeFilter, InvoiceVerb, TransactionKind } from '@/types';
 import {
   ColumnFiltersState,
   flexRender,
@@ -19,21 +20,28 @@ import { FC, useState } from 'react';
 import { getColumns } from './columns-definitions';
 
 type Props = {
+  kind: TransactionKind;
   data: Invoice[];
   onSelectInvoice: (invoice: Invoice, action: InvoiceVerb) => void;
+  currentInvoiceTypeFilter: InvoiceTypeFilter;
+  onInvoiceTypeFilterChanges: (value: InvoiceTypeFilter) => void;
 };
 
-export const List: FC<Props> = ({ data, onSelectInvoice }) => {
+const hiddenColumns: string[] = ['paid_status', 'amount_due', 'ncf'];
+export const List: FC<Props> = ({ kind, data, currentInvoiceTypeFilter, onSelectInvoice, onInvoiceTypeFilterChanges }) => {
+  const isInvoice = kind === 'invoice';
   const t = useTranslation().trans;
   const [sorting, setSorting] = useState<SortingState>([]);
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
   const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({
     ncf: false,
+    amount_due: isInvoice,
+    paid_status: isInvoice,
+    // sourceType: !isInvoice,
   });
   const [rowSelection, setRowSelection] = useState({});
 
-  const columns = getColumns({ onDidClick: onSelectInvoice, t });
-
+  const columns = getColumns({ kind, onDidClick: onSelectInvoice, t });
   const table = useReactTable({
     data,
     columns,
@@ -62,6 +70,19 @@ export const List: FC<Props> = ({ data, onSelectInvoice }) => {
           onChange={(event) => table.getColumn('customer.name')?.setFilterValue(event.target.value)}
           className="max-w-sm"
         /> */}
+        {isInvoice && (
+          <Tabs
+            value={currentInvoiceTypeFilter}
+            onValueChange={(value: string) => onInvoiceTypeFilterChanges(value as InvoiceTypeFilter)}
+            className="[&_[data-slot=tabs-trigger]:not([data-state=active])]:cursor-pointer"
+          >
+            <TabsList>
+              <TabsTrigger value="all">{t('global.all')}</TabsTrigger>
+              <TabsTrigger value="credit">{t('global.credit')}</TabsTrigger>
+              <TabsTrigger value="cash">{t('global.cash')}</TabsTrigger>
+            </TabsList>
+          </Tabs>
+        )}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button variant="outline" className="ml-auto">
@@ -72,6 +93,12 @@ export const List: FC<Props> = ({ data, onSelectInvoice }) => {
             {table
               .getAllColumns()
               .filter((column) => column.getCanHide())
+              .filter((column) => {
+                // if (isInvoice && column.id !== 'sourceType') {
+                //   return true;
+                // }
+                return !hiddenColumns.includes(column.id);
+              })
               .map((column) => {
                 return (
                   <DropdownMenuCheckboxItem

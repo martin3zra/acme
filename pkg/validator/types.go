@@ -1,7 +1,10 @@
 package validator
 
+import "reflect"
+
 var defaultRules = []string{
 	"required",
+	"required_if",
 	"max",
 	"min",
 	"gt",
@@ -20,6 +23,7 @@ var defaultRules = []string{
 	"date",
 	"after",
 	"before",
+	"before_or_equal",
 	"format",
 	"digits",
 	"digits_between",
@@ -31,6 +35,7 @@ var dateRules = []string{
 	"date",
 	"after",
 	"before",
+	"before_or_equal",
 	"format",
 }
 
@@ -59,6 +64,7 @@ type Validator struct {
 	ValidatesAttributes
 	errors   Errors
 	language *string
+	object   reflect.Value
 }
 
 type ConditionalRules struct {

@@ -1,6 +1,7 @@
 import { CurrencyCell } from '@/components/data-table/currency-cell';
 import { DateCell } from '@/components/data-table/date-cell';
 import { HeaderCell } from '@/components/data-table/header-cell';
+import { HeaderSortCell } from '@/components/data-table/header-sort-cell';
 import { TextCell } from '@/components/data-table/text-cell';
 import { StatusBadge } from '@/components/status-badge';
 import { Button } from '@/components/ui/button';
@@ -15,7 +16,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Item, Replacements, Verb } from '@/types';
 import { ColumnDef } from '@tanstack/react-table';
-import { ArrowUpDown, MoreHorizontal, Package, Wrench } from 'lucide-react';
+import { MoreHorizontal, Package, Wrench } from 'lucide-react';
 
 type Props = {
   onDidClick: (item: Item, action: Verb) => void;
@@ -33,7 +34,14 @@ export const getColumns = ({ onDidClick, t }: Props): ColumnDef<Item>[] => {
           aria-label="Select all"
         />
       ),
-      cell: ({ row }) => <Checkbox checked={row.getIsSelected()} onCheckedChange={(value) => row.toggleSelected(!!value)} aria-label="Select row" />,
+      cell: (props) => {
+        return (
+          <div className="flex items-center space-x-2">
+            <Checkbox checked={props.row.getIsSelected()} onCheckedChange={(value) => props.row.toggleSelected(!!value)} aria-label="Select row" />
+            {props.row.original.item_type === 'service' ? <Wrench className="size-4" /> : <Package className="size-4" />}
+          </div>
+        );
+      },
       enableSorting: false,
       enableHiding: false,
     },
@@ -41,6 +49,7 @@ export const getColumns = ({ onDidClick, t }: Props): ColumnDef<Item>[] => {
       id: 'identifiers.reference',
       accessorFn: (row) => row.identifiers?.reference ?? '', // prevent undefined
       meta: t('global.reference'),
+      size: 100,
       header: (props) => {
         return <HeaderCell title={t('global.reference')} alignment="left" columnWidth={props.column.getSize()} />;
       },
@@ -51,12 +60,9 @@ export const getColumns = ({ onDidClick, t }: Props): ColumnDef<Item>[] => {
     {
       accessorKey: 'name',
       meta: t('global.name'),
+      size: 320,
       header: ({ column }) => {
-        return (
-          <Button className="uppercase" variant="ghost" onClick={() => column.toggleSorting(column.getIsSorted() === 'asc')}>
-            {t('global.name')} <ArrowUpDown />
-          </Button>
-        );
+        return <HeaderSortCell<Item> title={t('global.name')} column={column} />;
       },
       cell: (props) => {
         return <TextCell columnWidth={props.column.getSize()} value={props.getValue() as string} />;
@@ -117,21 +123,9 @@ export const getColumns = ({ onDidClick, t }: Props): ColumnDef<Item>[] => {
       },
     },
     {
-      accessorKey: 'item_type',
-      meta: t('items.single.type'),
-      header: (props) => {
-        return <HeaderCell title={t('items.single.type')} alignment="left" columnWidth={props.column.getSize()} />;
-      },
-      cell: (props) => {
-        if (props.row.original.item_type === 'service') {
-          return <Wrench />;
-        }
-        return <Package />;
-      },
-    },
-    {
       accessorKey: 'unit.name',
       meta: t('global.unit'),
+      size: 84,
       header: (props) => {
         return <HeaderCell title={t('global.unit')} alignment="left" columnWidth={props.column.getSize()} />;
       },
@@ -142,6 +136,7 @@ export const getColumns = ({ onDidClick, t }: Props): ColumnDef<Item>[] => {
     {
       accessorKey: 'tax.name',
       meta: t('global.taxRate'),
+      size: 105,
       header: (props) => {
         return <HeaderCell title={t('global.taxRate')} alignment="left" columnWidth={props.column.getSize()} />;
       },
@@ -194,7 +189,7 @@ export const getColumns = ({ onDidClick, t }: Props): ColumnDef<Item>[] => {
                 <MoreHorizontal />
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
+            <DropdownMenuContent align="end" className="[&_[data-slot=dropdown-menu-item]]:cursor-pointer">
               <DropdownMenuLabel>{t('global.actions.title')}</DropdownMenuLabel>
               <DropdownMenuSeparator />
               <DropdownMenuItem onClick={() => onDidClick(props.row.original, 'view')}>{t('items.viewItem.title')}</DropdownMenuItem>

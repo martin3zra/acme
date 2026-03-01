@@ -50,7 +50,6 @@ export default function CreatePassword() {
           id="password_confirmation"
           type="password"
           required
-          autoFocus
           tabIndex={1}
           autoComplete="password_confirmation"
           value={data.password_confirmation}

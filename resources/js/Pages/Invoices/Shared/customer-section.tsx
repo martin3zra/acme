@@ -35,6 +35,12 @@ export const CustomerSection = ({
     setOpen(false);
   };
 
+  const handleNewCustomerClick = (event: React.MouseEvent<HTMLButtonElement>) => {
+    event.preventDefault();
+    alert('This feature is not implemented yet. Please navigate to the customers page to create a new customer.');
+    // router.visit('/customers');
+  };
+
   const EmptyCard = (): JSX.Element => {
     return (
       <div
@@ -42,7 +48,7 @@ export const CustomerSection = ({
         className={cn(
           'flex h-full w-full flex-col items-center justify-center px-2 pb-2 [&_svg]:text-white',
           'data-[slot=customer-error]:rounded-lg data-[slot=customer-error]:border data-[slot=customer-error]:bg-red-100/50',
-          'data-[slot=customer-error]:border-red-500 data-[slot=customer-error]:[&_[data-label=true]]:text-red-500 data-[slot=customer-error]:[&_svg]:text-red-500',
+          'data-[slot=customer-error]:border-red-500 data-[slot=customer-error]:**:data-[label=true]:text-red-500 data-[slot=customer-error]:[&_svg]:text-red-500',
         )}
       >
         <button onClick={() => setOpen(true)} className="flex h-full w-full cursor-pointer items-center justify-center gap-2">
@@ -102,7 +108,7 @@ export const CustomerSection = ({
         </InputSearchable.Trigger>
         <InputSearchable.Actions>
           <div className="flex w-full items-center justify-center rounded-b-lg border bg-gray-100/25 py-2">
-            <button className="flex cursor-pointer items-center justify-center gap-x-2 text-indigo-400" onClick={() => alert('Create new customer')}>
+            <button className="flex cursor-pointer items-center justify-center gap-x-2 text-indigo-400" onClick={handleNewCustomerClick}>
               <UserPlus className="size-4" /> {t('global.customerSection.addNew')}
             </button>
           </div>

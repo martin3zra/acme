@@ -79,6 +79,7 @@ func (ctx *Context) Error(err error, status ...int) {
 		403: "Forbidden.",
 		401: "Unauthorized.",
 		404: "Not Found.",
+		412: "Precondition Failed.",
 	}
 
 	defaultStatus := 500
@@ -239,6 +240,11 @@ func (ctx *Context) Int(key string) int {
 		return intValue
 	}
 	return 0
+}
+
+func (ctx *Context) WantsJson() bool {
+	acceptHeader := ctx.Request.Header.Get("Accept")
+	return strings.Contains(acceptHeader, "application/json")
 }
 
 // mergeTranslations merges shared "translations" with page-specific ones.

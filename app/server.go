@@ -1,22 +1,25 @@
 package app
 
 import (
+	"bytes"
+	"context"
 	"database/sql"
 	"embed"
+	"errors"
 	"fmt"
 	"log"
 	"net/http"
 	"os"
-	"strings"
 	"time"
 
-	"github.com/martin3zra/acme/pkg/foundation"
+	"github.com/martin3zra/acme/app/mail"
 	"github.com/martin3zra/acme/pkg/i18n"
 	"github.com/martin3zra/acme/pkg/inertia"
 	"github.com/martin3zra/acme/pkg/mailer"
 	"github.com/martin3zra/acme/pkg/routing"
 	"github.com/martin3zra/acme/pkg/session"
 	"github.com/martin3zra/acme/pkg/store"
+	"github.com/martin3zra/acme/pkg/support"
 )
 
 //go:embed sql/*.sql
@@ -34,25 +37,23 @@ type Server struct {
 	resources  embed.FS
 	translator *i18n.Translator
 	route      *routing.Router
+	httpServer *http.Server
 }
 
-func NewServer(assets, resources *embed.FS) *Server {
+func NewServer(assets, resources embed.FS) *Server {
 
 	qs, err := store.NewQueryStore(sqlQueriesFS, "sql/")
 	if err != nil {
 		panic(err)
 	}
-	translator := i18n.NewTranslator(trans("global"))
+	translator := i18n.NewTranslator(trans("global", "companies", "profile"))
 
 	server := &Server{
 		qs:         qs,
 		config:     LoadConfig(),
 		translator: translator,
-	}
-
-	if assets != nil && resources != nil {
-		server.assets = *assets
-		server.resources = *resources
+		assets:     assets,
+		resources:  resources,
 	}
 
 	return server
@@ -64,8 +65,7 @@ func (s *Server) Boot() {
 	s.openDatabaseConnection()
 	s.configureMailClient()
 
-	isRunningInCli := os.Getenv("RUNNING_IN_CLI")
-	if isRunningInCli == "YES" {
+	if s.isRunningInCLI() {
 		return
 	}
 
@@ -86,18 +86,66 @@ func (s *Server) configureRouting() {
 	s.bootRoutes()
 }
 
-func (s *Server) Start() {
+func (s *Server) Start() error {
 
-	server := &http.Server{
+	s.httpServer = &http.Server{
 		Addr:    fmt.Sprintf(":%s", s.config.port),
 		Handler: s.sessionManager.Handle(s.BindMiddleware(s.route)),
 	}
 
-	server.ListenAndServe()
+	log.Printf("HTTP server listening on %s", s.httpServer.Addr)
+
+	err := s.httpServer.ListenAndServe()
+	if errors.Is(err, http.ErrServerClosed) {
+		return nil
+	}
+
+	return err
 }
 
-func (s *Server) Shutdown() {
+func (s *Server) StartSSE() error {
+	if s.isRunningInCLI() {
+		return nil
+	}
+
+	mux := http.NewServeMux()
+
+	mux.HandleFunc("/sse/imports/", s.importEventsHandler)
+
+	server := &http.Server{
+		Addr:    ":8090", // separate port = no interference
+		Handler: mux,
+	}
+
+	log.Println("SSE server listening on :8090")
+	err := server.ListenAndServe()
+	if errors.Is(err, http.ErrServerClosed) {
+		return nil
+	}
+
+	return err
+}
+
+func (s *Server) Shutdown(ctx context.Context) error {
 	log.Print("Shutting down server")
+
+	if err := s.db.Close(); err != nil {
+		return fmt.Errorf("db close: %w", err)
+	}
+
+	if s.isRunningInCLI() {
+		return nil
+	}
+
+	// Stop accepting new connections
+	s.httpServer.SetKeepAlivesEnabled(false)
+
+	// Attempt graceful shutdown
+	if err := s.httpServer.Shutdown(ctx); err != nil {
+		return fmt.Errorf("http shutdown: %w", err)
+	}
+
+	return nil
 }
 
 func (s *Server) configureSessionManager() {
@@ -121,89 +169,136 @@ func (s *Server) trans(key string, replacements ...i18n.Replacements) string {
 	return s.translator.Trans(key, replacements...)
 }
 
-var rolePermissionsCache = map[string]map[string]bool{}
-
-var groupedPermissions = map[string]map[string][]string{
-	"owner": {"*": {"*"}},
-	"admin": {
-		"view":    {"dashboard", "invoice", "customer", "item", "payment", "setting"},
-		"viewAny": {"dashboard", "invoice", "customer", "item", "payment", "setting"},
-		"create":  {"dashboard", "invoice", "customer", "item", "payment", "setting"},
-		"delete":  {"dashboard", "invoice", "customer", "item", "payment", "setting"},
-		"update":  {"dashboard", "invoice", "customer", "item", "payment", "setting"},
-	},
-	"supervisor": {
-		"view":    {"dashboard", "customer", "item", "payment"},
-		"viewAny": {"dashboard", "invoice", "customer", "item", "payment"},
-		"create":  {"dashboard", "invoice", "customer", "item", "payment"},
-		"delete":  {"dashboard", "invoice", "customer", "item", "payment"},
-		"update":  {"dashboard", "invoice", "customer", "item", "payment"},
-	},
-	"standard": {
-		"view":   {"invoice", "customer"},
-		"create": {"invoice"},
-	},
-}
-
-func permissions(role string) map[string]bool {
-	if cached, exists := rolePermissionsCache[role]; exists {
-		return cached
+func (s *Server) abortWhenPrerequisiteMissing(ctx *routing.Context, resource string) bool {
+	cache, ok := ctx.Request.Context().Value(prereqCacheKey).(prereqCache)
+	if !ok {
+		return false
 	}
 
-	flatPermissions := make(map[string]bool)
+	account := ctx.Request.Context().Value(support.AccountKey{}).(map[string]any)
+	if account == nil {
+		log.Println("account not found in context")
+		return false
+	}
+	company := CurrentCompany(ctx.Request.Context())
+	key := fmt.Sprintf("%s:%d", resource, company.ID)
+	result, ok := cache[key]
 
-	if rolePermissions, exists := groupedPermissions[role]; exists {
-		for action, modules := range rolePermissions {
-			for _, module := range modules {
-				flatPermissions[action+":"+module] = true
+	if result.Ok || len(result.Missing) == 0 {
+		return false
+	}
+	urls := map[string]string{
+		"customers":           "/customers?mode=creating",
+		"items":               "/items?mode=creating",
+		"tax_sequence":        fmt.Sprintf("/settings/%v/profile?company_id=%s&tab=taxSequences", account["uuid"], company.UUID),
+		"order_sequence":      fmt.Sprintf("/settings/%v/profile?company_id=%s&tab=sequences", account["uuid"], company.UUID),
+		"taxes":               fmt.Sprintf("/settings/%v/profile?company_id=%s&tab=taxes", account["uuid"], company.UUID),
+		"invoices":            "/invoices/create",
+		"expenses_categories": fmt.Sprintf("/settings/%v/profile?company_id=%s&tab=expenseCategories", account["uuid"], company.UUID),
+	}
+	var enriched []Missing
 
-				// If role has full module access ("view:*"), create general key
-				if module == "*" {
-					flatPermissions[action+":*"] = true
+	for _, m := range result.Missing {
+		enriched = append(enriched, Missing{Key: m.Key, Message: m.Message, URL: urls[m.Key]})
+	}
+
+	ctx.Render("Error/Prerequisites", map[string]any{
+		"resource": resource,
+		"missing":  enriched,
+	})
+	return true
+}
+
+func (s *Server) StartScheduler(ctx context.Context, interval time.Duration) {
+
+	go func() {
+		ticker := time.NewTicker(interval)
+		defer ticker.Stop()
+		log.Println("scheduler started")
+		running := false
+
+		for {
+			select {
+			case <-ticker.C:
+				if running {
+					log.Println("scheduler already running, skipping tick")
+					continue
 				}
 
-				// If role has full action access ("*:invoice"), create wildcard key
-				if action == "*" {
-					flatPermissions["*:"+module] = true
+				running = true
+				if err := s.runRecurrenceScheduler(); err != nil {
+					log.Printf("Scheduler error: %v", err)
 				}
+				running = false
+
+			case <-ctx.Done():
+				log.Println("scheduler shutting down...")
+				return
 			}
 		}
-
-		// If role has full access ("*:*"), create a general wildcard key
-		if _, exists := rolePermissions["*"]; exists {
-			flatPermissions["*"] = true
-		}
-	}
-
-	rolePermissionsCache[role] = flatPermissions
-	return flatPermissions
+	}()
 }
 
-func Can(user *foundation.User, actionModule string) bool {
-	permissions := permissions(user.Role)
+func (s *Server) enqueueInvoiceEmail(companyID int, invoiceUUID string) {
+	// We need to log those invoices as sent or not?
 
-	// If the user requests "*" (full access check), return true if full access exists
-	if actionModule == "*" {
-		return permissions["*"]
+	type invoiceData struct {
+		Header *invoice `json:"header"`
+		Lines  []*line  `json:"lines"`
+	}
+	ctx := context.Background()
+	invoice, err := s.findInvoicesByUUID(ctx, TransactionKinds.Invoice, companyID, invoiceUUID)
+	if err != nil {
+		log.Println("error fetching invoice: ", invoiceUUID, err)
+		return
 	}
 
-	// Standard permission checks
-	if permissions[actionModule] {
-		return true
+	lines, err := s.findInvoiceLines(ctx, companyID, invoice.ID)
+	if err != nil {
+		log.Println("error fetching invoice lines: ", invoiceUUID)
+		return
 	}
 
-	// Action-wide wildcard (e.g., "view:*")
-	action := actionModule[:strings.Index(actionModule, ":")]
-	if permissions[action+":*"] {
-		return true
+	data := invoiceData{
+		Header: invoice,
+		Lines:  lines,
 	}
 
-	// Module-wide wildcard (e.g., "*:invoice")
-	module := actionModule[strings.Index(actionModule, ":")+1:]
-	if permissions["*:"+module] {
-		return true
+	invoicePDF, err := NewInvoicePDF(s.translator, data.Header, data.Lines)
+	if err != nil {
+		log.Println("error generating invoice PDF", invoiceUUID)
+		return
 	}
 
-	// Check for complete wildcard "*:*"
-	return permissions["*"]
+	company, err := s.findCompanyByID(ctx, invoice.CompanyID)
+	if err != nil {
+		log.Println("error fetching company while generating invoice PDF", invoiceUUID)
+		return
+	}
+	invoicePDF.Header(company)
+	invoicePDF.Lines()
+	invoicePDF.Footer(s.config.appName)
+
+	var buf bytes.Buffer
+	err = invoicePDF.pdf.Output(&buf)
+	if err != nil {
+		log.Println("error sending PDF document to the writer ", err)
+		return
+	}
+
+	s.mailer.
+		To(
+			invoice.Customer.Email,
+			invoice.Customer.Name,
+		).Send(mail.NewInvoiceMail(
+		map[string]any{
+			"header": invoice,
+			"lines":  lines,
+		}, buf.Bytes()))
+
+}
+
+func (s *Server) isRunningInCLI() bool {
+	isRunningInCli := os.Getenv("RUNNING_IN_CLI")
+	return isRunningInCli == "YES"
 }

@@ -1,6 +1,7 @@
 import { CurrencyCell } from '@/components/data-table/currency-cell';
 import { DateCell } from '@/components/data-table/date-cell';
 import { HeaderCell } from '@/components/data-table/header-cell';
+import { HeaderSortCell } from '@/components/data-table/header-sort-cell';
 import { LinkCell } from '@/components/data-table/link-cell';
 import { TextCell } from '@/components/data-table/text-cell';
 import { StatusBadge } from '@/components/status-badge';
@@ -14,16 +15,20 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { DiscountType, Invoice, InvoiceVerb, Replacements } from '@/types';
+import { capitalize } from '@/lib/utils';
+import { DiscountType, Invoice, InvoiceVerb, Replacements, TransactionKind } from '@/types';
 import { ColumnDef } from '@tanstack/react-table';
-import { ArrowUpDown, MoreHorizontal } from 'lucide-react';
+import { MoreHorizontal } from 'lucide-react';
+import { ConvertToInvoiceAction } from '../Shared/convert-to-invoice-action';
+import { SourceIcon } from '../Shared/source-icon';
 
 type Props = {
+  kind: TransactionKind;
   onDidClick: (item: Invoice, action: InvoiceVerb) => void;
   t: (key: string, replacements?: Replacements) => string;
 };
 
-export const getColumns = ({ onDidClick, t }: Props): ColumnDef<Invoice>[] => {
+export const getColumns = ({ kind, onDidClick, t }: Props): ColumnDef<Invoice>[] => {
   return [
     {
       id: 'select',
@@ -34,7 +39,15 @@ export const getColumns = ({ onDidClick, t }: Props): ColumnDef<Invoice>[] => {
           aria-label="Select all"
         />
       ),
-      cell: ({ row }) => <Checkbox checked={row.getIsSelected()} onCheckedChange={(value) => row.toggleSelected(!!value)} aria-label="Select row" />,
+      cell: ({ row }) => {
+        const source = row.original.source;
+        return (
+          <div className="flex space-x-3">
+            <Checkbox checked={row.getIsSelected()} onCheckedChange={(value) => row.toggleSelected(!!value)} aria-label="Select row" />
+            {source && <SourceIcon source={source} kind={kind} />}
+          </div>
+        );
+      },
       enableSorting: false,
       enableHiding: false,
     },
@@ -67,11 +80,7 @@ export const getColumns = ({ onDidClick, t }: Props): ColumnDef<Invoice>[] => {
       meta: t('global.customer'),
       size: 200,
       header: ({ column }) => {
-        return (
-          <Button className="font-semibold uppercase" variant="ghost" onClick={() => column.toggleSorting(column.getIsSorted() === 'asc')}>
-            {t('global.customer')} <ArrowUpDown />
-          </Button>
-        );
+        return <HeaderSortCell<Invoice> title={t('global.customer')} column={column} />;
       },
       cell: (props) => {
         return (
@@ -158,15 +167,15 @@ export const getColumns = ({ onDidClick, t }: Props): ColumnDef<Invoice>[] => {
         return <HeaderCell title={t('global.status')} alignment="center" columnWidth={props.column.getSize()} />;
       },
       cell: (props) => {
-        return <StatusBadge type="invoice" status={props.row.original.status} />;
+        return <StatusBadge kind={kind} type="invoice" status={props.row.original.status} />;
       },
     },
     {
       accessorKey: 'paid_status',
       size: 70,
-      meta: t('invoices.paidStatus'),
+      meta: t(`${kind}s.paidStatus`),
       header: (props) => {
-        return <HeaderCell title={t('invoices.paidStatus')} alignment="center" columnWidth={props.column.getSize()} />;
+        return <HeaderCell title={t(`${kind}s.paidStatus`)} alignment="center" columnWidth={props.column.getSize()} />;
       },
       cell: (props) => {
         return <StatusBadge type="paid" status={props.row.original.paid_status} />;
@@ -176,8 +185,9 @@ export const getColumns = ({ onDidClick, t }: Props): ColumnDef<Invoice>[] => {
       id: 'actions',
       enableHiding: false,
       cell: (props) => {
-        const disabled = props.row.original.status === 'void';
-        const canRecordPayment = props.row.original.paid_status === 'unpaid' || props.row.original.paid_status === 'partial';
+        const disabled = props.row.original.status === 'void' || props.row.original.status === 'closed';
+        const canRecordPayment = (kind === 'invoice' && props.row.original.paid_status === 'unpaid') || props.row.original.paid_status === 'partial';
+        const canBeVoid = kind === 'invoice';
         return (
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
@@ -186,25 +196,45 @@ export const getColumns = ({ onDidClick, t }: Props): ColumnDef<Invoice>[] => {
                 <MoreHorizontal />
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
+            <DropdownMenuContent align="end" className="[&_[data-slot=dropdown-menu-item]]:cursor-pointer">
               <DropdownMenuLabel>{t('global.actions.title')}</DropdownMenuLabel>
               <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={() => onDidClick(props.row.original, 'view')}>{t('invoices.viewInvoice.title')}</DropdownMenuItem>
-              <DropdownMenuItem onClick={() => onDidClick(props.row.original, 'edit')} disabled={disabled}>
-                {t('invoices.editInvoice.title')}
+              <DropdownMenuItem onClick={() => onDidClick(props.row.original, 'view')}>
+                {t(`${kind}s.view${capitalize(kind)}.title`)}
               </DropdownMenuItem>
-              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={() => onDidClick(props.row.original, 'edit')} disabled={disabled}>
+                {t(`${kind}s.edit${capitalize(kind)}.title`)}
+              </DropdownMenuItem>
+              {kind === 'invoice' && props.row.original.status !== 'void' && (
+                <>
+                  <ConvertToInvoiceAction mode="duplicate" id={props.row.original.uuid} title={t('global.duplicateInvoice')} kind={kind} />
+                  <DropdownMenuItem onClick={() => onDidClick(props.row.original, 'mark-as-recurrent')}>
+                    {t('global.actions.markAsRecurrent')}
+                  </DropdownMenuItem>
+                </>
+              )}
               {canRecordPayment && (
                 <>
+                  <DropdownMenuSeparator />
                   <DropdownMenuItem onClick={() => onDidClick(props.row.original, 'record-payment')}>
                     {t('global.actions.recordPayment')}
                   </DropdownMenuItem>
-                  <DropdownMenuSeparator />
                 </>
               )}
-              <DropdownMenuItem onClick={() => onDidClick(props.row.original, 'void')} disabled={disabled}>
-                {t('invoices.voidInvoice.title')}
-              </DropdownMenuItem>
+              {canBeVoid && (
+                <>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={() => onDidClick(props.row.original, 'void')} disabled={disabled}>
+                    {t(`${kind}s.void${capitalize(kind)}.title`)}
+                  </DropdownMenuItem>
+                </>
+              )}
+              {(kind === 'estimate' || kind === 'order') && props.row.original.status !== 'closed' && props.row.original.status !== 'void' && (
+                <>
+                  <DropdownMenuSeparator />
+                  <ConvertToInvoiceAction id={props.row.original.uuid} title={t('global.convertToInvoice')} kind={kind} />
+                </>
+              )}
             </DropdownMenuContent>
           </DropdownMenu>
         );

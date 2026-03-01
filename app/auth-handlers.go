@@ -48,6 +48,15 @@ func (s *Server) authHandler(ctx *routing.Context) {
 			"uuid":  account.UUID,
 			"owner": userCtx.Account(s.db) != nil,
 		}
+	} else {
+		account = userCtx.Account(s.db)
+		if account != nil {
+			attrs["account"] = map[string]any{
+				"id":    account.ID,
+				"uuid":  account.UUID,
+				"owner": userCtx.Account(s.db) != nil,
+			}
+		}
 	}
 	company, err := userCtx.currentCompany(s.db)
 	if err == nil {
@@ -66,6 +75,12 @@ func (s *Server) authHandler(ctx *routing.Context) {
 		return
 	}
 
+	intended := session.Get("intended")
+	if intended != nil {
+		session.Delete("intended")
+		ctx.Redirect(intended.(string), http.StatusSeeOther)
+		return
+	}
 	ctx.Redirect("/home", http.StatusSeeOther)
 }
 

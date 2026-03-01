@@ -55,11 +55,11 @@ export const UserList: FC<Props> = ({ data, onSelectUser, onAddNewUser }) => {
   return (
     <div>
       <HeadingSmall
-        title="Users"
-        description="Manage your users and permissions details"
+        title={t('users.title')}
+        description={t('users.description')}
         rightPanel={
           <Button onClick={onAddNewUser}>
-            <Plus /> Agregar usuario
+            <Plus /> {t('users.newUser.title')}
           </Button>
         }
       />

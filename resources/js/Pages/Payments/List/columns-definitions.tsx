@@ -1,6 +1,7 @@
 import { CurrencyCell } from '@/components/data-table/currency-cell';
 import { DateCell } from '@/components/data-table/date-cell';
 import { HeaderCell } from '@/components/data-table/header-cell';
+import { HeaderSortCell } from '@/components/data-table/header-sort-cell';
 import { LinkCell } from '@/components/data-table/link-cell';
 import { NumericCell } from '@/components/data-table/numeric-cell';
 import { TextCell } from '@/components/data-table/text-cell';
@@ -18,7 +19,7 @@ import {
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Payment, PaymentVerb, Replacements } from '@/types';
 import { ColumnDef } from '@tanstack/react-table';
-import { ArrowUpDown, MessageCircleMore, MoreHorizontal } from 'lucide-react';
+import { MessageCircleMore, MoreHorizontal } from 'lucide-react';
 
 type Props = {
   onDidClick: (item: Payment, action: PaymentVerb) => void;
@@ -36,33 +37,36 @@ export const getColumns = ({ onDidClick, t }: Props): ColumnDef<Payment>[] => {
           aria-label="Select all"
         />
       ),
-      cell: ({ row }) => <Checkbox checked={row.getIsSelected()} onCheckedChange={(value) => row.toggleSelected(!!value)} aria-label="Select row" />,
+      cell: ({ row }) => {
+        const hasNotes = !!row.original.notes;
+        return (
+          <div className="flex items-center space-x-2 **:data-[slot=has-notes]:block **:data-[slot=has-notes]:text-red-500">
+            <Checkbox checked={row.getIsSelected()} onCheckedChange={(value) => row.toggleSelected(!!value)} aria-label="Select row" />
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger>
+                  <MessageCircleMore className="size-4 cursor-pointer" data-slot={hasNotes ? 'has-notes' : 'default'} />
+                </TooltipTrigger>
+                <TooltipContent>{row.original.notes}</TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          </div>
+        );
+      },
       enableSorting: false,
       enableHiding: false,
     },
     {
-      accessorKey: 'number',
+      accessorKey: 'code',
       meta: t('global.number'),
       // size: 880,
       header: (props) => {
         return <HeaderCell title={t('global.number')} alignment="left" columnWidth={props.column.getSize()} />;
       },
       cell: (props) => {
-        const hasNotes = !!props.row.original.notes;
         return (
-          <div className="[&_[data-slot=has-notes]]:-px-6 relative flex [&_[data-slot=has-notes]]:block [&_[data-slot=has-notes]]:text-red-500">
+          <div className="[&_[data-slot=has-notes]]:-px-6 relative flex **:data-[slot=has-notes]:block **:data-[slot=has-notes]:text-red-500">
             <TextCell columnWidth={props.column.getSize()} value={props.getValue() as string} />
-            <TooltipProvider>
-              <Tooltip>
-                <TooltipTrigger>
-                  <MessageCircleMore
-                    className="absolute inset-0 -top-0 left-[62%] hidden size-5 -translate-x-1/2 -translate-y-1/2 transform cursor-pointer"
-                    data-slot={hasNotes ? 'has-notes' : 'default'}
-                  />
-                </TooltipTrigger>
-                <TooltipContent>{props.row.original.notes}</TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
           </div>
         );
       },
@@ -72,11 +76,7 @@ export const getColumns = ({ onDidClick, t }: Props): ColumnDef<Payment>[] => {
       id: 'customer.name',
       meta: t('global.customer'),
       header: ({ column }) => {
-        return (
-          <Button className="uppercase" variant="ghost" onClick={() => column.toggleSorting(column.getIsSorted() === 'asc')}>
-            {t('global.customer')} <ArrowUpDown />
-          </Button>
-        );
+        return <HeaderSortCell<Payment> title={t('global.customer')} column={column} />;
       },
       cell: (props) => {
         return (
@@ -156,7 +156,7 @@ export const getColumns = ({ onDidClick, t }: Props): ColumnDef<Payment>[] => {
                 <MoreHorizontal />
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
+            <DropdownMenuContent align="end" className="**:data-[slot=dropdown-menu-item]:cursor-pointer">
               <DropdownMenuLabel>{t('global.actions.title')}</DropdownMenuLabel>
               <DropdownMenuSeparator />
               <DropdownMenuItem onClick={() => onDidClick(props.row.original, 'view')}>{t('payments.viewPayment.title')}</DropdownMenuItem>

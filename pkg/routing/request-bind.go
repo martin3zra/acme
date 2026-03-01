@@ -16,11 +16,21 @@ func WithRequest[T any](handler func(ctx *Context, body *T)) HandlerFunc {
 		if err != nil {
 			if e, ok := err.(foundation.ErrorFormatter); ok {
 				if e.Status() == http.StatusForbidden {
+					if ctx.WantsJson() {
+						ctx.JSON(e.Status(), map[string]any{"status": e.Error()})
+						return
+					}
 					ctx.Error(err, e.Status())
 					return
 				}
 			}
 
+			if ctx.WantsJson() {
+				ctx.JSON(http.StatusUnprocessableEntity, map[string]any{"error": err.Error()})
+				return
+			}
+
+			// Review this, it was duplicating the errors
 			ctx.Errors("status", err.Error())
 			ctx.Back()
 			return

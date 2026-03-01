@@ -6,7 +6,7 @@ import (
 
 func (s *Server) onboardingHandler(ctx *routing.Context) {
 	ctx.Render("Onboarding/Index", map[string]any{
-		"translations": trans("onboarding"),
+		"translations": trans("onboarding", "companies"),
 		"status":       ctx.Query("status"),
 	})
 }

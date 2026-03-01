@@ -21,6 +21,7 @@ export default function Index({
   showPayment,
 }: PageProps<{ payments: Payment[]; payment: PaymentWithLines; showPayment: boolean }>) {
   const t = useTranslation().trans;
+  const [loadingPayment, setLoadingPayment] = useCallbackState<boolean>(false);
   const [open, setOpen] = useCallbackState<boolean>(showPayment);
   const [selectedPayment, setSelectedPayment] = useCallbackState<Payment | undefined>(undefined);
   const [deleteDialogOpen, setDeleteDialogOpen] = useCallbackState<boolean>(false);
@@ -53,6 +54,8 @@ export default function Index({
       data: { id: uuid },
       preserveScroll: true,
       preserveState: true,
+      onStart: () => setLoadingPayment(true),
+      onFinish: () => setLoadingPayment(false),
     });
   };
 
@@ -89,7 +92,7 @@ export default function Index({
 
         {hasPayments && <List data={payments} onSelectPayment={onSelectPayment} />}
 
-        {payment && (
+        {payment && !loadingPayment && (
           <Sheet open={open} onOpenChange={onOpenChange}>
             <SheetContent side="right" className="m-4 flex h-[calc(~'(100%-var(--spacing)*4)/3')] w-full flex-col rounded-md sm:max-w-[1380px]">
               <SheetHeader>
@@ -113,13 +116,17 @@ export default function Index({
                       </>
                     )}
 
-                    <Button>
-                      <Printer /> {t('global.actions.print')}
+                    <Button
+                      onClick={() => window.open(payment.pdfURL, '_blank')}
+                      rel="noopener noreferrer"
+                      className="flex items-center gap-x-3 rounded-sm bg-indigo-600 px-4 py-1 text-white hover:bg-indigo-700"
+                    >
+                      <Printer className="size-4" /> {t('global.actions.print')}
                     </Button>
                   </div>
                 </div>
               </SheetHeader>
-              <div className="relative grid gap-4 px-4">
+              <div className="relative grid gap-4 overflow-y-scroll px-4 pb-4">
                 {payment.header.status === 'void' && (
                   <div className="absolute inset-0 flex w-full items-center justify-center overflow-y-hidden bg-transparent">
                     <h1 className="-rotate-45 border-8 border-red-500/25 p-8 text-8xl font-extrabold text-red-500/25">VOID</h1>
@@ -133,7 +140,7 @@ export default function Index({
 
         {selectedPayment && (
           <ConfirmsPassword
-            title={t('payments.confirmsPassword.title', { payment: selectedPayment.number })}
+            title={t('payments.confirmsPassword.title', { payment: selectedPayment.code })}
             description={t('payments.confirmsPassword.description', { total: selectedPayment.amount })}
             action={t('payments.confirmsPassword.confirm')}
             verb={'update'}

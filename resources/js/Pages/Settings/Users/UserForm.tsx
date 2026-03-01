@@ -41,7 +41,7 @@ type UserCompany = {
   role: Role;
 };
 
-export default function UserForm({ onFinish, params, companies, roles }: UserFormProps) {
+export default function UserForm({ params, companies, roles }: UserFormProps) {
   const { auth } = usePage<PageProps>().props;
   const [userCompanies, setUserCompanies] = useState<UserCompany[]>((): UserCompany[] => {
     if (params.user === undefined) return [];
