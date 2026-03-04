@@ -116,6 +116,8 @@ func menu(args []string, server *app.Server) {
 		fmt.Println("generate key", str.GenerateRandom())
 	case "setup:account":
 		server.SetupAccount()
+	case "resend:account-email-verification":
+		server.ResendAccountVerificationEmail()
 	default:
 		fmt.Printf("Unknown command: %s\n", command)
 	}

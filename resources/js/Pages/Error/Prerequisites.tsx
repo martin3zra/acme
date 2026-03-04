@@ -36,13 +36,13 @@ export default function Prerequisites({ resource, missing }: Props) {
         </ul>
 
         <div className="mt-6 flex gap-3">
-          <a href={`/settings/${auth.account.uuid}/profile`} className="bg-primary text-primary-foreground rounded px-4 py-2">
+          <Link href={`/settings/${auth.account.uuid}/profile`} className="bg-primary text-primary-foreground rounded px-4 py-2">
             {t('global.prerequisites.actions.goToSettings')}
-          </a>
+          </Link>
 
-          <a href="/home" className="rounded border px-4 py-2">
+          <Link href="/home" className="rounded border px-4 py-2">
             {t('global.prerequisites.actions.goToHome')}
-          </a>
+          </Link>
         </div>
       </div>
     </>

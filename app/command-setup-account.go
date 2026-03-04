@@ -52,6 +52,21 @@ func (s *Server) SetupAccount() {
 	console.Info("The new account was created successfully!")
 }
 
+func (s *Server) ResendAccountVerificationEmail() {
+
+	email := console.Ask("What's the owner email?")
+	account, err := s.findAccountByOwnerEmailAddress(email)
+	if err != nil {
+		console.Info("It wasn't possible to resend the email verification. Something wrong happened.", err)
+		log.Fatal(err)
+		return
+	}
+
+	s.sendAccountVerificationNotification(*account)
+
+	console.Info("Email verification resend was successfully!")
+}
+
 func (s *Server) sendAccountVerificationNotification(acc account) {
 
 	var account any = acc

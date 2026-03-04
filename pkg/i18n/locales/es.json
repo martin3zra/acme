@@ -195,7 +195,8 @@
         "estimate": "la Cotización",
         "invoice": "la Factura",
         "item": "el Producto ó Servicio",
-        "payment": "el Recibo de Ingreso"
+        "payment": "el Recibo de Ingreso",
+        "customer": "el Cliente"
       },
       "missing": {
         "customers": "Debe existir al menos un cliente.",
