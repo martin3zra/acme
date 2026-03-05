@@ -14,6 +14,7 @@ func (s *Server) findTemplateByID(ctx context.Context, templateID int) (*Templat
 	var t Template
 	var createdAt, updatedAt time.Time
 	var deletedAt sql.NullTime
+	var description sql.NullString
 
 	err := s.db.QueryRowContext(
 		ctx,
@@ -23,7 +24,7 @@ func (s *Server) findTemplateByID(ctx context.Context, templateID int) (*Templat
 		templateID,
 		CurrentCompany(ctx).ID,
 	).Scan(
-		&t.ID, &t.UUID, &t.CompanyID, &t.Name, &t.Description, &t.Status, &t.CurrentVersionID,
+		&t.ID, &t.UUID, &t.CompanyID, &t.Name, &description, &t.Status, &t.CurrentVersionID,
 		&createdAt, &updatedAt, &deletedAt,
 	)
 
@@ -36,6 +37,9 @@ func (s *Server) findTemplateByID(ctx context.Context, templateID int) (*Templat
 
 	t.CreatedAt = &createdAt
 	t.UpdatedAt = &updatedAt
+	if description.Valid {
+		t.Description = description.String
+	}
 	if deletedAt.Valid {
 		t.DeletedAt = &deletedAt.Time
 	}
@@ -47,6 +51,7 @@ func (s *Server) findTemplateByID(ctx context.Context, templateID int) (*Templat
 func (s *Server) findTemplateVersionByID(ctx context.Context, versionID int) (*TemplateVersion, error) {
 	var tv TemplateVersion
 	var createdAt, updatedAt time.Time
+	var notes sql.NullString
 
 	err := s.db.QueryRowContext(
 		ctx,
@@ -57,7 +62,7 @@ func (s *Server) findTemplateVersionByID(ctx context.Context, versionID int) (*T
 		versionID,
 		CurrentCompany(ctx).ID,
 	).Scan(
-		&tv.ID, &tv.UUID, &tv.TemplateID, &tv.VersionNumber, &tv.LayoutJSON, &tv.Status, &tv.Notes,
+		&tv.ID, &tv.UUID, &tv.TemplateID, &tv.VersionNumber, &tv.LayoutJSON, &tv.Status, &notes,
 		&createdAt, &updatedAt,
 	)
 
@@ -70,6 +75,9 @@ func (s *Server) findTemplateVersionByID(ctx context.Context, versionID int) (*T
 
 	tv.CreatedAt = &createdAt
 	tv.UpdatedAt = &updatedAt
+	if notes.Valid {
+		tv.Notes = notes.String
+	}
 
 	return &tv, nil
 }
@@ -89,14 +97,15 @@ func (s *Server) listTemplates(ctx context.Context) ([]*Template, error) {
 	}
 	defer rows.Close()
 
-	var templates []*Template
+	templates := make([]*Template, 0)
 	for rows.Next() {
 		var t Template
 		var createdAt, updatedAt time.Time
 		var deletedAt sql.NullTime
+		var description sql.NullString
 
 		err := rows.Scan(
-			&t.ID, &t.UUID, &t.CompanyID, &t.Name, &t.Description, &t.Status, &t.CurrentVersionID,
+			&t.ID, &t.UUID, &t.CompanyID, &t.Name, &description, &t.Status, &t.CurrentVersionID,
 			&createdAt, &updatedAt, &deletedAt,
 		)
 		if err != nil {
@@ -105,6 +114,9 @@ func (s *Server) listTemplates(ctx context.Context) ([]*Template, error) {
 
 		t.CreatedAt = &createdAt
 		t.UpdatedAt = &updatedAt
+		if description.Valid {
+			t.Description = description.String
+		}
 		if deletedAt.Valid {
 			t.DeletedAt = &deletedAt.Time
 		}
@@ -119,6 +131,7 @@ func (s *Server) listTemplates(ctx context.Context) ([]*Template, error) {
 func (s *Server) getPublishedVersion(ctx context.Context, templateID int) (*TemplateVersion, error) {
 	var tv TemplateVersion
 	var createdAt, updatedAt time.Time
+	var notes sql.NullString
 
 	err := s.db.QueryRowContext(
 		ctx,
@@ -131,7 +144,7 @@ func (s *Server) getPublishedVersion(ctx context.Context, templateID int) (*Temp
 		templateID,
 		CurrentCompany(ctx).ID,
 	).Scan(
-		&tv.ID, &tv.UUID, &tv.TemplateID, &tv.VersionNumber, &tv.LayoutJSON, &tv.Status, &tv.Notes,
+		&tv.ID, &tv.UUID, &tv.TemplateID, &tv.VersionNumber, &tv.LayoutJSON, &tv.Status, &notes,
 		&createdAt, &updatedAt,
 	)
 
@@ -144,6 +157,9 @@ func (s *Server) getPublishedVersion(ctx context.Context, templateID int) (*Temp
 
 	tv.CreatedAt = &createdAt
 	tv.UpdatedAt = &updatedAt
+	if notes.Valid {
+		tv.Notes = notes.String
+	}
 
 	return &tv, nil
 }
@@ -169,9 +185,10 @@ func (s *Server) listTemplateVersions(ctx context.Context, templateID int) ([]*T
 	for rows.Next() {
 		var tv TemplateVersion
 		var createdAt, updatedAt time.Time
+		var notes sql.NullString
 
 		err := rows.Scan(
-			&tv.ID, &tv.UUID, &tv.TemplateID, &tv.VersionNumber, &tv.LayoutJSON, &tv.Status, &tv.Notes,
+			&tv.ID, &tv.UUID, &tv.TemplateID, &tv.VersionNumber, &tv.LayoutJSON, &tv.Status, &notes,
 			&createdAt, &updatedAt,
 		)
 		if err != nil {
@@ -180,6 +197,9 @@ func (s *Server) listTemplateVersions(ctx context.Context, templateID int) ([]*T
 
 		tv.CreatedAt = &createdAt
 		tv.UpdatedAt = &updatedAt
+		if notes.Valid {
+			tv.Notes = notes.String
+		}
 
 		versions = append(versions, &tv)
 	}

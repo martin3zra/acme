@@ -33,6 +33,10 @@ func (s *Server) bootRoutes() {
 		WithMiddleware(AuthenticatedMiddleware, Verified, EnforceVerifiedUserAccess).
 		WithoutGroupMiddleware(RedirectIfAuthenticated).
 		Group(func(route *routing.Router) {
+
+			// Test routes (public for demonstration)
+			s.route.GET("/test/estimate-pdf", s.testEstimatePDFHandler)
+
 			route.GET("/onboarding", s.onboardingHandler).WithoutMiddleware(RestrictedAccess)
 			route.POST("/companies", s.storeCompanyHandler).WithoutMiddleware(RestrictedAccess)
 
@@ -129,6 +133,18 @@ func (s *Server) bootRoutes() {
 						route.PUT("/companies/:id/tax-receipts", s.companyUpdateTaxReceipts())
 						route.POST("/users", s.storeUserHandler())
 						route.PUT("/users/:id", s.updateUserHandler())
+					})
+
+					// PDF Template routes
+					route.GroupPrefix("/admin/templates", func(route *routing.Router) {
+						route.GET("/", s.listTemplatesHandler).Can("manage:template")
+						route.GET("/:id", s.showTemplateHandler).Can("manage:template")
+						route.POST("/", s.storeTemplateHandler()).Can("manage:template")
+						route.POST("/:id/update", s.updateTemplateHandler()).Can("manage:template")
+						route.POST("/:id/publish", s.publishTemplateHandler()).Can("manage:template")
+						route.POST("/:id/preview", s.previewTemplateHandler()).Can("manage:template")
+						route.DELETE("/:id", s.deleteTemplateHandler()).Can("manage:template")
+						route.POST("/:id/duplicate", s.duplicateTemplateHandler()).Can("manage:template")
 					})
 				})
 

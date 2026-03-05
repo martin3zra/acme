@@ -1625,12 +1625,14 @@ type PreviewTemplateForm struct {
 	support.FormRequest
 	TemplateID int             `json:"template_id"`
 	Data       json.RawMessage `json:"data"` // Test data for rendering
+	LayoutJSON json.RawMessage `json:"layout_json"`
 }
 
 func (form PreviewTemplateForm) Rules() map[string]any {
 	return map[string]any{
 		"template_id": "required|exists:templates,id",
-		"data":        "required|json",
+		"data":        "sometimes|json",
+		"layout_json": "sometimes|json",
 	}
 }
 

@@ -10,6 +10,7 @@ import {
   ClipboardList,
   ClipboardPenLineIcon,
   CreditCard,
+  FileText,
   LayoutDashboardIcon,
   LayoutListIcon,
   Receipt,
@@ -44,6 +45,13 @@ const navMain: NavItem[] = [
     url: '/orders',
     icon: ShoppingCartIcon,
     requiredAbility: 'viewAny:order',
+  },
+  {
+    title: 'global.navMain.templates',
+    url: '/admin/templates',
+    icon: FileText,
+    match: ['/admin/templates'],
+    requiredAbility: 'manage:template',
   },
   {
     title: 'global.navMain.customers',
