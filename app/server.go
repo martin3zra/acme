@@ -63,6 +63,7 @@ func (s *Server) Boot() {
 
 	s.config.ensureHasBeenSet()
 	s.openDatabaseConnection()
+	s.runMigrations()
 	s.configureMailClient()
 
 	if s.isRunningInCLI() {
@@ -71,6 +72,38 @@ func (s *Server) Boot() {
 
 	s.configureSessionManager()
 	s.configureRouting()
+}
+
+func (s *Server) runMigrations() {
+	// Check if templates table exists
+	var exists bool
+	err := s.db.QueryRow(
+		`SELECT EXISTS (
+			SELECT 1 FROM information_schema.tables
+			WHERE table_name = 'templates'
+		)`).Scan(&exists)
+
+	if err != nil {
+		log.Printf("Migration check failed: %v", err)
+		return
+	}
+
+	if !exists {
+		// Run migration
+		migrationSQL, err := sqlQueriesFS.ReadFile("sql/migrate_templates.sql")
+		if err != nil {
+			log.Printf("Failed to read migration file: %v", err)
+			return
+		}
+
+		_, err = s.db.Exec(string(migrationSQL))
+		if err != nil {
+			log.Printf("Migration failed: %v", err)
+			return
+		}
+
+		log.Println("PDF template migrations completed")
+	}
 }
 
 func (s *Server) configureRouting() {

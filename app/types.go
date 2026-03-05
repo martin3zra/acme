@@ -1557,3 +1557,89 @@ func (d Date) MarshalJSON() ([]byte, error) {
 	formatted := d.Format("2006-01-02")
 	return []byte(`"` + formatted + `"`), nil
 }
+
+// Template represents a PDF template
+type Template struct {
+	ID               int             `json:"id"`
+	UUID             string          `json:"uuid"`
+	CompanyID        int             `json:"company_id"`
+	Name             string          `json:"name"`
+	Description      string          `json:"description"`
+	Status           string          `json:"status"` // draft, published
+	CurrentVersionID *int            `json:"current_version_id"`
+	foundation.Timestamps
+}
+
+// TemplateVersion represents a version of a PDF template
+type TemplateVersion struct {
+	ID            int             `json:"id"`
+	UUID          string          `json:"uuid"`
+	TemplateID    int             `json:"template_id"`
+	VersionNumber int             `json:"version_number"`
+	LayoutJSON    json.RawMessage `json:"layout_json"` // JSONB stored as raw JSON
+	Status        string          `json:"status"`     // draft, published
+	Notes         string          `json:"notes"`
+	foundation.Timestamps
+}
+
+// StoreTemplateForm is used to create or update a template
+type StoreTemplateForm struct {
+	support.FormRequest
+	Name        string          `json:"name"`
+	Description string          `json:"description"`
+	LayoutJSON  json.RawMessage `json:"layout_json"` // JSON layout definition
+}
+
+func (form StoreTemplateForm) Rules() map[string]any {
+	return map[string]any{
+		"name":        "required|min:3|max:255",
+		"description": "sometimes|max:1000",
+		"layout_json": "required|json",
+	}
+}
+
+func (form StoreTemplateForm) Authorize() bool {
+	return Can(form.User(), "manage:template")
+}
+
+// PublishTemplateForm is used to publish a template version
+type PublishTemplateForm struct {
+	support.FormRequest
+	TemplateID int    `json:"template_id"`
+	Notes      string `json:"notes"`
+}
+
+func (form PublishTemplateForm) Rules() map[string]any {
+	return map[string]any{
+		"template_id": "required|exists:templates,id",
+		"notes":       "sometimes|max:1000",
+	}
+}
+
+func (form PublishTemplateForm) Authorize() bool {
+	return Can(form.User(), "manage:template")
+}
+
+// PreviewTemplateForm is used to preview a template render
+type PreviewTemplateForm struct {
+	support.FormRequest
+	TemplateID int             `json:"template_id"`
+	Data       json.RawMessage `json:"data"` // Test data for rendering
+}
+
+func (form PreviewTemplateForm) Rules() map[string]any {
+	return map[string]any{
+		"template_id": "required|exists:templates,id",
+		"data":        "required|json",
+	}
+}
+
+func (form PreviewTemplateForm) Authorize() bool {
+	return Can(form.User(), "manage:template")
+}
+
+// TemplateRenderRequest represents a request to render a template with data
+type TemplateRenderRequest struct {
+	TemplateID int            `json:"template_id"`
+	Data       map[string]any `json:"data"`
+}
