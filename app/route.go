@@ -34,9 +34,6 @@ func (s *Server) bootRoutes() {
 		WithoutGroupMiddleware(RedirectIfAuthenticated).
 		Group(func(route *routing.Router) {
 
-			// Test routes (public for demonstration)
-			s.route.GET("/test/estimate-pdf", s.testEstimatePDFHandler)
-
 			route.GET("/onboarding", s.onboardingHandler).WithoutMiddleware(RestrictedAccess)
 			route.POST("/companies", s.storeCompanyHandler).WithoutMiddleware(RestrictedAccess)
 

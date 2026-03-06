@@ -8,7 +8,7 @@ import (
 // Element represents a parsed PDF element
 type Element struct {
 	Type string
-	Data interface{}
+	Data any
 }
 
 // LayoutEngine parses JSON layout definitions into program structures
@@ -21,7 +21,7 @@ func NewLayoutEngine() *LayoutEngine {
 
 // ParseElement parses a JSON element definition into an Element
 func (le *LayoutEngine) ParseElement(elemJSON json.RawMessage) (*Element, error) {
-	var rawElem map[string]interface{}
+	var rawElem map[string]any
 	if err := json.Unmarshal(elemJSON, &rawElem); err != nil {
 		return nil, fmt.Errorf("parse element JSON: %w", err)
 	}

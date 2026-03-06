@@ -1,7 +1,9 @@
 package components
 
 import (
-	"github.com/jung-kurt/gofpdf"
+	"errors"
+
+	"codeberg.org/go-pdf/fpdf"
 )
 
 // RGBColor represents an RGB color value.
@@ -27,11 +29,11 @@ type TextProps struct {
 
 // TextRenderer handles text rendering on PDF documents.
 type TextRenderer struct {
-	pdf *gofpdf.Fpdf
+	pdf *fpdf.Fpdf
 }
 
 // NewTextRenderer creates a new TextRenderer instance.
-func NewTextRenderer(pdf *gofpdf.Fpdf) *TextRenderer {
+func NewTextRenderer(pdf *fpdf.Fpdf) *TextRenderer {
 	return &TextRenderer{
 		pdf: pdf,
 	}
@@ -40,7 +42,7 @@ func NewTextRenderer(pdf *gofpdf.Fpdf) *TextRenderer {
 // Render draws text on the PDF with the specified properties.
 func (tr *TextRenderer) Render(props TextProps) error {
 	if tr.pdf == nil {
-		return ErrNilPDF
+		return errors.New("errNilPDF")
 	}
 
 	// Set color
@@ -91,70 +93,3 @@ func (tr *TextRenderer) GetHeight(props TextProps) float64 {
 
 	return height
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-}	return float64(lines) * fontSize * 0.35	lines := (len(content) / int(width)) + 1	// Approximate: each line is about fontSize * 0.35 in mm	pdf.SetFont("DejaVu", "", fontSize)func (tr *TextRenderer) GetHeight(pdf *fpdf.Fpdf, content string, width float64, fontSize float64) float64 {// GetHeight returns the height needed for the text}	pdf.SetTextColor(0, 0, 0)	// Reset color	pdf.CellFormat(props.Width, props.Height, props.Content, "", 0, props.Align, false, 0, "")	// Draw text	}		props.Align = "L"	if props.Align == "" {	// Align: L=left, C=center, R=right	pdf.SetXY(props.X, props.Y)	// Position	pdf.SetTextColor(int(props.Color.R), int(props.Color.G), int(props.Color.B))	pdf.SetFont("DejaVu", style, props.FontSize)	}		style += "I"	if props.Italic {	}		style += "B"	if props.Bold {	style := ""	// Set fontfunc (tr *TextRenderer) Render(pdf *fpdf.Fpdf, props TextProps) {// Render renders a text element on the PDF}	return &TextRenderer{}func NewTextRenderer() *TextRenderer {// NewTextRenderer creates a new text renderer}	B uint8	G uint8	R uint8type RGBColor struct {// RGBColor represents a color}	Color   RGBColor	Align   string // L, C, R	Italic  bool	Bold    bool	FontSize float64	Height  float64	Width   float64	Y       float64	X       float64	Content stringtype TextProps struct {// TextProps represents text element propertiestype TextRenderer struct{}// TextRenderer handles rendering text elements)	"codeberg.org/go-pdf/fpdf"import (
