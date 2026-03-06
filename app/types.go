@@ -1640,3 +1640,145 @@ type stockLevel struct {
 	ReorderQuantity   int    `json:"reorder_quantity"`
 	foundation.Timestamps
 }
+
+// ============================================================================
+// Form Requests
+// ============================================================================
+
+// StoreWarehouseForm handles warehouse creation
+type StoreWarehouseForm struct {
+	support.FormRequest
+	Name        string `json:"name"`
+	Code        string `json:"code,omitempty"`
+	Address     string `json:"address,omitempty"`
+	Description string `json:"description,omitempty"`
+}
+
+func (StoreWarehouseForm) Rules() map[string]any {
+	return map[string]any{
+		"name":        []any{"required", "min:3", "max:120"},
+		"address":     "sometimes|max:500",
+		"description": "sometimes|max:1000",
+	}
+}
+
+func (form StoreWarehouseForm) Authorize() bool {
+	return Can(form.User(), "create:warehouse")
+}
+
+// UpdateWarehouseForm handles warehouse updates
+type UpdateWarehouseForm struct {
+	support.FormRequest
+	ID          int    `json:"id"`
+	Name        string `json:"name"`
+	Address     string `json:"address,omitempty"`
+	Description string `json:"description,omitempty"`
+}
+
+func (UpdateWarehouseForm) Rules() map[string]any {
+	return map[string]any{
+		"name":        []any{"required", "min:3", "max:120"},
+		"address":     "sometimes|max:500",
+		"description": "sometimes|max:1000",
+	}
+}
+
+func (form UpdateWarehouseForm) Authorize() bool {
+	return Can(form.User(), "update:warehouse")
+}
+
+// StoreAttributeForm handles attribute creation
+type StoreAttributeForm struct {
+	support.FormRequest
+	Name        string `json:"name"`
+	Type        string `json:"type"`
+	DisplayName string `json:"display_name"`
+	Description string `json:"description,omitempty"`
+}
+
+func (StoreAttributeForm) Rules() map[string]any {
+	return map[string]any{
+		"name":         []any{"required", "min:2", "max:120"},
+		"type":         []any{"required", validator.Rule{}.In("select", "text", "numeric")},
+		"display_name": []any{"required", "min:2", "max:255"},
+		"description":  "sometimes|max:1000",
+	}
+}
+
+func (form StoreAttributeForm) Authorize() bool {
+	return Can(form.User(), "create:attribute")
+}
+
+// StoreAttributeValueForm handles attribute value creation
+type StoreAttributeValueForm struct {
+	support.FormRequest
+	AttributeID int    `json:"attribute_id"`
+	Value       string `json:"value"`
+	DisplayName string `json:"display_name"`
+	SortOrder   int    `json:"sort_order,omitempty"`
+}
+
+func (StoreAttributeValueForm) Rules() map[string]any {
+	return map[string]any{
+		"attribute_id": []any{"required", "exists:attributes,id"},
+		"value":        []any{"required", "min:1", "max:120"},
+		"display_name": []any{"required", "min:1", "max:255"},
+		"sort_order":   "sometimes|integer|min:0",
+	}
+}
+
+func (form StoreAttributeValueForm) Authorize() bool {
+	return Can(form.User(), "create:attribute")
+}
+
+// VariantCombo represents a combination of attribute values for a variant
+type VariantCombo struct {
+	AttributeValueIDs map[int]int `json:"attribute_value_ids"`
+	Price             *float64    `json:"price,omitempty"`
+	CostPrice         *float64    `json:"cost_price,omitempty"`
+	SKU               string      `json:"sku,omitempty"`
+}
+
+// StoreItemWithAttributesForm handles item creation with variants and attributes
+type StoreItemWithAttributesForm struct {
+	support.FormRequest
+	Name          string         `json:"name"`
+	Description   string         `json:"description,omitempty"`
+	AttributeIDs  []int          `json:"attribute_ids,omitempty"`
+	VariantCombos []VariantCombo `json:"variant_combos,omitempty"`
+}
+
+func (StoreItemWithAttributesForm) Rules() map[string]any {
+	return map[string]any{
+		"name":              []any{"required", "min:3", "max:120"},
+		"description":       "sometimes|max:1000",
+		"attribute_ids.*":   "sometimes|exists:attributes,id",
+		"variant_combos.*":  "sometimes|array",
+	}
+}
+
+func (form StoreItemWithAttributesForm) Authorize() bool {
+	return Can(form.User(), "create:item")
+}
+
+// StockAdjustmentForm handles stock adjustments
+type StockAdjustmentForm struct {
+	support.FormRequest
+	WarehouseID int    `json:"warehouse_id"`
+	VariantID   int    `json:"variant_id"`
+	Quantity    int    `json:"quantity"`
+	Reason      string `json:"reason,omitempty"`
+}
+
+func (StockAdjustmentForm) Rules() map[string]any {
+	return map[string]any{
+		"warehouse_id": []any{"required", "exists:warehouses,id"},
+		"variant_id":   []any{"required", "exists:items_variants,id"},
+		"quantity":     []any{"required", "integer"},
+		"reason":       "sometimes|max:500",
+	}
+}
+
+func (form StockAdjustmentForm) Authorize() bool {
+	return Can(form.User(), "update:stock")
+}
