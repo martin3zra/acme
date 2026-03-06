@@ -56,6 +56,15 @@
     "invoiced": "Facturado",
     "estimate": "Cotización",
     "order": "Pedido",
+    "warehouse": "Almacén",
+    "stockLevels": "Niveles de Stock",
+    "adjustStock": "Ajustar Stock",
+    "adjustStockQuantity": "Ajustar cantidad de stock",
+    "variant": "Variante",
+    "quantity": "Cantidad",
+    "reason": "Razón",
+    "attributes": "Atributos",
+    "displayName": "Nombre para mostrar",
     "receiptOfPayment": "Recibo de Ingreso",
     "weHaveReceivedFrom": "Hemos recibido de",
     "address": "Dirección",
@@ -979,6 +988,129 @@
       }
     }
   },
+  "warehouses": {
+    "title": "Almacenes",
+    "description": "Todos los almacenes creados se muestran aquí.",
+    "viewAll": "Ver todos los almacenes",
+    "paidStatus": "Pagada",
+    "paymentTerms": "Condiciones de pago",
+    "taxReceipt": "Tipo NCF",
+    "import": {
+      "title": "Importación Masiva de Almacenes",
+      "description": "Carga grandes volúmenes de almacenes con validación automática, detección de duplicados y registro detallado del proceso. Compatible con actualización de registros existentes."
+    },
+    "line": {
+      "form": {
+        "placeholder": "Referencia o presione ⌘K",
+        "addNew": "Registrar nuevo almacén",
+        "search": "Escriba un nombre de almacén..."
+      }
+    },
+    "single": {
+      "title": "Almacén",
+      "description": "Proporcione los detalles necesarios para configurar el almacén. Esta información le ayudará a identificar y gestionar dentro de su catalogo en el sistema.",
+      "type": "Tipo",
+      "service": "Servicio",
+      "product": "Producto",
+      "vendor_reference": "Referencia del proveedor"
+    },
+    "viewWarehouse": {
+      "title": "Ver almacén",
+      "description": "Detalles del almacén seleccionado."
+    },
+    "newWarehouse": {
+      "title": "Nuevo almacén",
+      "description": "Crea un nuevo almacén."
+    },
+    "editWarehouse": {
+      "title": "Editar almacén",
+      "description": "Edita los detalles del almacén seleccionado"
+    },
+    "trashWarehouse": {
+      "title": "Borrar almacén",
+      "description": "Borra los detalles del almacén seleccionado."
+    },
+    "emptyState": {
+      "title": "Crea tu primer almacén",
+      "description": "Una vez que cree tus almacenes, aparecerán aquí."
+    },
+    "noDataAvailable": "No hay datos disponibles",
+    "confirmsPassword": {
+      "title": "¿Estás seguro que deseas borrar el almacén :warehouse?",
+      "description": "Una vez que se elimine :warehouse, todos sus recursos seguirán estando disponibles, pero no se podrá realizar ninguna operación nueva.",
+      "confirm": "Si, borralo",
+      "cancel": "Cancelar"
+    },
+    "statuses": {
+      "enabled":{
+        "section": {
+          "title": "Deshabilitar almacén",
+          "description": "Bloquear almacén y todos sus recursos"
+        },
+        "confirmsPassword": {
+          "title": "¿Está seguro de que desea deshabilitar :warehouse?",
+          "description": "Al desactivar este almacén, se bloquearán todos sus recursos y datos. Ingrese su contraseña para confirmar que desea desactivarlo.",
+          "confirm": "Sí, desactívalo",
+          "variant": "destructive"
+        }
+      },
+      "disabled":{
+        "section": {
+          "title": "Habilitar almacén",
+          "description": "Desbloquear almacén y todos sus recursos"
+        },
+        "confirmsPassword": {
+          "title": "¿Está seguro de que desea activar :warehouse?",
+          "description": "Al activar este almacén, se desbloquearán todos sus recursos y datos. Ingrese su contraseña para confirmar que desea activarlo.",
+          "confirm": "Sí, actívalo",
+          "variant": "primary"
+        }
+      }
+    }
+  },
+  "stock": {
+    "title": "Niveles de Stock",
+    "description": "Todos los niveles de stock se muestran aquí.",
+    "adjustStock": "Ajustar Stock",
+    "single": {
+      "title": "Ajuste de Stock",
+      "description": "Ajustar cantidad de stock para un almacén y variante."
+    },
+    "emptyState": {
+      "title": "No hay niveles de stock",
+      "description": "Una vez que ajustes el stock, aparecerá aquí."
+    },
+    "noDataAvailable": "No hay datos disponibles"
+  },
+  "attributes": {
+    "title": "Atributos",
+    "description": "Todos los atributos creados se muestran aquí.",
+    "single": {
+      "title": "Atributo",
+      "description": "Proporcione los detalles necesarios para configurar el atributo. Esta información le ayudará a identificar y gestionar dentro de su catálogo en el sistema."
+    },
+    "viewAttribute": {
+      "title": "Ver atributo",
+      "description": "Detalles del atributo seleccionado."
+    },
+    "newAttribute": {
+      "title": "Nuevo atributo",
+      "description": "Crea un nuevo atributo."
+    },
+    "editAttribute": {
+      "title": "Editar atributo",
+      "description": "Edita los detalles del atributo seleccionado"
+    },
+    "trashAttribute": {
+      "title": "Borrar atributo",
+      "description": "Borra los detalles del atributo seleccionado."
+    },
+    "emptyState": {
+      "title": "Crea tu primer atributo",
+      "description": "Una vez que crees tus atributos, aparecerán aquí."
+    },
+    "noDataAvailable": "No hay datos disponibles"
+  },
   "payments": {
     "title": "Pagos",
     "description": "Todos los pagos registrados se muestran aquí.",
@@ -987,8 +1119,8 @@
     "line": {
       "form": {
         "placeholder": "Referencia o presione ⌘K",
-        "addNew": "Registrar nuevo artículo",
-        "search": "Escriba un nombre de artículo..."
+        "addNew": "Registrar nuevo pago",
+        "search": "Escriba un nombre de pago..."
       }
     },
     "single": {

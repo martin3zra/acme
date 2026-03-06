@@ -57,6 +57,9 @@ export default function SequenceView({ uuid, sequences }: SeqProps) {
         customer: data.sequences.customer,
         estimate: data.sequences.estimate,
         payment: data.sequences.payment,
+        order: data.sequences.order,
+        warehouse: data.sequences.warehouse,
+        template: data.sequences.template,
       };
     });
     put(`/settings/${auth.account.uuid}/companies/${uuid}/sequences`, { ...headers, preserveState: 'errors' });

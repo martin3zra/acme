@@ -244,6 +244,12 @@ func (s *Server) linkCompanyDefaultSequences(tx *sql.Tx, companyID int) error {
 			"padding": 6,
 			"format":  "{prefix}-{year}-{seq}",
 		},
+		"warehouse": map[string]any{
+			"prefix":  "WH",
+			"next":    1,
+			"padding": 4,
+			"format":  "{prefix}-{year}-{seq}",
+		},
 	}
 
 	defaultRedirectPreferences := RedirectPreferences{
