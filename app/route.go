@@ -52,7 +52,11 @@ func (s *Server) bootRoutes() {
 					route.PUT("/items/:id", s.updateItemHandler())
 					route.PUT("/items/:id/change-status", s.changeStatusItemHandler())
 					route.DELETE("/items/:id", s.deleteItemHandler())
-
+				route.GET("/warehouses", s.warehousesHandler).Can("viewAny:warehouse")
+				route.POST("/warehouses", s.storeWarehouseHandler()).Can("create:warehouse")
+				route.PUT("/warehouses/:id", s.updateWarehouseHandler()).Can("update:warehouse")
+				route.PUT("/warehouses/:id/change-status", s.changeStatusWarehouseHandler()).Can("update:warehouse")
+				route.DELETE("/warehouses/:id", s.deleteWarehouseHandler()).Can("delete:warehouse")
 					route.GET("/invoices", s.invoicesHandler).Can("viewAny:invoice")
 					route.POST("/invoices", s.storeInvoiceHandler())
 					route.GET("/invoices/create", s.createInvoiceHandler).Can("create:invoice")

@@ -11,18 +11,18 @@ var rolePermissionsCache = map[string]map[string]bool{}
 var groupedPermissions = map[string]map[string][]string{
 	"owner": {"*": {"*"}},
 	"admin": {
-		"view":    {"dashboard", "invoice", "estimate", "order", "customer", "item", "payment", "reports", "setting"},
-		"viewAny": {"dashboard", "invoice", "estimate", "order", "customer", "item", "payment", "reports", "setting"},
-		"create":  {"dashboard", "invoice", "estimate", "order", "customer", "item", "payment", "reports", "setting"},
-		"delete":  {"dashboard", "invoice", "estimate", "order", "customer", "item", "payment", "reports", "setting"},
-		"update":  {"dashboard", "invoice", "estimate", "order", "customer", "item", "payment", "reports", "setting", "company:sequence"},
+		"view":    {"dashboard", "invoice", "estimate", "order", "customer", "item", "payment", "reports", "setting", "warehouse", "stock"},
+		"viewAny": {"dashboard", "invoice", "estimate", "order", "customer", "item", "payment", "reports", "setting", "warehouse", "stock"},
+		"create":  {"dashboard", "invoice", "estimate", "order", "customer", "item", "payment", "reports", "setting", "warehouse", "stock", "attribute"},
+		"delete":  {"dashboard", "invoice", "estimate", "order", "customer", "item", "payment", "reports", "setting", "warehouse"},
+		"update":  {"dashboard", "invoice", "estimate", "order", "customer", "item", "payment", "reports", "setting", "company:sequence", "warehouse", "stock", "attribute"},
 	},
 	"supervisor": {
-		"view":    {"dashboard", "customer", "item", "payment", "reports"},
-		"viewAny": {"dashboard", "invoice", "estimate", "order", "customer", "item", "payment", "reports"},
-		"create":  {"dashboard", "invoice", "estimate", "order", "customer", "item", "payment", "reports"},
+		"view":    {"dashboard", "customer", "item", "payment", "reports", "warehouse", "stock"},
+		"viewAny": {"dashboard", "invoice", "estimate", "order", "customer", "item", "payment", "reports", "warehouse", "stock"},
+		"create":  {"dashboard", "invoice", "estimate", "order", "customer", "item", "payment", "reports", "warehouse", "stock", "attribute"},
 		"delete":  {"dashboard", "invoice", "estimate", "order", "customer", "item", "payment", "reports"},
-		"update":  {"dashboard", "invoice", "estimate", "order", "customer", "item", "payment", "reports"},
+		"update":  {"dashboard", "invoice", "estimate", "order", "customer", "item", "payment", "reports", "warehouse", "stock", "attribute"},
 	},
 	"standard": {
 		"view":   {"invoice", "customer"},
