@@ -1,70 +1,36 @@
+import HeadingSmall from '@/components/heading-small';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
 import { useTranslation } from '@/hooks/use-translation';
 import AppLayout from '@/layouts/app-layout';
-import { PageProps } from '@/types';
 import { router } from '@inertiajs/react';
-import { Plus, Pencil, Trash2, ChevronRight } from 'lucide-react';
+import { Plus } from 'lucide-react';
 import { useState } from 'react';
+import { breadcrumbs } from './constants';
+import { List } from './List/Index';
+import CreateForm from './Shared/CreateForm';
+import { Attribute } from './types';
+import { PageProps } from '@/types';
 
-interface Attribute {
-  id: number;
-  uuid: string;
-  name: string;
-  type: string;
-  display_name: string;
-  description?: string;
-  created_at: string;
-  updated_at: string;
-}
-
-export default function Index({ attributes }: PageProps<{ attributes: Attribute[] }>) {
+export default function Index({ auth, attributes }: PageProps<{ attributes: Attribute[] }>) {
   const t = useTranslation().trans;
   const [open, setOpen] = useState(false);
-  const [formData, setFormData] = useState({
-    name: '',
-    type: 'select',
-    display_name: '',
-    description: '',
-  });
-  const [editingId, setEditingId] = useState<number | null>(null);
+  const [selectedAttribute, setSelectedAttribute] = useState<Attribute | undefined>(undefined);
+  const hasAttributes = attributes.length > 0;
 
   const handleCreate = () => {
-    setFormData({ name: '', type: 'select', display_name: '', description: '' });
-    setEditingId(null);
+    setSelectedAttribute(undefined);
     setOpen(true);
   };
 
   const handleEdit = (attribute: Attribute) => {
-    setFormData({
-      name: attribute.name,
-      type: attribute.type,
-      display_name: attribute.display_name,
-      description: attribute.description || '',
-    });
-    setEditingId(attribute.id);
+    setSelectedAttribute(attribute);
     setOpen(true);
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-
-    if (editingId) {
-      router.put(`/attributes/${editingId}`, formData);
-    } else {
-      router.post('/attributes', formData);
-    }
-
-    setOpen(false);
+  const onOpenChange = (value: boolean) => {
+    setOpen(value);
+    if (!value) setSelectedAttribute(undefined);
   };
 
   const handleDelete = (id: number) => {
@@ -74,142 +40,51 @@ export default function Index({ attributes }: PageProps<{ attributes: Attribute[
   };
 
   return (
-    <AppLayout
-      title={t('@global.attributes')}
-      breadcrumbs={[{ label: t('@global.attributes'), href: '/attributes' }]}
-    >
+    <AppLayout user={auth.user} breadcrumbs={breadcrumbs}>
       <div className="space-y-6">
-        <div className="flex justify-between items-center">
-          <h1 className="text-3xl font-bold">{t('@global.attributes')}</h1>
-          <Button onClick={handleCreate}>
-            <Plus className="w-4 h-4 mr-2" />
-            {t('@global.create')}
-          </Button>
-        </div>
+        {hasAttributes && (
+          <HeadingSmall
+            title={t('@global.attributes')}
+            rightPanel={
+              <Button onClick={handleCreate}>
+                <Plus /> {t('@global.create')}
+              </Button>
+            }
+          />
+        )}
 
-        {attributes.length === 0 ? (
-          <div className="text-center py-12">
-            <p className="text-gray-500">{t('@global.noDataAvailable')}</p>
+        {!hasAttributes ? (
+          <div className="absolute top-1/2 left-1/2 flex h-61 min-w-3xl -translate-x-1/2 -translate-y-1/2 flex-col items-center gap-4 rounded-3xl bg-white p-10 shadow-[0px_8px_12px_-4px_rgba(16,12,12,0.08),0px_0px_2px_rgba(16,12,12,0.1),0px_1px_2px_rgba(16,12,12,0.1)]">
+            <h4 className="text-2xl">{t('@global.attributes')}</h4>
+            <p className="text-sm text-gray-400">{t('@global.noDataAvailable')}</p>
+
+            <div className="flex space-x-3">
+              <Button onClick={handleCreate}>
+                <Plus /> {t('@global.create')}
+              </Button>
+            </div>
           </div>
         ) : (
-          <div className="border rounded-lg">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>{t('@global.name')}</TableHead>
-                  <TableHead>{t('@global.displayName')}</TableHead>
-                  <TableHead>{t('@global.type')}</TableHead>
-                  <TableHead>{t('@global.description')}</TableHead>
-                  <TableHead className="text-right">{t('@global.actions')}</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {attributes.map((attribute) => (
-                  <TableRow key={attribute.id}>
-                    <TableCell className="font-medium">{attribute.name}</TableCell>
-                    <TableCell>{attribute.display_name}</TableCell>
-                    <TableCell>
-                      <span className="inline-block px-2 py-1 bg-blue-100 text-blue-800 rounded text-sm">
-                        {attribute.type}
-                      </span>
-                    </TableCell>
-                    <TableCell>{attribute.description || '-'}</TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex justify-end gap-2">
-                        <a
-                          href={`/attributes/${attribute.id}/values`}
-                          className="p-2 hover:bg-gray-100 rounded inline-block"
-                          title="Manage values"
-                        >
-                          <ChevronRight className="w-4 h-4" />
-                        </a>
-                        <button
-                          onClick={() => handleEdit(attribute)}
-                          className="p-2 hover:bg-gray-100 rounded"
-                        >
-                          <Pencil className="w-4 h-4" />
-                        </button>
-                        <button
-                          onClick={() => handleDelete(attribute.id)}
-                          className="p-2 hover:bg-gray-100 rounded text-red-600"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
+          <List data={attributes} onEdit={handleEdit} onDelete={handleDelete} t={t} />
         )}
+
+        <Sheet open={open} onOpenChange={onOpenChange}>
+          <SheetContent side="right" className="m-4 flex h-[calc(~'(100%_-_var(--spacing)_*_4)_/_3')] w-full flex-col rounded-md sm:max-w-7xl">
+            <SheetHeader>
+              <SheetTitle>
+                {selectedAttribute ? t('@global.actions.edit') : t('@global.actions.create')} {t('@global.attribute')}
+              </SheetTitle>
+              <SheetDescription>
+                {selectedAttribute ? `${t('@global.update')} attribute settings` : `${t('@global.create')} a new attribute`}
+              </SheetDescription>
+            </SheetHeader>
+
+            <div className="no-scrollbar grid gap-4 overflow-y-scroll px-4">
+              <CreateForm attribute={selectedAttribute} onFinish={() => onOpenChange(false)} />
+            </div>
+          </SheetContent>
+        </Sheet>
       </div>
-
-      <Sheet open={open} onOpenChange={setOpen}>
-        <SheetContent>
-          <SheetHeader>
-            <SheetTitle>
-              {editingId ? t('@global.edit') : t('@global.create')} {t('@global.attribute')}
-            </SheetTitle>
-            <SheetDescription>
-              {editingId
-                ? `${t('@global.update')} attribute settings`
-                : `${t('@global.create')} a new attribute`}
-            </SheetDescription>
-          </SheetHeader>
-
-          <form onSubmit={handleSubmit} className="space-y-6 mt-6">
-            <div className="space-y-2">
-              <label className="text-sm font-medium">{t('@global.name')}</label>
-              <Input
-                value={formData.name}
-                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                placeholder="e.g., color, size, length"
-                required
-              />
-            </div>
-
-            <div className="space-y-2">
-              <label className="text-sm font-medium">{t('@global.displayName')}</label>
-              <Input
-                value={formData.display_name}
-                onChange={(e) => setFormData({ ...formData, display_name: e.target.value })}
-                placeholder="e.g., Color, Shirt Size, Length"
-                required
-              />
-            </div>
-
-            <div className="space-y-2">
-              <label className="text-sm font-medium">{t('@global.type')}</label>
-              <select
-                value={formData.type}
-                onChange={(e) => setFormData({ ...formData, type: e.target.value })}
-                className="w-full p-2 border rounded-md"
-                required
-              >
-                <option value="select">Select (Dropdown)</option>
-                <option value="text">Text</option>
-                <option value="numeric">Numeric</option>
-              </select>
-            </div>
-
-            <div className="space-y-2">
-              <label className="text-sm font-medium">{t('@global.description')}</label>
-              <textarea
-                value={formData.description}
-                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                className="w-full p-2 border rounded-md"
-                placeholder="Optional description"
-                rows={3}
-              />
-            </div>
-
-            <Button type="submit" className="w-full">
-              {t('@global.save')}
-            </Button>
-          </form>
-        </SheetContent>
-      </Sheet>
     </AppLayout>
   );
 }
