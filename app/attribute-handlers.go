@@ -1,25 +1,24 @@
-package main
+package app
 
 import (
 	"fmt"
 
-	"acme/pkg/i18n"
-	"acme/pkg/routing"
+	"github.com/martin3zra/acme/pkg/i18n"
+	"github.com/martin3zra/acme/pkg/routing"
+	"github.com/martin3zra/acme/pkg/validator/locale"
 )
 
 // attributesHandler returns list of attributes
-func (s *Server) attributesHandler() routing.HandlerFunc {
-	return func(ctx *routing.Context) {
-		attributes, err := s.findAttributes(ctx.Request.Context())
-		if err != nil {
-			ctx.Error(err)
-			return
-		}
-
-		ctx.Render("Attributes/Index", map[string]any{
-			"attributes": attributes,
-		})
+func (s *Server) attributesHandler(ctx *routing.Context) {
+	attributes, err := s.findAttributes(ctx.Request.Context())
+	if err != nil {
+		ctx.Error(err)
+		return
 	}
+
+	ctx.Render("Attributes/Index", map[string]any{
+		"attributes": attributes,
+	})
 }
 
 // storeAttributeHandler creates a new attribute
@@ -109,27 +108,25 @@ func (s *Server) deleteAttributeHandler() routing.HandlerFunc {
 }
 
 // attributeValuesHandler returns list of values for an attribute
-func (s *Server) attributeValuesHandler() routing.HandlerFunc {
-	return func(ctx *routing.Context) {
-		attributeID := ctx.Int("id")
+func (s *Server) attributeValuesHandler(ctx *routing.Context) {
+	attributeID := ctx.Int("id")
 
-		attribute, err := s.findAttributeByID(ctx.Request.Context(), attributeID)
-		if err != nil {
-			ctx.Error(err)
-			return
-		}
-
-		values, err := s.findAttributeValuesByAttribute(ctx.Request.Context(), attributeID)
-		if err != nil {
-			ctx.Error(err)
-			return
-		}
-
-		ctx.Render("Attributes/Values", map[string]any{
-			"attribute": attribute,
-			"values":    values,
-		})
+	attribute, err := s.findAttributeByID(ctx.Request.Context(), attributeID)
+	if err != nil {
+		ctx.Error(err)
+		return
 	}
+
+	values, err := s.findAttributeValuesByAttribute(ctx.Request.Context(), attributeID)
+	if err != nil {
+		ctx.Error(err)
+		return
+	}
+
+	ctx.Render("Attributes/Values", map[string]any{
+		"attribute": attribute,
+		"values":    values,
+	})
 }
 
 // storeAttributeValueHandler creates a new attribute value
@@ -205,3 +202,4 @@ func (s *Server) deleteAttributeValueHandler() routing.HandlerFunc {
 		ctx.Redirect(fmt.Sprintf("/attributes/%d/values", attributeID))
 	})
 }
+

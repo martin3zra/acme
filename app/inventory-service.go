@@ -1,4 +1,4 @@
-package main
+package app
 
 import (
 	"context"
@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"strings"
 
-	"acme/pkg/database"
+	"github.com/martin3zra/acme/pkg/database"
 )
 
 // CreateProductWithVariantsService handles the complex logic of creating products with variants

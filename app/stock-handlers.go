@@ -1,88 +1,82 @@
-package main
+package app
 
 import (
 	"fmt"
 
-	"acme/pkg/i18n"
-	"acme/pkg/routing"
+	"github.com/martin3zra/acme/pkg/i18n"
+	"github.com/martin3zra/acme/pkg/routing"
 )
 
 // stockLevelsHandler returns list of stock levels
-func (s *Server) stockLevelsHandler() routing.HandlerFunc {
-	return func(ctx *routing.Context) {
-		filters := map[string]interface{}{}
+func (s *Server) stockLevelsHandler(ctx *routing.Context) {
+	filters := map[string]interface{}{}
 
-		// Optional filter by warehouse
-		if warehouseID := ctx.Query("warehouse_id"); warehouseID != "" {
-			filters["warehouse_id"] = warehouseID
-		}
-
-		// Optional filter by variant
-		if variantID := ctx.Query("variant_id"); variantID != "" {
-			filters["variant_id"] = variantID
-		}
-
-		stocks, err := s.findStockLevels(ctx.Request.Context(), filters)
-		if err != nil {
-			ctx.Error(err)
-			return
-		}
-
-		warehouses, err := s.findWarehouses(ctx.Request.Context())
-		if err != nil {
-			ctx.Error(err)
-			return
-		}
-
-		ctx.Render("Stock/Index", map[string]any{
-			"stocks":     stocks,
-			"warehouses": warehouses,
-		})
+	// Optional filter by warehouse
+	if warehouseID := ctx.Query("warehouse_id"); warehouseID != "" {
+		filters["warehouse_id"] = warehouseID
 	}
+
+	// Optional filter by variant
+	if variantID := ctx.Query("variant_id"); variantID != "" {
+		filters["variant_id"] = variantID
+	}
+
+	stocks, err := s.findStockLevels(ctx.Request.Context(), filters)
+	if err != nil {
+		ctx.Error(err)
+		return
+	}
+
+	warehouses, err := s.findWarehouses(ctx.Request.Context())
+	if err != nil {
+		ctx.Error(err)
+		return
+	}
+
+	ctx.Render("Stock/Index", map[string]any{
+		"stocks":     stocks,
+		"warehouses": warehouses,
+	})
 }
 
 // stockByItemHandler returns stock levels for a specific item
-func (s *Server) stockByItemHandler() routing.HandlerFunc {
-	return func(ctx *routing.Context) {
-		itemID := ctx.Int("id")
+func (s *Server) stockByItemHandler(ctx *routing.Context) {
+	itemID := ctx.Int("id")
 
-		stocks, err := s.findStockLevels(ctx.Request.Context(), map[string]interface{}{
-			"item_id": itemID,
-		})
-		if err != nil {
-			ctx.Error(err)
-			return
-		}
-
-		ctx.Render("Stock/ByItem", map[string]any{
-			"stocks":  stocks,
-			"item_id": itemID,
-		})
+	stocks, err := s.findStockLevels(ctx.Request.Context(), map[string]interface{}{
+		"item_id": itemID,
+	})
+	if err != nil {
+		ctx.Error(err)
+		return
 	}
+
+	ctx.Render("Stock/ByItem", map[string]any{
+		"stocks":  stocks,
+		"item_id": itemID,
+	})
 }
 
 // stockByWarehouseHandler returns stock levels for a specific warehouse
-func (s *Server) stockByWarehouseHandler() routing.HandlerFunc {
-	return func(ctx *routing.Context) {
-		warehouseID := ctx.Int("id")
+func (s *Server) stockByWarehouseHandler(ctx *routing.Context) {
+	warehouseID := ctx.Int("id")
 
-		warehouse, err := s.findWarehouseByID(ctx.Request.Context(), warehouseID)
-		if err != nil {
-			ctx.Error(err)
-			return
-		}
-
-		stocks, err := s.getStockForWarehouse(ctx.Request.Context(), warehouseID)
-		if err != nil {
-			ctx.Error(err)
-			return
-		}
-
-		ctx.Render("Stock/ByWarehouse", map[string]any{
-			"stocks":    stocks,
-			"warehouse": warehouse,
-		})
+	warehouse, err := s.findWarehouseByID(ctx.Request.Context(), warehouseID)
+	if err != nil {
+		ctx.Error(err)
+		return
 	}
+
+	stocks, err := s.getStockForWarehouse(ctx.Request.Context(), warehouseID)
+	if err != nil {
+		ctx.Error(err)
+		return
+	}
+
+	ctx.Render("Stock/ByWarehouse", map[string]any{
+		"stocks":    stocks,
+		"warehouse": warehouse,
+	})
 }
 
 // adjustStockHandler handles stock quantity adjustments
@@ -110,7 +104,7 @@ func (s *Server) initializeStockForVariantHandler() routing.HandlerFunc {
 			return
 		}
 
-		companyID := CurrentCompany(ctx).ID
+		companyID := CurrentCompany(ctx.Request.Context()).ID
 
 		// Create stock records for all warehouses
 		for _, warehouse := range warehouses {

@@ -1,25 +1,24 @@
-package main
+package app
 
 import (
 	"fmt"
 
-	"acme/pkg/i18n"
-	"acme/pkg/routing"
+	"github.com/martin3zra/acme/pkg/i18n"
+	"github.com/martin3zra/acme/pkg/routing"
+	"github.com/martin3zra/acme/pkg/validator/locale"
 )
 
 // warehousesHandler returns the list of warehouses
-func (s *Server) warehousesHandler() routing.HandlerFunc {
-	return func(ctx *routing.Context) {
-		warehouses, err := s.findWarehouses(ctx.Request.Context())
-		if err != nil {
-			ctx.Error(err)
-			return
-		}
-
-		ctx.Render("Warehouses/Index", map[string]any{
-			"warehouses": warehouses,
-		})
+func (s *Server) warehousesHandler(ctx *routing.Context) {
+	warehouses, err := s.findWarehouses(ctx.Request.Context())
+	if err != nil {
+		ctx.Error(err)
+		return
 	}
+
+	ctx.Render("Warehouses/Index", map[string]any{
+		"warehouses": warehouses,
+	})
 }
 
 // storeWarehouseHandler creates a new warehouse

@@ -1,14 +1,11 @@
-package main
+package app
 
 import (
 	"context"
 	"database/sql"
 	"errors"
-	"fmt"
-	"time"
 
-	"acme/pkg/database"
-	"acme/pkg/foundation"
+	"github.com/martin3zra/acme/pkg/database"
 )
 
 // findWarehouses returns all active warehouses for the current company
@@ -141,7 +138,7 @@ func (s *Server) toggleWarehouseStatus(ctx context.Context, id int) error {
 	companyID := CurrentCompany(ctx).ID
 
 	// Get current status
-	var currentStatus foundation.Status
+	var currentStatus string
 	err := s.db.QueryRowContext(
 		ctx,
 		`SELECT status FROM warehouses 
@@ -154,9 +151,9 @@ func (s *Server) toggleWarehouseStatus(ctx context.Context, id int) error {
 	}
 
 	// Toggle status
-	newStatus := foundation.StatusDisabled
-	if currentStatus == foundation.StatusDisabled {
-		newStatus = foundation.StatusEnabled
+	newStatus := "disabled"
+	if currentStatus == "disabled" {
+		newStatus = "enabled"
 	}
 
 	_, err = s.db.ExecContext(

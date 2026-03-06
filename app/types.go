@@ -1699,7 +1699,7 @@ type StoreAttributeForm struct {
 func (StoreAttributeForm) Rules() map[string]any {
 	return map[string]any{
 		"name":         []any{"required", "min:2", "max:120"},
-		"type":         []any{"required", validator.Rule{}.In("select", "text", "numeric")},
+		"type":         "required|in:select,text,numeric",
 		"display_name": []any{"required", "min:2", "max:255"},
 		"description":  "sometimes|max:1000",
 	}
