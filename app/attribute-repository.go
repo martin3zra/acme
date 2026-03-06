@@ -38,7 +38,29 @@ func (s *Server) findAttributes(ctx context.Context) ([]*attribute, error) {
 }
 
 // findAttributeByID returns a single attribute by ID
-func (s *Server) findAttributeByID(ctx context.Context, id int) (*attribute, error) {
+func (s *Server) findAttributeByID(ctx context.Context, id string) (*attribute, error) {
+	attr := new(attribute)
+	err := s.db.QueryRowContext(
+		ctx,
+		`SELECT a.id, a.uuid, a.name, a.type, a.display_name, a.description,
+		        a.created_at, a.updated_at, a.deleted_at
+		 FROM attributes a
+		 WHERE a.company_id = $1 AND a.uuid = $2 AND a.deleted_at IS NULL`,
+		CurrentCompany(ctx).ID, id,
+	).Scan(
+		&attr.ID, &attr.UUID, &attr.Name, &attr.Type, &attr.DisplayName, &attr.Description,
+		&attr.CreatedAt, &attr.UpdatedAt, &attr.DeletedAt,
+	)
+
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, errors.New("attribute not found")
+	}
+
+	return attr, err
+}
+
+// findAttributeByIntID returns a single attribute by integer ID
+func (s *Server) findAttributeByIntID(ctx context.Context, id int) (*attribute, error) {
 	attr := new(attribute)
 	err := s.db.QueryRowContext(
 		ctx,

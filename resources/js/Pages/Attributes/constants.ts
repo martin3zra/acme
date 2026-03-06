@@ -3,7 +3,7 @@ import { BreadcrumbItem, defaultBreadcrumbs } from '@/types';
 export const breadcrumbs: BreadcrumbItem[] = [
   ...defaultBreadcrumbs,
   {
-    title: '@global.attributes',
+    title: 'global.attributes',
     href: '/attributes',
   },
 ];

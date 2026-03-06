@@ -56,6 +56,7 @@
     "invoiced": "Facturado",
     "estimate": "Cotización",
     "order": "Pedido",
+    "attribute": "Atributo",
     "warehouse": "Almacén",
     "stockLevels": "Niveles de Stock",
     "adjustStock": "Ajustar Stock",
@@ -65,6 +66,8 @@
     "reason": "Razón",
     "attributes": "Atributos",
     "displayName": "Nombre para mostrar",
+      "attributeValue": "Valor de atributo",
+      "attributeValues": "Valores",
     "receiptOfPayment": "Recibo de Ingreso",
     "weHaveReceivedFrom": "Hemos recibido de",
     "address": "Dirección",
@@ -1085,6 +1088,24 @@
   "attributes": {
     "title": "Atributos",
     "description": "Todos los atributos creados se muestran aquí.",
+      "values": {
+        "title": "Valores de atributos",
+        "description": "Gestiona los valores disponibles para este atributo.",
+        "sortOrder": "Orden",
+        "sortOrderHelp": "Los valores se ordenarán de menor a mayor número.",
+        "newValue": {
+          "title": "Nuevo valor",
+          "description": "Crea un nuevo valor para este atributo."
+        },
+        "editValue": {
+          "title": "Editar valor",
+          "description": "Edita los detalles del valor seleccionado."
+        },
+        "emptyState": {
+          "title": "No hay valores disponibles",
+          "description": "Una vez que agregues valores, aparecerán aquí."
+        }
+      },
     "single": {
       "title": "Atributo",
       "description": "Proporcione los detalles necesarios para configurar el atributo. Esta información le ayudará a identificar y gestionar dentro de su catálogo en el sistema."

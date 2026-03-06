@@ -7,82 +7,92 @@ import { PageProps } from '@/types';
 import { router } from '@inertiajs/react';
 import { Plus } from 'lucide-react';
 import { useState } from 'react';
-import { breadcrumbs } from './constants';
+import { Attribute, AttributeValue } from '../types';
 import { List } from './List/Index';
 import CreateForm from './Shared/CreateForm';
-import { Attribute } from './types';
 
-export default function Index({ auth, attributes }: PageProps<{ attributes: Attribute[] }>) {
+export default function Index({
+  auth,
+  attribute,
+  values,
+}: PageProps<{ attribute: Attribute; values: AttributeValue[] }>) {
   const t = useTranslation().trans;
   const [open, setOpen] = useState(false);
-  const [selectedAttribute, setSelectedAttribute] = useState<Attribute | undefined>(undefined);
-  const hasAttributes = attributes.length > 0;
+  const [selectedValue, setSelectedValue] = useState<AttributeValue | undefined>(undefined);
+  const hasValues = values.length > 0;
+
+  const breadcrumbs = [
+    { title: t('global.attributes'), href: '/attributes' },
+    { title: attribute.display_name, href: `/attributes/${attribute.uuid}` },
+    { title: t('global.actions.title'), href: '' },
+  ];
 
   const handleCreate = () => {
-    setSelectedAttribute(undefined);
+    setSelectedValue(undefined);
     setOpen(true);
   };
 
-  const handleEdit = (attribute: Attribute) => {
-    setSelectedAttribute(attribute);
+  const handleEdit = (value: AttributeValue) => {
+    setSelectedValue(value);
     setOpen(true);
   };
 
   const onOpenChange = (value: boolean) => {
     setOpen(value);
-    if (!value) setSelectedAttribute(undefined);
+    if (!value) setSelectedValue(undefined);
   };
 
-  const handleDelete = (uuid: string) => {
-    if (confirm('Are you sure?')) {
-      router.delete(`/attributes/${uuid}`);
+  const handleDelete = (id: number) => {
+    if (confirm(t('global.actions.delete') + '?')) {
+      router.delete(`/attribute-values/${id}/${attribute.uuid}`);
     }
   };
 
   return (
     <AppLayout user={auth.user} breadcrumbs={breadcrumbs}>
       <div className="space-y-6">
-        {hasAttributes && (
+        {hasValues && (
           <HeadingSmall
-            title={t('global.attributes')}
+            title={`${attribute.display_name} ${t('global.attributeValues')}`}
+            description={t('attributes.values.description')}
             rightPanel={
               <Button onClick={handleCreate}>
-                <Plus /> {t('attributes.newAttribute.title')}
+                <Plus /> {t('attributes.values.newValue.title')}
               </Button>
             }
           />
         )}
 
-        {!hasAttributes ? (
+        {!hasValues ? (
           <div className="absolute top-1/2 left-1/2 flex h-61 min-w-3xl -translate-x-1/2 -translate-y-1/2 flex-col items-center gap-4 rounded-3xl bg-white p-10 shadow-[0px_8px_12px_-4px_rgba(16,12,12,0.08),0px_0px_2px_rgba(16,12,12,0.1),0px_1px_2px_rgba(16,12,12,0.1)]">
-            <h4 className="text-2xl">{t('attributes.emptyState.title')}</h4>
-            <p className="text-sm text-gray-400">{t('attributes.emptyState.description')}</p>
+            <h4 className="text-2xl">{t('global.attributeValues')}</h4>
+            <p className="text-sm text-gray-400">{t('attributes.values.emptyState.description')}</p>
 
             <div className="flex space-x-3">
               <Button onClick={handleCreate}>
-                <Plus /> {t('attributes.newAttribute.title')}
+                <Plus /> {t('attributes.values.newValue.title')}
               </Button>
             </div>
           </div>
         ) : (
-          <List data={attributes} onEdit={handleEdit} onDelete={handleDelete} t={t} />
+          <List data={values} onEdit={handleEdit} onDelete={handleDelete} t={t} />
         )}
 
         <Sheet open={open} onOpenChange={onOpenChange}>
           <SheetContent side="right" className="m-4 flex h-[calc(~'(100%_-_var(--spacing)_*_4)_/_3')] w-full flex-col rounded-md sm:max-w-7xl">
             <SheetHeader>
               <SheetTitle>
-                {selectedAttribute ? t('global.actions.edit') : t('global.actions.create')} {t('global.attribute')}
+                {selectedValue ? t('global.actions.edit') : t('global.actions.create')} {t('global.attributeValue')}
               </SheetTitle>
               <SheetDescription>
-                {selectedAttribute
-                  ? `${t('global.update')} ${t('global.attribute')} settings`
-                  : `${t('global.actions.create')} a new ${t('global.attribute')}`}
+                {selectedValue
+                  ? `${t('global.update')} ${attribute.display_name} value`
+                  : `${t('global.create')} new ${attribute.display_name} value`}
               </SheetDescription>
             </SheetHeader>
 
             <div className="no-scrollbar grid gap-4 overflow-y-scroll px-4">
-              <CreateForm attribute={selectedAttribute} onFinish={() => onOpenChange(false)} />
+              <CreateForm attributeId={attribute.id} value={selectedValue} onFinish={() => onOpenChange(false)} />
             </div>
           </SheetContent>
         </Sheet>

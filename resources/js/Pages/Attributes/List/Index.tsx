@@ -1,11 +1,12 @@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Link } from '@inertiajs/react';
 import { ChevronRight, Pencil, Trash2 } from 'lucide-react';
 import { Attribute } from '../types';
 
 type ListProps = {
   data: Attribute[];
   onEdit: (attribute: Attribute) => void;
-  onDelete: (id: number) => void;
+  onDelete: (uuid: string) => void;
   t: (key: string) => string;
 };
 
@@ -15,11 +16,11 @@ export function List({ data, onEdit, onDelete, t }: ListProps) {
       <Table>
         <TableHeader>
           <TableRow>
-            <TableHead>{t('@global.name')}</TableHead>
-            <TableHead>{t('@global.displayName')}</TableHead>
-            <TableHead>{t('@global.type')}</TableHead>
-            <TableHead>{t('@global.description')}</TableHead>
-            <TableHead className="text-right">{t('@global.actions')}</TableHead>
+            <TableHead>{t('global.name')}</TableHead>
+            <TableHead>{t('global.displayName')}</TableHead>
+            <TableHead>{t('global.type')}</TableHead>
+            <TableHead>{t('global.description')}</TableHead>
+            <TableHead className="text-right">{t('global.actions.title')}</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -33,13 +34,13 @@ export function List({ data, onEdit, onDelete, t }: ListProps) {
               <TableCell>{attribute.description || '-'}</TableCell>
               <TableCell className="text-right">
                 <div className="flex justify-end gap-2">
-                  <a href={`/attributes/${attribute.id}/values`} className="inline-block rounded p-2 hover:bg-gray-100" title="Manage values">
+                  <Link href={`/attributes/${attribute.uuid}/values`} className="inline-block rounded p-2 hover:bg-gray-100" title="Manage values">
                     <ChevronRight className="h-4 w-4" />
-                  </a>
+                  </Link>
                   <button onClick={() => onEdit(attribute)} className="rounded p-2 hover:bg-gray-100">
                     <Pencil className="h-4 w-4" />
                   </button>
-                  <button onClick={() => onDelete(attribute.id)} className="rounded p-2 text-red-600 hover:bg-gray-100">
+                  <button onClick={() => onDelete(attribute.uuid)} className="rounded p-2 text-red-600 hover:bg-gray-100">
                     <Trash2 className="h-4 w-4" />
                   </button>
                 </div>

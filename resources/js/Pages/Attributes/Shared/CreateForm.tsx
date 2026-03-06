@@ -50,7 +50,7 @@ export default function CreateForm({ attribute, onFinish }: CreateFormProps) {
         {propsErrors.status && <div className="col-span-6 mb-4 text-center text-sm font-medium text-red-600">{propsErrors.status}</div>}
 
         <div className="col-span-6 gap-2">
-          <Label htmlFor="name">{t('@global.name')}</Label>
+          <Label htmlFor="name">{t('global.name')}</Label>
           <Input
             id="name"
             className="mt-1 block w-full"
@@ -63,7 +63,7 @@ export default function CreateForm({ attribute, onFinish }: CreateFormProps) {
         </div>
 
         <div className="col-span-6 gap-2">
-          <Label htmlFor="display_name">{t('@global.displayName')}</Label>
+          <Label htmlFor="display_name">{t('global.displayName')}</Label>
           <Input
             id="display_name"
             className="mt-1 block w-full"
@@ -76,7 +76,7 @@ export default function CreateForm({ attribute, onFinish }: CreateFormProps) {
         </div>
 
         <div className="col-span-6 gap-2">
-          <Label htmlFor="type">{t('@global.type')}</Label>
+          <Label htmlFor="type">{t('global.type')}</Label>
           <select
             id="type"
             value={data.type}
@@ -92,7 +92,7 @@ export default function CreateForm({ attribute, onFinish }: CreateFormProps) {
         </div>
 
         <div className="col-span-6 gap-2">
-          <Label htmlFor="description">{t('@global.description')}</Label>
+          <Label htmlFor="description">{t('global.description')}</Label>
           <textarea
             id="description"
             className="mt-1 block w-full rounded-lg border border-gray-300 bg-gray-50 p-2.5 text-sm text-gray-900"
@@ -107,7 +107,7 @@ export default function CreateForm({ attribute, onFinish }: CreateFormProps) {
 
       <FormSection.Actions>
         <Button type="submit" disabled={processing} className="uppercase">
-          {t('@global.save')}
+          {t('global.save')}
         </Button>
       </FormSection.Actions>
     </FormSection>
