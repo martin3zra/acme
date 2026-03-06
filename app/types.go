@@ -1720,7 +1720,7 @@ func (form StoreAttributeForm) Authorize() bool {
 // StoreAttributeValueForm handles attribute value creation
 type StoreAttributeValueForm struct {
 	support.FormRequest
-	AttributeID int    `json:"attribute_id"`
+	AttributeID int    `json:"-"`
 	Value       string `json:"value"`
 	DisplayName string `json:"display_name"`
 	SortOrder   int    `json:"sort_order,omitempty"`
@@ -1728,7 +1728,6 @@ type StoreAttributeValueForm struct {
 
 func (StoreAttributeValueForm) Rules() map[string]any {
 	return map[string]any{
-		"attribute_id": []any{"required", "exists:attributes,id"},
 		"value":        []any{"required", "min:1", "max:120"},
 		"display_name": []any{"required", "min:1", "max:255"},
 		"sort_order":   "sometimes|integer|min:0",

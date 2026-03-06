@@ -12,14 +12,14 @@ var groupedPermissions = map[string]map[string][]string{
 	"owner": {"*": {"*"}},
 	"admin": {
 		"view":    {"dashboard", "invoice", "estimate", "order", "customer", "item", "payment", "reports", "setting", "warehouse", "stock"},
-		"viewAny": {"dashboard", "invoice", "estimate", "order", "customer", "item", "payment", "reports", "setting", "warehouse", "stock"},
+		"viewAny": {"dashboard", "invoice", "estimate", "order", "customer", "item", "payment", "reports", "setting", "warehouse", "stock", "attribute"},
 		"create":  {"dashboard", "invoice", "estimate", "order", "customer", "item", "payment", "reports", "setting", "warehouse", "stock", "attribute"},
 		"delete":  {"dashboard", "invoice", "estimate", "order", "customer", "item", "payment", "reports", "setting", "warehouse"},
 		"update":  {"dashboard", "invoice", "estimate", "order", "customer", "item", "payment", "reports", "setting", "company:sequence", "warehouse", "stock", "attribute"},
 	},
 	"supervisor": {
 		"view":    {"dashboard", "customer", "item", "payment", "reports", "warehouse", "stock"},
-		"viewAny": {"dashboard", "invoice", "estimate", "order", "customer", "item", "payment", "reports", "warehouse", "stock"},
+		"viewAny": {"dashboard", "invoice", "estimate", "order", "customer", "item", "payment", "reports", "warehouse", "stock", "attribute"},
 		"create":  {"dashboard", "invoice", "estimate", "order", "customer", "item", "payment", "reports", "warehouse", "stock", "attribute"},
 		"delete":  {"dashboard", "invoice", "estimate", "order", "customer", "item", "payment", "reports"},
 		"update":  {"dashboard", "invoice", "estimate", "order", "customer", "item", "payment", "reports", "warehouse", "stock", "attribute"},

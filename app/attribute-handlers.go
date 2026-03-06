@@ -124,9 +124,10 @@ func (s *Server) attributeValuesHandler(ctx *routing.Context) {
 		return
 	}
 
-	ctx.Render("Attributes/Values", map[string]any{
-		"attribute": attribute,
-		"values":    values,
+	ctx.Render("Attributes/Values/Index", map[string]any{
+		"translations": trans("attributes"),
+		"attribute":    attribute,
+		"values":       values,
 	})
 }
 
@@ -157,9 +158,17 @@ func (s *Server) storeAttributeValueHandler() routing.HandlerFunc {
 // updateAttributeValueHandler updates an attribute value
 func (s *Server) updateAttributeValueHandler() routing.HandlerFunc {
 	return routing.WithRequest(func(ctx *routing.Context, form *StoreAttributeValueForm) {
-		valueID := ctx.Int("id")
+		valueUUID := ctx.Param("uuid")
 
-		err := s.updateAttributeValue(ctx.Request.Context(), valueID, form)
+		av, err := s.findAttributeValueByUUID(ctx.Request.Context(), valueUUID)
+		if err != nil {
+			ctx.BackWithError(err)
+			return
+		}
+
+		form.AttributeID = av.AttributeID
+
+		err = s.updateAttributeValue(ctx.Request.Context(), valueUUID, form)
 		if err != nil {
 			ctx.BackWithError(err)
 			return
@@ -167,20 +176,12 @@ func (s *Server) updateAttributeValueHandler() routing.HandlerFunc {
 
 		ctx.Flash("success", s.trans("global.wasUpdated", i18n.Replacements{"subject": "@global.attributeValue"}))
 
-		// Get attribute ID to redirect back
-		// Get attribute value to find its attribute UUID
-		av, err := s.findAttributeValueByID(ctx.Request.Context(), valueID)
-		if err != nil {
-			ctx.BackWithError(err)
-			return
-		}
-		
 		attr, err := s.findAttributeByIntID(ctx.Request.Context(), av.AttributeID)
 		if err != nil {
 			ctx.BackWithError(err)
 			return
 		}
-		
+
 		ctx.Redirect(fmt.Sprintf("/attributes/%s/values", attr.UUID))
 	})
 }
@@ -192,15 +193,20 @@ func (s *Server) deleteAttributeValueHandler() routing.HandlerFunc {
 	}
 
 	return routing.WithRequest(func(ctx *routing.Context, frm *form) {
-		valueID := ctx.Int("id")
-		attributeUUID := ctx.Param("attribute_id")
+		valueUUID := ctx.Param("uuid")
+
+		av, err := s.findAttributeValueByUUID(ctx.Request.Context(), valueUUID)
+		if err != nil {
+			ctx.BackWithError(err)
+			return
+		}
 
 		// Check if value is in use
 		var count int64
-		err := s.db.QueryRowContext(
+		err = s.db.QueryRowContext(
 			ctx.Request.Context(),
 			`SELECT COUNT(*) FROM variant_attribute_values WHERE attribute_value_id = $1 AND company_id = $2`,
-			valueID, CurrentCompany(ctx.Request.Context()).ID,
+			av.ID, CurrentCompany(ctx.Request.Context()).ID,
 		).Scan(&count)
 
 		if err != nil {
@@ -213,13 +219,19 @@ func (s *Server) deleteAttributeValueHandler() routing.HandlerFunc {
 			return
 		}
 
-		err = s.deleteAttributeValue(ctx.Request.Context(), valueID)
+		err = s.deleteAttributeValue(ctx.Request.Context(), valueUUID)
+		if err != nil {
+			ctx.BackWithError(err)
+			return
+		}
+
+		attr, err := s.findAttributeByIntID(ctx.Request.Context(), av.AttributeID)
 		if err != nil {
 			ctx.BackWithError(err)
 			return
 		}
 
 		ctx.Flash("success", fmt.Sprintf(locale.SpanishMessages()["messages.deleted"].(string), locale.SpanishMessages()["global.attributeValue"]))
-		ctx.Redirect(fmt.Sprintf("/attributes/%s/values", attributeUUID))
+		ctx.Redirect(fmt.Sprintf("/attributes/%s/values", attr.UUID))
 	})
 }

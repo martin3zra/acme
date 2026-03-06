@@ -71,8 +71,8 @@ func (s *Server) bootRoutes() {
 					route.DELETE("/attributes/:id", s.deleteAttributeHandler()).Can("delete:attribute")
 					route.GET("/attributes/:id/values", s.attributeValuesHandler).Can("viewAny:attribute")
 					route.POST("/attributes/:id/values", s.storeAttributeValueHandler()).Can("create:attribute")
-					route.PUT("/attribute-values/:id", s.updateAttributeValueHandler()).Can("update:attribute")
-					route.DELETE("/attribute-values/:id/:attribute_id", s.deleteAttributeValueHandler()).Can("delete:attribute")
+					route.PUT("/attribute-values/:uuid", s.updateAttributeValueHandler()).Can("update:attribute")
+					route.DELETE("/attribute-values/:uuid", s.deleteAttributeValueHandler()).Can("delete:attribute")
 
 					route.GET("/invoices", s.invoicesHandler).Can("viewAny:invoice")
 					route.POST("/invoices", s.storeInvoiceHandler())

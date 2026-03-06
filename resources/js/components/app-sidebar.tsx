@@ -11,11 +11,13 @@ import {
   ClipboardPenLineIcon,
   CreditCard,
   LayoutDashboardIcon,
-  LayoutListIcon,
+  Package,
   Receipt,
   SettingsIcon,
   ShoppingCartIcon,
+  SlidersHorizontal,
   UsersIcon,
+  Warehouse,
 } from 'lucide-react';
 import * as React from 'react';
 import AppLogoIcon from './app-logo-icon';
@@ -52,9 +54,21 @@ const navMain: NavItem[] = [
     requiredAbility: 'viewAny:customer',
   },
   {
+    title: 'global.navMain.warehouses',
+    url: '/warehouses',
+    icon: Warehouse,
+    requiredAbility: 'viewAny:warehouse',
+  },
+  {
+    title: 'global.navMain.attributes',
+    url: '/attributes',
+    icon: SlidersHorizontal,
+    requiredAbility: 'viewAny:attribute',
+  },
+  {
     title: 'global.navMain.items',
     url: '/items',
-    icon: LayoutListIcon,
+    icon: Package,
     requiredAbility: 'viewAny:item',
   },
   {

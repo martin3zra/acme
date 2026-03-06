@@ -5,26 +5,30 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useHeader } from '@/composables/use-headers';
 import { useTranslation } from '@/hooks/use-translation';
-import { PageProps } from '@/types';
+import { PageProps, Verb } from '@/types';
 import { useForm, usePage } from '@inertiajs/react';
 import { AttributeValue, AttributeValueForm } from '../../types';
 
+export type CreateFormParams = {
+  attributeId: string;
+  value: AttributeValue | undefined;
+  action: Verb;
+};
+
 type CreateFormProps = {
-  attributeId: number;
-  value?: AttributeValue;
+  params: CreateFormParams;
   onFinish: () => void;
 };
 
-export default function CreateForm({ attributeId, value, onFinish }: CreateFormProps) {
+export default function CreateForm({ params, onFinish }: CreateFormProps) {
   const t = useTranslation().trans;
   const { headers } = useHeader();
   const { errors: propsErrors } = usePage<PageProps>().props;
 
   const { data, setData, post, put, errors, processing, reset } = useForm<AttributeValueForm>({
-    attribute_id: attributeId,
-    value: value?.value || '',
-    display_name: value?.display_name || '',
-    sort_order: value?.sort_order || 0,
+    value: params.value?.value || '',
+    display_name: params.value?.display_name || '',
+    sort_order: params.value?.sort_order || 0,
   });
 
   const options = {
@@ -37,12 +41,12 @@ export default function CreateForm({ attributeId, value, onFinish }: CreateFormP
   };
 
   const submit = () => {
-    if (value) {
-      put(`/attribute-values/${value.id}`, options);
+    if (params.value) {
+      put(`/attribute-values/${params.value.uuid}`, options);
       return;
     }
 
-    post(`/attributes/${attributeId}/values`, options);
+    post(`/attributes/${params.attributeId}/values`, options);
   };
 
   return (
@@ -57,7 +61,7 @@ export default function CreateForm({ attributeId, value, onFinish }: CreateFormP
             className="mt-1 block w-full"
             value={data.value}
             onChange={(e) => setData('value', e.target.value)}
-            placeholder="e.g., red, blue, s, m, l"
+            placeholder={t('attributes.values.form.valuePlaceholder')}
             required
           />
           <InputError className="mt-2" message={errors.value} />
@@ -70,7 +74,7 @@ export default function CreateForm({ attributeId, value, onFinish }: CreateFormP
             className="mt-1 block w-full"
             value={data.display_name}
             onChange={(e) => setData('display_name', e.target.value)}
-            placeholder="e.g., Red, Blue, Small, Medium, Large"
+            placeholder={t('attributes.values.form.displayNamePlaceholder')}
             required
           />
           <InputError className="mt-2" message={errors.display_name} />
@@ -84,7 +88,7 @@ export default function CreateForm({ attributeId, value, onFinish }: CreateFormP
             className="mt-1 block w-full"
             value={data.sort_order}
             onChange={(e) => setData('sort_order', parseInt(e.target.value) || 0)}
-            placeholder="0"
+            placeholder={t('attributes.values.form.sortOrderPlaceholder')}
           />
           <InputError className="mt-2" message={errors.sort_order} />
           <p className="mt-1 text-sm text-gray-500">{t('attributes.values.sortOrderHelp')}</p>

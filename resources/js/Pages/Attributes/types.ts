@@ -16,20 +16,19 @@ export type AttributeForm = {
   description: string;
 };
 
-  export interface AttributeValue {
-    id: number;
-    uuid: string;
-    attribute_id: number;
-    value: string;
-    display_name: string;
-    sort_order: number;
-    created_at: string;
-    updated_at: string;
-  }
+export interface AttributeValue {
+  id: number;
+  uuid: string;
+  attribute_id: number;
+  value: string;
+  display_name: string;
+  sort_order: number;
+  created_at: string;
+  updated_at: string;
+}
 
-  export type AttributeValueForm = {
-    attribute_id: number;
-    value: string;
-    display_name: string;
-    sort_order: number;
-  };
+export type AttributeValueForm = {
+  value: string;
+  display_name: string;
+  sort_order: number;
+};

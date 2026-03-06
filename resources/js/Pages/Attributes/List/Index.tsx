@@ -34,7 +34,11 @@ export function List({ data, onEdit, onDelete, t }: ListProps) {
               <TableCell>{attribute.description || '-'}</TableCell>
               <TableCell className="text-right">
                 <div className="flex justify-end gap-2">
-                  <Link href={`/attributes/${attribute.uuid}/values`} className="inline-block rounded p-2 hover:bg-gray-100" title="Manage values">
+                  <Link
+                    href={`/attributes/${attribute.uuid}/values`}
+                    className="inline-block rounded p-2 hover:bg-gray-100"
+                    title={t('attributes.values.title')}
+                  >
                     <ChevronRight className="h-4 w-4" />
                   </Link>
                   <button onClick={() => onEdit(attribute)} className="rounded p-2 hover:bg-gray-100">

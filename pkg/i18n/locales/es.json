@@ -66,8 +66,8 @@
     "reason": "Razón",
     "attributes": "Atributos",
     "displayName": "Nombre para mostrar",
-      "attributeValue": "Valor de atributo",
-      "attributeValues": "Valores",
+    "attributeValue": "Valor de atributo",
+    "attributeValues": "Valores",
     "receiptOfPayment": "Recibo de Ingreso",
     "weHaveReceivedFrom": "Hemos recibido de",
     "address": "Dirección",
@@ -305,7 +305,8 @@
     "navGroups": {
       "overview": "Resumen", 
       "sales": "Ventas", 
-      "customersCatalog": "Clientes y Catálogo", 
+      "catalog": "Catálogos", 
+      "inventory": "Inventario", 
       "finance": "Finanzas", 
       "analytics": "Análisis"
     },
@@ -316,6 +317,8 @@
       "orders": "Pedidos",
       "customers": "Clientes",
       "items": "Productos",
+      "warehouses": "Almacenes",
+      "attributes": "Atributos",
       "payments": "Pagos",
       "expenses": "Gastos",
       "reports": "Reportes"
@@ -1093,6 +1096,10 @@
         "description": "Gestiona los valores disponibles para este atributo.",
         "sortOrder": "Orden",
         "sortOrderHelp": "Los valores se ordenarán de menor a mayor número.",
+        "viewValue": {
+          "title": "Ver valor",
+          "description": "Detalles del valor seleccionado."
+        },
         "newValue": {
           "title": "Nuevo valor",
           "description": "Crea un nuevo valor para este atributo."
@@ -1100,6 +1107,20 @@
         "editValue": {
           "title": "Editar valor",
           "description": "Edita los detalles del valor seleccionado."
+        },
+        "trashValue": {
+          "title": "Borrar valor",
+          "description": "Borra los detalles del valor seleccionado."
+        },
+        "confirmsPassword": {
+          "title": "¿Está seguro de que desea borrar :value?",
+          "description": "Una vez eliminado este valor de atributo, todos sus recursos y datos serán borrados permanentemente. Por favor, ingrese su contraseña para confirmar que desea eliminarlo permanentemente.",
+          "confirm": "Sí, bórralo"
+        },
+        "form": {
+          "valuePlaceholder": "p. ej., red, blue, s, m, l",
+          "displayNamePlaceholder": "p. ej., Rojo, Azul, Pequeño, Mediano, Grande",
+          "sortOrderPlaceholder": "0"
         },
         "emptyState": {
           "title": "No hay valores disponibles",

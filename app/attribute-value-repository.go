@@ -59,6 +59,28 @@ func (s *Server) findAttributeValueByID(ctx context.Context, id int) (*attribute
 	return av, err
 }
 
+// findAttributeValueByUUID returns a single attribute value by UUID
+func (s *Server) findAttributeValueByUUID(ctx context.Context, uuid string) (*attributeValue, error) {
+	av := new(attributeValue)
+	err := s.db.QueryRowContext(
+		ctx,
+		`SELECT av.id, av.uuid, av.attribute_id, av.value, av.display_name, av.sort_order,
+		        av.created_at, av.updated_at, av.deleted_at
+		 FROM attribute_values av
+		 WHERE av.company_id = $1 AND av.uuid = $2 AND av.deleted_at IS NULL`,
+		CurrentCompany(ctx).ID, uuid,
+	).Scan(
+		&av.ID, &av.UUID, &av.AttributeID, &av.Value, &av.DisplayName, &av.SortOrder,
+		&av.CreatedAt, &av.UpdatedAt, &av.DeletedAt,
+	)
+
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, errors.New("attribute value not found")
+	}
+
+	return av, err
+}
+
 // storeAttributeValue creates a new attribute value
 func (s *Server) storeAttributeValue(ctx context.Context, form *StoreAttributeValueForm) error {
 	companyID := CurrentCompany(ctx).ID
@@ -67,6 +89,13 @@ func (s *Server) storeAttributeValue(ctx context.Context, form *StoreAttributeVa
 		ctx,
 		`INSERT INTO attribute_values (company_id, uuid, attribute_id, value, display_name, sort_order, created_at, updated_at)
 		 VALUES ($1, gen_random_uuid(), $2, $3, $4, $5, NOW(), NOW())
+     ON CONFLICT (company_id, attribute_id, value)
+     DO UPDATE
+     SET
+        deleted_at = NULL,
+        display_name = EXCLUDED.display_name,
+        sort_order = EXCLUDED.sort_order,
+        updated_at = NOW()
 		 RETURNING id`,
 	)
 	if err != nil {
@@ -79,34 +108,35 @@ func (s *Server) storeAttributeValue(ctx context.Context, form *StoreAttributeVa
 		sortOrder = 0
 	}
 
-	return stmt.QueryRowContext(ctx, companyID, form.AttributeID, form.Value, form.DisplayName, sortOrder).Err()
+	var id int
+	return stmt.QueryRowContext(ctx, companyID, form.AttributeID, form.Value, form.DisplayName, sortOrder).Scan(&id)
 }
 
 // updateAttributeValue updates an existing attribute value
-func (s *Server) updateAttributeValue(ctx context.Context, id int, form *StoreAttributeValueForm) error {
+func (s *Server) updateAttributeValue(ctx context.Context, uuid string, form *StoreAttributeValueForm) error {
 	companyID := CurrentCompany(ctx).ID
 
 	_, err := s.db.ExecContext(
 		ctx,
 		`UPDATE attribute_values 
-		 SET display_name = $1, sort_order = $2, updated_at = NOW()
-		 WHERE company_id = $3 AND id = $4 AND deleted_at IS NULL`,
-		form.DisplayName, form.SortOrder, companyID, id,
+		 SET value = $1, display_name = $2, sort_order = $3, updated_at = NOW()
+		 WHERE company_id = $4 AND uuid = $5 AND deleted_at IS NULL`,
+		form.Value, form.DisplayName, form.SortOrder, companyID, uuid,
 	)
 
 	return err
 }
 
 // deleteAttributeValue soft-deletes an attribute value
-func (s *Server) deleteAttributeValue(ctx context.Context, id int) error {
+func (s *Server) deleteAttributeValue(ctx context.Context, uuid string) error {
 	companyID := CurrentCompany(ctx).ID
 
 	_, err := s.db.ExecContext(
 		ctx,
 		`UPDATE attribute_values 
 		 SET deleted_at = NOW(), updated_at = NOW()
-		 WHERE company_id = $1 AND id = $2`,
-		companyID, id,
+		 WHERE company_id = $1 AND uuid = $2`,
+		companyID, uuid,
 	)
 
 	return err
