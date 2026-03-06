@@ -20,7 +20,7 @@ export function List({ data, onEdit, onDelete, onStatusToggle, t }: ListProps) {
             <TableHead>{t('global.name')}</TableHead>
             <TableHead>{t('global.address')}</TableHead>
             <TableHead>{t('global.status')}</TableHead>
-            <TableHead className="text-right">{t('global.actions')}</TableHead>
+            <TableHead className="text-right">{t('global.actions.title')}</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>

@@ -1,15 +1,15 @@
-import { Button } from '@/components/ui/button';
 import HeadingSmall from '@/components/heading-small';
-import { useHeader } from '@/composables/use-headers';
+import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet';
+import { useHeader } from '@/composables/use-headers';
 import { useTranslation } from '@/hooks/use-translation';
 import AppLayout from '@/layouts/app-layout';
 import { PageProps } from '@/types';
 import { router } from '@inertiajs/react';
 import { Plus } from 'lucide-react';
 import { useState } from 'react';
-import { List } from './List/Index';
 import { breadcrumbs } from './constants';
+import { List } from './List/Index';
 import CreateForm from './Shared/CreateForm';
 import { Warehouse } from './types';
 
@@ -34,6 +34,7 @@ export default function Index({ auth, warehouses }: PageProps<{ warehouses: Ware
     setOpen(value);
     if (!value) setSelectedWarehouse(undefined);
   };
+  
 
   const handleDelete = (id: number) => {
     if (confirm('Are you sure?')) {
@@ -79,9 +80,7 @@ export default function Index({ auth, warehouses }: PageProps<{ warehouses: Ware
               <SheetTitle>
                 {selectedWarehouse ? t('global.actions.edit') : t('global.actions.create')} {t('global.warehouse')}
               </SheetTitle>
-              <SheetDescription>
-                {t('warehouses.newWarehouse.description')}
-              </SheetDescription>
+              <SheetDescription>{t('warehouses.newWarehouse.description')}</SheetDescription>
             </SheetHeader>
 
             <div className="no-scrollbar grid gap-4 overflow-y-scroll px-4">

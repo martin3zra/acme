@@ -3,6 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { useTranslation } from '@/hooks/use-translation';
 import AppLayout from '@/layouts/app-layout';
+import { PageProps } from '@/types';
 import { router } from '@inertiajs/react';
 import { Plus } from 'lucide-react';
 import { useState } from 'react';
@@ -10,7 +11,6 @@ import { breadcrumbs } from './constants';
 import { List } from './List/Index';
 import CreateForm from './Shared/CreateForm';
 import { Attribute } from './types';
-import { PageProps } from '@/types';
 
 export default function Index({ auth, attributes }: PageProps<{ attributes: Attribute[] }>) {
   const t = useTranslation().trans;

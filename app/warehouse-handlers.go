@@ -17,7 +17,8 @@ func (s *Server) warehousesHandler(ctx *routing.Context) {
 	}
 
 	ctx.Render("Warehouses/Index", map[string]any{
-		"warehouses": warehouses,
+		"translations": trans("warehouses"),
+		"warehouses":   warehouses,
 	})
 }
 
