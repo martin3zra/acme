@@ -113,3 +113,22 @@ func (s *Server) updateAttribute(ctx context.Context, id int, form *StoreAttribu
 
 	return err
 }
+
+// findAttributesWithValues returns all active attributes including active values
+func (s *Server) findAttributesWithValues(ctx context.Context) ([]*attribute, error) {
+	attrs, err := s.findAttributes(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, attr := range attrs {
+		values, valueErr := s.findAttributeValuesByAttribute(ctx, attr.ID)
+		if valueErr != nil {
+			return nil, valueErr
+		}
+
+		attr.Values = values
+	}
+
+	return attrs, nil
+}

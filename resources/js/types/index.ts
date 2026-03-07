@@ -145,6 +145,22 @@ export interface ItemIdentifiers {
   vendor_reference: string;
 }
 
+export interface ItemVariantSummary {
+  id: number;
+  uuid: string;
+  sku: string;
+  name: string;
+  is_default: boolean;
+}
+
+export interface ItemVariantSetup {
+  has_variants: boolean;
+  attribute_ids: number[];
+  selected_values_by_attribute: Record<string, number[]>;
+  existing_signatures?: string[];
+  variants: ItemVariantSummary[];
+}
+
 export interface Item {
   id: number;
   uuid: string;
@@ -155,6 +171,8 @@ export interface Item {
   description: string;
   status: string;
   item_type?: ItemType; // This can be 'product' or 'service'
+  has_variants?: boolean;
+  variant_setup?: ItemVariantSetup;
   identifiers?: ItemIdentifiers; // Optional identifiers for the item
 }
 

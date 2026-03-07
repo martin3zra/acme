@@ -15,6 +15,7 @@ import (
 	"strings"
 
 	"github.com/google/uuid"
+	"github.com/martin3zra/acme/pkg/cache"
 	"github.com/martin3zra/acme/pkg/i18n"
 	"github.com/martin3zra/acme/pkg/routing"
 	inertia "github.com/romsar/gonertia/v2"
@@ -31,6 +32,12 @@ func (s *Server) itemsHandler(ctx *routing.Context) {
 		itemType = "all"
 	}
 
+	selectedUUID := ctx.Query("id")
+	selectedAction := ctx.Query("action")
+	if selectedAction != "edit" && selectedAction != "view" && selectedAction != "trash" {
+		selectedAction = "view"
+	}
+
 	items, err := s.findItems(ctx.Request.Context(), itemType)
 	if err != nil {
 		ctx.Error(err)
@@ -43,6 +50,37 @@ func (s *Server) itemsHandler(ctx *routing.Context) {
 		"items":                 items,
 		"currentItemTypeFilter": itemType,
 	}
+
+	if selectedUUID != "" {
+		c := cache.NewPgCache(s.db)
+		key := fmt.Sprintf("preview:item:%s", selectedUUID)
+		data, err := cache.Remember(ctx.Request.Context(), c, key, func() (*item, error) {
+			selectedItem, err := s.findItemByUUID(ctx.Request.Context(), selectedUUID)
+			if err != nil {
+				return nil, err
+			}
+
+			if selectedItem.ItemType == "product" {
+				setup, err := s.findItemVariantSetup(ctx.Request.Context(), selectedItem.ID)
+				if err != nil {
+					return nil, err
+				}
+				selectedItem.VariantSetup = setup
+				selectedItem.HasVariants = setup.HasVariants
+			}
+
+			return selectedItem, nil
+		})
+		if err != nil {
+			ctx.Error(err)
+			return
+		}
+
+		props["item"] = data
+		props["selectedAction"] = selectedAction
+		props["openState"] = true
+	}
+
 	// only add units defer if not creating
 	if mode != "creating" {
 		props["units"] = inertia.Defer(func() (any, error) {
@@ -50,6 +88,9 @@ func (s *Server) itemsHandler(ctx *routing.Context) {
 		}, "attributes")
 		props["taxes"] = inertia.Defer(func() (any, error) {
 			return s.findTaxes(ctx.Request.Context())
+		}, "attributes")
+		props["attributes"] = inertia.Defer(func() (any, error) {
+			return s.findAttributesWithValues(ctx.Request.Context())
 		}, "attributes")
 	} else {
 		units, err := s.findUnits(ctx.Request.Context())
@@ -64,9 +105,43 @@ func (s *Server) itemsHandler(ctx *routing.Context) {
 			return
 		}
 		props["taxes"] = taxes
+		attributes, err := s.findAttributesWithValues(ctx.Request.Context())
+		if err != nil {
+			ctx.Error(err)
+			return
+		}
+		props["attributes"] = attributes
 	}
 
 	ctx.Render("Items/Index", props)
+}
+
+func (s *Server) itemVariantSetupHandler(ctx *routing.Context) {
+	itemUUID := ctx.Param("id")
+
+	item, err := s.findItemByUUID(ctx.Request.Context(), itemUUID)
+	if err != nil {
+		ctx.Error(err)
+		return
+	}
+
+	if item.ItemType != "product" {
+		ctx.JSON(http.StatusOK, map[string]any{
+			"has_variants":                 false,
+			"attribute_ids":                []int{},
+			"selected_values_by_attribute": map[int][]int{},
+			"variants":                     []any{},
+		})
+		return
+	}
+
+	setup, err := s.findItemVariantSetup(ctx.Request.Context(), item.ID)
+	if err != nil {
+		ctx.Error(err)
+		return
+	}
+
+	ctx.JSON(http.StatusOK, setup)
 }
 
 func (s *Server) storeItemHandler() routing.HandlerFunc {
@@ -87,11 +162,23 @@ func (s *Server) storeItemHandler() routing.HandlerFunc {
 
 func (s *Server) updateItemHandler() routing.HandlerFunc {
 	return routing.WithRequest(func(ctx *routing.Context, form *UpdateItemForm) {
-
-		err := s.updateItem(ctx.Request.Context(), ctx.Int("id"), form)
+		itemUUID := ctx.Param("id")
+		item, err := s.findItemByUUID(ctx.Request.Context(), itemUUID)
 		if err != nil {
 			ctx.BackWith("status", s.trans("global.wasNotUpdated", i18n.Replacements{"subject": "@global.item"}))
 			return
+		}
+
+		err = s.updateItem(ctx.Request.Context(), item.ID, form)
+		if err != nil {
+			ctx.BackWith("status", s.trans("global.wasNotUpdated", i18n.Replacements{"subject": "@global.item"}))
+			return
+		}
+
+		c := cache.NewPgCache(s.db)
+		key := fmt.Sprintf("preview:item:%s", itemUUID)
+		if err = c.Delete(ctx.Request.Context(), key); err != nil {
+			log.Printf("Error deleting cache: %v", err)
 		}
 
 		ctx.Flash("success", s.trans("global.wasUpdated", i18n.Replacements{"subject": "@global.item"}))
@@ -102,11 +189,23 @@ func (s *Server) updateItemHandler() routing.HandlerFunc {
 
 func (s *Server) deleteItemHandler() routing.HandlerFunc {
 	return routing.WithRequest(func(ctx *routing.Context, form *ConfirmsPasswords) {
-
-		err := s.deleteItem(ctx.Request.Context(), ctx.Int("id"))
+		itemUUID := ctx.Param("id")
+		item, err := s.findItemByUUID(ctx.Request.Context(), itemUUID)
 		if err != nil {
 			ctx.BackWith("current_password", s.trans("global.wasNotDeleted", i18n.Replacements{"subject": "@global.item"}))
 			return
+		}
+
+		err = s.deleteItem(ctx.Request.Context(), item.ID)
+		if err != nil {
+			ctx.BackWith("current_password", s.trans("global.wasNotDeleted", i18n.Replacements{"subject": "@global.item"}))
+			return
+		}
+
+		c := cache.NewPgCache(s.db)
+		key := fmt.Sprintf("preview:item:%s", itemUUID)
+		if err = c.Delete(ctx.Request.Context(), key); err != nil {
+			log.Printf("Error deleting cache: %v", err)
 		}
 
 		ctx.Flash("success", s.trans("global.wasDeleted", i18n.Replacements{"subject": "@global.item"}))
@@ -117,8 +216,9 @@ func (s *Server) deleteItemHandler() routing.HandlerFunc {
 
 func (s *Server) changeStatusItemHandler() routing.HandlerFunc {
 	return routing.WithRequest(func(ctx *routing.Context, form *ConfirmsPasswords) {
+		itemUUID := ctx.Param("id")
 
-		item, err := s.findItemByID(ctx.Request.Context(), ctx.Int("id"))
+		item, err := s.findItemByUUID(ctx.Request.Context(), itemUUID)
 		if err != nil {
 			ctx.BackWith("status", s.trans("global.wasNotUpdated", i18n.Replacements{"subject": "@global.item"}))
 			return
@@ -129,6 +229,12 @@ func (s *Server) changeStatusItemHandler() routing.HandlerFunc {
 		if err != nil {
 			ctx.BackWith("status", s.trans("global.wasNotUpdated", i18n.Replacements{"subject": "@global.item"}))
 			return
+		}
+
+		c := cache.NewPgCache(s.db)
+		key := fmt.Sprintf("preview:item:%s", itemUUID)
+		if err = c.Delete(ctx.Request.Context(), key); err != nil {
+			log.Printf("Error deleting cache: %v", err)
 		}
 
 		ctx.Flash("success", s.trans("global.wasUpdated", i18n.Replacements{"subject": "@global.item"}))

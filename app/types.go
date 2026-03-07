@@ -214,13 +214,16 @@ func (d *ItemIdentifiers) Scan(value any) error {
 
 type StoreItemForm struct {
 	support.FormRequest
-	Name        string          `json:"name"`
-	Price       float64         `json:"price"`
-	Description string          `json:"description"`
-	TaxID       int             `json:"tax_id"`
-	UnitID      int             `json:"unit_id"`
-	ItemType    string          `json:"item_type"` // e.g. "product", "service"
-	Identifiers ItemIdentifiers `json:"identifiers,omitempty"`
+	Name          string          `json:"name"`
+	Price         float64         `json:"price"`
+	Description   string          `json:"description"`
+	TaxID         int             `json:"tax_id"`
+	UnitID        int             `json:"unit_id"`
+	ItemType      string          `json:"item_type"` // e.g. "product", "service"
+	HasVariants   bool            `json:"has_variants,omitempty"`
+	AttributeIDs  []int           `json:"attribute_ids,omitempty"`
+	VariantCombos []VariantCombo  `json:"variant_combos,omitempty"`
+	Identifiers   ItemIdentifiers `json:"identifiers,omitempty"`
 }
 
 func (form StoreItemForm) Authorize() bool {
@@ -240,6 +243,9 @@ func (StoreItemForm) Rules() map[string]any {
 		"tax_id":                       "bail|required|exists:taxes,id",
 		"unit_id":                      "bail|required|exists:units,id",
 		"item_type":                    "bail|required|in:product,service",
+		"has_variants":                 "sometimes|boolean",
+		"attribute_ids.*":              "sometimes|exists:attributes,id",
+		"variant_combos":               "sometimes",
 		"identifiers":                  "sometimes",
 		"identifiers.reference":        "sometimes|nullable|max:100",
 		"identifiers.code":             "sometimes|nullable|max:50",
@@ -251,14 +257,17 @@ func (StoreItemForm) Rules() map[string]any {
 
 type UpdateItemForm struct {
 	support.FormRequest
-	ID          int             `json:"id"`
-	Name        string          `json:"name"`
-	Price       float64         `json:"price"`
-	Description string          `json:"description"`
-	TaxID       int             `json:"tax_id"`
-	UnitID      int             `json:"unit_id"`
-	ItemType    string          `json:"item_type"` // e.g. "product", "service"
-	Identifiers ItemIdentifiers `json:"identifiers,omitempty"`
+	ID            int             `json:"id"`
+	Name          string          `json:"name"`
+	Price         float64         `json:"price"`
+	Description   string          `json:"description"`
+	TaxID         int             `json:"tax_id"`
+	UnitID        int             `json:"unit_id"`
+	ItemType      string          `json:"item_type"` // e.g. "product", "service"
+	HasVariants   bool            `json:"has_variants,omitempty"`
+	AttributeIDs  []int           `json:"attribute_ids,omitempty"`
+	VariantCombos []VariantCombo  `json:"variant_combos,omitempty"`
+	Identifiers   ItemIdentifiers `json:"identifiers,omitempty"`
 }
 
 func (form UpdateItemForm) Authorize() bool {
@@ -273,6 +282,9 @@ func (form UpdateItemForm) Rules() map[string]any {
 		"tax_id":                       "required|exists:taxes,id",
 		"unit_id":                      "required|exists:units,id",
 		"item_type":                    "bail|required|in:product,service",
+		"has_variants":                 "sometimes|boolean",
+		"attribute_ids.*":              "sometimes|exists:attributes,id",
+		"variant_combos":               "sometimes",
 		"identifiers":                  "sometimes",
 		"identifiers.reference":        "sometimes|nullable|max:100",
 		"identifiers.code":             "sometimes|nullable|max:50",
@@ -1182,13 +1194,13 @@ type InvoiceSequence struct {
 }
 
 type CompanySequence struct {
-	Invoice  InvoiceSequence `json:"invoice"`
-	Template SequenceConfig  `json:"template"`
-	Customer SequenceConfig  `json:"customer"`
-	Estimate SequenceConfig  `json:"estimate"`
-	Payment  SequenceConfig  `json:"payment"`
-	Order    SequenceConfig  `json:"order"`
-	Warehouse SequenceConfig `json:"warehouse"`
+	Invoice   InvoiceSequence `json:"invoice"`
+	Template  SequenceConfig  `json:"template"`
+	Customer  SequenceConfig  `json:"customer"`
+	Estimate  SequenceConfig  `json:"estimate"`
+	Payment   SequenceConfig  `json:"payment"`
+	Order     SequenceConfig  `json:"order"`
+	Warehouse SequenceConfig  `json:"warehouse"`
 }
 
 type SequenceForm struct {
@@ -1572,58 +1584,59 @@ func (d Date) MarshalJSON() ([]byte, error) {
 
 // warehouse represents a physical or logical inventory location
 type warehouse struct {
-	ID          int                `json:"id"`
-	UUID        string             `json:"uuid"`
-	Code        string             `json:"code"`
-	Name        string             `json:"name"`
-	Address     *string            `json:"address,omitempty"`
-	Description *string            `json:"description,omitempty"`
-	Status      foundation.Status  `json:"status"`
+	ID          int               `json:"id"`
+	UUID        string            `json:"uuid"`
+	Code        string            `json:"code"`
+	Name        string            `json:"name"`
+	Address     *string           `json:"address,omitempty"`
+	Description *string           `json:"description,omitempty"`
+	Status      foundation.Status `json:"status"`
 	foundation.Timestamps
 }
 
 // itemVariant represents a stockable SKU variant of an item
 type itemVariant struct {
-	ID                    int       `json:"id"`
-	UUID                  string    `json:"uuid"`
-	ItemID                int       `json:"item_id"`
-	SKU                   string    `json:"sku"`
-	Name                  string    `json:"name"`
-	IsDefault             bool      `json:"is_default"`
-	Price                 *float64  `json:"price,omitempty"`
-	CostPrice             *float64  `json:"cost_price,omitempty"`
+	ID        int      `json:"id"`
+	UUID      string   `json:"uuid"`
+	ItemID    int      `json:"item_id"`
+	SKU       string   `json:"sku"`
+	Name      string   `json:"name"`
+	IsDefault bool     `json:"is_default"`
+	Price     *float64 `json:"price,omitempty"`
+	CostPrice *float64 `json:"cost_price,omitempty"`
 	foundation.Timestamps
 }
 
 // attribute represents a product attribute type (Color, Size, Length, Power, etc.)
 type attribute struct {
-	ID          int     `json:"id"`
-	UUID        string  `json:"uuid"`
-	Name        string  `json:"name"`
-	Type        string  `json:"type"` // "select", "text", "numeric"
-	DisplayName string  `json:"display_name"`
-	Description *string `json:"description,omitempty"`
+	ID          int               `json:"id"`
+	UUID        string            `json:"uuid"`
+	Name        string            `json:"name"`
+	Type        string            `json:"type"` // "select", "text", "numeric"
+	DisplayName string            `json:"display_name"`
+	Description *string           `json:"description,omitempty"`
+	Values      []*attributeValue `json:"values,omitempty"`
 	foundation.Timestamps
 }
 
 // attributeValue represents a specific value for an attribute (Red, Blue, S, M, L, etc.)
 type attributeValue struct {
-	ID          int     `json:"id"`
-	UUID        string  `json:"uuid"`
-	AttributeID int     `json:"attribute_id"`
-	Value       string  `json:"value"`
-	DisplayName string  `json:"display_name"`
-	SortOrder   int     `json:"sort_order"`
+	ID          int    `json:"id"`
+	UUID        string `json:"uuid"`
+	AttributeID int    `json:"attribute_id"`
+	Value       string `json:"value"`
+	DisplayName string `json:"display_name"`
+	SortOrder   int    `json:"sort_order"`
 	foundation.Timestamps
 }
 
 // productAttribute represents the link between an item and an attribute
 type productAttribute struct {
-	ID          int         `json:"id"`
-	ItemID      int         `json:"item_id"`
-	AttributeID int         `json:"attribute_id"`
-	SortOrder   int         `json:"sort_order"`
-	Attribute   *attribute  `json:"attribute,omitempty"`
+	ID          int        `json:"id"`
+	ItemID      int        `json:"item_id"`
+	AttributeID int        `json:"attribute_id"`
+	SortOrder   int        `json:"sort_order"`
+	Attribute   *attribute `json:"attribute,omitempty"`
 	foundation.Timestamps
 }
 
@@ -1639,13 +1652,13 @@ type variantAttributeValue struct {
 
 // stockLevel represents the quantity of a variant in a warehouse
 type stockLevel struct {
-	ID                int    `json:"id"`
-	UUID              string `json:"uuid"`
-	WarehouseID       int    `json:"warehouse_id"`
-	VariantID         int    `json:"variant_id"`
-	Quantity          int    `json:"quantity"`
-	ReorderLevel      int    `json:"reorder_level"`
-	ReorderQuantity   int    `json:"reorder_quantity"`
+	ID              int    `json:"id"`
+	UUID            string `json:"uuid"`
+	WarehouseID     int    `json:"warehouse_id"`
+	VariantID       int    `json:"variant_id"`
+	Quantity        int    `json:"quantity"`
+	ReorderLevel    int    `json:"reorder_level"`
+	ReorderQuantity int    `json:"reorder_quantity"`
 	foundation.Timestamps
 }
 
@@ -1757,10 +1770,10 @@ type StoreItemWithAttributesForm struct {
 
 func (StoreItemWithAttributesForm) Rules() map[string]any {
 	return map[string]any{
-		"name":              []any{"required", "min:3", "max:120"},
-		"description":       "sometimes|max:1000",
-		"attribute_ids.*":   "sometimes|exists:attributes,id",
-		"variant_combos.*":  "sometimes|array",
+		"name":             []any{"required", "min:3", "max:120"},
+		"description":      "sometimes|max:1000",
+		"attribute_ids.*":  "sometimes|exists:attributes,id",
+		"variant_combos.*": "sometimes|array",
 	}
 }
 

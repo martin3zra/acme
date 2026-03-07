@@ -48,6 +48,7 @@ func (s *Server) bootRoutes() {
 					route.DELETE("/customers/:id", s.deleteCustomerHandler())
 
 					route.GET("/items", s.itemsHandler).Can("viewAny:item")
+					route.GET("/items/:id/variant-setup", s.itemVariantSetupHandler).Can("viewAny:item")
 					route.POST("/items", s.storeItemHandler())
 					route.PUT("/items/:id", s.updateItemHandler())
 					route.PUT("/items/:id/change-status", s.changeStatusItemHandler())

@@ -929,7 +929,26 @@
       "type": "Tipo",
       "service": "Servicio",
       "product": "Producto",
-      "vendor_reference": "Referencia del proveedor"
+      "vendor_reference": "Referencia del proveedor",
+      "hasVariants": "Este producto tiene variantes",
+      "hasVariantsHelp": "Actívelo para seleccionar atributos y generar variantes automáticamente.",
+      "variantSetup": {
+        "attributes": "Atributos",
+        "values": "Valores seleccionados",
+        "variants": "Variantes",
+        "currentTitle": "Configuración actual de variantes",
+        "currentDescription": "Este producto ya tiene variantes configuradas.",
+        "priceTemplateHelp": "El precio general del producto se usará como precio inicial para todas las variantes. Luego puedes ajustarlo manualmente por variante.",
+        "skuAutoHelp": "Se genera un SKU sugerido por variante. Si lo dejas vacío, el sistema lo generará automáticamente al guardar.",
+        "existingLockedTag": "existente",
+        "existingLockedHelp": "Las combinaciones ya existentes no se editan aquí. Solo se guardarán nuevas combinaciones.",
+        "noAttributes": "No hay atributos disponibles. Crea atributos y valores antes de activar variantes.",
+        "noValues": "Este atributo no tiene valores disponibles.",
+        "noVariants": "No hay variantes registradas para este producto.",
+        "noVariantsConfigured": "Este producto no tiene variantes configuradas.",
+        "attributeRequired": "Selecciona al menos un atributo para crear variantes.",
+        "valueRequired": "Selecciona al menos un valor por atributo para generar variantes."
+      }
     },
     "viewItem": {
       "title": "Ver producto",
