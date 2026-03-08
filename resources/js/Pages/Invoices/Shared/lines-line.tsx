@@ -10,9 +10,11 @@ type Props = {
 };
 
 export default function Line({ line, index, currency, handleRemoveLine }: Props) {
+  const lineTitle = line.variant_name && line.variant_name !== 'Default' ? `${line.name} - ${line.variant_name}` : line.name;
+
   return (
     <tr>
-      <td className="border border-gray-300 px-1 text-start">{line.identifiers?.reference ?? line.name}</td>
+      <td className="border border-gray-300 px-1 text-start">{line.identifiers?.reference ?? line.identifiers?.sku ?? lineTitle}</td>
       <td className="border border-gray-300 px-1 text-start">{line.description}</td>
       <td className="border border-gray-300 px-1 text-start">{line.unit.name}</td>
       <td className="border border-gray-300 px-1 text-end">{line.qty}</td>

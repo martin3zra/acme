@@ -109,20 +109,27 @@ func mapToStoreItemForm(rowNum int, data map[string]any, unitID int, taxes []*ta
 		return nil, err
 	}
 
+	combo := VariantCombo{Price: &price}
+	if sku, ok := getString(data, "sku"); ok {
+		combo.SKU = sku
+	}
+	if barcode, ok := getString(data, "barcode"); ok {
+		combo.Barcode = barcode
+	}
+	if reference, ok := getString(data, "reference"); ok {
+		combo.Reference = reference
+	}
+	if vendorRef, ok := getString(data, "vendor_reference"); ok {
+		combo.VendorReference = vendorRef
+	}
+
 	return &StoreItemForm{
-		Name:        name,
-		Price:       price,
-		Description: derefOrEmpty(getStringPtr(data, "description")),
-		TaxID:       taxID,
-		UnitID:      unitID,
-		ItemType:    itemType,
-		Identifiers: ItemIdentifiers{
-			Reference:       getStringPtr(data, "reference"),
-			Code:            getStringPtr(data, "code"),
-			SKU:             getStringPtr(data, "sku"),
-			Barcode:         getStringPtr(data, "barcode"),
-			VendorReference: getStringPtr(data, "vendor_reference"),
-		},
+		Name:          name,
+		Description:   derefOrEmpty(getStringPtr(data, "description")),
+		TaxID:         taxID,
+		UnitID:        unitID,
+		ItemType:      itemType,
+		VariantCombos: []VariantCombo{combo},
 	}, nil
 }
 

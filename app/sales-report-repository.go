@@ -82,7 +82,8 @@ func (s *Server) findItemWiseSales(ctx context.Context, From, To time.Time) ([]I
 	rows, err := s.db.Query(`
 		SELECT i.id AS item_id, i.name AS item_name,  SUM(s.total) AS total_amount
 		FROM items i
-		JOIN invoices_items s ON (s.company_id = i.company_id AND s.item_id = i.id)
+		JOIN items_variants iv ON (iv.company_id = i.company_id AND iv.item_id = i.id)
+		JOIN invoices_items s ON (s.company_id = iv.company_id AND s.variant_id = iv.id)
 		JOIN invoices h ON (h.company_id = s.company_id AND h.id = s.invoice_id)
 		WHERE s.company_id = $1
     AND h.transaction_kind = 'invoice'

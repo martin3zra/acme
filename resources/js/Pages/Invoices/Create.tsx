@@ -61,12 +61,12 @@ export interface InvoiceFormData {
   customer_id: number;
   terms: string;
   tax_receipt: number;
-  lines: any[];
+  lines: LineForm[];
   date: Date;
   discount: DiscountType;
   kind: string;
   recurrence: Recurrent;
-  [key: string]: any;
+  [key: string]: unknown;
 }
 
 export default function Create({
@@ -82,7 +82,7 @@ export default function Create({
   customers: Customer[];
   customer: Customer;
   items: Item[];
-  item: Item;
+  item?: Item;
   tax_receipts: TaxReceipt[];
   kind: TransactionKind;
   showPaymentCTA: boolean;
@@ -107,6 +107,8 @@ export default function Create({
   });
   const [currentItem, setCurrentItem] = React.useState<Item | undefined>(undefined);
 
+  const resolveVariantID = useCallback((candidate?: Pick<Item, 'id' | 'variant_id'>) => candidate?.variant_id ?? candidate?.id, []);
+
   const { headers } = useHeader();
   const { errors: propsErrors } = usePage<PageProps>().props;
   const { setData, post, transform, processing, errors } = useForm<InvoiceFormData>({
@@ -124,7 +126,8 @@ export default function Create({
   useEffect(() => setCurrentItem(item), [item]);
 
   const findCurrentItem = useCallback(() => {
-    const exists = (element: LineForm) => element.id === currentItem?.id;
+    const currentVariantID = resolveVariantID(currentItem);
+    const exists = (element: LineForm) => resolveVariantID(element) === currentVariantID;
     const index = invoiceForm.lines.findIndex(exists);
     if (index >= 0) {
       setEditing(true);
@@ -133,7 +136,7 @@ export default function Create({
       qtyInputRef.current!.value = line.qty.toString();
       setAmount(line.amount);
     }
-  }, [currentItem, invoiceForm.lines]);
+  }, [currentItem, invoiceForm.lines, resolveVariantID]);
 
   useEffect(() => {
     if (currentItem) {
@@ -167,7 +170,7 @@ export default function Create({
 
   const handleOnSelectedItem = (item: Item) => {
     setCurrentItem(item);
-    referenceInputRef.current!.value = item.name;
+    referenceInputRef.current!.value = item.identifiers?.reference || item.sku || item.name;
     qtyInputRef.current!.value = '1';
   };
 
@@ -190,9 +193,10 @@ export default function Create({
 
   const processCurrentItem = () => {
     const line = currentItem!;
+    const currentVariantID = resolveVariantID(line);
 
     if (isEditing) {
-      const index = invoiceForm.lines.findIndex((element: LineForm) => element.id === line.id);
+      const index = invoiceForm.lines.findIndex((element: LineForm) => resolveVariantID(element) === currentVariantID);
       if (index >= 0) {
         invoiceForm.lines[index].qty = qtyInputRef.current?.valueAsNumber || 0;
         invoiceForm.lines[index].amount = amount;
@@ -204,7 +208,14 @@ export default function Create({
         amountValue = line.price * (qtyInputRef.current?.valueAsNumber || 0);
       }
       // When searching for the current item, if exists on the invoice, then display current values, and update the qty
-      invoiceForm.lines.push({ ...line, qty: qtyInputRef.current?.valueAsNumber || 0, amount: amountValue, action: 'added' });
+      invoiceForm.lines.push({
+        ...line,
+        variant_id: currentVariantID,
+        id: currentVariantID || line.id,
+        qty: qtyInputRef.current?.valueAsNumber || 0,
+        amount: amountValue,
+        action: 'added',
+      });
     }
     setInvoiceForm(() => {
       return { ...invoiceForm, lines: [...invoiceForm.lines] };
@@ -330,7 +341,7 @@ export default function Create({
 
   const placedInvoice = () => {
     transform((data) => {
-      const payload: Record<string, any> = {
+      const payload: Record<string, unknown> = {
         ...data,
         customer_id: invoiceForm.header.customer?.id,
         date: invoiceForm.header.date,
@@ -340,7 +351,16 @@ export default function Create({
         notes: invoiceForm.header.notes || '',
         kind: invoiceForm.kind,
         lines: invoiceForm.lines.map((line) => {
-          return { id: line.id, qty: line.qty, unit: line.unit.id, price: line.price, rate: line.tax.rate, action: line.action };
+          const variantID = line.variant_id ?? line.id;
+          return {
+            id: variantID,
+            variant_id: variantID,
+            qty: line.qty,
+            unit: line.unit.id,
+            price: line.price,
+            rate: line.tax.rate,
+            action: line.action,
+          };
         }),
         // payment: invoiceForm.payment,
       };
@@ -423,7 +443,7 @@ export default function Create({
     });
   };
 
-  const handleMarkAsRecurrent = (event: React.MouseEvent<HTMLButtonElement>) => {
+  const handleMarkAsRecurrent = () => {
     setMarkAsRecurrent(true);
   };
 
@@ -672,7 +692,7 @@ export default function Create({
               onInteractOutside={(e) => e.preventDefault()}
               onPointerDownOutside={(e) => e.preventDefault()}
               onEscapeKeyDown={(e) => e.preventDefault()}
-              className="m-4 flex h-[calc(~'(100%-var(--spacing)*4)/3')] w-full flex-col rounded-md sm:max-w-7xl [&>button]:hidden"
+              className="m-4 flex h-[calc(~'(100%_-_var(--spacing)_*_4)_/_3')] w-full flex-col rounded-md sm:max-w-7xl [&>button]:hidden"
             >
               <SheetHeader>
                 <SheetTitle>Recurrence Invoice</SheetTitle>

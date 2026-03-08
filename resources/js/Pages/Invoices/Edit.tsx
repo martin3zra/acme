@@ -62,7 +62,7 @@ export default function Edit({
   invoice: InvoiceWithLines;
   customers: Customer[];
   items: Item[];
-  item: Item;
+  item?: Item;
   tax_receipts: Nameable[];
   kind: TransactionKind;
 }>) {
@@ -115,6 +115,8 @@ export default function Edit({
   const referenceInputRef = React.useRef<HTMLInputElement>(null);
   const qtyInputRef = React.useRef<HTMLInputElement>(null);
 
+  const resolveVariantID = useCallback((candidate?: Pick<Item, 'id' | 'variant_id'>) => candidate?.variant_id ?? candidate?.id, []);
+
   useEffect(() => {
     const searchCustomer = () => {
       router.reload({ only: ['customers'], data: { search: debouncedSearch }, preserveUrl: true });
@@ -129,7 +131,8 @@ export default function Edit({
   useEffect(() => setCurrentItem(item), [item]);
 
   const findCurrentItem = useCallback(() => {
-    const exists = (element: LineForm) => element.id === currentItem?.id;
+    const currentVariantID = resolveVariantID(currentItem);
+    const exists = (element: LineForm) => resolveVariantID(element) === currentVariantID;
     const index = invoiceForm.lines.findIndex(exists);
     if (index >= 0) {
       setEditing(true);
@@ -138,7 +141,7 @@ export default function Edit({
       qtyInputRef.current!.value = line.qty.toString();
       setAmount(line.amount);
     }
-  }, [currentItem, invoiceForm.lines]);
+  }, [currentItem, invoiceForm.lines, resolveVariantID]);
 
   useEffect(() => {
     if (currentItem) {
@@ -149,7 +152,7 @@ export default function Edit({
 
   const handleOnSelectedItem = (item: Item) => {
     setCurrentItem(item);
-    referenceInputRef.current!.value = item.name;
+    referenceInputRef.current!.value = item.identifiers?.reference || item.sku || item.name;
     qtyInputRef.current!.value = '1';
   };
 
@@ -191,7 +194,7 @@ export default function Edit({
 
   const performUpdate = () => {
     transform((data) => {
-      const payload: Record<string, any> = {
+      const payload: Record<string, unknown> = {
         ...data,
         customer_id: invoiceForm.header.customer?.id,
         date: invoiceForm.header.date,
@@ -201,7 +204,16 @@ export default function Edit({
         notes: invoiceForm.header.notes || '',
         kind: kind,
         lines: invoiceForm.lines.map((line) => {
-          return { id: line.id, unit: line.unit.id, qty: line.qty, price: line.price, rate: line.tax.rate, action: line.action };
+          const variantID = line.variant_id ?? line.id;
+          return {
+            id: variantID,
+            variant_id: variantID,
+            unit: line.unit.id,
+            qty: line.qty,
+            price: line.price,
+            rate: line.tax.rate,
+            action: line.action,
+          };
         }),
         // payment: invoiceForm.payment,
       };
@@ -265,9 +277,10 @@ export default function Edit({
 
   const processCurrentItem = () => {
     const line = currentItem!;
+    const currentVariantID = resolveVariantID(line);
 
     if (isEditing) {
-      const index = invoiceForm.lines.findIndex((element: LineForm) => element.id === line.id);
+      const index = invoiceForm.lines.findIndex((element: LineForm) => resolveVariantID(element) === currentVariantID);
       if (index >= 0) {
         invoiceForm.lines[index].qty = qtyInputRef.current?.valueAsNumber || 0;
         invoiceForm.lines[index].amount = amount;
@@ -276,7 +289,14 @@ export default function Edit({
       setEditing(false);
     } else {
       // When searching for the current item, if exists on the invoice, then display current values, and update the qty
-      invoiceForm.lines.push({ ...line, qty: qtyInputRef.current?.valueAsNumber || 0, amount, action: 'added' });
+      invoiceForm.lines.push({
+        ...line,
+        variant_id: currentVariantID,
+        id: currentVariantID || line.id,
+        qty: qtyInputRef.current?.valueAsNumber || 0,
+        amount,
+        action: 'added',
+      });
     }
     setInvoiceForm(() => {
       return { ...invoiceForm, lines: [...invoiceForm.lines] };

@@ -25,6 +25,11 @@ export default function LinesForm({
   computedItemAmount,
 }: Props) {
   const t = useTranslation().trans;
+  const variantDescription =
+    currentItem?.variant_name && currentItem.variant_name !== 'Default'
+      ? `${currentItem.description} • ${currentItem.variant_name}`
+      : currentItem?.description;
+
   return (
     <tr>
       <th scope="col" className="w-60 border border-gray-300 pe-1">
@@ -34,12 +39,12 @@ export default function LinesForm({
           data-reset={false}
           placeholder={t(`${kind}s.line.form.placeholder`)}
           onKeyDown={handleOnKeyDown}
-          className="rounded-none border-none focus-visible:border-none focus-visible:ring-[2px]"
+          className="rounded-none border-none focus-visible:border-none focus-visible:ring-2"
           tabIndex={0}
         />
       </th>
       <th scope="col" className="w-auto border border-gray-300 bg-gray-50 px-1">
-        <Label>{currentItem?.description}</Label>
+        <Label>{variantDescription}</Label>
       </th>
       <th scope="col" className="w-36 border border-gray-300 bg-gray-50 px-1">
         <Label>{currentItem?.unit.name}</Label>
@@ -49,7 +54,7 @@ export default function LinesForm({
           type="number"
           min={1}
           name="qty"
-          className="rounded-none border-none text-end focus-visible:border-none focus-visible:ring-[2px]"
+          className="rounded-none border-none text-end focus-visible:border-none focus-visible:ring-2"
           tabIndex={1}
           ref={qtyInputRef}
           onFocus={(e) => computedItemAmount(e.currentTarget.valueAsNumber)}

@@ -214,60 +214,68 @@ func (d *ItemIdentifiers) Scan(value any) error {
 
 type StoreItemForm struct {
 	support.FormRequest
-	Name          string          `json:"name"`
-	Price         float64         `json:"price"`
-	Description   string          `json:"description"`
-	TaxID         int             `json:"tax_id"`
-	UnitID        int             `json:"unit_id"`
-	ItemType      string          `json:"item_type"` // e.g. "product", "service"
-	HasVariants   bool            `json:"has_variants,omitempty"`
-	AttributeIDs  []int           `json:"attribute_ids,omitempty"`
-	VariantCombos []VariantCombo  `json:"variant_combos,omitempty"`
-	Identifiers   ItemIdentifiers `json:"identifiers,omitempty"`
+	Name          string         `json:"name"`
+	Description   string         `json:"description"`
+	TaxID         int            `json:"tax_id"`
+	UnitID        int            `json:"unit_id"`
+	ItemType      string         `json:"item_type"` // e.g. "product", "service"
+	AttributeIDs  []int          `json:"attribute_ids,omitempty"`
+	VariantCombos []VariantCombo `json:"variant_combos,omitempty"`
 }
 
 func (form StoreItemForm) Authorize() bool {
 	return Can(form.User(), "create:item")
 }
 
-func (StoreItemForm) Rules() map[string]any {
-	return map[string]any{
+func (form StoreItemForm) Rules() map[string]any {
+	rules := map[string]any{
 		"name": []any{
 			"required",
 			"min:3",
 			"max:120",
 			validator.Rule{}.Unique("items", "name"),
 		},
-		"description":                  "sometimes|min:3|max:120",
-		"price":                        "required|min:0",
-		"tax_id":                       "bail|required|exists:taxes,id",
-		"unit_id":                      "bail|required|exists:units,id",
-		"item_type":                    "bail|required|in:product,service",
-		"has_variants":                 "sometimes|boolean",
-		"attribute_ids.*":              "sometimes|exists:attributes,id",
-		"variant_combos":               "sometimes",
-		"identifiers":                  "sometimes",
-		"identifiers.reference":        "sometimes|nullable|max:100",
-		"identifiers.code":             "sometimes|nullable|max:50",
-		"identifiers.sku":              "sometimes|nullable|max:50",
-		"identifiers.barcode":          "sometimes|nullable|max:32",
-		"identifiers.vendor_reference": "sometimes|nullable|max:100",
+		"description":     "sometimes|min:3|max:120",
+		"tax_id":          "bail|required|exists:taxes,id",
+		"unit_id":         "bail|required|exists:units,id",
+		"item_type":       "bail|required|in:product,service",
+		"attribute_ids.*": "sometimes|exists:attributes,id",
+		"variant_combos":  "sometimes|array",
 	}
+
+	// Add variant combo field validation
+	company := CurrentCompany(form.Context())
+	if company != nil {
+		rules["variant_combos.*.sku"] = []any{
+			"sometimes",
+			"max:50",
+			validator.Rule{}.Unique("items_variants", "sku").Where("company_id", company.ID),
+		}
+		rules["variant_combos.*.barcode"] = []any{
+			"sometimes",
+			"max:100",
+			validator.Rule{}.Unique("items_variants", "barcode").Where("company_id", company.ID),
+		}
+	}
+	
+	rules["variant_combos.*.reference"] = "sometimes|max:100"
+	rules["variant_combos.*.vendor_reference"] = "sometimes|max:100"
+	rules["variant_combos.*.price"] = "required|numeric|min:0"
+	rules["variant_combos.*.cost_price"] = "sometimes|numeric|min:0"
+
+	return rules
 }
 
 type UpdateItemForm struct {
 	support.FormRequest
-	ID            int             `json:"id"`
-	Name          string          `json:"name"`
-	Price         float64         `json:"price"`
-	Description   string          `json:"description"`
-	TaxID         int             `json:"tax_id"`
-	UnitID        int             `json:"unit_id"`
-	ItemType      string          `json:"item_type"` // e.g. "product", "service"
-	HasVariants   bool            `json:"has_variants,omitempty"`
-	AttributeIDs  []int           `json:"attribute_ids,omitempty"`
-	VariantCombos []VariantCombo  `json:"variant_combos,omitempty"`
-	Identifiers   ItemIdentifiers `json:"identifiers,omitempty"`
+	ID            int            `json:"id"`
+	Name          string         `json:"name"`
+	Description   string         `json:"description"`
+	TaxID         int            `json:"tax_id"`
+	UnitID        int            `json:"unit_id"`
+	ItemType      string         `json:"item_type"` // e.g. "product", "service"
+	AttributeIDs  []int          `json:"attribute_ids,omitempty"`
+	VariantCombos []VariantCombo `json:"variant_combos,omitempty"`
 }
 
 func (form UpdateItemForm) Authorize() bool {
@@ -275,23 +283,37 @@ func (form UpdateItemForm) Authorize() bool {
 }
 
 func (form UpdateItemForm) Rules() map[string]any {
-	return map[string]any{
-		"name":                         []any{"required", "min:3", "max:120", validator.Rule{}.Unique("items", "name").Ignore(form.ID, "id")},
-		"description":                  "sometimes|min:3|max:120",
-		"price":                        "required|min:0",
-		"tax_id":                       "required|exists:taxes,id",
-		"unit_id":                      "required|exists:units,id",
-		"item_type":                    "bail|required|in:product,service",
-		"has_variants":                 "sometimes|boolean",
-		"attribute_ids.*":              "sometimes|exists:attributes,id",
-		"variant_combos":               "sometimes",
-		"identifiers":                  "sometimes",
-		"identifiers.reference":        "sometimes|nullable|max:100",
-		"identifiers.code":             "sometimes|nullable|max:50",
-		"identifiers.sku":              "sometimes|nullable|max:50",
-		"identifiers.barcode":          "sometimes|nullable|max:32",
-		"identifiers.vendor_reference": "sometimes|nullable|max:100",
+	rules := map[string]any{
+		"name":            []any{"required", "min:3", "max:120", validator.Rule{}.Unique("items", "name").Ignore(form.ID, "id")},
+		"description":     "sometimes|min:3|max:120",
+		"tax_id":          "bail|required|exists:taxes,id",
+		"unit_id":         "bail|required|exists:units,id",
+		"item_type":       "bail|required|in:product,service",
+		"attribute_ids.*": "sometimes|exists:attributes,id",
+		"variant_combos":  "sometimes|array",
 	}
+
+	// Add variant combo field validation
+	company := CurrentCompany(form.Context())
+	if company != nil {
+		rules["variant_combos.*.sku"] = []any{
+			"sometimes",
+			"max:50",
+			validator.Rule{}.Unique("items_variants", "sku").Where("company_id", company.ID),
+		}
+		rules["variant_combos.*.barcode"] = []any{
+			"sometimes",
+			"max:100",
+			validator.Rule{}.Unique("items_variants", "barcode").Where("company_id", company.ID),
+		}
+	}
+	
+	rules["variant_combos.*.reference"] = "sometimes|max:100"
+	rules["variant_combos.*.vendor_reference"] = "sometimes|max:100"
+	rules["variant_combos.*.price"] = "required|numeric|min:0"
+	rules["variant_combos.*.cost_price"] = "sometimes|numeric|min:0"
+
+	return rules
 }
 
 type TermType string
@@ -648,16 +670,17 @@ func (d *Payment) Scan(value any) error {
 }
 
 type Line struct {
-	ID       int        `json:"id"`
-	Unit     int        `json:"unit"`
-	Qty      int        `json:"qty"`
-	Price    float64    `json:"price"`
-	Rate     float64    `json:"rate"`
-	Action   LineAction `json:"action"`
-	tax      float64
-	amount   float64
-	discount float64
-	total    float64
+	VariantID int        `json:"variant_id"`
+	ID        int        `json:"id"` // Deprecated: kept for backward compatibility, maps to VariantID
+	Unit      int        `json:"unit"`
+	Qty       int        `json:"qty"`
+	Price     float64    `json:"price"`
+	Rate      float64    `json:"rate"`
+	Action    LineAction `json:"action"`
+	tax       float64
+	amount    float64
+	discount  float64
+	total     float64
 }
 
 type StoreInvoiceForm struct {
@@ -708,7 +731,8 @@ func (form StoreInvoiceForm) Rules() map[string]any {
 		"terms":                   "bail|required_if:kind,invoice,order,template|min:1",
 		"tax_receipt":             "bail|sometimes|required_if:kind,invoice|exists:tax_receipts,id",
 		"lines":                   "required|min:1",
-		"lines.*.id":              "required|exists:items,id",
+		"lines.*.variant_id":      "required|exists:items_variants,id",
+		"lines.*.id":              "sometimes|exists:items_variants,id",
 		"lines.*.unit":            "required|exists:units,id",
 		"lines.*.qty":             "required|min:1",
 		"lines.*.price":           "required",
@@ -760,6 +784,11 @@ func (form *StoreInvoiceForm) PassedValidation() {
 }
 
 func (form *StoreInvoiceForm) PrepareForValidation() {
+	for _, line := range form.Lines {
+		if line.VariantID == 0 && line.ID != 0 {
+			line.VariantID = line.ID
+		}
+	}
 	if form.Kind != TransactionKinds.Template {
 		form.Recurrence = nil
 	}
@@ -809,18 +838,19 @@ func (form UpdateInvoiceForm) Authorize() bool {
 
 func (form UpdateInvoiceForm) Rules() map[string]any {
 	return map[string]any{
-		"customer_id":    "bail|required|exists:customers,id",
-		"date":           "bail|required|date",
-		"terms":          "bail|sometimes|required_if:kind,invoice,order|min:1",
-		"tax_receipt":    "bail|sometimes|required_if:kind,invoice|exists:tax_receipts,id",
-		"lines":          "required|min:1",
-		"lines.*.id":     "required|exists:items,id",
-		"lines.*.unit":   "required|exists:units,id",
-		"lines.*.qty":    "required|min:1", // ADD when rule here, only validate when is the action is added or updated
-		"lines.*.price":  "required",
-		"lines.*.rate":   "required",
-		"lines.*.action": "required|in:added,updated,deleted,unchanged",
-		"discount":       "required",
+		"customer_id":        "bail|required|exists:customers,id",
+		"date":               "bail|required|date",
+		"terms":              "bail|sometimes|required_if:kind,invoice,order|min:1",
+		"tax_receipt":        "bail|sometimes|required_if:kind,invoice|exists:tax_receipts,id",
+		"lines":              "required|min:1",
+		"lines.*.variant_id": "required|exists:items_variants,id",
+		"lines.*.id":         "sometimes|exists:items_variants,id",
+		"lines.*.unit":       "required|exists:units,id",
+		"lines.*.qty":        "required|min:1", // ADD when rule here, only validate when is the action is added or updated
+		"lines.*.price":      "required",
+		"lines.*.rate":       "required",
+		"lines.*.action":     "required|in:added,updated,deleted,unchanged",
+		"discount":           "required",
 		"discount.value": []any{
 			"sometimes",
 			validator.Rule{}.When(form.Discount.Type == "percentage", "between:0,100", "min:0"),
@@ -1596,14 +1626,19 @@ type warehouse struct {
 
 // itemVariant represents a stockable SKU variant of an item
 type itemVariant struct {
-	ID        int      `json:"id"`
-	UUID      string   `json:"uuid"`
-	ItemID    int      `json:"item_id"`
-	SKU       string   `json:"sku"`
-	Name      string   `json:"name"`
-	IsDefault bool     `json:"is_default"`
-	Price     *float64 `json:"price,omitempty"`
-	CostPrice *float64 `json:"cost_price,omitempty"`
+	ID                   int      `json:"id"`
+	UUID                 string   `json:"uuid"`
+	ItemID               int      `json:"item_id"`
+	SKU                  string   `json:"sku"`
+	Name                 string   `json:"name"`
+	Barcode              *string  `json:"barcode,omitempty"`
+	Reference            *string  `json:"reference,omitempty"`
+	VendorReference      *string  `json:"vendor_reference,omitempty"`
+	CombinationSignature string   `json:"combination_signature"`
+	IsDefault            bool     `json:"is_default"`
+	Price                *float64 `json:"price,omitempty"`
+	CostPrice            *float64 `json:"cost_price,omitempty"`
+	Active               bool     `json:"active"`
 	foundation.Timestamps
 }
 
@@ -1757,6 +1792,10 @@ type VariantCombo struct {
 	Price             *float64    `json:"price,omitempty"`
 	CostPrice         *float64    `json:"cost_price,omitempty"`
 	SKU               string      `json:"sku,omitempty"`
+	Barcode           string      `json:"barcode,omitempty"`
+	Reference         string      `json:"reference,omitempty"`
+	VendorReference   string      `json:"vendor_reference,omitempty"`
+	Active            *bool       `json:"active,omitempty"`
 }
 
 // StoreItemWithAttributesForm handles item creation with variants and attributes

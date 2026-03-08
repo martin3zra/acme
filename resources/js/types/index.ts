@@ -3,7 +3,7 @@ import { IconName } from './icons';
 
 export interface ErrorResponse {
   status: string;
-  data?: any;
+  data?: unknown;
 }
 
 export interface LinkedCompany {
@@ -163,12 +163,18 @@ export interface ItemVariantSetup {
 
 export interface Item {
   id: number;
+  variant_id?: number;
   uuid: string;
   name: string;
   price: number;
   tax: Tax;
   unit: Unit;
   description: string;
+  variant_name?: string;
+  sku?: string;
+  barcode?: string;
+  stock_qty?: number;
+  is_default?: boolean;
   status: string;
   item_type?: ItemType; // This can be 'product' or 'service'
   has_variants?: boolean;

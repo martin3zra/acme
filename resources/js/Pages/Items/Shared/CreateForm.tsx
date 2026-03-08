@@ -53,12 +53,23 @@ type VariantComboForm = {
   sku?: string;
   price?: number;
   cost_price?: number;
+  barcode?: string;
+  reference?: string;
+  vendor_reference?: string;
+  active?: boolean;
 };
 
 type VariantComboPreview = {
   key: string;
   attribute_value_ids: Record<number, number>;
   label: string;
+  sku?: string;
+  price?: number;
+  cost_price?: number;
+  barcode?: string;
+  reference?: string;
+  vendor_reference?: string;
+  active?: boolean;
 };
 
 type ItemAttributeValueOption = {
@@ -100,6 +111,11 @@ export default function CreateForm({ onFinish, params }: CreateFormProps) {
   const [selectedValuesByAttribute, setSelectedValuesByAttribute] = useState<Record<number, number[]>>({});
   const [variantPriceOverrides, setVariantPriceOverrides] = useState<Record<string, number | undefined>>({});
   const [variantSKUOverrides, setVariantSKUOverrides] = useState<Record<string, string | undefined>>({});
+  const [variantBarcodeOverrides, setVariantBarcodeOverrides] = useState<Record<string, string | undefined>>({});
+  const [variantReferenceOverrides, setVariantReferenceOverrides] = useState<Record<string, string | undefined>>({});
+  const [variantVendorRefOverrides, setVariantVendorRefOverrides] = useState<Record<string, string | undefined>>({});
+  const [variantCostPriceOverrides, setVariantCostPriceOverrides] = useState<Record<string, number | undefined>>({});
+  const [variantActiveOverrides, setVariantActiveOverrides] = useState<Record<string, boolean>>({});
   const [variantSetupError, setVariantSetupError] = useState<string>('');
 
   const viewMode = params.action === 'view';
@@ -204,10 +220,18 @@ export default function CreateForm({ onFinish, params }: CreateFormProps) {
     const combos: VariantComboPreview[] = [];
     const build = (attributeIndex: number, current: Record<number, number>) => {
       if (attributeIndex === selectedAttributeIDs.length) {
+        const key = buildVariantKey(current);
         combos.push({
-          key: buildVariantKey(current),
+          key,
           attribute_value_ids: current,
           label: buildVariantLabel(current),
+          sku: variantSKUOverrides[key],
+          price: variantPriceOverrides[key],
+          cost_price: variantCostPriceOverrides[key],
+          barcode: variantBarcodeOverrides[key],
+          reference: variantReferenceOverrides[key],
+          vendor_reference: variantVendorRefOverrides[key],
+          active: variantActiveOverrides[key] !== undefined ? variantActiveOverrides[key] : true,
         });
         return;
       }
@@ -238,41 +262,130 @@ export default function CreateForm({ onFinish, params }: CreateFormProps) {
     return `SKU-${itemNameChunk || 'ITEM'}-${hashChunk}`;
   };
 
+  const buildSmartVariantSKU = (combo: VariantComboPreview): string => {
+    // Extract first 3-4 chars from item name
+    const itemPrefix = (data.name || 'ITEM')
+      .toUpperCase()
+      .replace(/[^A-Z0-9]/g, '')
+      .slice(0, 4);
+
+    // Get abbreviated attribute values
+    const attributeParts = selectedAttributeIDs
+      .map((attributeID) => {
+        const attribute = attributeOptions.find((attr) => attr.id === attributeID);
+        const valueID = combo.attribute_value_ids[attributeID];
+        const value = attribute?.values?.find((v) => v.id === valueID);
+        const displayValue = value?.display_name || value?.value || '';
+        // Abbreviate to 3-4 chars, remove special chars
+        return displayValue
+          .toUpperCase()
+          .replace(/[^A-Z0-9]/g, '')
+          .slice(0, 4);
+      })
+      .filter((part) => part);
+
+    // Join with hyphens: ITEM-ATTR1-ATTR2
+    const parts = [itemPrefix, ...attributeParts];
+    return parts.join('-').slice(0, 50); // Max 50 chars
+  };
+
+  const generateEAN13Barcode = (variantIndex: number): string => {
+    // Simple EAN-13 compatible format: company prefix (6 digits) + item sequence (5 digits) + check digit
+    // For demo purposes, using a placeholder company prefix. In production, this would come from company settings.
+    const companyPrefix = '100000'; // 6 digits
+    const itemSequence = String(variantIndex + 1).padStart(5, '0'); // 5 digits
+    const productCode = companyPrefix + itemSequence; // 11 digits
+
+    // Calculate EAN-13 check digit
+    const calculateCheckDigit = (code: string): string => {
+      const digits = code.split('').map(Number);
+      const sum = digits.reduce((acc, digit, idx) => {
+        return acc + digit * (idx % 2 === 0 ? 1 : 3);
+      }, 0);
+      const checkDigit = (10 - (sum % 10)) % 10;
+      return String(checkDigit);
+    };
+
+    return productCode + calculateCheckDigit(productCode);
+  };
+
+  const handleBulkApplyPrice = (price: number) => {
+    const updates: Record<string, number> = {};
+    variantComboPreviews.forEach((combo) => {
+      if (!existingVariantSignatures.has(combo.key)) {
+        updates[combo.key] = price;
+      }
+    });
+    setVariantPriceOverrides((current) => ({ ...current, ...updates }));
+  };
+
+  const handleBulkGenerateSKUs = () => {
+    const updates: Record<string, string> = {};
+    variantComboPreviews.forEach((combo) => {
+      if (!existingVariantSignatures.has(combo.key) && !variantSKUOverrides[combo.key]) {
+        updates[combo.key] = buildSmartVariantSKU(combo);
+      }
+    });
+    setVariantSKUOverrides((current) => ({ ...current, ...updates }));
+  };
+
+  const handleBulkGenerateBarcodes = () => {
+    const updates: Record<string, string> = {};
+    variantComboPreviews.forEach((combo, index) => {
+      if (!existingVariantSignatures.has(combo.key) && !variantBarcodeOverrides[combo.key]) {
+        updates[combo.key] = generateEAN13Barcode(index);
+      }
+    });
+    setVariantBarcodeOverrides((current) => ({ ...current, ...updates }));
+  };
+
   const variantComboPreviews = buildVariantPreviews();
 
   useEffect(() => {
     if (!data.has_variants || variantComboPreviews.length === 0) {
       setVariantPriceOverrides((current) => (Object.keys(current).length === 0 ? current : {}));
       setVariantSKUOverrides((current) => (Object.keys(current).length === 0 ? current : {}));
+      setVariantBarcodeOverrides((current) => (Object.keys(current).length === 0 ? current : {}));
+      setVariantReferenceOverrides((current) => (Object.keys(current).length === 0 ? current : {}));
+      setVariantVendorRefOverrides((current) => (Object.keys(current).length === 0 ? current : {}));
+      setVariantCostPriceOverrides((current) => (Object.keys(current).length === 0 ? current : {}));
+      setVariantActiveOverrides((current) => (Object.keys(current).length === 0 ? current : {}));
       return;
     }
 
-    setVariantPriceOverrides((current) => {
-      const next: Record<string, number | undefined> = {};
+    // Sync overrides with current previews
+    const syncOverrides = <T,>(current: Record<string, T>, defaultValue?: (combo: VariantComboPreview) => T): Record<string, T> => {
+      const next: Record<string, T> = {};
       for (const combo of variantComboPreviews) {
-        next[combo.key] = current[combo.key];
+        if (current[combo.key] !== undefined) {
+          next[combo.key] = current[combo.key];
+        } else if (defaultValue) {
+          next[combo.key] = defaultValue(combo);
+        }
       }
       return next;
-    });
+    };
 
-    setVariantSKUOverrides((current) => {
-      const next: Record<string, string | undefined> = {};
-      for (const combo of variantComboPreviews) {
-        const existingSKU = current[combo.key];
-        next[combo.key] = existingSKU !== undefined ? existingSKU : generateSuggestedVariantSKU(combo);
-      }
-      return next;
-    });
+    setVariantPriceOverrides((current) => syncOverrides(current));
+    setVariantSKUOverrides((current) => syncOverrides(current, generateSuggestedVariantSKU));
+    setVariantBarcodeOverrides((current) => syncOverrides(current));
+    setVariantReferenceOverrides((current) => syncOverrides(current));
+    setVariantVendorRefOverrides((current) => syncOverrides(current));
+    setVariantCostPriceOverrides((current) => syncOverrides(current));
+    setVariantActiveOverrides((current) => syncOverrides(current));
   }, [data.has_variants, data.name, selectedAttributeIDs.join(','), JSON.stringify(selectedValuesByAttribute)]);
 
   const buildVariantCombos = (): VariantComboForm[] => {
-    return variantComboPreviews
-      .filter((combo) => !existingVariantSignatures.has(combo.key))
-      .map((combo) => ({
-        attribute_value_ids: combo.attribute_value_ids,
-        price: variantPriceOverrides[combo.key] ?? data.price,
-        sku: (variantSKUOverrides[combo.key] || '').trim() || undefined,
-      }));
+    return variantComboPreviews.map((combo) => ({
+      attribute_value_ids: combo.attribute_value_ids,
+      price: variantPriceOverrides[combo.key] ?? data.price,
+      cost_price: variantCostPriceOverrides[combo.key],
+      sku: (variantSKUOverrides[combo.key] || '').trim() || undefined,
+      barcode: (variantBarcodeOverrides[combo.key] || '').trim() || undefined,
+      reference: (variantReferenceOverrides[combo.key] || '').trim() || undefined,
+      vendor_reference: (variantVendorRefOverrides[combo.key] || '').trim() || undefined,
+      active: variantActiveOverrides[combo.key] !== undefined ? variantActiveOverrides[combo.key] : true,
+    }));
   };
 
   const toggleAttribute = (attributeID: number, checked: boolean) => {
@@ -458,64 +571,180 @@ export default function CreateForm({ onFinish, params }: CreateFormProps) {
                     })}
 
                     {variantComboPreviews.length > 0 && (
-                      <div className="space-y-2">
-                        <Label>{t('items.single.variantSetup.variants')}</Label>
+                      <div className="space-y-3">
+                        <div className="flex items-center justify-between">
+                          <Label>{t('items.single.variantSetup.variants')}</Label>
+                          <div className="flex gap-2">
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              onClick={() => {
+                                const price = prompt(t('items.single.variantSetup.bulkPricePrompt'));
+                                if (price) {
+                                  const numPrice = parseFloat(price);
+                                  if (!isNaN(numPrice) && numPrice >= 0) {
+                                    handleBulkApplyPrice(numPrice);
+                                  }
+                                }
+                              }}
+                            >
+                              Apply Price to All
+                            </Button>
+                            <Button type="button" variant="outline" size="sm" onClick={handleBulkGenerateSKUs}>
+                              Generate SKUs
+                            </Button>
+                            <Button type="button" variant="outline" size="sm" onClick={handleBulkGenerateBarcodes}>
+                              Generate Barcodes
+                            </Button>
+                          </div>
+                        </div>
                         {params.action === 'edit' && (
                           <p className="text-muted-foreground text-sm">{t('items.single.variantSetup.existingLockedHelp')}</p>
                         )}
-                        <div className="text-muted-foreground grid grid-cols-[1fr_200px_140px] gap-3 text-xs font-medium">
-                          <span>{t('global.variant')}</span>
-                          <span>{t('global.sku')}</span>
-                          <span className="text-right">{t('global.price')}</span>
-                        </div>
-                        <div className="space-y-2">
-                          {variantComboPreviews.map((combo) => (
-                            <div key={combo.key} className="grid grid-cols-[1fr_200px_140px] items-center gap-3">
-                              {(() => {
+
+                        <div className="overflow-x-auto rounded-md border">
+                          <table className="w-full text-sm">
+                            <thead className="bg-muted/50 border-b">
+                              <tr>
+                                <th className="p-2 text-left font-medium">{t('global.variant')}</th>
+                                <th className="w-32 p-2 text-left font-medium">{t('global.sku')}</th>
+                                <th className="w-32 p-2 text-left font-medium">{t('global.barcode')}</th>
+                                <th className="w-28 p-2 text-left font-medium">{t('global.reference')}</th>
+                                <th className="w-28 p-2 text-left font-medium">Vendor Ref</th>
+                                <th className="w-24 p-2 text-right font-medium">Cost Price</th>
+                                <th className="w-24 p-2 text-right font-medium">{t('global.price')}</th>
+                                <th className="w-16 p-2 text-center font-medium">Active</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {variantComboPreviews.map((combo) => {
                                 const isExistingVariant = params.action === 'edit' && existingVariantSignatures.has(combo.key);
+                                const isActive = variantActiveOverrides[combo.key] !== undefined ? variantActiveOverrides[combo.key] : true;
+
                                 return (
-                                  <>
-                                    <p className="text-sm">
-                                      {combo.label || '-'}{' '}
-                                      {isExistingVariant ? (
-                                        <span className="text-muted-foreground">({t('items.single.variantSetup.existingLockedTag')})</span>
-                                      ) : (
-                                        ''
-                                      )}
-                                    </p>
-                                    <Input
-                                      type="text"
-                                      className="w-full"
-                                      value={variantSKUOverrides[combo.key] ?? generateSuggestedVariantSKU(combo)}
-                                      disabled={isExistingVariant}
-                                      onChange={(event) => {
-                                        const value = event.target.value;
-                                        setVariantSKUOverrides((current) => ({
-                                          ...current,
-                                          [combo.key]: value,
-                                        }));
-                                      }}
-                                    />
-                                    <Input
-                                      type="number"
-                                      min={0}
-                                      step="0.01"
-                                      className="w-36 text-right"
-                                      value={(variantPriceOverrides[combo.key] ?? data.price).toString()}
-                                      disabled={isExistingVariant}
-                                      onChange={(event) => {
-                                        const value = event.target.valueAsNumber;
-                                        setVariantPriceOverrides((current) => ({
-                                          ...current,
-                                          [combo.key]: Number.isNaN(value) ? undefined : value,
-                                        }));
-                                      }}
-                                    />
-                                  </>
+                                  <tr key={combo.key} className={`border-b last:border-0 ${!isActive ? 'opacity-50' : ''}`}>
+                                    <td className="p-2">
+                                      <div className="text-sm">
+                                        {combo.label || '-'}
+                                        {isExistingVariant && (
+                                          <span className="text-muted-foreground ml-2 text-xs">
+                                            ({t('items.single.variantSetup.existingLockedTag')})
+                                          </span>
+                                        )}
+                                      </div>
+                                    </td>
+                                    <td className="p-2">
+                                      <Input
+                                        type="text"
+                                        className="h-8 text-xs"
+                                        value={variantSKUOverrides[combo.key] ?? generateSuggestedVariantSKU(combo)}
+                                        disabled={isExistingVariant}
+                                        onChange={(e) => {
+                                          setVariantSKUOverrides((current) => ({
+                                            ...current,
+                                            [combo.key]: e.target.value,
+                                          }));
+                                        }}
+                                      />
+                                    </td>
+                                    <td className="p-2">
+                                      <Input
+                                        type="text"
+                                        className="h-8 text-xs"
+                                        value={variantBarcodeOverrides[combo.key] ?? ''}
+                                        disabled={isExistingVariant}
+                                        placeholder="Barcode"
+                                        onChange={(e) => {
+                                          setVariantBarcodeOverrides((current) => ({
+                                            ...current,
+                                            [combo.key]: e.target.value,
+                                          }));
+                                        }}
+                                      />
+                                    </td>
+                                    <td className="p-2">
+                                      <Input
+                                        type="text"
+                                        className="h-8 text-xs"
+                                        value={variantReferenceOverrides[combo.key] ?? ''}
+                                        disabled={isExistingVariant}
+                                        placeholder="Ref"
+                                        onChange={(e) => {
+                                          setVariantReferenceOverrides((current) => ({
+                                            ...current,
+                                            [combo.key]: e.target.value,
+                                          }));
+                                        }}
+                                      />
+                                    </td>
+                                    <td className="p-2">
+                                      <Input
+                                        type="text"
+                                        className="h-8 text-xs"
+                                        value={variantVendorRefOverrides[combo.key] ?? ''}
+                                        disabled={isExistingVariant}
+                                        placeholder="Vendor"
+                                        onChange={(e) => {
+                                          setVariantVendorRefOverrides((current) => ({
+                                            ...current,
+                                            [combo.key]: e.target.value,
+                                          }));
+                                        }}
+                                      />
+                                    </td>
+                                    <td className="p-2">
+                                      <Input
+                                        type="number"
+                                        min={0}
+                                        step="0.01"
+                                        className="h-8 text-right text-xs"
+                                        value={variantCostPriceOverrides[combo.key]?.toString() ?? ''}
+                                        disabled={isExistingVariant}
+                                        placeholder="0.00"
+                                        onChange={(e) => {
+                                          const value = e.target.valueAsNumber;
+                                          setVariantCostPriceOverrides((current) => ({
+                                            ...current,
+                                            [combo.key]: Number.isNaN(value) ? undefined : value,
+                                          }));
+                                        }}
+                                      />
+                                    </td>
+                                    <td className="p-2">
+                                      <Input
+                                        type="number"
+                                        min={0}
+                                        step="0.01"
+                                        className="h-8 text-right text-xs"
+                                        value={(variantPriceOverrides[combo.key] ?? data.price).toString()}
+                                        disabled={isExistingVariant}
+                                        onChange={(e) => {
+                                          const value = e.target.valueAsNumber;
+                                          setVariantPriceOverrides((current) => ({
+                                            ...current,
+                                            [combo.key]: Number.isNaN(value) ? undefined : value,
+                                          }));
+                                        }}
+                                      />
+                                    </td>
+                                    <td className="p-2 text-center">
+                                      <Checkbox
+                                        checked={isActive}
+                                        disabled={isExistingVariant}
+                                        onCheckedChange={(checked) => {
+                                          setVariantActiveOverrides((current) => ({
+                                            ...current,
+                                            [combo.key]: checked === true,
+                                          }));
+                                        }}
+                                      />
+                                    </td>
+                                  </tr>
                                 );
-                              })()}
-                            </div>
-                          ))}
+                              })}
+                            </tbody>
+                          </table>
                         </div>
                       </div>
                     )}

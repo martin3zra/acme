@@ -5,6 +5,7 @@ func mapInvoiceToStoreForm(invoice *invoice, lines []*line) *StoreInvoiceForm {
 	for _, line := range lines {
 		var l Line
 		l.ID = int(line.ID)
+		l.VariantID = int(line.ID)
 		l.Unit = int(line.Unit.ID)
 		l.Qty = int(line.Qty)
 		l.Price = line.Price

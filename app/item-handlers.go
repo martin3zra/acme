@@ -66,7 +66,6 @@ func (s *Server) itemsHandler(ctx *routing.Context) {
 					return nil, err
 				}
 				selectedItem.VariantSetup = setup
-				selectedItem.HasVariants = setup.HasVariants
 			}
 
 			return selectedItem, nil

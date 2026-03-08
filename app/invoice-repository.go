@@ -349,10 +349,14 @@ func (s *Server) voidInvoice(ctx context.Context, kind TransactionKind, uuid str
 func (s *Server) attachInvoiceLines(tx *sql.Tx, companyId, invoiceId int, form *StoreInvoiceForm) error {
 	vals := []any{}
 	for _, line := range form.Lines {
-		vals = append(vals, companyId, invoiceId, line.ID, line.Unit, line.Qty, line.Price, line.Rate, line.amount, line.tax, line.total)
+		variantID := line.VariantID
+		if variantID == 0 {
+			variantID = line.ID // Backward compatibility
+		}
+		vals = append(vals, companyId, invoiceId, variantID, line.Unit, line.Qty, line.Price, line.Rate, line.amount, line.tax, line.total)
 	}
 
-	stmt := "INSERT INTO invoices_items (company_id, invoice_id, item_id, unit_id, qty, price, rate, amount, tax, total) VALUES "
+	stmt := "INSERT INTO invoices_items (company_id, invoice_id, variant_id, unit_id, qty, price, rate, amount, tax, total) VALUES "
 	stmt += database.PrepareBulkInsert(10, len(form.Lines))
 
 	_, err := tx.Exec(stmt, vals...)
@@ -364,20 +368,24 @@ func (s *Server) processInvoiceLines(tx *sql.Tx, companyId, invoiceId int, form 
 
 	lines := s.filterInvoiceLines(form.Lines, ADDED, UPDATED, DELETED)
 	for _, line := range lines {
+		variantID := line.VariantID
+		if variantID == 0 {
+			variantID = line.ID // Backward compatibility
+		}
 		switch line.Action {
 		case ADDED:
-			stmt := "INSERT INTO invoices_items (company_id, invoice_id, item_id, unit_id, qty, price, tax) VALUES($1,$2,$3,$4,$5,$6,$7) "
-			if _, err := tx.Exec(stmt, companyId, invoiceId, line.ID, line.Unit, line.Qty, line.Price, line.Rate); err != nil {
+			stmt := "INSERT INTO invoices_items (company_id, invoice_id, variant_id, unit_id, qty, price, tax) VALUES($1,$2,$3,$4,$5,$6,$7) "
+			if _, err := tx.Exec(stmt, companyId, invoiceId, variantID, line.Unit, line.Qty, line.Price, line.Rate); err != nil {
 				return err
 			}
 		case UPDATED:
-			stmt := "UPDATE invoices_items SET qty = $4, unit_id = $5 WHERE company_id = $1 AND invoice_id = $2 AND item_id = $3 "
-			if _, err := tx.Exec(stmt, companyId, invoiceId, line.ID, line.Qty, line.Unit); err != nil {
+			stmt := "UPDATE invoices_items SET qty = $4, unit_id = $5 WHERE company_id = $1 AND invoice_id = $2 AND variant_id = $3 "
+			if _, err := tx.Exec(stmt, companyId, invoiceId, variantID, line.Qty, line.Unit); err != nil {
 				return err
 			}
 		case DELETED:
-			stmt := "DELETE FROM invoices_items WHERE company_id = $1 AND invoice_id = $2 AND item_id = $3"
-			if _, err := tx.Exec(stmt, companyId, invoiceId, line.ID); err != nil {
+			stmt := "DELETE FROM invoices_items WHERE company_id = $1 AND invoice_id = $2 AND variant_id = $3"
+			if _, err := tx.Exec(stmt, companyId, invoiceId, variantID); err != nil {
 				return err
 			}
 		default:
@@ -389,22 +397,29 @@ func (s *Server) processInvoiceLines(tx *sql.Tx, companyId, invoiceId int, form 
 
 func (s *Server) findInvoiceLines(ctx context.Context, companyID, invoiceID int) ([]*line, error) {
 	rows, err := s.db.Query(`
-    SELECT ii.item_id, ii.qty, ii.price, items_units.unit_id, it.name, it.description, items_units.name,
-    ii.created_at, ii.updated_at, ii.deleted_at, 'unchanged' as action, ii.amount, ii.total,
-    taxes.id as tax_id, taxes.name as tax_name, ii.rate, ii.tax, it.identifiers
-    FROM invoices_items AS ii
-    INNER JOIN companies AS com ON (ii.company_id = com.id)
-    INNER JOIN invoices AS i ON (ii.invoice_id = i.id AND ii.company_id = i.company_id)
-    INNER JOIN items AS it ON(ii.item_id = it.id AND ii.company_id = it.company_id)
-    LEFT JOIN LATERAL (
-      SELECT items_units.unit_id, units.name
-      FROM items_units
-      INNER JOIN units ON (items_units.unit_id = units.id)
-      WHERE items_units.item_id = it.id limit 1
-    ) items_units ON true
-    INNER JOIN taxes ON (it.company_id = taxes.company_id AND it.tax_id = taxes.id)
-    WHERE ii.company_id = $1
-    AND ii.invoice_id = $2`, companyID, invoiceID)
+		SELECT ii.variant_id, ii.qty, ii.price, items_units.unit_id, it.name, it.description, items_units.name,
+		ii.created_at, ii.updated_at, ii.deleted_at, 'unchanged' as action, ii.amount, ii.total,
+		taxes.id as tax_id, taxes.name as tax_name, ii.rate, ii.tax,
+		jsonb_build_object(
+			'reference', iv.reference,
+			'sku', iv.sku,
+			'barcode', iv.barcode,
+			'vendor_reference', iv.vendor_reference
+		) as identifiers
+		FROM invoices_items AS ii
+		INNER JOIN companies AS com ON (ii.company_id = com.id)
+		INNER JOIN invoices AS i ON (ii.invoice_id = i.id AND ii.company_id = i.company_id)
+		INNER JOIN items_variants AS iv ON (ii.variant_id = iv.id AND ii.company_id = iv.company_id)
+		INNER JOIN items AS it ON (iv.item_id = it.id AND iv.company_id = it.company_id)
+		LEFT JOIN LATERAL (
+			SELECT items_units.unit_id, units.name
+			FROM items_units
+			INNER JOIN units ON (items_units.unit_id = units.id)
+			WHERE items_units.item_id = it.id limit 1
+		) items_units ON true
+		INNER JOIN taxes ON (it.company_id = taxes.company_id AND it.tax_id = taxes.id)
+		WHERE ii.company_id = $1
+		AND ii.invoice_id = $2`, companyID, invoiceID)
 	if err != nil {
 		return nil, err
 	}

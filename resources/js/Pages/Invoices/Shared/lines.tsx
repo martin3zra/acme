@@ -1,4 +1,5 @@
 import { AlertDestructive } from '@/components/alert-destructive';
+import { Badge } from '@/components/ui/badge';
 import { Command, CommandDialog, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
 import { useNumber } from '@/composables/use-number';
 import { useDebounced } from '@/hooks/use-debounced';
@@ -44,6 +45,14 @@ export const Lines = ({
   const [search, setSearch] = useState<string>('');
   const dedbouncedSearch = useDebounced(search, 500);
   const currency = useNumber().currency;
+
+  const formatVariantLabel = (item: Item) => {
+    if (!item.variant_name || item.variant_name === 'Default') {
+      return item.name;
+    }
+
+    return `${item.name} - ${item.variant_name}`;
+  };
 
   const computedItemAmount = (qty: number) => {
     setAmount(qty * (currentItem?.price || 0));
@@ -117,8 +126,8 @@ export const Lines = ({
                 items.map((item) => (
                   <CommandItem
                     asChild
-                    value={String(item.id)}
-                    key={String(item.id)}
+                    value={String(item.variant_id ?? item.id)}
+                    key={String(item.variant_id ?? item.id)}
                     onSelect={() => {
                       handleOnSelected(item);
                       setOpen(false);
@@ -126,8 +135,13 @@ export const Lines = ({
                   >
                     <div className="flex w-full items-center justify-between">
                       <div className="flex w-full flex-col items-start justify-start gap-y-0">
-                        <div>{item.name}</div>
-                        <div className="text-muted-foreground text-xs">{item.description}</div>
+                        <div>{formatVariantLabel(item)}</div>
+                        <div className="text-muted-foreground flex items-center gap-2 text-xs">
+                          {item.sku && <span>SKU: {item.sku}</span>}
+                          {item.barcode && <span>BAR: {item.barcode}</span>}
+                          <Badge variant="outline">Stock: {item.stock_qty ?? 0}</Badge>
+                        </div>
+                        {item.description && <div className="text-muted-foreground text-xs">{item.description}</div>}
                       </div>
                       <div className="text-xl font-medium">{currency(item.price)}</div>
                     </div>

@@ -16,7 +16,8 @@ func (s *Server) findTaxesWiseSales(ctx context.Context, From, To time.Time) ([]
 		SELECT  t.id AS tax_id, t.name AS tax_name, SUM(ii.qty * ii.price * t.rate / 100) AS total_tax
     FROM invoices i
     JOIN invoices_items ii ON i.id = ii.invoice_id
-    JOIN items it ON ii.item_id = it.id
+	    JOIN items_variants iv ON ii.variant_id = iv.id
+	    JOIN items it ON iv.item_id = it.id
     JOIN taxes t ON it.tax_id = t.id
     WHERE i.company_id = $1
     AND i.paid_status = 'paid'
