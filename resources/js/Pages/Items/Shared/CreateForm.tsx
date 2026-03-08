@@ -457,6 +457,14 @@ export default function CreateForm({ onFinish, params }: CreateFormProps) {
     if (params.action === 'edit') put(`/items/${params.item!.uuid}`, options);
   };
 
+  const showVariantMatrixEditor = params.action !== 'view' && data.item_type === 'product' && data.has_variants;
+  const showSingleVariantFields =
+    data.item_type !== 'product' ||
+    (params.action !== 'view' && !data.has_variants) ||
+    (params.action === 'view' && !existingHasVariants);
+  const showExpandedVariantSection =
+    showVariantMatrixEditor || (params.action === 'view' && data.item_type === 'product' && existingHasVariants);
+
   return (
     <div className="flex flex-col space-y-6">
       <FormSection onSubmit={submit}>
@@ -465,40 +473,111 @@ export default function CreateForm({ onFinish, params }: CreateFormProps) {
         <FormSection.Form>
           {propsErrors.status && <div className="mb-4 text-center text-sm font-medium text-red-600">{propsErrors.status}</div>}
 
-          <div className="col-span-4 flex flex-col gap-y-6">
-            <div className="flex flex-col gap-2">
-              <Label htmlFor="item_type">{t('items.single.type')}</Label>
-              <RadioGroup
-                className="grid grid-cols-3 gap-6"
-                value={data.item_type}
-                onChange={(type: ItemType) => {
-                  setData('item_type', type);
+          <div className="col-span-6 grid gap-6 lg:grid-cols-12">
+            <div className="border-border space-y-4 rounded-lg border p-4 lg:col-span-7">
+              <p className="text-muted-foreground text-xs font-semibold tracking-[0.2em]">GENERAL</p>
 
-                  if (type !== 'product') {
-                    setData('has_variants', false);
-                    setSelectedAttributeIDs([]);
-                    setSelectedValuesByAttribute({});
-                    setVariantSetupError('');
-                  }
-                }}
-              >
-                {ItemTypes.map((type: ItemType) => (
-                  <Field key={type}>
-                    <Radio
-                      value={type}
-                      className="group data-checked:bg-primary data-checked:text-primary-foreground bg-primary/5 data-focus:outline-primary relative flex cursor-pointer grid-cols-1 rounded-lg px-5 py-4 shadow-md transition focus:not-data-focus:outline-none data-focus:outline"
-                    >
-                      <div className="flex w-full capitalize">{t(`items.single.${type}`)}</div>
-                      <CheckCircleIcon className="size-6 opacity-0 transition group-data-checked:opacity-100" />
-                    </Radio>
-                  </Field>
-                ))}
-              </RadioGroup>
+              <div className="space-y-2">
+                <Label htmlFor="item_type">{t('items.single.type')}</Label>
+                <RadioGroup
+                  className="grid grid-cols-1 gap-3 sm:grid-cols-3"
+                  value={data.item_type}
+                  onChange={(type: ItemType) => {
+                    setData('item_type', type);
+
+                    if (type !== 'product') {
+                      setData('has_variants', false);
+                      setSelectedAttributeIDs([]);
+                      setSelectedValuesByAttribute({});
+                      setVariantSetupError('');
+                    }
+                  }}
+                >
+                  {ItemTypes.map((type: ItemType) => (
+                    <Field key={type}>
+                      <Radio
+                        value={type}
+                        className="group data-checked:bg-primary data-checked:text-primary-foreground bg-primary/5 data-focus:outline-primary relative flex cursor-pointer grid-cols-1 rounded-lg px-5 py-4 shadow-md transition focus:not-data-focus:outline-none data-focus:outline"
+                      >
+                        <div className="flex w-full capitalize">{t(`items.single.${type}`)}</div>
+                        <CheckCircleIcon className="size-6 opacity-0 transition group-data-checked:opacity-100" />
+                      </Radio>
+                    </Field>
+                  ))}
+                </RadioGroup>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="name">{t('global.name')}</Label>
+                <Input
+                  id="name"
+                  className="mt-1 block w-full"
+                  value={data.name}
+                  onChange={(e) => setData('name', e.target.value)}
+                  required
+                  autoComplete="name"
+                  placeholder="Item name"
+                  readOnly={viewMode}
+                />
+                <InputError className="mt-2" message={errors.name} />
+              </div>
+
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="flex flex-col gap-2">
+                  <Label>{t('global.unit')}</Label>
+                  <Select
+                    onValueChange={(value) => setData('unit_id', Number(value))}
+                    disabled={viewMode}
+                    defaultValue={data.unit_id.toString()}
+                    value={data.unit_id.toString()}
+                    required
+                  >
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="Select item unit" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {params.units.map((unit) => (
+                        <SelectItem key={unit.id} value={unit.id.toString()}>
+                          {unit.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <InputError className="mt-2" message={errors.unit_id} />
+                </div>
+
+                <div className="flex flex-col gap-2">
+                  <Label>{t('global.tax')}</Label>
+                  <Select
+                    onValueChange={(value) => setData('tax_id', Number(value))}
+                    disabled={viewMode}
+                    defaultValue={data.tax_id.toString()}
+                    value={data.tax_id.toString()}
+                    required
+                  >
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="Select item tax" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {params.taxes.map((tax) => (
+                        <SelectItem key={tax.id} value={tax.id.toString()}>
+                          {tax.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <InputError className="mt-2" message={errors.tax_id} />
+                </div>
+              </div>
             </div>
 
-            {params.action !== 'view' && data.item_type === 'product' && (
-              <div className="border-border space-y-4 rounded-lg border p-4">
-                <div className="flex items-center justify-between gap-4">
+            <div
+              className={`border-border space-y-4 rounded-lg border p-4 ${showExpandedVariantSection ? 'lg:col-span-12' : 'lg:col-span-5'}`}
+            >
+              <p className="text-muted-foreground text-xs font-semibold tracking-[0.2em]">VARIANTS</p>
+
+              {params.action !== 'view' && data.item_type === 'product' && (
+                <div className="flex flex-col gap-3 rounded-md border p-3 sm:flex-row sm:items-center sm:justify-between">
                   <div className="space-y-1">
                     <Label htmlFor="has_variants">{t('items.single.hasVariants')}</Label>
                     <p className="text-muted-foreground text-sm">{t('items.single.hasVariantsHelp')}</p>
@@ -516,304 +595,287 @@ export default function CreateForm({ onFinish, params }: CreateFormProps) {
                     }}
                   />
                 </div>
+              )}
 
-                {data.has_variants && (
-                  <div className="space-y-4">
-                    <p className="text-muted-foreground text-sm">{t('items.single.variantSetup.priceTemplateHelp')}</p>
-                    <p className="text-muted-foreground text-sm">{t('items.single.variantSetup.skuAutoHelp')}</p>
+              {showSingleVariantFields && (
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="price">{t('global.price')}</Label>
+                    <Input
+                      id="price"
+                      type="number"
+                      className="text-right"
+                      value={data.price}
+                      onChange={(e) => setData('price', e.target.valueAsNumber)}
+                      placeholder="0.00"
+                      readOnly={viewMode}
+                    />
+                    <InputError className="mt-2" message={errors.price} />
+                  </div>
 
-                    <div className="space-y-2">
-                      <Label>{t('items.single.variantSetup.attributes')}</Label>
-                      {attributeOptions.length === 0 && (
-                        <p className="text-muted-foreground text-sm">{t('items.single.variantSetup.noAttributes')}</p>
-                      )}
+                  <div className="space-y-2">
+                    <Label htmlFor="sku">{t('global.sku')}</Label>
+                    <Input
+                      id="sku"
+                      value={data.sku}
+                      onChange={(e) => setData('sku', e.target.value)}
+                      autoComplete="sku"
+                      placeholder="Item sku"
+                      readOnly={viewMode}
+                    />
+                    <InputError className="mt-2" message={errors.sku} />
+                  </div>
 
-                      {attributeOptions.map((attribute) => (
-                        <div key={attribute.id} className="flex items-center gap-2">
-                          <Checkbox
-                            id={`attribute-${attribute.id}`}
-                            checked={selectedAttributeIDs.includes(attribute.id)}
-                            onCheckedChange={(checked) => toggleAttribute(attribute.id, checked === true)}
-                          />
-                          <Label htmlFor={`attribute-${attribute.id}`}>{attribute.display_name || attribute.name}</Label>
-                        </div>
-                      ))}
-                    </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="barcode">{t('global.barcode')}</Label>
+                    <Input
+                      id="barcode"
+                      value={data.barcode}
+                      onChange={(e) => setData('barcode', e.target.value)}
+                      autoComplete="barcode"
+                      placeholder="Item barcode"
+                      readOnly={viewMode}
+                    />
+                    <InputError className="mt-2" message={errors.barcode} />
+                  </div>
+                </div>
+              )}
 
-                    {selectedAttributeIDs.map((attributeID) => {
-                      const attribute = attributeOptions.find((entry) => entry.id === attributeID);
-                      if (!attribute) {
-                        return null;
-                      }
+              {showVariantMatrixEditor && (
+                <div className="space-y-4">
+                  <p className="text-muted-foreground text-sm">{t('items.single.variantSetup.priceTemplateHelp')}</p>
+                  <p className="text-muted-foreground text-sm">{t('items.single.variantSetup.skuAutoHelp')}</p>
 
-                      return (
-                        <div key={`values-${attributeID}`} className="space-y-2">
-                          <Label>{attribute.display_name || attribute.name}</Label>
+                  <div className="space-y-2">
+                    <Label>{t('items.single.variantSetup.attributes')}</Label>
+                    {attributeOptions.length === 0 && <p className="text-muted-foreground text-sm">{t('items.single.variantSetup.noAttributes')}</p>}
 
-                          {(attribute.values || []).length === 0 ? (
-                            <p className="text-muted-foreground text-sm">{t('items.single.variantSetup.noValues')}</p>
-                          ) : (
-                            <div className="grid gap-2 sm:grid-cols-2">
-                              {(attribute.values || []).map((value) => (
-                                <div key={value.id} className="flex items-center gap-2">
-                                  <Checkbox
-                                    id={`attribute-${attributeID}-value-${value.id}`}
-                                    checked={(selectedValuesByAttribute[attributeID] || []).includes(value.id)}
-                                    onCheckedChange={(checked) => toggleAttributeValue(attributeID, value.id, checked === true)}
-                                  />
-                                  <Label htmlFor={`attribute-${attributeID}-value-${value.id}`}>{value.display_name || value.value}</Label>
-                                </div>
-                              ))}
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })}
-
-                    {variantComboPreviews.length > 0 && (
-                      <div className="space-y-3">
-                        <div className="flex items-center justify-between">
-                          <Label>{t('items.single.variantSetup.variants')}</Label>
-                          <div className="flex gap-2">
-                            <Button
-                              type="button"
-                              variant="outline"
-                              size="sm"
-                              onClick={() => {
-                                const price = prompt(t('items.single.variantSetup.bulkPricePrompt'));
-                                if (price) {
-                                  const numPrice = parseFloat(price);
-                                  if (!isNaN(numPrice) && numPrice >= 0) {
-                                    handleBulkApplyPrice(numPrice);
-                                  }
-                                }
-                              }}
-                            >
-                              Apply Price to All
-                            </Button>
-                            <Button type="button" variant="outline" size="sm" onClick={handleBulkGenerateSKUs}>
-                              Generate SKUs
-                            </Button>
-                            <Button type="button" variant="outline" size="sm" onClick={handleBulkGenerateBarcodes}>
-                              Generate Barcodes
-                            </Button>
-                          </div>
-                        </div>
-                        {params.action === 'edit' && (
-                          <p className="text-muted-foreground text-sm">{t('items.single.variantSetup.existingLockedHelp')}</p>
-                        )}
-
-                        <div className="overflow-x-auto rounded-md border">
-                          <table className="w-full text-sm">
-                            <thead className="bg-muted/50 border-b">
-                              <tr>
-                                <th className="p-2 text-left font-medium">{t('global.variant')}</th>
-                                <th className="w-32 p-2 text-left font-medium">{t('global.sku')}</th>
-                                <th className="w-32 p-2 text-left font-medium">{t('global.barcode')}</th>
-                                <th className="w-28 p-2 text-left font-medium">{t('global.reference')}</th>
-                                <th className="w-28 p-2 text-left font-medium">Vendor Ref</th>
-                                <th className="w-24 p-2 text-right font-medium">Cost Price</th>
-                                <th className="w-24 p-2 text-right font-medium">{t('global.price')}</th>
-                                <th className="w-16 p-2 text-center font-medium">Active</th>
-                              </tr>
-                            </thead>
-                            <tbody>
-                              {variantComboPreviews.map((combo) => {
-                                const isExistingVariant = params.action === 'edit' && existingVariantSignatures.has(combo.key);
-                                const isActive = variantActiveOverrides[combo.key] !== undefined ? variantActiveOverrides[combo.key] : true;
-
-                                return (
-                                  <tr key={combo.key} className={`border-b last:border-0 ${!isActive ? 'opacity-50' : ''}`}>
-                                    <td className="p-2">
-                                      <div className="text-sm">
-                                        {combo.label || '-'}
-                                        {isExistingVariant && (
-                                          <span className="text-muted-foreground ml-2 text-xs">
-                                            ({t('items.single.variantSetup.existingLockedTag')})
-                                          </span>
-                                        )}
-                                      </div>
-                                    </td>
-                                    <td className="p-2">
-                                      <Input
-                                        type="text"
-                                        className="h-8 text-xs"
-                                        value={variantSKUOverrides[combo.key] ?? generateSuggestedVariantSKU(combo)}
-                                        disabled={isExistingVariant}
-                                        onChange={(e) => {
-                                          setVariantSKUOverrides((current) => ({
-                                            ...current,
-                                            [combo.key]: e.target.value,
-                                          }));
-                                        }}
-                                      />
-                                    </td>
-                                    <td className="p-2">
-                                      <Input
-                                        type="text"
-                                        className="h-8 text-xs"
-                                        value={variantBarcodeOverrides[combo.key] ?? ''}
-                                        disabled={isExistingVariant}
-                                        placeholder="Barcode"
-                                        onChange={(e) => {
-                                          setVariantBarcodeOverrides((current) => ({
-                                            ...current,
-                                            [combo.key]: e.target.value,
-                                          }));
-                                        }}
-                                      />
-                                    </td>
-                                    <td className="p-2">
-                                      <Input
-                                        type="text"
-                                        className="h-8 text-xs"
-                                        value={variantReferenceOverrides[combo.key] ?? ''}
-                                        disabled={isExistingVariant}
-                                        placeholder="Ref"
-                                        onChange={(e) => {
-                                          setVariantReferenceOverrides((current) => ({
-                                            ...current,
-                                            [combo.key]: e.target.value,
-                                          }));
-                                        }}
-                                      />
-                                    </td>
-                                    <td className="p-2">
-                                      <Input
-                                        type="text"
-                                        className="h-8 text-xs"
-                                        value={variantVendorRefOverrides[combo.key] ?? ''}
-                                        disabled={isExistingVariant}
-                                        placeholder="Vendor"
-                                        onChange={(e) => {
-                                          setVariantVendorRefOverrides((current) => ({
-                                            ...current,
-                                            [combo.key]: e.target.value,
-                                          }));
-                                        }}
-                                      />
-                                    </td>
-                                    <td className="p-2">
-                                      <Input
-                                        type="number"
-                                        min={0}
-                                        step="0.01"
-                                        className="h-8 text-right text-xs"
-                                        value={variantCostPriceOverrides[combo.key]?.toString() ?? ''}
-                                        disabled={isExistingVariant}
-                                        placeholder="0.00"
-                                        onChange={(e) => {
-                                          const value = e.target.valueAsNumber;
-                                          setVariantCostPriceOverrides((current) => ({
-                                            ...current,
-                                            [combo.key]: Number.isNaN(value) ? undefined : value,
-                                          }));
-                                        }}
-                                      />
-                                    </td>
-                                    <td className="p-2">
-                                      <Input
-                                        type="number"
-                                        min={0}
-                                        step="0.01"
-                                        className="h-8 text-right text-xs"
-                                        value={(variantPriceOverrides[combo.key] ?? data.price).toString()}
-                                        disabled={isExistingVariant}
-                                        onChange={(e) => {
-                                          const value = e.target.valueAsNumber;
-                                          setVariantPriceOverrides((current) => ({
-                                            ...current,
-                                            [combo.key]: Number.isNaN(value) ? undefined : value,
-                                          }));
-                                        }}
-                                      />
-                                    </td>
-                                    <td className="p-2 text-center">
-                                      <Checkbox
-                                        checked={isActive}
-                                        disabled={isExistingVariant}
-                                        onCheckedChange={(checked) => {
-                                          setVariantActiveOverrides((current) => ({
-                                            ...current,
-                                            [combo.key]: checked === true,
-                                          }));
-                                        }}
-                                      />
-                                    </td>
-                                  </tr>
-                                );
-                              })}
-                            </tbody>
-                          </table>
-                        </div>
+                    {attributeOptions.map((attribute) => (
+                      <div key={attribute.id} className="flex items-center gap-2">
+                        <Checkbox
+                          id={`attribute-${attribute.id}`}
+                          checked={selectedAttributeIDs.includes(attribute.id)}
+                          onCheckedChange={(checked) => toggleAttribute(attribute.id, checked === true)}
+                        />
+                        <Label htmlFor={`attribute-${attribute.id}`}>{attribute.display_name || attribute.name}</Label>
                       </div>
-                    )}
+                    ))}
+                  </div>
 
-                    {params.action === 'edit' && (
-                      <div className="space-y-2">
-                        <Label>{t('items.single.variantSetup.variants')}</Label>
-                        {(existingVariantSetup?.variants || []).length === 0 ? (
-                          <p className="text-muted-foreground text-sm">{t('items.single.variantSetup.noVariants')}</p>
+                  {selectedAttributeIDs.map((attributeID) => {
+                    const attribute = attributeOptions.find((entry) => entry.id === attributeID);
+                    if (!attribute) {
+                      return null;
+                    }
+
+                    return (
+                      <div key={`values-${attributeID}`} className="space-y-2">
+                        <Label>{attribute.display_name || attribute.name}</Label>
+
+                        {(attribute.values || []).length === 0 ? (
+                          <p className="text-muted-foreground text-sm">{t('items.single.variantSetup.noValues')}</p>
                         ) : (
-                          <div className="space-y-1">
-                            {existingVariantSetup!.variants.map((variant) => (
-                              <p key={variant.uuid} className="text-sm">
-                                <span className="font-medium">{variant.name}</span> ({variant.sku})
-                              </p>
+                          <div className="grid gap-2 sm:grid-cols-2">
+                            {(attribute.values || []).map((value) => (
+                              <div key={value.id} className="flex items-center gap-2">
+                                <Checkbox
+                                  id={`attribute-${attributeID}-value-${value.id}`}
+                                  checked={(selectedValuesByAttribute[attributeID] || []).includes(value.id)}
+                                  onCheckedChange={(checked) => toggleAttributeValue(attributeID, value.id, checked === true)}
+                                />
+                                <Label htmlFor={`attribute-${attributeID}-value-${value.id}`}>{value.display_name || value.value}</Label>
+                              </div>
                             ))}
                           </div>
                         )}
                       </div>
-                    )}
+                    );
+                  })}
 
-                    {!!variantSetupError && <InputError className="mt-2" message={variantSetupError} />}
-                  </div>
-                )}
-
-                {!data.has_variants && params.action === 'edit' && (
-                  <div className="rounded-md bg-blue-50 p-3">
-                    <p className="text-sm text-blue-800">{t('items.single.variantSetup.noVariantsConfigured')}</p>
-                  </div>
-                )}
-              </div>
-            )}
-
-            {params.action === 'view' && data.item_type === 'product' && (
-              <div className="border-border space-y-4 rounded-lg border p-4">
-                <div className="space-y-1">
-                  <Label>{t('items.single.variantSetup.currentTitle')}</Label>
-                  <p className="text-muted-foreground text-sm">{t('items.single.variantSetup.currentDescription')}</p>
-                </div>
-
-                {existingVariantSetup && existingHasVariants ? (
-                  <>
-                    <div className="space-y-2">
-                      <Label>{t('items.single.variantSetup.attributes')}</Label>
-                      <p className="text-sm">{selectedAttributeLabels.join(', ') || '-'}</p>
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label>{t('items.single.variantSetup.values')}</Label>
-                      {selectedAttributeValueLabels.length === 0 ? (
-                        <p className="text-muted-foreground text-sm">{t('items.single.variantSetup.noValues')}</p>
-                      ) : (
-                        <div className="space-y-1">
-                          {selectedAttributeValueLabels.map((entry) => (
-                            <p key={entry.attribute} className="text-sm">
-                              <span className="font-medium">{entry.attribute}:</span> {entry.labels.join(', ') || '-'}
-                            </p>
-                          ))}
+                  {variantComboPreviews.length > 0 && (
+                    <div className="space-y-3">
+                      <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                        <Label>{t('items.single.variantSetup.variants')}</Label>
+                        <div className="flex flex-wrap gap-2">
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                              const price = prompt(t('items.single.variantSetup.bulkPricePrompt'));
+                              if (price) {
+                                const numPrice = parseFloat(price);
+                                if (!isNaN(numPrice) && numPrice >= 0) {
+                                  handleBulkApplyPrice(numPrice);
+                                }
+                              }
+                            }}
+                          >
+                            Apply Price to All
+                          </Button>
+                          <Button type="button" variant="outline" size="sm" onClick={handleBulkGenerateSKUs}>
+                            Generate SKUs
+                          </Button>
+                          <Button type="button" variant="outline" size="sm" onClick={handleBulkGenerateBarcodes}>
+                            Generate Barcodes
+                          </Button>
                         </div>
-                      )}
-                    </div>
+                      </div>
 
+                      {params.action === 'edit' && <p className="text-muted-foreground text-sm">{t('items.single.variantSetup.existingLockedHelp')}</p>}
+
+                      <div className="overflow-x-auto rounded-md border">
+                        <table className="w-full text-sm">
+                          <thead className="bg-muted/50 border-b">
+                            <tr>
+                              <th className="p-2 text-left font-medium">{t('global.variant')}</th>
+                              <th className="w-32 p-2 text-left font-medium">{t('global.sku')}</th>
+                              <th className="w-32 p-2 text-left font-medium">{t('global.barcode')}</th>
+                              <th className="w-28 p-2 text-left font-medium">{t('global.reference')}</th>
+                              <th className="w-28 p-2 text-left font-medium">Vendor Ref</th>
+                              <th className="w-24 p-2 text-right font-medium">Cost Price</th>
+                              <th className="w-24 p-2 text-right font-medium">{t('global.price')}</th>
+                              <th className="w-16 p-2 text-center font-medium">Active</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {variantComboPreviews.map((combo) => {
+                              const isExistingVariant = params.action === 'edit' && existingVariantSignatures.has(combo.key);
+                              const isActive = variantActiveOverrides[combo.key] !== undefined ? variantActiveOverrides[combo.key] : true;
+
+                              return (
+                                <tr key={combo.key} className={`border-b last:border-0 ${!isActive ? 'opacity-50' : ''}`}>
+                                  <td className="p-2">
+                                    <div className="text-sm">
+                                      {combo.label || '-'}
+                                      {isExistingVariant && (
+                                        <span className="text-muted-foreground ml-2 text-xs">({t('items.single.variantSetup.existingLockedTag')})</span>
+                                      )}
+                                    </div>
+                                  </td>
+                                  <td className="p-2">
+                                    <Input
+                                      type="text"
+                                      className="h-8 text-xs"
+                                      value={variantSKUOverrides[combo.key] ?? generateSuggestedVariantSKU(combo)}
+                                      disabled={isExistingVariant}
+                                      onChange={(e) => {
+                                        setVariantSKUOverrides((current) => ({
+                                          ...current,
+                                          [combo.key]: e.target.value,
+                                        }));
+                                      }}
+                                    />
+                                  </td>
+                                  <td className="p-2">
+                                    <Input
+                                      type="text"
+                                      className="h-8 text-xs"
+                                      value={variantBarcodeOverrides[combo.key] ?? ''}
+                                      disabled={isExistingVariant}
+                                      placeholder="Barcode"
+                                      onChange={(e) => {
+                                        setVariantBarcodeOverrides((current) => ({
+                                          ...current,
+                                          [combo.key]: e.target.value,
+                                        }));
+                                      }}
+                                    />
+                                  </td>
+                                  <td className="p-2">
+                                    <Input
+                                      type="text"
+                                      className="h-8 text-xs"
+                                      value={variantReferenceOverrides[combo.key] ?? ''}
+                                      disabled={isExistingVariant}
+                                      placeholder="Ref"
+                                      onChange={(e) => {
+                                        setVariantReferenceOverrides((current) => ({
+                                          ...current,
+                                          [combo.key]: e.target.value,
+                                        }));
+                                      }}
+                                    />
+                                  </td>
+                                  <td className="p-2">
+                                    <Input
+                                      type="text"
+                                      className="h-8 text-xs"
+                                      value={variantVendorRefOverrides[combo.key] ?? ''}
+                                      disabled={isExistingVariant}
+                                      placeholder="Vendor"
+                                      onChange={(e) => {
+                                        setVariantVendorRefOverrides((current) => ({
+                                          ...current,
+                                          [combo.key]: e.target.value,
+                                        }));
+                                      }}
+                                    />
+                                  </td>
+                                  <td className="p-2">
+                                    <Input
+                                      type="number"
+                                      min={0}
+                                      step="0.01"
+                                      className="h-8 text-right text-xs"
+                                      value={variantCostPriceOverrides[combo.key]?.toString() ?? ''}
+                                      disabled={isExistingVariant}
+                                      placeholder="0.00"
+                                      onChange={(e) => {
+                                        const value = e.target.valueAsNumber;
+                                        setVariantCostPriceOverrides((current) => ({
+                                          ...current,
+                                          [combo.key]: Number.isNaN(value) ? undefined : value,
+                                        }));
+                                      }}
+                                    />
+                                  </td>
+                                  <td className="p-2">
+                                    <Input
+                                      type="number"
+                                      min={0}
+                                      step="0.01"
+                                      className="h-8 text-right text-xs"
+                                      value={(variantPriceOverrides[combo.key] ?? data.price).toString()}
+                                      disabled={isExistingVariant}
+                                      onChange={(e) => {
+                                        const value = e.target.valueAsNumber;
+                                        setVariantPriceOverrides((current) => ({
+                                          ...current,
+                                          [combo.key]: Number.isNaN(value) ? undefined : value,
+                                        }));
+                                      }}
+                                    />
+                                  </td>
+                                  <td className="p-2 text-center">
+                                    <Checkbox
+                                      checked={isActive}
+                                      disabled={isExistingVariant}
+                                      onCheckedChange={(checked) => {
+                                        setVariantActiveOverrides((current) => ({
+                                          ...current,
+                                          [combo.key]: checked === true,
+                                        }));
+                                      }}
+                                    />
+                                  </td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  )}
+
+                  {params.action === 'edit' && (
                     <div className="space-y-2">
                       <Label>{t('items.single.variantSetup.variants')}</Label>
-                      {(existingVariantSetup.variants || []).length === 0 ? (
+                      {(existingVariantSetup?.variants || []).length === 0 ? (
                         <p className="text-muted-foreground text-sm">{t('items.single.variantSetup.noVariants')}</p>
                       ) : (
                         <div className="space-y-1">
-                          {existingVariantSetup.variants.map((variant) => (
+                          {existingVariantSetup!.variants.map((variant) => (
                             <p key={variant.uuid} className="text-sm">
                               <span className="font-medium">{variant.name}</span> ({variant.sku})
                             </p>
@@ -821,92 +883,122 @@ export default function CreateForm({ onFinish, params }: CreateFormProps) {
                         </div>
                       )}
                     </div>
-                  </>
-                ) : (
-                  <div className="rounded-md bg-blue-50 p-3">
-                    <p className="text-sm text-blue-800">{t('items.single.variantSetup.noVariantsConfigured')}</p>
+                  )}
+
+                  {!!variantSetupError && <InputError className="mt-2" message={variantSetupError} />}
+                </div>
+              )}
+
+              {params.action !== 'view' && data.item_type === 'product' && !data.has_variants && (
+                <div className="rounded-md bg-blue-50 p-3">
+                  <p className="text-sm text-blue-800">{t('items.single.variantSetup.noVariantsConfigured')}</p>
+                </div>
+              )}
+
+              {params.action === 'view' && data.item_type === 'product' && (
+                <div className="space-y-4 rounded-md border p-3">
+                  <div className="space-y-1">
+                    <Label>{t('items.single.variantSetup.currentTitle')}</Label>
+                    <p className="text-muted-foreground text-sm">{t('items.single.variantSetup.currentDescription')}</p>
                   </div>
-                )}
-              </div>
-            )}
-            <div className="flex flex-col gap-2">
-              <div className="gap-2">
-                <Label htmlFor="name">{t('global.name')}</Label>
-                <Input
-                  id="name"
-                  className="mt-1 block w-full"
-                  value={data.name}
-                  onChange={(e) => setData('name', e.target.value)}
-                  required
-                  autoComplete="name"
-                  placeholder="Item name"
-                  readOnly={viewMode}
-                />
-                <InputError className="mt-2" message={errors.name} />
-              </div>
+
+                  {existingVariantSetup && existingHasVariants ? (
+                    <>
+                      <div className="space-y-2">
+                        <Label>{t('items.single.variantSetup.attributes')}</Label>
+                        <p className="text-sm">{selectedAttributeLabels.join(', ') || '-'}</p>
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label>{t('items.single.variantSetup.values')}</Label>
+                        {selectedAttributeValueLabels.length === 0 ? (
+                          <p className="text-muted-foreground text-sm">{t('items.single.variantSetup.noValues')}</p>
+                        ) : (
+                          <div className="space-y-1">
+                            {selectedAttributeValueLabels.map((entry) => (
+                              <p key={entry.attribute} className="text-sm">
+                                <span className="font-medium">{entry.attribute}:</span> {entry.labels.join(', ') || '-'}
+                              </p>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label>{t('items.single.variantSetup.variants')}</Label>
+                        {(existingVariantSetup.variants || []).length === 0 ? (
+                          <p className="text-muted-foreground text-sm">{t('items.single.variantSetup.noVariants')}</p>
+                        ) : (
+                          <div className="space-y-1">
+                            {existingVariantSetup.variants.map((variant) => (
+                              <p key={variant.uuid} className="text-sm">
+                                <span className="font-medium">{variant.name}</span> ({variant.sku})
+                              </p>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    </>
+                  ) : (
+                    <div className="rounded-md bg-blue-50 p-3">
+                      <p className="text-sm text-blue-800">{t('items.single.variantSetup.noVariantsConfigured')}</p>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
-            <div className="flex flex-col gap-2">
-              <div className="flex items-center justify-between gap-x-2">
-                <div className="flex flex-col gap-2">
-                  <Label>{t('global.unit')}</Label>
-                  <Select
-                    onValueChange={(value) => setData('unit_id', Number(value))}
-                    disabled={viewMode}
-                    defaultValue={data.unit_id.toString()}
-                    value={data.unit_id.toString()}
-                    required
-                  >
-                    <SelectTrigger className="w-44">
-                      <SelectValue placeholder="Select item unit" />
-                    </SelectTrigger>
-                    <SelectContent className="">
-                      {params.units.map((unit) => (
-                        <SelectItem key={unit.id} value={unit.id.toString()}>
-                          {unit.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <InputError className="mt-2" message={errors.unit_id} />
-                </div>
-                <div className="flex flex-col gap-2">
-                  <Label>{t('global.tax')}</Label>
-                  <Select
-                    onValueChange={(value) => setData('tax_id', Number(value))}
-                    disabled={viewMode}
-                    defaultValue={data.tax_id.toString()}
-                    value={data.tax_id.toString()}
-                    required
-                  >
-                    <SelectTrigger className="w-44">
-                      <SelectValue placeholder="Select item tax" />
-                    </SelectTrigger>
-                    <SelectContent className="">
-                      {params.taxes.map((tax) => (
-                        <SelectItem key={tax.id} value={tax.id.toString()}>
-                          {tax.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <InputError className="mt-2" message={errors.tax_id} />
-                </div>
-                <div className="flex flex-col gap-2">
-                  <Label htmlFor="price">{t('global.price')}</Label>
+
+            <div className="border-border space-y-4 rounded-lg border p-4 lg:col-span-6">
+              <p className="text-muted-foreground text-xs font-semibold tracking-[0.2em]">INVENTORY</p>
+
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-2">
+                  <Label htmlFor="reference">{t('global.reference')}</Label>
                   <Input
-                    id="price"
-                    type="number"
-                    className="mt-0 block w-full max-w-40 text-right"
-                    value={data.price}
-                    onChange={(e) => setData('price', e.target.valueAsNumber)}
-                    placeholder="Jane Doe"
+                    id="reference"
+                    value={data.reference}
+                    onChange={(e) => setData('reference', e.target.value)}
+                    autoComplete="reference"
+                    placeholder="Item reference"
                     readOnly={viewMode}
                   />
-                  <InputError className="mt-2" message={errors.price} />
+                  <InputError className="mt-2" message={errors.reference} />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="code">{t('global.code')}</Label>
+                  <Input
+                    id="code"
+                    value={data.code}
+                    onChange={(e) => setData('code', e.target.value)}
+                    autoComplete="code"
+                    placeholder="Item code"
+                    readOnly={viewMode}
+                  />
+                  <InputError className="mt-2" message={errors.code} />
                 </div>
               </div>
             </div>
-            <div className="flex flex-col gap-2">
+
+            <div className="border-border space-y-4 rounded-lg border p-4 lg:col-span-6">
+              <p className="text-muted-foreground text-xs font-semibold tracking-[0.2em]">PURCHASING</p>
+
+              <div className="space-y-2">
+                <Label htmlFor="vendor_reference">{t('items.single.vendor_reference')}</Label>
+                <Input
+                  id="vendor_reference"
+                  value={data.vendor_reference}
+                  onChange={(e) => setData('vendor_reference', e.target.value)}
+                  placeholder="Item vendor reference"
+                  readOnly={viewMode}
+                />
+                <InputError className="mt-2" message={errors.vendor_reference} />
+              </div>
+            </div>
+
+            <div className="border-border space-y-4 rounded-lg border p-4 lg:col-span-12">
+              <p className="text-muted-foreground text-xs font-semibold tracking-[0.2em]">DESCRIPTION</p>
+
               <div className="grid gap-2">
                 <Label htmlFor="description">{t('global.description')}</Label>
                 <textarea
@@ -914,87 +1006,11 @@ export default function CreateForm({ onFinish, params }: CreateFormProps) {
                   className="mt-1 block w-full rounded-lg border border-gray-300 bg-gray-50 p-2.5 text-sm text-gray-900 focus:border-blue-500 focus:ring-blue-500"
                   value={data.description}
                   onChange={(e) => setData('description', e.target.value)}
-                  placeholder="Wrire some description here..."
+                  placeholder="Write some description here..."
                   rows={3}
                   readOnly={viewMode}
                 />
                 <InputError className="mt-2" message={errors.description} />
-              </div>
-            </div>
-          </div>
-          <div className="col-span-2 space-y-6">
-            <div className="flex flex-col gap-2">
-              <div className="gap-2">
-                <Label htmlFor="reference">{t('global.reference')}</Label>
-                <Input
-                  id="reference"
-                  className="mt-1 block w-full"
-                  value={data.reference}
-                  onChange={(e) => setData('reference', e.target.value)}
-                  autoComplete="reference"
-                  placeholder="Item reference"
-                  readOnly={viewMode}
-                />
-                <InputError className="mt-2" message={errors.reference} />
-              </div>
-            </div>
-            <div className="flex flex-col gap-2">
-              <div className="gap-2">
-                <Label htmlFor="code">{t('global.code')}</Label>
-                <Input
-                  id="code"
-                  className="mt-1 block w-full"
-                  value={data.code}
-                  onChange={(e) => setData('code', e.target.value)}
-                  autoComplete="code"
-                  placeholder="Item code"
-                  readOnly={viewMode}
-                />
-                <InputError className="mt-2" message={errors.code} />
-              </div>
-            </div>
-            <div className="flex flex-col gap-2">
-              <div className="gap-2">
-                <Label htmlFor="sku">{t('global.sku')}</Label>
-                <Input
-                  id="sku"
-                  className="mt-1 block w-full"
-                  value={data.sku}
-                  onChange={(e) => setData('sku', e.target.value)}
-                  autoComplete="sku"
-                  placeholder="Item sku"
-                  readOnly={viewMode}
-                />
-                <InputError className="mt-2" message={errors.sku} />
-              </div>
-            </div>
-            <div className="flex flex-col gap-2">
-              <div className="gap-2">
-                <Label htmlFor="barcode">{t('global.barcode')}</Label>
-                <Input
-                  id="barcode"
-                  className="mt-1 block w-full"
-                  value={data.barcode}
-                  onChange={(e) => setData('barcode', e.target.value)}
-                  autoComplete="barcode"
-                  placeholder="Item barcode"
-                  readOnly={viewMode}
-                />
-                <InputError className="mt-2" message={errors.barcode} />
-              </div>
-            </div>
-            <div className="flex flex-col gap-2">
-              <div className="gap-2">
-                <Label htmlFor="vendor_reference">{t('items.single.vendor_reference')}</Label>
-                <Input
-                  id="vendor_reference"
-                  className="mt-1 block w-full"
-                  value={data.vendor_reference}
-                  onChange={(e) => setData('vendor_reference', e.target.value)}
-                  placeholder="Item vendor reference"
-                  readOnly={viewMode}
-                />
-                <InputError className="mt-2" message={errors.vendor_reference} />
               </div>
             </div>
           </div>
