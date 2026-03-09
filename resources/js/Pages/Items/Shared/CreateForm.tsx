@@ -1429,20 +1429,24 @@ export default function CreateForm({ onFinish, params }: CreateFormProps) {
                         )}
                       </div>
 
-                      <div ref={variantTableContainerRef} className="max-h-136 overflow-auto rounded-md border" onScroll={handleVariantTableScroll}>
-                        <table className="w-full text-sm">
+                      <div
+                        ref={variantTableContainerRef}
+                        className="max-h-136 overflow-x-auto overflow-y-auto rounded-md border"
+                        onScroll={handleVariantTableScroll}
+                      >
+                        <table className="w-full min-w-360 text-sm">
                           <thead className="bg-muted/50 border-b">
                             <tr>
-                              <th className="p-2 text-left font-medium">{t('global.variant')}</th>
-                              <th className="w-32 p-2 text-left font-medium">{t('global.sku')}</th>
-                              <th className="w-32 p-2 text-left font-medium">{t('global.barcode')}</th>
-                              <th className="w-28 p-2 text-left font-medium">{t('global.reference')}</th>
-                              <th className="w-28 p-2 text-left font-medium">Vendor Ref</th>
-                              <th className="w-24 p-2 text-right font-medium">Cost Price</th>
-                              <th className="w-24 p-2 text-right font-medium">{t('global.price')}</th>
-                              <th className="w-20 p-2 text-center font-medium">Track</th>
-                              <th className="p-2 text-left font-medium">Warehouse quantities</th>
-                              <th className="w-16 p-2 text-center font-medium">Active</th>
+                              <th className="w-64 min-w-44 p-2 text-left font-medium">{t('global.variant')}</th>
+                              <th className="w-44 min-w-44 p-2 text-left font-medium">{t('global.sku')}</th>
+                              <th className="w-44 min-w-44 p-2 text-left font-medium">{t('global.barcode')}</th>
+                              <th className="w-36 min-w-36 p-2 text-left font-medium">{t('global.reference')}</th>
+                              <th className="w-36 min-w-36 p-2 text-left font-medium">Vendor Ref</th>
+                              <th className="w-32 min-w-32 p-2 text-right font-medium">Cost Price</th>
+                              <th className="w-32 min-w-32 p-2 text-right font-medium">{t('global.price')}</th>
+                              <th className="w-24 min-w-24 p-2 text-center font-medium">Track</th>
+                              <th className="min-w-84 p-2 text-left font-medium">Warehouse quantities</th>
+                              <th className="bg-muted/50 sticky right-0 z-20 w-20 min-w-20 border-l p-2 text-center font-medium">Active</th>
                             </tr>
                           </thead>
                           <tbody>
@@ -1461,13 +1465,13 @@ export default function CreateForm({ onFinish, params }: CreateFormProps) {
 
                                 return (
                                   <tr key={combo.key} className={`border-b last:border-0 ${!isActive ? 'opacity-50' : ''}`}>
-                                    <td className="p-2">
-                                      <div className="text-sm">{combo.label || '-'}</div>
+                                    <td className="w-64 min-w-64 p-2">
+                                      <div className="text-sm whitespace-nowrap">{combo.label || '-'}</div>
                                     </td>
                                     <td className="p-2">
                                       <Input
                                         type="text"
-                                        className="h-8 text-xs"
+                                        className="h-9 text-sm"
                                         value={variantSKUOverrides[combo.key] ?? combo.sku ?? ''}
                                         placeholder="SKU"
                                         onChange={(e) => {
@@ -1481,7 +1485,7 @@ export default function CreateForm({ onFinish, params }: CreateFormProps) {
                                     <td className="p-2">
                                       <Input
                                         type="text"
-                                        className="h-8 text-xs"
+                                        className="h-9 text-sm"
                                         value={variantBarcodeOverrides[combo.key] ?? combo.barcode ?? ''}
                                         placeholder="Barcode"
                                         onChange={(e) => {
@@ -1495,7 +1499,7 @@ export default function CreateForm({ onFinish, params }: CreateFormProps) {
                                     <td className="p-2">
                                       <Input
                                         type="text"
-                                        className="h-8 text-xs"
+                                        className="h-9 text-sm"
                                         value={variantReferenceOverrides[combo.key] ?? combo.reference ?? ''}
                                         placeholder="Ref"
                                         onChange={(e) => {
@@ -1509,7 +1513,7 @@ export default function CreateForm({ onFinish, params }: CreateFormProps) {
                                     <td className="p-2">
                                       <Input
                                         type="text"
-                                        className="h-8 text-xs"
+                                        className="h-9 text-sm"
                                         value={variantVendorRefOverrides[combo.key] ?? combo.vendor_reference ?? ''}
                                         placeholder="Vendor"
                                         onChange={(e) => {
@@ -1525,7 +1529,7 @@ export default function CreateForm({ onFinish, params }: CreateFormProps) {
                                         type="number"
                                         min={0}
                                         step="0.01"
-                                        className="h-8 text-right text-xs"
+                                        className="h-9 text-right text-sm"
                                         value={(variantCostPriceOverrides[combo.key] ?? combo.cost_price)?.toString() ?? ''}
                                         placeholder="0.00"
                                         onChange={(e) => {
@@ -1542,7 +1546,7 @@ export default function CreateForm({ onFinish, params }: CreateFormProps) {
                                         type="number"
                                         min={0}
                                         step="0.01"
-                                        className="h-8 text-right text-xs"
+                                        className="h-9 text-right text-sm"
                                         value={(variantPriceOverrides[combo.key] ?? combo.price ?? data.price).toString()}
                                         onChange={(e) => {
                                           const value = e.target.valueAsNumber;
@@ -1572,13 +1576,13 @@ export default function CreateForm({ onFinish, params }: CreateFormProps) {
                                       ) : (
                                         <div className="space-y-2">
                                           {warehouseOptions.map((warehouse) => (
-                                            <div key={`${combo.key}-stock-${warehouse.id}`} className="grid grid-cols-[1fr_120px] items-center gap-3">
+                                            <div key={`${combo.key}-stock-${warehouse.id}`} className="grid grid-cols-[1fr_160px] items-center gap-3">
                                               <p className="text-xs font-medium whitespace-nowrap">{warehouse.name} -&gt; quantity</p>
                                               <Input
                                                 type="number"
                                                 min={0}
                                                 step={1}
-                                                className="h-8 text-right text-xs"
+                                                className="h-9 text-right text-sm"
                                                 value={(stockByWarehouse[warehouse.id] ?? 0).toString()}
                                                 onChange={(e) => {
                                                   const value = e.target.valueAsNumber;
@@ -1590,7 +1594,7 @@ export default function CreateForm({ onFinish, params }: CreateFormProps) {
                                         </div>
                                       )}
                                     </td>
-                                    <td className="p-2 text-center">
+                                    <td className="bg-background sticky right-0 z-10 border-l p-2 text-center">
                                       <Checkbox
                                         checked={isActive}
                                         onCheckedChange={(checked) => {

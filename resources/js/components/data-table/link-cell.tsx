@@ -17,8 +17,10 @@ export type Props = {
 
 export const LinkCell: FC<Props> = ({ href, value, columnWidth }) => {
   return (
-    <div className="text-primary p-1.5 font-medium hover:underline hover:underline-offset-4" title={value} style={{ width: columnWidth }}>
-      <Link href={href}>{value}</Link>
+    <div className="w-full min-w-0 p-1.5" title={value} style={{ width: columnWidth }}>
+      <Link className="text-primary block truncate font-medium hover:underline hover:underline-offset-4" href={href}>
+        {value}
+      </Link>
     </div>
   );
 };

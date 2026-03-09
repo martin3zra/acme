@@ -78,17 +78,18 @@ export const getColumns = ({ kind, onDidClick, t }: Props): ColumnDef<Invoice>[]
       accessorKey: 'customer.name',
       id: 'customer.name',
       meta: t('global.customer'),
-      size: 200,
+      minSize: 200,
+      maxSize: 260,
       header: ({ column }) => {
         return <HeaderSortCell<Invoice> title={t('global.customer')} column={column} />;
       },
       cell: (props) => {
+        const customerName = String(props.getValue() ?? '');
+
         return (
-          <LinkCell
-            href={`/customers?id=${props.row.original.customer.uuid}`}
-            columnWidth={props.column.getSize()}
-            value={props.getValue() as string}
-          />
+          <div title={customerName} className="min-w-0">
+            <LinkCell href={`/customers?id=${props.row.original.customer.uuid}`} columnWidth={props.column.getSize()} value={customerName} />
+          </div>
         );
       },
     },
