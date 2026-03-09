@@ -7,6 +7,7 @@ import { useHeader } from '@/composables/use-headers';
 import { useTranslation } from '@/hooks/use-translation';
 import { PageProps, Verb } from '@/types';
 import { useForm, usePage } from '@inertiajs/react';
+import { useMemo, useState } from 'react';
 import { AttributeValue, AttributeValueForm } from '../../types';
 
 export type CreateFormParams = {
@@ -23,7 +24,8 @@ type CreateFormProps = {
 export default function CreateForm({ params, onFinish }: CreateFormProps) {
   const t = useTranslation().trans;
   const { headers } = useHeader();
-  const { errors: propsErrors } = usePage<PageProps>().props;
+  const { errors: propsErrors, values = [] } = usePage<PageProps<{ values?: AttributeValue[] }>>().props;
+  const [valueError, setValueError] = useState('');
 
   const { data, setData, post, put, errors, processing, reset } = useForm<AttributeValueForm>({
     value: params.value?.value || '',
@@ -40,7 +42,24 @@ export default function CreateForm({ params, onFinish }: CreateFormProps) {
     },
   };
 
+  const normalizedValue = useMemo(() => data.value.trim().toLowerCase(), [data.value]);
+
+  const hasDuplicateValue = useMemo(() => {
+    if (!normalizedValue) {
+      return false;
+    }
+
+    return values.some((existing) => existing.uuid !== params.value?.uuid && existing.value.trim().toLowerCase() === normalizedValue);
+  }, [normalizedValue, params.value?.uuid, values]);
+
   const submit = () => {
+    if (hasDuplicateValue) {
+      setValueError('Attribute value already exists. Please use a different value.');
+      return;
+    }
+
+    setValueError('');
+
     if (params.value) {
       put(`/attribute-values/${params.value.uuid}`, options);
       return;
@@ -60,11 +79,17 @@ export default function CreateForm({ params, onFinish }: CreateFormProps) {
             id="value"
             className="mt-1 block w-full"
             value={data.value}
-            onChange={(e) => setData('value', e.target.value)}
+            onChange={(e) => {
+              if (valueError) {
+                setValueError('');
+              }
+
+              setData('value', e.target.value);
+            }}
             placeholder={t('attributes.values.form.valuePlaceholder')}
             required
           />
-          <InputError className="mt-2" message={errors.value} />
+          <InputError className="mt-2" message={errors.value || valueError} />
         </div>
 
         <div className="col-span-6 gap-2">

@@ -121,4 +121,4 @@ CREATE INDEX idx_variant_attribute_values_attribute ON variant_attribute_values(
 CREATE INDEX idx_stock_levels_company ON stock_levels(company_id);
 CREATE INDEX idx_stock_levels_warehouse ON stock_levels(warehouse_id);
 CREATE INDEX idx_stock_levels_variant ON stock_levels(variant_id);
-CREATE INDEX idx_stock_levels_combo ON stock_levels(warehouse_id, variant_id);
+CREATE INDEX idx_stock_levels_combo ON stock_levels(company_id, warehouse_id, variant_id);

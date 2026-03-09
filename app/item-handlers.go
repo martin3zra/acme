@@ -91,6 +91,9 @@ func (s *Server) itemsHandler(ctx *routing.Context) {
 		props["attributes"] = inertia.Defer(func() (any, error) {
 			return s.findAttributesWithValues(ctx.Request.Context())
 		}, "attributes")
+		props["warehouses"] = inertia.Defer(func() (any, error) {
+			return s.findWarehouses(ctx.Request.Context())
+		}, "attributes")
 	} else {
 		units, err := s.findUnits(ctx.Request.Context())
 		if err != nil {
@@ -110,6 +113,12 @@ func (s *Server) itemsHandler(ctx *routing.Context) {
 			return
 		}
 		props["attributes"] = attributes
+		warehouses, err := s.findWarehouses(ctx.Request.Context())
+		if err != nil {
+			ctx.Error(err)
+			return
+		}
+		props["warehouses"] = warehouses
 	}
 
 	ctx.Render("Items/Index", props)

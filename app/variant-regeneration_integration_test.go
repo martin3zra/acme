@@ -19,6 +19,7 @@ func TestVariantRegenerationLifecycleIntegration(t *testing.T) {
 		t.Fatalf("begin transaction: %v", err)
 	}
 	defer tx.Rollback()
+	ensureTrackInventoryColumn(t, tx)
 
 	companyID, taxID, _, ok := findVariantFixtureCompanyAndTax(t, tx)
 	if !ok {
@@ -141,6 +142,106 @@ func TestVariantRegenerationLifecycleIntegration(t *testing.T) {
 	mustAssertSingleVariantPerSignature(t, tx, companyID, itemID, blueMediumSig)
 }
 
+func TestVariantRegenerationUpdatesExistingVariantFields(t *testing.T) {
+	db := openVariantIntegrationDB(t)
+	defer db.Close()
+
+	tx, err := db.Begin()
+	if err != nil {
+		t.Fatalf("begin transaction: %v", err)
+	}
+	defer tx.Rollback()
+	ensureTrackInventoryColumn(t, tx)
+
+	companyID, taxID, _, ok := findVariantFixtureCompanyAndTax(t, tx)
+	if !ok {
+		t.Skip("no suitable fixture company/tax found in test database")
+	}
+
+	unique := time.Now().UnixNano()
+
+	itemID := mustInsertTestItem(t, tx, companyID, taxID, unique)
+	colorAttributeID := mustInsertTestAttribute(t, tx, companyID, fmt.Sprintf("color-updates-%d", unique), "Color")
+	redValueID := mustInsertTestAttributeValue(t, tx, companyID, colorAttributeID, "red", "Red", 1)
+
+	s := &Server{}
+	attributeIDs := []int{colorAttributeID}
+	comboSignature := buildVariantSignature(map[int]int{colorAttributeID: redValueID})
+
+	initialPrice := 10.0
+	initialCost := 4.0
+	initialActive := true
+	initialCombos := []VariantCombo{
+		{
+			AttributeValueIDs: map[int]int{colorAttributeID: redValueID},
+			SKU:               "SKU-UPD-1",
+			Barcode:           "7891234567890",
+			Reference:         "REF-1",
+			VendorReference:   "VREF-1",
+			Price:             &initialPrice,
+			CostPrice:         &initialCost,
+			Active:            &initialActive,
+		},
+	}
+
+	if err = s.addConfiguredVariants(tx, companyID, itemID, "Variant Update Item", attributeIDs, initialCombos); err != nil {
+		t.Fatalf("initial variant generation failed: %v", err)
+	}
+
+	initial := mustFindVariantDetailsBySignature(t, tx, companyID, itemID, comboSignature)
+
+	updatedPrice := 12.5
+	updatedCost := 6.25
+	updatedActive := false
+	updatedCombos := []VariantCombo{
+		{
+			AttributeValueIDs: map[int]int{colorAttributeID: redValueID},
+			VariantID:         initial.ID,
+			SKU:               "SKU-UPD-2",
+			Barcode:           "7891234567001",
+			Reference:         "REF-2",
+			VendorReference:   "VREF-2",
+			Price:             &updatedPrice,
+			CostPrice:         &updatedCost,
+			Active:            &updatedActive,
+		},
+	}
+
+	if err = s.addConfiguredVariants(tx, companyID, itemID, "Variant Update Item", attributeIDs, updatedCombos); err != nil {
+		t.Fatalf("variant update regeneration failed: %v", err)
+	}
+
+	updated := mustFindVariantDetailsBySignature(t, tx, companyID, itemID, comboSignature)
+
+	if updated.ID != initial.ID {
+		t.Fatalf("expected update in place for signature %s: initial=%d updated=%d", comboSignature, initial.ID, updated.ID)
+	}
+	if updated.SKU != "SKU-UPD-2" {
+		t.Fatalf("expected updated sku SKU-UPD-2, got %s", updated.SKU)
+	}
+	if !updated.Barcode.Valid || updated.Barcode.String != "7891234567001" {
+		t.Fatalf("expected updated barcode 7891234567001, got %v", updated.Barcode)
+	}
+	if !updated.Reference.Valid || updated.Reference.String != "REF-2" {
+		t.Fatalf("expected updated reference REF-2, got %v", updated.Reference)
+	}
+	if !updated.VendorReference.Valid || updated.VendorReference.String != "VREF-2" {
+		t.Fatalf("expected updated vendor reference VREF-2, got %v", updated.VendorReference)
+	}
+	if !updated.Price.Valid || updated.Price.Float64 != updatedPrice {
+		t.Fatalf("expected updated price %.2f, got %v", updatedPrice, updated.Price)
+	}
+	if !updated.CostPrice.Valid || updated.CostPrice.Float64 != updatedCost {
+		t.Fatalf("expected updated cost %.2f, got %v", updatedCost, updated.CostPrice)
+	}
+	if updated.Active {
+		t.Fatalf("expected variant to be inactive after update")
+	}
+	if updated.DeletedAt.Valid {
+		t.Fatalf("updated variant should not be soft deleted")
+	}
+}
+
 func openVariantIntegrationDB(t *testing.T) *sql.DB {
 	t.Helper()
 
@@ -182,6 +283,18 @@ func findVariantFixtureCompanyAndTax(t *testing.T, tx *sql.Tx) (int, int, int, b
 	}
 
 	return companyID, taxID, unitID, true
+}
+
+func ensureTrackInventoryColumn(t *testing.T, tx *sql.Tx) {
+	t.Helper()
+
+	if _, err := tx.Exec(`ALTER TABLE items_variants ADD COLUMN IF NOT EXISTS track_inventory BOOLEAN DEFAULT TRUE`); err != nil {
+		t.Fatalf("ensure items_variants.track_inventory column: %v", err)
+	}
+
+	if _, err := tx.Exec(`UPDATE items_variants SET track_inventory = TRUE WHERE track_inventory IS NULL`); err != nil {
+		t.Fatalf("backfill items_variants.track_inventory values: %v", err)
+	}
 }
 
 func mustInsertTestItem(t *testing.T, tx *sql.Tx, companyID, taxID int, unique int64) int {
@@ -286,6 +399,18 @@ type variantState struct {
 	DeletedAt sql.NullTime
 }
 
+type variantDetails struct {
+	ID              int
+	SKU             string
+	Barcode         sql.NullString
+	Reference       sql.NullString
+	VendorReference sql.NullString
+	Price           sql.NullFloat64
+	CostPrice       sql.NullFloat64
+	Active          bool
+	DeletedAt       sql.NullTime
+}
+
 func mustFindVariantStateBySignature(t *testing.T, tx *sql.Tx, companyID, itemID int, signature string) variantState {
 	t.Helper()
 
@@ -304,6 +429,26 @@ func mustFindVariantStateBySignature(t *testing.T, tx *sql.Tx, companyID, itemID
 	}
 
 	return state
+}
+
+func mustFindVariantDetailsBySignature(t *testing.T, tx *sql.Tx, companyID, itemID int, signature string) variantDetails {
+	t.Helper()
+
+	details := variantDetails{}
+	err := tx.QueryRow(
+		`SELECT id, sku, barcode, reference, vendor_reference, price, cost_price, active, deleted_at
+		 FROM items_variants
+		 WHERE company_id = $1 AND item_id = $2 AND combination_signature = $3
+		 LIMIT 1`,
+		companyID,
+		itemID,
+		signature,
+	).Scan(&details.ID, &details.SKU, &details.Barcode, &details.Reference, &details.VendorReference, &details.Price, &details.CostPrice, &details.Active, &details.DeletedAt)
+	if err != nil {
+		t.Fatalf("query variant details for %s: %v", signature, err)
+	}
+
+	return details
 }
 
 func mustAssertSingleVariantPerSignature(t *testing.T, tx *sql.Tx, companyID, itemID int, signature string) {

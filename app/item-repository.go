@@ -3,9 +3,11 @@ package app
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"sort"
+	"strconv"
 	"strings"
 
 	"github.com/martin3zra/acme/pkg/database"
@@ -31,19 +33,24 @@ type item struct {
 }
 
 type itemVariantSummary struct {
-	ID              int      `json:"id"`
-	UUID            string   `json:"uuid"`
-	SKU             string   `json:"sku"`
-	Name            string   `json:"name"`
-	Barcode         *string  `json:"barcode,omitempty"`
-	Reference       *string  `json:"reference,omitempty"`
-	VendorReference *string  `json:"vendor_reference,omitempty"`
-	Price           *float64 `json:"price"`
-	IsDefault       bool     `json:"is_default"`
-	Active          bool     `json:"active"`
+	ID                   int         `json:"id"`
+	UUID                 string      `json:"uuid"`
+	CombinationSignature string      `json:"combination_signature"`
+	SKU                  string      `json:"sku"`
+	Name                 string      `json:"name"`
+	Barcode              *string     `json:"barcode,omitempty"`
+	Reference            *string     `json:"reference,omitempty"`
+	VendorReference      *string     `json:"vendor_reference,omitempty"`
+	Price                *float64    `json:"price"`
+	CostPrice            *float64    `json:"cost_price,omitempty"`
+	TrackInventory       bool        `json:"track_inventory"`
+	StockByWarehouse     map[int]int `json:"stock_by_warehouse,omitempty"`
+	IsDefault            bool        `json:"is_default"`
+	Active               bool        `json:"active"`
 }
 
 type itemVariantSetup struct {
+	HasVariants               bool                  `json:"has_variants"`
 	AttributeIDs              []int                 `json:"attribute_ids"`
 	SelectedValuesByAttribute map[int][]int         `json:"selected_values_by_attribute"`
 	ExistingSignatures        []string              `json:"existing_signatures"`
@@ -183,7 +190,7 @@ func (s *Server) findItemsByCriteria(ctx context.Context, term string) ([]*invoi
 			iv.barcode,
 			iv.is_default,
 			COALESCE(iv.price, 0),
-			COALESCE(SUM(sl.quantity), 0) AS stock_qty,
+			CASE WHEN iv.track_inventory THEN COALESCE(SUM(sl.quantity), 0) ELSE 0 END AS stock_qty,
 			jsonb_build_object(
 				'reference', iv.reference,
 				'sku', iv.sku,
@@ -219,7 +226,7 @@ func (s *Server) findItemsByCriteria(ctx context.Context, term string) ([]*invoi
 				COALESCE(iv.vendor_reference, '') ILIKE $2
 			)
 		GROUP BY iv.id, iv.uuid, i.name, iv.name, i.description, iv.sku, iv.barcode, iv.reference, iv.vendor_reference, iv.is_default,
-			iv.price, t.id, t.name, t.rate, iu.unit_id, iu.name
+			iv.price, iv.track_inventory, t.id, t.name, t.rate, iu.unit_id, iu.name
 		ORDER BY i.name, iv.is_default DESC, iv.name
 		LIMIT 50
 	`, CurrentCompany(ctx).ID, "%"+term+"%")
@@ -276,7 +283,7 @@ func (s *Server) findItemsByReference(ctx context.Context, term string) (*invoic
 			iv.barcode,
 			iv.is_default,
 			COALESCE(iv.price, 0),
-			COALESCE(st.qty, 0) AS stock_qty,
+			CASE WHEN iv.track_inventory THEN COALESCE(st.qty, 0) ELSE 0 END AS stock_qty,
 			jsonb_build_object(
 				'reference', iv.reference,
 				'sku', iv.sku,
@@ -452,14 +459,14 @@ func (s *Server) findVariantBySignature(tx *sql.Tx, companyID, itemID int, signa
 	v := new(itemVariant)
 	err := tx.QueryRow(
 		`SELECT id, uuid, item_id, sku, name, barcode, reference, vendor_reference,
-		        combination_signature, is_default, price, cost_price, active, created_at, updated_at, deleted_at
+		        combination_signature, is_default, price, cost_price, track_inventory, active, created_at, updated_at, deleted_at
 		 FROM items_variants
 		 WHERE company_id = $1 AND item_id = $2 AND combination_signature = $3
 		 LIMIT 1`,
 		companyID, itemID, signature,
 	).Scan(
 		&v.ID, &v.UUID, &v.ItemID, &v.SKU, &v.Name, &v.Barcode, &v.Reference, &v.VendorReference,
-		&v.CombinationSignature, &v.IsDefault, &v.Price, &v.CostPrice, &v.Active, &v.CreatedAt, &v.UpdatedAt, &v.DeletedAt,
+		&v.CombinationSignature, &v.IsDefault, &v.Price, &v.CostPrice, &v.TrackInventory, &v.Active, &v.CreatedAt, &v.UpdatedAt, &v.DeletedAt,
 	)
 
 	if errors.Is(err, sql.ErrNoRows) {
@@ -470,7 +477,7 @@ func (s *Server) findVariantBySignature(tx *sql.Tx, companyID, itemID int, signa
 }
 
 // reviveVariant reactivates a soft-deleted variant
-func (s *Server) reviveVariant(tx *sql.Tx, companyID int, variantID int, sku, name string, barcode, reference, vendorRef *string, price, costPrice *float64, active bool) error {
+func (s *Server) reviveVariant(tx *sql.Tx, companyID int, variantID int, sku, name string, barcode, reference, vendorRef *string, price, costPrice *float64, trackInventory, active bool) error {
 	_, err := tx.Exec(
 		`UPDATE items_variants
 		 SET deleted_at = NULL,
@@ -482,9 +489,10 @@ func (s *Server) reviveVariant(tx *sql.Tx, companyID int, variantID int, sku, na
 		     vendor_reference = $6,
 		     price = $7,
 		     cost_price = $8,
+		     track_inventory = $9,
 		     updated_at = NOW()
-		 WHERE company_id = $9 AND id = $10`,
-		active, sku, name, barcode, reference, vendorRef, price, costPrice, companyID, variantID,
+		 WHERE company_id = $10 AND id = $11`,
+		active, sku, name, barcode, reference, vendorRef, price, costPrice, trackInventory, companyID, variantID,
 	)
 	return err
 }
@@ -499,6 +507,116 @@ func (s *Server) reactivateVariant(tx *sql.Tx, companyID int, variantID int) err
 	)
 
 	return err
+}
+
+func (s *Server) updateVariant(tx *sql.Tx, companyID int, variantID int, sku, name string, barcode, reference, vendorRef *string, price, costPrice *float64, trackInventory, active bool) error {
+	_, err := tx.Exec(
+		`UPDATE items_variants
+		 SET sku = $1,
+		     name = $2,
+		     barcode = $3,
+		     reference = $4,
+		     vendor_reference = $5,
+		     price = $6,
+		     cost_price = $7,
+		     track_inventory = $8,
+		     active = $9,
+		     updated_at = NOW()
+		 WHERE company_id = $10 AND id = $11 AND deleted_at IS NULL`,
+		sku, name, barcode, reference, vendorRef, price, costPrice, trackInventory, active, companyID, variantID,
+	)
+
+	return err
+}
+
+func (s *Server) ensureUniqueVariantSKU(tx *sql.Tx, companyID int, variantID int, sku string) error {
+	if sku == "" {
+		return nil
+	}
+
+	var exists bool
+	query := `SELECT EXISTS(
+		SELECT 1 FROM items_variants
+		WHERE company_id = $1 AND sku = $2 AND deleted_at IS NULL`
+	args := []any{companyID, sku}
+
+	if variantID > 0 {
+		query += ` AND id <> $3`
+		args = append(args, variantID)
+	}
+
+	query += `)`
+	if err := tx.QueryRow(query, args...).Scan(&exists); err != nil {
+		return err
+	}
+
+	if exists {
+		return fmt.Errorf("sku already exists")
+	}
+
+	return nil
+}
+
+func (s *Server) ensureUniqueVariantBarcode(tx *sql.Tx, companyID int, variantID int, barcode string) error {
+	if barcode == "" {
+		return nil
+	}
+
+	var exists bool
+	query := `SELECT EXISTS(
+		SELECT 1 FROM items_variants
+		WHERE company_id = $1 AND barcode = $2 AND deleted_at IS NULL`
+	args := []any{companyID, barcode}
+
+	if variantID > 0 {
+		query += ` AND id <> $3`
+		args = append(args, variantID)
+	}
+
+	query += `)`
+	if err := tx.QueryRow(query, args...).Scan(&exists); err != nil {
+		return err
+	}
+
+	if exists {
+		return fmt.Errorf("barcode already exists")
+	}
+
+	return nil
+}
+
+func (s *Server) validateVariantComboUniqueness(tx *sql.Tx, companyID int, variantCombos []VariantCombo) error {
+	seenSKUs := make(map[string]bool)
+	seenBarcodes := make(map[string]bool)
+
+	for _, combo := range variantCombos {
+		sku := strings.TrimSpace(combo.SKU)
+		barcode := strings.TrimSpace(combo.Barcode)
+
+		if sku != "" {
+			if seenSKUs[sku] {
+				return fmt.Errorf("sku must be unique")
+			}
+			seenSKUs[sku] = true
+
+			if err := s.ensureUniqueVariantSKU(tx, companyID, combo.VariantID, sku); err != nil {
+				return err
+			}
+		}
+
+		if barcode != "" {
+			if seenBarcodes[barcode] {
+				return fmt.Errorf("barcode must be unique")
+			}
+			seenBarcodes[barcode] = true
+
+			if err := s.ensureUniqueVariantBarcode(tx, companyID, combo.VariantID, barcode); err != nil {
+				return err
+			}
+		}
+	}
+
+	return nil
 }
 
 // isVariantReferenced checks if a variant is referenced by invoices or stock
@@ -610,23 +728,36 @@ func (s *Server) addConfiguredVariants(tx *sql.Tx, companyID, itemID int, itemNa
 			active = *combo.Active
 		}
 
+		trackInventory := true
+		if combo.TrackInventory != nil {
+			trackInventory = *combo.TrackInventory
+		}
+
 		if existing != nil {
-			// Variant exists - revive if soft-deleted, reactivate if inactive
+			// Variant exists - revive if soft-deleted, otherwise update inline editable fields.
 			if existing.DeletedAt != nil {
 				// Revive soft-deleted variant
-				if err = s.reviveVariant(tx, companyID, existing.ID, sku, variantName, barcode, reference, vendorRef, variantPrice, combo.CostPrice, active); err != nil {
+				if err = s.reviveVariant(tx, companyID, existing.ID, sku, variantName, barcode, reference, vendorRef, variantPrice, combo.CostPrice, trackInventory, active); err != nil {
 					return err
 				}
 				// Ensure variant attribute values are present
 				if err = s.storeVariantAttributeValues(tx, companyID, existing.ID, combo.AttributeValueIDs); err != nil {
 					return err
 				}
-			} else if !existing.Active {
-				if err = s.reactivateVariant(tx, companyID, existing.ID); err != nil {
+			} else {
+				if err = s.updateVariant(tx, companyID, existing.ID, sku, variantName, barcode, reference, vendorRef, variantPrice, combo.CostPrice, trackInventory, active); err != nil {
+					return err
+				}
+
+				if err = s.storeVariantAttributeValues(tx, companyID, existing.ID, combo.AttributeValueIDs); err != nil {
 					return err
 				}
 			}
-			// If active, skip (already exists)
+
+			if err = s.syncVariantStockLevels(tx, companyID, existing.ID, trackInventory, combo.StockByWarehouse); err != nil {
+				return err
+			}
+
 			continue
 		}
 
@@ -641,6 +772,7 @@ func (s *Server) addConfiguredVariants(tx *sql.Tx, companyID, itemID int, itemNa
 			IsDefault:            len(existingSignatures) == 0 && nextIndex == 1,
 			Price:                variantPrice,
 			CostPrice:            combo.CostPrice,
+			TrackInventory:       trackInventory,
 			Active:               active,
 		}
 
@@ -649,6 +781,10 @@ func (s *Server) addConfiguredVariants(tx *sql.Tx, companyID, itemID int, itemNa
 		}
 
 		if err = s.storeVariantAttributeValues(tx, companyID, variant.ID, combo.AttributeValueIDs); err != nil {
+			return err
+		}
+
+		if err = s.syncVariantStockLevels(tx, companyID, variant.ID, trackInventory, combo.StockByWarehouse); err != nil {
 			return err
 		}
 
@@ -804,6 +940,12 @@ func (s *Server) updateItem(ctx context.Context, itemID int, form *UpdateItemFor
 		}
 
 		if form.ItemType == "product" {
+			if len(form.VariantCombos) > 0 {
+				if err = s.validateVariantComboUniqueness(tx, companyID, form.VariantCombos); err != nil {
+					return err
+				}
+			}
+
 			if len(form.AttributeIDs) > 0 && len(form.VariantCombos) > 0 {
 				if err = s.addConfiguredVariants(tx, companyID, itemID, form.Name, form.AttributeIDs, form.VariantCombos); err != nil {
 					return err
@@ -856,7 +998,7 @@ func (s *Server) findItemVariants(ctx context.Context, itemID int) ([]*itemVaria
 	rows, err := s.db.QueryContext(
 		ctx,
 		`SELECT iv.id, iv.uuid, iv.item_id, iv.sku, iv.name, iv.barcode, iv.reference, iv.vendor_reference,
-		        iv.combination_signature, iv.is_default, iv.price, iv.cost_price, iv.active, iv.created_at, iv.updated_at, iv.deleted_at
+		        iv.combination_signature, iv.is_default, iv.price, iv.cost_price, iv.track_inventory, iv.active, iv.created_at, iv.updated_at, iv.deleted_at
 		 FROM items_variants iv
 		 WHERE iv.company_id = $1 AND iv.item_id = $2 AND iv.deleted_at IS NULL
 		 ORDER BY iv.is_default DESC, iv.name`,
@@ -872,7 +1014,7 @@ func (s *Server) findItemVariants(ctx context.Context, itemID int) ([]*itemVaria
 		v := new(itemVariant)
 		if err = rows.Scan(
 			&v.ID, &v.UUID, &v.ItemID, &v.SKU, &v.Name, &v.Barcode, &v.Reference, &v.VendorReference,
-			&v.CombinationSignature, &v.IsDefault, &v.Price, &v.CostPrice, &v.Active, &v.CreatedAt, &v.UpdatedAt, &v.DeletedAt,
+			&v.CombinationSignature, &v.IsDefault, &v.Price, &v.CostPrice, &v.TrackInventory, &v.Active, &v.CreatedAt, &v.UpdatedAt, &v.DeletedAt,
 		); err != nil {
 			return data, err
 		}
@@ -888,13 +1030,13 @@ func (s *Server) findVariantByID(ctx context.Context, id int) (*itemVariant, err
 	err := s.db.QueryRowContext(
 		ctx,
 		`SELECT iv.id, iv.uuid, iv.item_id, iv.sku, iv.name, iv.barcode, iv.reference, iv.vendor_reference,
-		        iv.combination_signature, iv.is_default, iv.price, iv.cost_price, iv.active, iv.created_at, iv.updated_at, iv.deleted_at
+		        iv.combination_signature, iv.is_default, iv.price, iv.cost_price, iv.track_inventory, iv.active, iv.created_at, iv.updated_at, iv.deleted_at
 		 FROM items_variants iv
 		 WHERE iv.company_id = $1 AND iv.id = $2 AND iv.deleted_at IS NULL`,
 		CurrentCompany(ctx).ID, id,
 	).Scan(
 		&v.ID, &v.UUID, &v.ItemID, &v.SKU, &v.Name, &v.Barcode, &v.Reference, &v.VendorReference,
-		&v.CombinationSignature, &v.IsDefault, &v.Price, &v.CostPrice, &v.Active, &v.CreatedAt, &v.UpdatedAt, &v.DeletedAt,
+		&v.CombinationSignature, &v.IsDefault, &v.Price, &v.CostPrice, &v.TrackInventory, &v.Active, &v.CreatedAt, &v.UpdatedAt, &v.DeletedAt,
 	)
 
 	if errors.Is(err, sql.ErrNoRows) {
@@ -910,13 +1052,13 @@ func (s *Server) findVariantBySKU(ctx context.Context, sku string) (*itemVariant
 	err := s.db.QueryRowContext(
 		ctx,
 		`SELECT iv.id, iv.uuid, iv.item_id, iv.sku, iv.name, iv.barcode, iv.reference, iv.vendor_reference,
-		        iv.combination_signature, iv.is_default, iv.price, iv.cost_price, iv.active, iv.created_at, iv.updated_at, iv.deleted_at
+		        iv.combination_signature, iv.is_default, iv.price, iv.cost_price, iv.track_inventory, iv.active, iv.created_at, iv.updated_at, iv.deleted_at
 		 FROM items_variants iv
 		 WHERE iv.sku = $1 AND iv.deleted_at IS NULL`,
 		sku,
 	).Scan(
 		&v.ID, &v.UUID, &v.ItemID, &v.SKU, &v.Name, &v.Barcode, &v.Reference, &v.VendorReference,
-		&v.CombinationSignature, &v.IsDefault, &v.Price, &v.CostPrice, &v.Active, &v.CreatedAt, &v.UpdatedAt, &v.DeletedAt,
+		&v.CombinationSignature, &v.IsDefault, &v.Price, &v.CostPrice, &v.TrackInventory, &v.Active, &v.CreatedAt, &v.UpdatedAt, &v.DeletedAt,
 	)
 
 	if errors.Is(err, sql.ErrNoRows) {
@@ -995,8 +1137,14 @@ func (s *Server) findItemVariantSetup(ctx context.Context, itemID int) (*itemVar
 
 	variantRows, err := s.db.QueryContext(
 		ctx,
-		`SELECT id, uuid, sku, name, barcode, reference, vendor_reference, price, is_default, active
-		 FROM items_variants
+		`SELECT iv.id, iv.uuid, iv.combination_signature, iv.sku, iv.name, iv.barcode, iv.reference, iv.vendor_reference,
+		        iv.price, iv.cost_price, iv.track_inventory, iv.is_default, iv.active,
+		        COALESCE((
+		          SELECT jsonb_object_agg(sl.warehouse_id::text, sl.quantity)
+		          FROM stock_levels sl
+		          WHERE sl.company_id = iv.company_id AND sl.variant_id = iv.id
+		        ), '{}'::jsonb) AS stock_by_warehouse
+		 FROM items_variants iv
 		 WHERE company_id = $1 AND item_id = $2 AND deleted_at IS NULL
 		 ORDER BY is_default DESC, name`,
 		CurrentCompany(ctx).ID, itemID,
@@ -1008,9 +1156,27 @@ func (s *Server) findItemVariantSetup(ctx context.Context, itemID int) (*itemVar
 
 	for variantRows.Next() {
 		variant := &itemVariantSummary{}
-		if err = variantRows.Scan(&variant.ID, &variant.UUID, &variant.SKU, &variant.Name, &variant.Barcode, &variant.Reference, &variant.VendorReference, &variant.Price, &variant.IsDefault, &variant.Active); err != nil {
+		var rawStockByWarehouse []byte
+		if err = variantRows.Scan(
+			&variant.ID,
+			&variant.UUID,
+			&variant.CombinationSignature,
+			&variant.SKU,
+			&variant.Name,
+			&variant.Barcode,
+			&variant.Reference,
+			&variant.VendorReference,
+			&variant.Price,
+			&variant.CostPrice,
+			&variant.TrackInventory,
+			&variant.IsDefault,
+			&variant.Active,
+			&rawStockByWarehouse,
+		); err != nil {
 			return nil, err
 		}
+
+		variant.StockByWarehouse = parseStockByWarehouse(rawStockByWarehouse)
 
 		setup.Variants = append(setup.Variants, variant)
 	}
@@ -1045,14 +1211,38 @@ func (s *Server) findItemVariantSetup(ctx context.Context, itemID int) (*itemVar
 		return nil, err
 	}
 
+	setup.HasVariants = len(setup.Variants) > 1 || len(setup.AttributeIDs) > 0
+
 	return setup, nil
+}
+
+func parseStockByWarehouse(raw []byte) map[int]int {
+	if len(raw) == 0 {
+		return map[int]int{}
+	}
+
+	parsed := make(map[string]int)
+	if err := json.Unmarshal(raw, &parsed); err != nil {
+		return map[int]int{}
+	}
+
+	stockByWarehouse := make(map[int]int, len(parsed))
+	for warehouseID, quantity := range parsed {
+		id, err := strconv.Atoi(warehouseID)
+		if err != nil {
+			continue
+		}
+		stockByWarehouse[id] = quantity
+	}
+
+	return stockByWarehouse
 }
 
 // storeItemVariant creates a new item variant
 func (s *Server) storeItemVariant(tx *sql.Tx, companyID, itemID int, variant *itemVariant) error {
 	stmt, err := tx.Prepare(
-		`INSERT INTO items_variants (company_id, item_id, uuid, sku, name, barcode, reference, vendor_reference, combination_signature, is_default, price, cost_price, active, created_at, updated_at)
-		 VALUES ($1, $2, gen_random_uuid(), $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, NOW(), NOW())
+		`INSERT INTO items_variants (company_id, item_id, uuid, sku, name, barcode, reference, vendor_reference, combination_signature, is_default, price, cost_price, track_inventory, active, created_at, updated_at)
+		 VALUES ($1, $2, gen_random_uuid(), $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, NOW(), NOW())
 		 RETURNING id`,
 	)
 	if err != nil {
@@ -1060,14 +1250,14 @@ func (s *Server) storeItemVariant(tx *sql.Tx, companyID, itemID int, variant *it
 	}
 	defer stmt.Close()
 
-	return stmt.QueryRow(companyID, itemID, variant.SKU, variant.Name, variant.Barcode, variant.Reference, variant.VendorReference, variant.CombinationSignature, variant.IsDefault, variant.Price, variant.CostPrice, variant.Active).Scan(&variant.ID)
+	return stmt.QueryRow(companyID, itemID, variant.SKU, variant.Name, variant.Barcode, variant.Reference, variant.VendorReference, variant.CombinationSignature, variant.IsDefault, variant.Price, variant.CostPrice, variant.TrackInventory, variant.Active).Scan(&variant.ID)
 }
 
 // storeDefaultVariant creates the default variant for an item
 func (s *Server) storeDefaultVariant(tx *sql.Tx, companyID, itemID int, itemName string) error {
 	stmt, err := tx.Prepare(
-		`INSERT INTO items_variants (company_id, item_id, uuid, sku, name, combination_signature, is_default, price, active, created_at, updated_at)
-		 VALUES ($1, $2, gen_random_uuid(), (SELECT 'SKU-' || gen_random_uuid()::text), $3, '', true, 0.00, true, NOW(), NOW())
+		`INSERT INTO items_variants (company_id, item_id, uuid, sku, name, combination_signature, is_default, price, track_inventory, active, created_at, updated_at)
+		 VALUES ($1, $2, gen_random_uuid(), (SELECT 'SKU-' || gen_random_uuid()::text), $3, '', true, 0.00, true, true, NOW(), NOW())
 		 RETURNING id`,
 	)
 	if err != nil {
@@ -1090,6 +1280,16 @@ func (s *Server) storeDefaultVariantFromCombo(tx *sql.Tx, companyID, itemID int,
 		price = *combo.Price
 	}
 
+	var costPrice *float64
+	if combo.CostPrice != nil {
+		costPrice = combo.CostPrice
+	}
+
+	trackInventory := true
+	if combo.TrackInventory != nil {
+		trackInventory = *combo.TrackInventory
+	}
+
 	var barcode, reference, vendorRef *string
 	if combo.Barcode != "" {
 		barcode = &combo.Barcode
@@ -1109,10 +1309,16 @@ func (s *Server) storeDefaultVariantFromCombo(tx *sql.Tx, companyID, itemID int,
 		VendorReference: vendorRef,
 		IsDefault:       true,
 		Price:           &price,
+		CostPrice:       costPrice,
+		TrackInventory:  trackInventory,
 		Active:          true,
 	}
 
-	return s.storeItemVariant(tx, companyID, itemID, variant)
+	if err := s.storeItemVariant(tx, companyID, itemID, variant); err != nil {
+		return err
+	}
+
+	return s.syncVariantStockLevels(tx, companyID, variant.ID, trackInventory, combo.StockByWarehouse)
 }
 
 // ensureDefaultVariant checks if a default variant exists, creates one if not
@@ -1156,6 +1362,16 @@ func (s *Server) ensureDefaultVariantFromCombo(tx *sql.Tx, companyID, itemID int
 		price = *combo.Price
 	}
 
+	var costPrice *float64
+	if combo.CostPrice != nil {
+		costPrice = combo.CostPrice
+	}
+
+	trackInventory := true
+	if combo.TrackInventory != nil {
+		trackInventory = *combo.TrackInventory
+	}
+
 	_, err = tx.Exec(
 		`UPDATE items_variants
 		 SET sku = COALESCE(NULLIF($1, ''), sku),
@@ -1163,10 +1379,105 @@ func (s *Server) ensureDefaultVariantFromCombo(tx *sql.Tx, companyID, itemID int
 		     reference = NULLIF($3, ''),
 		     vendor_reference = NULLIF($4, ''),
 		     price = $5,
+		     cost_price = $6,
+		     track_inventory = $7,
 		     active = true,
 		     updated_at = NOW()
-		 WHERE company_id = $6 AND id = $7`,
-		combo.SKU, combo.Barcode, combo.Reference, combo.VendorReference, price, companyID, variantID,
+		 WHERE company_id = $8 AND id = $9`,
+		combo.SKU, combo.Barcode, combo.Reference, combo.VendorReference, price, costPrice, trackInventory, companyID, variantID,
+	)
+
+	if err != nil {
+		return err
+	}
+
+	return s.syncVariantStockLevels(tx, companyID, variantID, trackInventory, combo.StockByWarehouse)
+}
+
+func (s *Server) ensureWarehouseBelongsToCompany(tx *sql.Tx, companyID, warehouseID int) error {
+	var exists bool
+	err := tx.QueryRow(
+		`SELECT EXISTS(
+			SELECT 1
+			FROM warehouses
+			WHERE company_id = $1 AND id = $2 AND deleted_at IS NULL
+		)`,
+		companyID, warehouseID,
+	).Scan(&exists)
+	if err != nil {
+		return err
+	}
+
+	if !exists {
+		return fmt.Errorf("warehouse %d does not belong to company", warehouseID)
+	}
+
+	return nil
+}
+
+func (s *Server) syncVariantStockLevels(tx *sql.Tx, companyID, variantID int, trackInventory bool, stockByWarehouse map[int]int) error {
+	if !trackInventory {
+		_, err := tx.Exec(
+			`DELETE FROM stock_levels WHERE company_id = $1 AND variant_id = $2`,
+			companyID, variantID,
+		)
+		return err
+	}
+
+	if stockByWarehouse == nil {
+		return nil
+	}
+
+	warehouseIDs := make([]int, 0, len(stockByWarehouse))
+	for warehouseID, quantity := range stockByWarehouse {
+		if quantity < 0 {
+			return fmt.Errorf("stock quantity cannot be negative")
+		}
+
+		if err := s.ensureWarehouseBelongsToCompany(tx, companyID, warehouseID); err != nil {
+			return err
+		}
+
+		_, err := tx.Exec(
+			`INSERT INTO stock_levels (company_id, warehouse_id, variant_id, quantity, created_at, updated_at)
+			 VALUES ($1, $2, $3, $4, NOW(), NOW())
+			 ON CONFLICT (company_id, warehouse_id, variant_id)
+			 DO UPDATE SET quantity = EXCLUDED.quantity, updated_at = NOW()`,
+			companyID, warehouseID, variantID, quantity,
+		)
+		if err != nil {
+			return err
+		}
+
+		warehouseIDs = append(warehouseIDs, warehouseID)
+	}
+
+	if len(warehouseIDs) == 0 {
+		_, err := tx.Exec(
+			`DELETE FROM stock_levels WHERE company_id = $1 AND variant_id = $2`,
+			companyID, variantID,
+		)
+		return err
+	}
+
+	sort.Ints(warehouseIDs)
+	placeholders := make([]string, len(warehouseIDs))
+	args := make([]any, 0, len(warehouseIDs)+2)
+	args = append(args, companyID, variantID)
+	for idx, warehouseID := range warehouseIDs {
+		placeholders[idx] = fmt.Sprintf("$%d", idx+3)
+		args = append(args, warehouseID)
+	}
+
+	_, err := tx.Exec(
+		fmt.Sprintf(
+			`DELETE FROM stock_levels
+			 WHERE company_id = $1
+			   AND variant_id = $2
+			   AND warehouse_id NOT IN (%s)`,
+			strings.Join(placeholders, ", "),
+		),
+		args...,
 	)
 
 	return err

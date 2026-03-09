@@ -9,10 +9,16 @@ import AppLayout from '@/layouts/app-layout';
 import { Item, ItemTypeFilter, PageProps, Tax, Unit, Verb } from '@/types';
 import { Deferred, router, usePage } from '@inertiajs/react';
 import { FileUp, Plus } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { breadcrumbs } from './constants';
 import { List } from './List/Index';
 import CreateForm, { CreateFormParams, ItemAttributeOption } from './Shared/CreateForm';
+
+type ItemWarehouseOption = {
+  id: number;
+  code: string;
+  name: string;
+};
 
 export default function Index({
   auth,
@@ -22,6 +28,7 @@ export default function Index({
   taxes,
   units,
   attributes,
+  warehouses,
   currentItemTypeFilter,
   openState,
 }: PageProps<{
@@ -32,19 +39,25 @@ export default function Index({
   taxes: Tax[];
   units: Unit[];
   attributes: ItemAttributeOption[];
+  warehouses: ItemWarehouseOption[];
   currentItemTypeFilter: ItemTypeFilter;
 }>) {
   const t = useTranslation().trans;
   const page = usePage<PageProps>();
+  const taxOptions = Array.isArray(taxes) ? taxes : [];
+  const unitOptions = Array.isArray(units) ? units : [];
+  const attributeOptions = Array.isArray(attributes) ? attributes : [];
+  const warehouseOptions = useMemo(() => (Array.isArray(warehouses) ? warehouses : []), [warehouses]);
   const [loadingItem, setLoadingItem] = useState<boolean>(false);
   const [open, setOpen] = useState<boolean>(item !== undefined || openState);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState<boolean>(false);
   const [importSheetOpen, setImportSheetOpen] = useState<boolean>(false);
   const [selectedItem, setSelectedItem] = useState<CreateFormParams>({
     item,
-    taxes,
-    units,
-    attributes,
+    taxes: taxOptions,
+    units: unitOptions,
+    attributes: attributeOptions,
+    warehouses: warehouseOptions,
     action: item !== undefined ? selectedAction || 'view' : 'create',
   });
 
@@ -52,7 +65,14 @@ export default function Index({
   const hasItems = items.length > 0;
 
   const onCreateNewItem = () => {
-    setSelectedItem({ item: undefined, taxes, units, attributes, action: 'create' });
+    setSelectedItem({
+      item: undefined,
+      taxes: taxOptions,
+      units: unitOptions,
+      attributes: attributeOptions,
+      warehouses: warehouseOptions,
+      action: 'create',
+    });
     setOpen(true);
   };
 
@@ -68,7 +88,14 @@ export default function Index({
   };
 
   const onSelectItem = (item: Item, action: Verb): void => {
-    setSelectedItem({ item, taxes, units, attributes, action });
+    setSelectedItem({
+      item,
+      taxes: taxOptions,
+      units: unitOptions,
+      attributes: attributeOptions,
+      warehouses: warehouseOptions,
+      action,
+    });
 
     if (action === 'trash') {
       setDeleteDialogOpen(true);
@@ -83,7 +110,14 @@ export default function Index({
   const onOpenChange = (open: boolean) => {
     setOpen(open);
     if (!open) {
-      setSelectedItem({ item: undefined, taxes, units, attributes, action: 'create' });
+      setSelectedItem({
+        item: undefined,
+        taxes: taxOptions,
+        units: unitOptions,
+        attributes: attributeOptions,
+        warehouses: warehouseOptions,
+        action: 'create',
+      });
       const nextURL = currentItemTypeFilter === 'all' ? window.location.pathname : `${window.location.pathname}?itemType=${currentItemTypeFilter}`;
       router.replace({
         url: nextURL,
@@ -127,6 +161,14 @@ export default function Index({
     setDeleteDialogOpen(open);
   };
 
+  const formParams: CreateFormParams = {
+    ...selectedItem,
+    taxes: taxOptions,
+    units: unitOptions,
+    attributes: attributeOptions,
+    warehouses: warehouseOptions,
+  };
+
   return (
     <AppLayout user={auth.user} breadcrumbs={breadcrumbs}>
       <div className="space-y-6">
@@ -135,7 +177,7 @@ export default function Index({
             title={t('items.title')}
             description={t('items.description')}
             rightPanel={
-              <Deferred data={open ? [] : ['taxes', 'units', 'attributes']} fallback={<div>Loading...</div>}>
+              <Deferred data={open ? [] : ['taxes', 'units', 'attributes', 'warehouses']} fallback={<div>Loading...</div>}>
                 <div className="flex space-x-2">
                   <Button onClick={onCreateNewItem}>
                     <Plus /> {t('items.newItem.title')}
@@ -154,7 +196,7 @@ export default function Index({
             <div className="absolute top-1/2 left-1/2 flex h-61 min-w-3xl -translate-x-1/2 -translate-y-1/2 flex-col items-center gap-4 rounded-3xl bg-white p-10 shadow-[0px_8px_12px_-4px_rgba(16,12,12,0.08),0px_0px_2px_rgba(16,12,12,0.1),0px_1px_2px_rgba(16,12,12,0.1)]">
               <h4 className="text-2xl">{t(`items.emptyState.${currentItemTypeFilter}.title`)}</h4>
               <p className="text-sm text-gray-400">{t(`items.emptyState.${currentItemTypeFilter}.description`)}</p>
-              <Deferred data={open ? [] : ['taxes', 'units', 'attributes']} fallback={<div>Loading...</div>}>
+              <Deferred data={open ? [] : ['taxes', 'units', 'attributes', 'warehouses']} fallback={<div>Loading...</div>}>
                 <div className="flex space-x-3">
                   {currentItemTypeFilter !== 'all' && (
                     <Button variant={'outline'} onClick={() => onItemFilterTypeChange('all')}>
@@ -194,7 +236,7 @@ export default function Index({
               <div className="grid gap-4 overflow-y-scroll px-4">
                 <CreateForm
                   key={`${selectedItem.action}-${selectedItem.item?.id || 'new'}`}
-                  params={selectedItem}
+                  params={formParams}
                   onFinish={() => modalHandler(false)}
                 />
               </div>

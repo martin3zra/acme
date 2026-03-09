@@ -4,7 +4,41 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"strings"
 )
+
+func normalizeAttributeValue(value string) string {
+	return strings.ToLower(strings.TrimSpace(value))
+}
+
+func (s *Server) hasDuplicateAttributeValue(ctx context.Context, companyID, attributeID int, value string, exceptUUID *string) (bool, error) {
+	query := `SELECT EXISTS(
+		SELECT 1
+		FROM attribute_values
+		WHERE company_id = $1
+		  AND attribute_id = $2
+		  AND deleted_at IS NULL
+		  AND lower(trim(value)) = $3
+	)`
+
+	args := []any{companyID, attributeID, normalizeAttributeValue(value)}
+	if exceptUUID != nil {
+		query = `SELECT EXISTS(
+			SELECT 1
+			FROM attribute_values
+			WHERE company_id = $1
+			  AND attribute_id = $2
+			  AND deleted_at IS NULL
+			  AND lower(trim(value)) = $3
+			  AND uuid != $4
+		)`
+		args = append(args, *exceptUUID)
+	}
+
+	var exists bool
+	err := s.db.QueryRowContext(ctx, query, args...).Scan(&exists)
+	return exists, err
+}
 
 // findAttributeValuesByAttribute returns all values for an attribute
 func (s *Server) findAttributeValuesByAttribute(ctx context.Context, attributeID int) ([]*attributeValue, error) {
@@ -84,6 +118,17 @@ func (s *Server) findAttributeValueByUUID(ctx context.Context, uuid string) (*at
 // storeAttributeValue creates a new attribute value
 func (s *Server) storeAttributeValue(ctx context.Context, form *StoreAttributeValueForm) error {
 	companyID := CurrentCompany(ctx).ID
+	form.Value = strings.TrimSpace(form.Value)
+	form.DisplayName = strings.TrimSpace(form.DisplayName)
+
+	hasDuplicate, err := s.hasDuplicateAttributeValue(ctx, companyID, form.AttributeID, form.Value, nil)
+	if err != nil {
+		return err
+	}
+
+	if hasDuplicate {
+		return errors.New("attribute value already exists")
+	}
 
 	stmt, err := s.db.PrepareContext(
 		ctx,
@@ -115,8 +160,19 @@ func (s *Server) storeAttributeValue(ctx context.Context, form *StoreAttributeVa
 // updateAttributeValue updates an existing attribute value
 func (s *Server) updateAttributeValue(ctx context.Context, uuid string, form *StoreAttributeValueForm) error {
 	companyID := CurrentCompany(ctx).ID
+	form.Value = strings.TrimSpace(form.Value)
+	form.DisplayName = strings.TrimSpace(form.DisplayName)
 
-	_, err := s.db.ExecContext(
+	hasDuplicate, err := s.hasDuplicateAttributeValue(ctx, companyID, form.AttributeID, form.Value, &uuid)
+	if err != nil {
+		return err
+	}
+
+	if hasDuplicate {
+		return errors.New("attribute value already exists")
+	}
+
+	_, err = s.db.ExecContext(
 		ctx,
 		`UPDATE attribute_values 
 		 SET value = $1, display_name = $2, sort_order = $3, updated_at = NOW()

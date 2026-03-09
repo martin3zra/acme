@@ -7,6 +7,7 @@ import { useHeader } from '@/composables/use-headers';
 import { useTranslation } from '@/hooks/use-translation';
 import { PageProps } from '@/types';
 import { useForm, usePage } from '@inertiajs/react';
+import { useMemo, useState } from 'react';
 import { Attribute, AttributeForm } from '../types';
 
 type CreateFormProps = {
@@ -17,7 +18,8 @@ type CreateFormProps = {
 export default function CreateForm({ attribute, onFinish }: CreateFormProps) {
   const t = useTranslation().trans;
   const { headers } = useHeader();
-  const { errors: propsErrors } = usePage<PageProps>().props;
+  const { errors: propsErrors, attributes = [] } = usePage<PageProps<{ attributes?: Attribute[] }>>().props;
+  const [nameError, setNameError] = useState('');
 
   const { data, setData, post, put, errors, processing, reset } = useForm<AttributeForm>({
     name: attribute?.name || '',
@@ -35,7 +37,24 @@ export default function CreateForm({ attribute, onFinish }: CreateFormProps) {
     },
   };
 
+  const normalizedName = useMemo(() => data.name.trim().toLowerCase(), [data.name]);
+
+  const hasDuplicateName = useMemo(() => {
+    if (!normalizedName) {
+      return false;
+    }
+
+    return attributes.some((existing) => existing.uuid !== attribute?.uuid && existing.name.trim().toLowerCase() === normalizedName);
+  }, [attribute?.uuid, attributes, normalizedName]);
+
   const submit = () => {
+    if (hasDuplicateName) {
+      setNameError('Attribute name already exists. Please use a different name.');
+      return;
+    }
+
+    setNameError('');
+
     if (attribute) {
       put(`/attributes/${attribute.id}`, options);
       return;
@@ -55,11 +74,17 @@ export default function CreateForm({ attribute, onFinish }: CreateFormProps) {
             id="name"
             className="mt-1 block w-full"
             value={data.name}
-            onChange={(e) => setData('name', e.target.value)}
+            onChange={(e) => {
+              if (nameError) {
+                setNameError('');
+              }
+
+              setData('name', e.target.value);
+            }}
             placeholder="e.g., color, size, length"
             required
           />
-          <InputError className="mt-2" message={errors.name} />
+          <InputError className="mt-2" message={errors.name || nameError} />
         </div>
 
         <div className="col-span-6 gap-2">

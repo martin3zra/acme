@@ -4,7 +4,39 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"strings"
 )
+
+func normalizeAttributeName(name string) string {
+	return strings.ToLower(strings.TrimSpace(name))
+}
+
+func (s *Server) hasDuplicateAttributeName(ctx context.Context, companyID int, name string, exceptID *int) (bool, error) {
+	query := `SELECT EXISTS(
+		SELECT 1
+		FROM attributes
+		WHERE company_id = $1
+		  AND deleted_at IS NULL
+		  AND lower(trim(name)) = $2
+	)`
+
+	args := []any{companyID, normalizeAttributeName(name)}
+	if exceptID != nil {
+		query = `SELECT EXISTS(
+			SELECT 1
+			FROM attributes
+			WHERE company_id = $1
+			  AND deleted_at IS NULL
+			  AND lower(trim(name)) = $2
+			  AND id != $3
+		)`
+		args = append(args, *exceptID)
+	}
+
+	var exists bool
+	err := s.db.QueryRowContext(ctx, query, args...).Scan(&exists)
+	return exists, err
+}
 
 // findAttributes returns all active attributes for the current company
 func (s *Server) findAttributes(ctx context.Context) ([]*attribute, error) {
@@ -84,6 +116,18 @@ func (s *Server) findAttributeByIntID(ctx context.Context, id int) (*attribute, 
 // storeAttribute creates a new attribute
 func (s *Server) storeAttribute(ctx context.Context, form *StoreAttributeForm) error {
 	companyID := CurrentCompany(ctx).ID
+	form.Name = strings.TrimSpace(form.Name)
+	form.DisplayName = strings.TrimSpace(form.DisplayName)
+	form.Description = strings.TrimSpace(form.Description)
+
+	hasDuplicate, err := s.hasDuplicateAttributeName(ctx, companyID, form.Name, nil)
+	if err != nil {
+		return err
+	}
+
+	if hasDuplicate {
+		return errors.New("attribute name already exists")
+	}
 
 	stmt, err := s.db.PrepareContext(
 		ctx,
@@ -102,13 +146,25 @@ func (s *Server) storeAttribute(ctx context.Context, form *StoreAttributeForm) e
 // updateAttribute updates an existing attribute
 func (s *Server) updateAttribute(ctx context.Context, id int, form *StoreAttributeForm) error {
 	companyID := CurrentCompany(ctx).ID
+	form.Name = strings.TrimSpace(form.Name)
+	form.DisplayName = strings.TrimSpace(form.DisplayName)
+	form.Description = strings.TrimSpace(form.Description)
 
-	_, err := s.db.ExecContext(
+	hasDuplicate, err := s.hasDuplicateAttributeName(ctx, companyID, form.Name, &id)
+	if err != nil {
+		return err
+	}
+
+	if hasDuplicate {
+		return errors.New("attribute name already exists")
+	}
+
+	_, err = s.db.ExecContext(
 		ctx,
 		`UPDATE attributes 
-		 SET type = $1, display_name = $2, description = $3, updated_at = NOW()
-		 WHERE company_id = $4 AND id = $5 AND deleted_at IS NULL`,
-		form.Type, form.DisplayName, form.Description, companyID, id,
+		 SET name = $1, type = $2, display_name = $3, description = $4, updated_at = NOW()
+		 WHERE company_id = $5 AND id = $6 AND deleted_at IS NULL`,
+		form.Name, form.Type, form.DisplayName, form.Description, companyID, id,
 	)
 
 	return err

@@ -246,6 +246,7 @@ func (form StoreItemForm) Rules() map[string]any {
 	// Add variant combo field validation
 	company := CurrentCompany(form.Context())
 	if company != nil {
+		rules["variant_combos.*.variant_id"] = "sometimes|integer|exists:items_variants,id"
 		rules["variant_combos.*.sku"] = []any{
 			"sometimes",
 			"max:50",
@@ -257,9 +258,12 @@ func (form StoreItemForm) Rules() map[string]any {
 			validator.Rule{}.Unique("items_variants", "barcode").Where("company_id", company.ID),
 		}
 	}
-	
+
 	rules["variant_combos.*.reference"] = "sometimes|max:100"
 	rules["variant_combos.*.vendor_reference"] = "sometimes|max:100"
+	rules["variant_combos.*.track_inventory"] = "sometimes|boolean"
+	rules["variant_combos.*.stock_by_warehouse"] = "sometimes|array"
+	rules["variant_combos.*.stock_by_warehouse.*"] = "sometimes|integer|min:0"
 	rules["variant_combos.*.price"] = "required|numeric|min:0"
 	rules["variant_combos.*.cost_price"] = "sometimes|numeric|min:0"
 
@@ -293,23 +297,15 @@ func (form UpdateItemForm) Rules() map[string]any {
 		"variant_combos":  "sometimes|array",
 	}
 
-	// Add variant combo field validation
-	company := CurrentCompany(form.Context())
-	if company != nil {
-		rules["variant_combos.*.sku"] = []any{
-			"sometimes",
-			"max:50",
-			validator.Rule{}.Unique("items_variants", "sku").Where("company_id", company.ID),
-		}
-		rules["variant_combos.*.barcode"] = []any{
-			"sometimes",
-			"max:100",
-			validator.Rule{}.Unique("items_variants", "barcode").Where("company_id", company.ID),
-		}
-	}
-	
+	rules["variant_combos.*.variant_id"] = "sometimes|integer|exists:items_variants,id"
+	rules["variant_combos.*.sku"] = "sometimes|max:50"
+	rules["variant_combos.*.barcode"] = "sometimes|max:100"
+
 	rules["variant_combos.*.reference"] = "sometimes|max:100"
 	rules["variant_combos.*.vendor_reference"] = "sometimes|max:100"
+	rules["variant_combos.*.track_inventory"] = "sometimes|boolean"
+	rules["variant_combos.*.stock_by_warehouse"] = "sometimes|array"
+	rules["variant_combos.*.stock_by_warehouse.*"] = "sometimes|integer|min:0"
 	rules["variant_combos.*.price"] = "required|numeric|min:0"
 	rules["variant_combos.*.cost_price"] = "sometimes|numeric|min:0"
 
@@ -1626,19 +1622,21 @@ type warehouse struct {
 
 // itemVariant represents a stockable SKU variant of an item
 type itemVariant struct {
-	ID                   int      `json:"id"`
-	UUID                 string   `json:"uuid"`
-	ItemID               int      `json:"item_id"`
-	SKU                  string   `json:"sku"`
-	Name                 string   `json:"name"`
-	Barcode              *string  `json:"barcode,omitempty"`
-	Reference            *string  `json:"reference,omitempty"`
-	VendorReference      *string  `json:"vendor_reference,omitempty"`
-	CombinationSignature string   `json:"combination_signature"`
-	IsDefault            bool     `json:"is_default"`
-	Price                *float64 `json:"price,omitempty"`
-	CostPrice            *float64 `json:"cost_price,omitempty"`
-	Active               bool     `json:"active"`
+	ID                   int         `json:"id"`
+	UUID                 string      `json:"uuid"`
+	ItemID               int         `json:"item_id"`
+	SKU                  string      `json:"sku"`
+	Name                 string      `json:"name"`
+	Barcode              *string     `json:"barcode,omitempty"`
+	Reference            *string     `json:"reference,omitempty"`
+	VendorReference      *string     `json:"vendor_reference,omitempty"`
+	CombinationSignature string      `json:"combination_signature"`
+	IsDefault            bool        `json:"is_default"`
+	Price                *float64    `json:"price,omitempty"`
+	CostPrice            *float64    `json:"cost_price,omitempty"`
+	TrackInventory       bool        `json:"track_inventory"`
+	StockByWarehouse     map[int]int `json:"stock_by_warehouse,omitempty"`
+	Active               bool        `json:"active"`
 	foundation.Timestamps
 }
 
@@ -1788,9 +1786,12 @@ func (form StoreAttributeValueForm) Authorize() bool {
 
 // VariantCombo represents a combination of attribute values for a variant
 type VariantCombo struct {
+	VariantID         int         `json:"variant_id,omitempty"`
 	AttributeValueIDs map[int]int `json:"attribute_value_ids"`
 	Price             *float64    `json:"price,omitempty"`
 	CostPrice         *float64    `json:"cost_price,omitempty"`
+	TrackInventory    *bool       `json:"track_inventory,omitempty"`
+	StockByWarehouse  map[int]int `json:"stock_by_warehouse,omitempty"`
 	SKU               string      `json:"sku,omitempty"`
 	Barcode           string      `json:"barcode,omitempty"`
 	Reference         string      `json:"reference,omitempty"`

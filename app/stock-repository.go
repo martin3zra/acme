@@ -161,7 +161,15 @@ func (s *Server) getStockForWarehouse(ctx context.Context, warehouseID int) ([]*
 func (s *Server) adjustStock(ctx context.Context, warehouseID, variantID int, quantity int) error {
 	companyID := CurrentCompany(ctx).ID
 
-	_, err := s.db.ExecContext(
+	trackInventory, err := s.isVariantInventoryTracked(ctx, variantID)
+	if err != nil {
+		return err
+	}
+	if !trackInventory {
+		return errors.New("inventory tracking is disabled for this variant")
+	}
+
+	_, err = s.db.ExecContext(
 		ctx,
 		`INSERT INTO stock_levels (company_id, warehouse_id, variant_id, quantity, created_at, updated_at)
 		 VALUES ($1, $2, $3, $4, NOW(), NOW())
@@ -171,6 +179,24 @@ func (s *Server) adjustStock(ctx context.Context, warehouseID, variantID int, qu
 	)
 
 	return err
+}
+
+func (s *Server) isVariantInventoryTracked(ctx context.Context, variantID int) (bool, error) {
+	companyID := CurrentCompany(ctx).ID
+	var trackInventory bool
+
+	err := s.db.QueryRowContext(
+		ctx,
+		`SELECT track_inventory
+		 FROM items_variants
+		 WHERE company_id = $1 AND id = $2 AND deleted_at IS NULL`,
+		companyID, variantID,
+	).Scan(&trackInventory)
+	if errors.Is(err, sql.ErrNoRows) {
+		return false, errors.New("variant not found")
+	}
+
+	return trackInventory, err
 }
 
 // initializeStock creates a stock level record with initial quantity

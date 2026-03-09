@@ -148,9 +148,18 @@ export interface ItemIdentifiers {
 export interface ItemVariantSummary {
   id: number;
   uuid: string;
+  combination_signature?: string;
   sku: string;
   name: string;
   is_default: boolean;
+  price?: number;
+  cost_price?: number;
+  barcode?: string;
+  reference?: string;
+  vendor_reference?: string;
+  track_inventory?: boolean;
+  stock_by_warehouse?: Record<number, number>;
+  active?: boolean;
 }
 
 export interface ItemVariantSetup {
