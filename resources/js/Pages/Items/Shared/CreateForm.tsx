@@ -1707,15 +1707,12 @@ export default function CreateForm({ onFinish, params }: CreateFormProps) {
                             gridTemplateColumns: `200px repeat(${Math.max(matrixMeta.columnAttribute.values.length, 1)}, minmax(120px, 1fr))`,
                           }}
                         >
-                          <div className="bg-background sticky top-0 left-0 z-30 border-r border-b p-3 text-xs font-semibold tracking-wide text-muted-foreground uppercase">
+                          <div className="bg-background text-muted-foreground sticky top-0 left-0 z-30 border-r border-b p-3 text-xs font-semibold tracking-wide uppercase">
                             {matrixMeta.rowAttribute.name} / {matrixMeta.columnAttribute.name}
                           </div>
 
                           {matrixMeta.columnAttribute.values.map((columnValue) => (
-                            <div
-                              key={`matrix-column-${columnValue.id}`}
-                              className="bg-background sticky top-0 z-20 border-b p-3 text-sm font-medium"
-                            >
+                            <div key={`matrix-column-${columnValue.id}`} className="bg-background sticky top-0 z-20 border-b p-3 text-sm font-medium">
                               {columnValue.label}
                             </div>
                           ))}
@@ -1729,7 +1726,10 @@ export default function CreateForm({ onFinish, params }: CreateFormProps) {
 
                                 if (!combo) {
                                   return (
-                                    <div key={`matrix-cell-missing-${rowValue.id}-${columnValue.id}`} className="flex min-h-24 items-center justify-center border-b p-2">
+                                    <div
+                                      key={`matrix-cell-missing-${rowValue.id}-${columnValue.id}`}
+                                      className="flex min-h-24 items-center justify-center border-b p-2"
+                                    >
                                       <span className="text-muted-foreground text-xs">-</span>
                                     </div>
                                   );
@@ -1751,10 +1751,10 @@ export default function CreateForm({ onFinish, params }: CreateFormProps) {
                                           ref={(node) => {
                                             matrixCellRefs.current[combo.key] = node;
                                           }}
-                                          className={`flex h-full min-h-20 w-full flex-col justify-center rounded-md border p-2 text-left transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ${
+                                          className={`focus-visible:ring-ring flex h-full min-h-20 w-full flex-col justify-center rounded-md border p-2 text-left transition focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none ${
                                             isMatrixCellActive
                                               ? 'border-border bg-background hover:bg-muted/50'
-                                              : 'border-dashed border-primary/40 bg-primary/5 hover:bg-primary/10'
+                                              : 'border-primary/40 bg-primary/5 hover:bg-primary/10 border-dashed'
                                           }`}
                                           onClick={() => {
                                             if (!isMatrixCellActive) {
@@ -1775,19 +1775,19 @@ export default function CreateForm({ onFinish, params }: CreateFormProps) {
                                           ) : (
                                             <>
                                               <span className="truncate text-xs font-medium">{currentVariantSKU(combo) || 'No SKU'}</span>
-                                              <span className="text-muted-foreground text-xs">${(currentVariantPrice(combo) ?? data.price ?? 0).toFixed(2)}</span>
+                                              <span className="text-muted-foreground text-xs">
+                                                ${(currentVariantPrice(combo) ?? data.price ?? 0).toFixed(2)}
+                                              </span>
                                               <span className="text-muted-foreground text-xs">Stock: {currentVariantTotalStock(combo)}</span>
                                             </>
                                           )}
                                         </button>
                                       </PopoverTrigger>
 
-                                      <PopoverContent
-                                        align="start"
-                                        className="w-72 space-y-3"
-                                        onEscapeKeyDown={() => setOpenMatrixCellKey(null)}
-                                      >
-                                        <p className="text-sm font-semibold">{rowValue.label} / {columnValue.label}</p>
+                                      <PopoverContent align="start" className="w-72 space-y-3" onEscapeKeyDown={() => setOpenMatrixCellKey(null)}>
+                                        <p className="text-sm font-semibold">
+                                          {rowValue.label} / {columnValue.label}
+                                        </p>
 
                                         <div className="space-y-2">
                                           <Label className="text-xs">SKU</Label>
@@ -1871,7 +1871,11 @@ export default function CreateForm({ onFinish, params }: CreateFormProps) {
                                         <div className="flex items-center justify-between rounded-md border p-2">
                                           <Label className="text-xs">Active</Label>
                                           <Switch
-                                            checked={variantActiveOverrides[combo.key] !== undefined ? variantActiveOverrides[combo.key] : combo.active !== false}
+                                            checked={
+                                              variantActiveOverrides[combo.key] !== undefined
+                                                ? variantActiveOverrides[combo.key]
+                                                : combo.active !== false
+                                            }
                                             onCheckedChange={(checked) => {
                                               if (!isMatrixCellActive) {
                                                 activateMatrixCombo(combo.key);
@@ -1889,12 +1893,7 @@ export default function CreateForm({ onFinish, params }: CreateFormProps) {
                                             Close
                                           </Button>
                                           {isMatrixCellActive && (
-                                            <Button
-                                              type="button"
-                                              variant="outline"
-                                              size="sm"
-                                              onClick={() => removeMatrixCombo(combo.key)}
-                                            >
+                                            <Button type="button" variant="outline" size="sm" onClick={() => removeMatrixCombo(combo.key)}>
                                               Remove
                                             </Button>
                                           )}
@@ -1909,7 +1908,9 @@ export default function CreateForm({ onFinish, params }: CreateFormProps) {
                         </div>
                       </div>
 
-                      <p className="text-muted-foreground text-xs">Use arrow keys to navigate cells, Enter to edit, and Escape to close the editor.</p>
+                      <p className="text-muted-foreground text-xs">
+                        Use arrow keys to navigate cells, Enter to edit, and Escape to close the editor.
+                      </p>
                     </div>
                   )}
 

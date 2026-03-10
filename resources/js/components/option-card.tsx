@@ -43,12 +43,7 @@ export default function OptionCard({
           {description && <p className="text-muted-foreground text-xs">{description}</p>}
         </div>
 
-        <Checkbox
-          id={cardID}
-          checked={checked}
-          disabled={disabled}
-          onCheckedChange={(next) => onCheckedChange(next === true)}
-        />
+        <Checkbox id={cardID} checked={checked} disabled={disabled} onCheckedChange={(next) => onCheckedChange(next === true)} />
       </div>
 
       {!checked ? (
