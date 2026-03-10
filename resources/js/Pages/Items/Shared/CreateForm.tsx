@@ -2,15 +2,18 @@ import ActionSection from '@/components/action-section';
 import { ConfirmsPassword } from '@/components/confirms-password';
 import FormSection from '@/components/form-section';
 import InputError from '@/components/input-error';
+import OptionCard from '@/components/option-card';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { useHeader } from '@/composables/use-headers';
 import { useVerb } from '@/composables/use-verbs';
 import { useTranslation } from '@/hooks/use-translation';
+import { generateVariantCombinations } from '@/lib/variants';
 import { Item, ItemType, ItemTypes, PageProps, Tax, Unit, Verb } from '@/types';
 import { Field, Radio, RadioGroup } from '@headlessui/react';
 import { useForm, usePage } from '@inertiajs/react';
@@ -91,6 +94,11 @@ type ItemAttributeValueOption = {
   id: number;
   value: string;
   display_name: string;
+};
+
+type MatrixPosition = {
+  rowIndex: number;
+  columnIndex: number;
 };
 
 export type ItemAttributeOption = {
@@ -206,8 +214,11 @@ export default function CreateForm({ onFinish, params }: CreateFormProps) {
   const [variantSKUFilter, setVariantSKUFilter] = useState<string>('');
   const [variantBarcodeFilter, setVariantBarcodeFilter] = useState<string>('');
   const [variantAttributeValueFilters, setVariantAttributeValueFilters] = useState<Record<number, number[]>>({});
+  const [matrixActiveComboKeys, setMatrixActiveComboKeys] = useState<Record<string, true>>({});
+  const [openMatrixCellKey, setOpenMatrixCellKey] = useState<string | null>(null);
   const [variantTablePage, setVariantTablePage] = useState<number>(1);
   const variantTableContainerRef = useRef<HTMLDivElement | null>(null);
+  const matrixCellRefs = useRef<Record<string, HTMLButtonElement | null>>({});
   const variantTableLastScrollTopRef = useRef<number>(0);
   const variantTableScrollAnchorRef = useRef<'top' | 'bottom' | null>(null);
   const suppressVariantTableScrollHandlerRef = useRef<boolean>(false);
@@ -395,49 +406,51 @@ export default function CreateForm({ onFinish, params }: CreateFormProps) {
       return [];
     }
 
-    const valueGroups = selectedAttributeIDs.map((attributeID) => selectedValuesByAttribute[attributeID] || []);
-    if (valueGroups.some((group) => group.length === 0)) {
+    const valueGroups = selectedAttributeIDs.reduce<Record<string, number[]>>((current, attributeID) => {
+      current[String(attributeID)] = selectedValuesByAttribute[attributeID] || [];
+      return current;
+    }, {});
+
+    if (Object.values(valueGroups).some((group) => group.length === 0)) {
       return [];
     }
 
-    const combos: VariantComboPreview[] = [];
-    const build = (attributeIndex: number, current: Record<number, number>) => {
-      if (attributeIndex === selectedAttributeIDs.length) {
-        const key = buildVariantKey(current);
-        const existingVariant = existingVariantsBySignature.get(key);
+    const combinations = generateVariantCombinations(valueGroups);
 
-        combos.push({
-          key,
-          variant_id: existingVariant?.id,
-          attribute_value_ids: current,
-          label: buildVariantLabel(current),
-          sku: variantSKUOverrides[key] ?? existingVariant?.sku,
-          price: variantPriceOverrides[key] ?? existingVariant?.price,
-          cost_price: variantCostPriceOverrides[key] ?? existingVariant?.cost_price,
-          track_inventory:
-            variantTrackInventoryOverrides[key] !== undefined
-              ? variantTrackInventoryOverrides[key]
-              : (existingVariant?.track_inventory ?? data.track_inventory),
-          stock_by_warehouse: variantStockByWarehouseOverrides[key] ?? normalizeStockByWarehouse(existingVariant?.stock_by_warehouse),
-          barcode: variantBarcodeOverrides[key] ?? existingVariant?.barcode,
-          reference: variantReferenceOverrides[key] ?? existingVariant?.reference,
-          vendor_reference: variantVendorRefOverrides[key] ?? existingVariant?.vendor_reference,
-          active: variantActiveOverrides[key] !== undefined ? variantActiveOverrides[key] : existingVariant?.active !== false,
-        });
-        return;
-      }
+    return combinations.map((combination): VariantComboPreview => {
+      const normalizedSelection = Object.entries(combination).reduce<Record<number, number>>((current, [attributeID, valueID]) => {
+        const normalizedAttributeID = Number(attributeID);
+        const normalizedValueID = Number(valueID);
+        if (Number.isNaN(normalizedAttributeID) || Number.isNaN(normalizedValueID)) {
+          return current;
+        }
 
-      const attributeID = selectedAttributeIDs[attributeIndex];
-      for (const valueID of valueGroups[attributeIndex]) {
-        build(attributeIndex + 1, {
-          ...current,
-          [attributeID]: valueID,
-        });
-      }
-    };
+        current[normalizedAttributeID] = normalizedValueID;
+        return current;
+      }, {});
 
-    build(0, {});
-    return combos;
+      const key = buildVariantKey(normalizedSelection);
+      const existingVariant = existingVariantsBySignature.get(key);
+
+      return {
+        key,
+        variant_id: existingVariant?.id,
+        attribute_value_ids: normalizedSelection,
+        label: buildVariantLabel(normalizedSelection),
+        sku: variantSKUOverrides[key] ?? existingVariant?.sku,
+        price: variantPriceOverrides[key] ?? existingVariant?.price,
+        cost_price: variantCostPriceOverrides[key] ?? existingVariant?.cost_price,
+        track_inventory:
+          variantTrackInventoryOverrides[key] !== undefined
+            ? variantTrackInventoryOverrides[key]
+            : (existingVariant?.track_inventory ?? data.track_inventory),
+        stock_by_warehouse: variantStockByWarehouseOverrides[key] ?? normalizeStockByWarehouse(existingVariant?.stock_by_warehouse),
+        barcode: variantBarcodeOverrides[key] ?? existingVariant?.barcode,
+        reference: variantReferenceOverrides[key] ?? existingVariant?.reference,
+        vendor_reference: variantVendorRefOverrides[key] ?? existingVariant?.vendor_reference,
+        active: variantActiveOverrides[key] !== undefined ? variantActiveOverrides[key] : existingVariant?.active !== false,
+      };
+    });
   }, [
     buildVariantKey,
     buildVariantLabel,
@@ -455,6 +468,277 @@ export default function CreateForm({ onFinish, params }: CreateFormProps) {
     variantTrackInventoryOverrides,
     variantVendorRefOverrides,
   ]);
+
+  const isTwoAttributeMatrixMode = selectedAttributeIDs.length === 2;
+
+  useEffect(() => {
+    if (!isTwoAttributeMatrixMode) {
+      setMatrixActiveComboKeys((current) => (Object.keys(current).length === 0 ? current : {}));
+      setOpenMatrixCellKey(null);
+      return;
+    }
+
+    setMatrixActiveComboKeys((current) => {
+      const next: Record<string, true> = {};
+
+      for (const combo of variantComboPreviews) {
+        if (current[combo.key] || combo.variant_id !== undefined) {
+          next[combo.key] = true;
+        }
+      }
+
+      const currentKeys = Object.keys(current);
+      const nextKeys = Object.keys(next);
+      if (currentKeys.length === nextKeys.length && currentKeys.every((key) => key in next)) {
+        return current;
+      }
+
+      return next;
+    });
+  }, [isTwoAttributeMatrixMode, variantComboPreviews]);
+
+  const activeVariantComboPreviews = useMemo(() => {
+    if (!isTwoAttributeMatrixMode) {
+      return variantComboPreviews;
+    }
+
+    return variantComboPreviews.filter((combo) => matrixActiveComboKeys[combo.key]);
+  }, [isTwoAttributeMatrixMode, matrixActiveComboKeys, variantComboPreviews]);
+
+  const variantCreationCountLabel = `${activeVariantComboPreviews.length} variant${activeVariantComboPreviews.length === 1 ? '' : 's'} will be created`;
+
+  const matrixMeta = useMemo(() => {
+    if (!isTwoAttributeMatrixMode) {
+      return null;
+    }
+
+    const [rowAttributeID, columnAttributeID] = selectedAttributeIDs;
+    const rowAttribute = attributeOptions.find((entry) => entry.id === rowAttributeID);
+    const columnAttribute = attributeOptions.find((entry) => entry.id === columnAttributeID);
+
+    if (!rowAttribute || !columnAttribute) {
+      return null;
+    }
+
+    const rowSelectedValueIDs = new Set(selectedValuesByAttribute[rowAttributeID] || []);
+    const columnSelectedValueIDs = new Set(selectedValuesByAttribute[columnAttributeID] || []);
+
+    return {
+      rowAttribute: {
+        id: rowAttributeID,
+        name: rowAttribute.display_name || rowAttribute.name,
+        values: (rowAttribute.values || [])
+          .filter((value) => rowSelectedValueIDs.has(value.id))
+          .map((value) => ({
+            id: value.id,
+            label: value.display_name || value.value,
+          })),
+      },
+      columnAttribute: {
+        id: columnAttributeID,
+        name: columnAttribute.display_name || columnAttribute.name,
+        values: (columnAttribute.values || [])
+          .filter((value) => columnSelectedValueIDs.has(value.id))
+          .map((value) => ({
+            id: value.id,
+            label: value.display_name || value.value,
+          })),
+      },
+    };
+  }, [attributeOptions, isTwoAttributeMatrixMode, selectedAttributeIDs, selectedValuesByAttribute]);
+
+  const matrixVariantLookup = useMemo(() => {
+    if (!matrixMeta) {
+      return new Map<string, VariantComboPreview>();
+    }
+
+    const lookup = new Map<string, VariantComboPreview>();
+    for (const combo of variantComboPreviews) {
+      const rowValueID = combo.attribute_value_ids[matrixMeta.rowAttribute.id];
+      const columnValueID = combo.attribute_value_ids[matrixMeta.columnAttribute.id];
+
+      if (rowValueID === undefined || columnValueID === undefined) {
+        continue;
+      }
+
+      lookup.set(`${rowValueID}|${columnValueID}`, combo);
+    }
+
+    return lookup;
+  }, [matrixMeta, variantComboPreviews]);
+
+  const matrixCellPositions = useMemo(() => {
+    if (!matrixMeta) {
+      return {} as Record<string, MatrixPosition>;
+    }
+
+    const positions: Record<string, MatrixPosition> = {};
+    matrixMeta.rowAttribute.values.forEach((rowValue, rowIndex) => {
+      matrixMeta.columnAttribute.values.forEach((columnValue, columnIndex) => {
+        const combo = matrixVariantLookup.get(`${rowValue.id}|${columnValue.id}`);
+        if (!combo) {
+          return;
+        }
+
+        positions[combo.key] = {
+          rowIndex,
+          columnIndex,
+        };
+      });
+    });
+
+    return positions;
+  }, [matrixMeta, matrixVariantLookup]);
+
+  const focusMatrixCell = useCallback(
+    (rowIndex: number, columnIndex: number) => {
+      if (!matrixMeta) {
+        return;
+      }
+
+      const safeRow = Math.min(Math.max(rowIndex, 0), Math.max(matrixMeta.rowAttribute.values.length - 1, 0));
+      const safeColumn = Math.min(Math.max(columnIndex, 0), Math.max(matrixMeta.columnAttribute.values.length - 1, 0));
+      const rowValue = matrixMeta.rowAttribute.values[safeRow];
+      const columnValue = matrixMeta.columnAttribute.values[safeColumn];
+
+      if (!rowValue || !columnValue) {
+        return;
+      }
+
+      const combo = matrixVariantLookup.get(`${rowValue.id}|${columnValue.id}`);
+      if (!combo) {
+        return;
+      }
+
+      matrixCellRefs.current[combo.key]?.focus();
+    },
+    [matrixMeta, matrixVariantLookup],
+  );
+
+  const handleMatrixCellKeyDown = useCallback(
+    (event: React.KeyboardEvent<HTMLButtonElement>, comboKey: string) => {
+      const currentPosition = matrixCellPositions[comboKey];
+      if (!currentPosition) {
+        return;
+      }
+
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        setOpenMatrixCellKey(null);
+        return;
+      }
+
+      if (event.key === 'Enter') {
+        event.preventDefault();
+        setOpenMatrixCellKey(comboKey);
+        return;
+      }
+
+      const deltas: Record<string, [number, number]> = {
+        ArrowUp: [-1, 0],
+        ArrowDown: [1, 0],
+        ArrowLeft: [0, -1],
+        ArrowRight: [0, 1],
+      };
+
+      const delta = deltas[event.key];
+      if (!delta) {
+        return;
+      }
+
+      event.preventDefault();
+      focusMatrixCell(currentPosition.rowIndex + delta[0], currentPosition.columnIndex + delta[1]);
+    },
+    [focusMatrixCell, matrixCellPositions],
+  );
+
+  const ensureAllMatrixCombosActive = useCallback(() => {
+    if (!isTwoAttributeMatrixMode) {
+      return;
+    }
+
+    setMatrixActiveComboKeys(() => {
+      const next: Record<string, true> = {};
+      for (const combo of variantComboPreviews) {
+        next[combo.key] = true;
+      }
+      return next;
+    });
+  }, [isTwoAttributeMatrixMode, variantComboPreviews]);
+
+  const activateMatrixCombo = (comboKey: string) => {
+    setMatrixActiveComboKeys((current) => {
+      if (current[comboKey]) {
+        return current;
+      }
+
+      return {
+        ...current,
+        [comboKey]: true,
+      };
+    });
+
+    setVariantActiveOverrides((current) => ({
+      ...current,
+      [comboKey]: true,
+    }));
+  };
+
+  const clearMatrixComboOverrides = (comboKey: string) => {
+    const removeKey = <T,>(current: Record<string, T>): Record<string, T> => {
+      if (!(comboKey in current)) {
+        return current;
+      }
+
+      const next = { ...current };
+      delete next[comboKey];
+      return next;
+    };
+
+    setVariantPriceOverrides((current) => removeKey(current));
+    setVariantSKUOverrides((current) => removeKey(current));
+    setVariantBarcodeOverrides((current) => removeKey(current));
+    setVariantReferenceOverrides((current) => removeKey(current));
+    setVariantVendorRefOverrides((current) => removeKey(current));
+    setVariantCostPriceOverrides((current) => removeKey(current));
+    setVariantActiveOverrides((current) => removeKey(current));
+    setVariantTrackInventoryOverrides((current) => removeKey(current));
+    setVariantStockByWarehouseOverrides((current) => removeKey(current));
+  };
+
+  const removeMatrixCombo = (comboKey: string) => {
+    setMatrixActiveComboKeys((current) => {
+      if (!(comboKey in current)) {
+        return current;
+      }
+
+      const next = { ...current };
+      delete next[comboKey];
+      return next;
+    });
+
+    if (openMatrixCellKey === comboKey) {
+      setOpenMatrixCellKey(null);
+    }
+
+    clearMatrixComboOverrides(comboKey);
+  };
+
+  useEffect(() => {
+    if (!openMatrixCellKey) {
+      return;
+    }
+
+    const comboStillExists = variantComboPreviews.some((combo) => combo.key === openMatrixCellKey);
+    if (!comboStillExists) {
+      setOpenMatrixCellKey(null);
+      return;
+    }
+
+    if (isTwoAttributeMatrixMode && !matrixActiveComboKeys[openMatrixCellKey]) {
+      setOpenMatrixCellKey(null);
+    }
+  }, [isTwoAttributeMatrixMode, matrixActiveComboKeys, openMatrixCellKey, variantComboPreviews]);
 
   const toAlphaNumericUpper = (value: string): string => {
     return value
@@ -486,6 +770,31 @@ export default function CreateForm({ onFinish, params }: CreateFormProps) {
 
   const currentVariantStockByWarehouse = (combo: VariantComboPreview): Record<number, number> => {
     return variantStockByWarehouseOverrides[combo.key] ?? normalizeStockByWarehouse(combo.stock_by_warehouse);
+  };
+
+  const currentVariantTotalStock = (combo: VariantComboPreview): number => {
+    return Object.values(currentVariantStockByWarehouse(combo)).reduce((total, quantity) => {
+      const normalizedQuantity = Number(quantity);
+      return total + (Number.isNaN(normalizedQuantity) ? 0 : Math.max(0, normalizedQuantity));
+    }, 0);
+  };
+
+  const updatePreviewVariantStock = (combo: VariantComboPreview, nextQuantity: number) => {
+    const normalizedQuantity = Number.isNaN(nextQuantity) ? 0 : Math.max(0, nextQuantity);
+
+    if (warehouseOptions.length === 0) {
+      return;
+    }
+
+    const nextStockByWarehouse = warehouseOptions.reduce<Record<number, number>>((current, warehouse, index) => {
+      current[warehouse.id] = index === 0 ? normalizedQuantity : 0;
+      return current;
+    }, {});
+
+    setVariantStockByWarehouseOverrides((current) => ({
+      ...current,
+      [combo.key]: nextStockByWarehouse,
+    }));
   };
 
   const isPriceEmpty = (price: number | undefined): boolean => {
@@ -568,6 +877,14 @@ export default function CreateForm({ onFinish, params }: CreateFormProps) {
     setVariantPriceOverrides((current) => ({ ...current, ...updates }));
   };
 
+  const handleBulkApplyPriceToAll = (price: number) => {
+    const updates: Record<string, number> = {};
+    variantComboPreviews.forEach((combo) => {
+      updates[combo.key] = price;
+    });
+    setVariantPriceOverrides((current) => ({ ...current, ...updates }));
+  };
+
   const applyBulkPriceFromInput = () => {
     const value = Number(bulkPriceInput);
     if (bulkPriceInput.trim() === '' || Number.isNaN(value) || value < 0) {
@@ -577,6 +894,18 @@ export default function CreateForm({ onFinish, params }: CreateFormProps) {
 
     setVariantSetupError('');
     handleBulkApplyPrice(value);
+  };
+
+  const applyMatrixPriceFromInput = () => {
+    const value = Number(bulkPriceInput);
+    if (bulkPriceInput.trim() === '' || Number.isNaN(value) || value < 0) {
+      setVariantSetupError('Enter a valid non-negative price before applying bulk price.');
+      return;
+    }
+
+    setVariantSetupError('');
+    ensureAllMatrixCombosActive();
+    handleBulkApplyPriceToAll(value);
   };
 
   const handleBulkGenerateSKUs = () => {
@@ -625,6 +954,16 @@ export default function CreateForm({ onFinish, params }: CreateFormProps) {
     setVariantBarcodeOverrides((current) => ({ ...current, ...updates }));
   };
 
+  const handleMatrixGenerateSKUs = () => {
+    ensureAllMatrixCombosActive();
+    handleBulkGenerateSKUs();
+  };
+
+  const handleMatrixGenerateBarcodes = () => {
+    ensureAllMatrixCombosActive();
+    handleBulkGenerateBarcodes();
+  };
+
   const selectedAttributeIDsKey = selectedAttributeIDs.join(',');
   const selectedValuesByAttributeKey = JSON.stringify(selectedValuesByAttribute);
 
@@ -652,7 +991,7 @@ export default function CreateForm({ onFinish, params }: CreateFormProps) {
 
       return JSON.stringify(normalizeRecord(current)) === JSON.stringify(normalizeRecord(next)) ? current : next;
     });
-  }, [selectedAttributeIDsKey, selectedValuesByAttributeKey]);
+  }, [selectedAttributeIDs, selectedValuesByAttribute]);
 
   useEffect(() => {
     if (!data.has_variants || variantComboPreviews.length === 0) {
@@ -867,7 +1206,9 @@ export default function CreateForm({ onFinish, params }: CreateFormProps) {
   };
 
   const buildVariantCombos = (): VariantComboForm[] => {
-    return variantComboPreviews.map((combo) => ({
+    const combosToPersist = isTwoAttributeMatrixMode ? activeVariantComboPreviews : variantComboPreviews;
+
+    return combosToPersist.map((combo) => ({
       variant_id: combo.variant_id,
       attribute_value_ids: combo.attribute_value_ids,
       price: variantPriceOverrides[combo.key] ?? combo.price ?? data.price,
@@ -1288,54 +1629,291 @@ export default function CreateForm({ onFinish, params }: CreateFormProps) {
                 <div className="space-y-4">
                   <p className="text-muted-foreground text-sm">{t('items.single.variantSetup.priceTemplateHelp')}</p>
                   <p className="text-muted-foreground text-sm">{t('items.single.variantSetup.skuAutoHelp')}</p>
+                  <p className="text-sm font-medium">{variantCreationCountLabel}</p>
+                  {isTwoAttributeMatrixMode && (
+                    <p className="text-muted-foreground text-xs">
+                      {activeVariantComboPreviews.length} active of {variantComboPreviews.length} possible combinations.
+                    </p>
+                  )}
 
-                  <div className="space-y-2">
-                    <Label>{t('items.single.variantSetup.attributes')}</Label>
-                    {attributeOptions.length === 0 && <p className="text-muted-foreground text-sm">{t('items.single.variantSetup.noAttributes')}</p>}
-
-                    {attributeOptions.map((attribute) => (
-                      <div key={attribute.id} className="flex items-center gap-2">
-                        <Checkbox
-                          id={`attribute-${attribute.id}`}
-                          checked={selectedAttributeIDs.includes(attribute.id)}
-                          onCheckedChange={(checked) => toggleAttribute(attribute.id, checked === true)}
-                        />
-                        <Label htmlFor={`attribute-${attribute.id}`}>{attribute.display_name || attribute.name}</Label>
+                  <div className="space-y-3">
+                    <div className="space-y-3">
+                      <div className="space-y-1">
+                        <Label>{t('items.single.variantSetup.attributes')}</Label>
+                        <p className="text-muted-foreground text-xs">Select attributes to include in this product variant setup.</p>
                       </div>
-                    ))}
+
+                      {attributeOptions.length === 0 ? (
+                        <p className="text-muted-foreground text-sm">{t('items.single.variantSetup.noAttributes')}</p>
+                      ) : (
+                        <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                          {attributeOptions.map((attribute) => {
+                            const isSelected = selectedAttributeIDs.includes(attribute.id);
+                            const attributeName = attribute.display_name || attribute.name;
+                            const valueOptions = (attribute.values || []).map((value) => ({
+                              label: value.display_name || value.value,
+                              value: value.id,
+                            }));
+                            const selectedValueIDs = selectedValuesByAttribute[attribute.id] || [];
+
+                            return (
+                              <OptionCard
+                                key={attribute.id}
+                                title={attributeName}
+                                checked={isSelected}
+                                values={valueOptions}
+                                selectedValueIDs={selectedValueIDs}
+                                onCheckedChange={(checked) => toggleAttribute(attribute.id, checked)}
+                                onToggleValue={(valueID, checked) => toggleAttributeValue(attribute.id, valueID, checked)}
+                                description="Enable this option and choose values for variant generation."
+                              />
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
                   </div>
 
-                  {selectedAttributeIDs.map((attributeID) => {
-                    const attribute = attributeOptions.find((entry) => entry.id === attributeID);
-                    if (!attribute) {
-                      return null;
-                    }
-
-                    return (
-                      <div key={`values-${attributeID}`} className="space-y-2">
-                        <Label>{attribute.display_name || attribute.name}</Label>
-
-                        {(attribute.values || []).length === 0 ? (
-                          <p className="text-muted-foreground text-sm">{t('items.single.variantSetup.noValues')}</p>
-                        ) : (
-                          <div className="grid gap-2 sm:grid-cols-2">
-                            {(attribute.values || []).map((value) => (
-                              <div key={value.id} className="flex items-center gap-2">
-                                <Checkbox
-                                  id={`attribute-${attributeID}-value-${value.id}`}
-                                  checked={(selectedValuesByAttribute[attributeID] || []).includes(value.id)}
-                                  onCheckedChange={(checked) => toggleAttributeValue(attributeID, value.id, checked === true)}
-                                />
-                                <Label htmlFor={`attribute-${attributeID}-value-${value.id}`}>{value.display_name || value.value}</Label>
-                              </div>
-                            ))}
-                          </div>
-                        )}
+                  {variantComboPreviews.length > 0 && isTwoAttributeMatrixMode && matrixMeta && (
+                    <div className="space-y-4">
+                      <div className="space-y-2 rounded-md border p-3">
+                        <p className="text-sm font-semibold">Variant Tools</p>
+                        <div className="flex flex-wrap items-center gap-2">
+                          <Input
+                            type="number"
+                            min={0}
+                            step="0.01"
+                            className="h-8 w-32 text-right text-xs"
+                            value={bulkPriceInput}
+                            onChange={(e) => setBulkPriceInput(e.target.value)}
+                            placeholder="0.00"
+                          />
+                          <Button type="button" variant="outline" size="sm" onClick={applyMatrixPriceFromInput}>
+                            Apply to All
+                          </Button>
+                          <Button type="button" variant="outline" size="sm" onClick={handleMatrixGenerateSKUs}>
+                            Generate SKUs
+                          </Button>
+                          <Button type="button" variant="outline" size="sm" onClick={handleMatrixGenerateBarcodes}>
+                            Generate Barcodes
+                          </Button>
+                        </div>
                       </div>
-                    );
-                  })}
 
-                  {variantComboPreviews.length > 0 && (
+                      <div className="overflow-x-auto rounded-md border">
+                        <div
+                          className="grid min-w-max"
+                          style={{
+                            gridTemplateColumns: `200px repeat(${Math.max(matrixMeta.columnAttribute.values.length, 1)}, minmax(120px, 1fr))`,
+                          }}
+                        >
+                          <div className="bg-background sticky top-0 left-0 z-30 border-r border-b p-3 text-xs font-semibold tracking-wide text-muted-foreground uppercase">
+                            {matrixMeta.rowAttribute.name} / {matrixMeta.columnAttribute.name}
+                          </div>
+
+                          {matrixMeta.columnAttribute.values.map((columnValue) => (
+                            <div
+                              key={`matrix-column-${columnValue.id}`}
+                              className="bg-background sticky top-0 z-20 border-b p-3 text-sm font-medium"
+                            >
+                              {columnValue.label}
+                            </div>
+                          ))}
+
+                          {matrixMeta.rowAttribute.values.map((rowValue) => (
+                            <div key={`matrix-row-${rowValue.id}`} className="contents">
+                              <div className="bg-background sticky left-0 z-10 border-r border-b p-3 text-sm font-medium">{rowValue.label}</div>
+
+                              {matrixMeta.columnAttribute.values.map((columnValue) => {
+                                const combo = matrixVariantLookup.get(`${rowValue.id}|${columnValue.id}`);
+
+                                if (!combo) {
+                                  return (
+                                    <div key={`matrix-cell-missing-${rowValue.id}-${columnValue.id}`} className="flex min-h-24 items-center justify-center border-b p-2">
+                                      <span className="text-muted-foreground text-xs">-</span>
+                                    </div>
+                                  );
+                                }
+
+                                const isMatrixCellActive = !!matrixActiveComboKeys[combo.key];
+                                const isTrackingInventory = currentVariantTrackInventory(combo);
+                                const stockDisabled = !isTrackingInventory || warehouseOptions.length === 0;
+
+                                return (
+                                  <div key={`matrix-cell-${combo.key}`} className="border-b p-2">
+                                    <Popover
+                                      open={openMatrixCellKey === combo.key}
+                                      onOpenChange={(open) => setOpenMatrixCellKey(open ? combo.key : null)}
+                                    >
+                                      <PopoverTrigger asChild>
+                                        <button
+                                          type="button"
+                                          ref={(node) => {
+                                            matrixCellRefs.current[combo.key] = node;
+                                          }}
+                                          className={`flex h-full min-h-20 w-full flex-col justify-center rounded-md border p-2 text-left transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ${
+                                            isMatrixCellActive
+                                              ? 'border-border bg-background hover:bg-muted/50'
+                                              : 'border-dashed border-primary/40 bg-primary/5 hover:bg-primary/10'
+                                          }`}
+                                          onClick={() => {
+                                            if (!isMatrixCellActive) {
+                                              activateMatrixCombo(combo.key);
+                                            }
+                                            setOpenMatrixCellKey(combo.key);
+                                          }}
+                                          onKeyDown={(event) => {
+                                            if (event.key === 'Enter' && !isMatrixCellActive) {
+                                              activateMatrixCombo(combo.key);
+                                            }
+                                            handleMatrixCellKeyDown(event, combo.key);
+                                          }}
+                                          aria-label={`Edit variant ${rowValue.label} ${columnValue.label}`}
+                                        >
+                                          {!isMatrixCellActive ? (
+                                            <span className="text-primary text-lg font-semibold">+</span>
+                                          ) : (
+                                            <>
+                                              <span className="truncate text-xs font-medium">{currentVariantSKU(combo) || 'No SKU'}</span>
+                                              <span className="text-muted-foreground text-xs">${(currentVariantPrice(combo) ?? data.price ?? 0).toFixed(2)}</span>
+                                              <span className="text-muted-foreground text-xs">Stock: {currentVariantTotalStock(combo)}</span>
+                                            </>
+                                          )}
+                                        </button>
+                                      </PopoverTrigger>
+
+                                      <PopoverContent
+                                        align="start"
+                                        className="w-72 space-y-3"
+                                        onEscapeKeyDown={() => setOpenMatrixCellKey(null)}
+                                      >
+                                        <p className="text-sm font-semibold">{rowValue.label} / {columnValue.label}</p>
+
+                                        <div className="space-y-2">
+                                          <Label className="text-xs">SKU</Label>
+                                          <Input
+                                            type="text"
+                                            className="h-8 text-sm"
+                                            value={variantSKUOverrides[combo.key] ?? combo.sku ?? ''}
+                                            placeholder="SKU"
+                                            onChange={(e) => {
+                                              if (!isMatrixCellActive) {
+                                                activateMatrixCombo(combo.key);
+                                              }
+                                              setVariantSKUOverrides((current) => ({
+                                                ...current,
+                                                [combo.key]: e.target.value,
+                                              }));
+                                            }}
+                                          />
+                                        </div>
+
+                                        <div className="space-y-2">
+                                          <Label className="text-xs">Barcode</Label>
+                                          <Input
+                                            type="text"
+                                            className="h-8 text-sm"
+                                            value={variantBarcodeOverrides[combo.key] ?? combo.barcode ?? ''}
+                                            placeholder="Barcode"
+                                            onChange={(e) => {
+                                              if (!isMatrixCellActive) {
+                                                activateMatrixCombo(combo.key);
+                                              }
+                                              setVariantBarcodeOverrides((current) => ({
+                                                ...current,
+                                                [combo.key]: e.target.value,
+                                              }));
+                                            }}
+                                          />
+                                        </div>
+
+                                        <div className="grid grid-cols-2 gap-2">
+                                          <div className="space-y-2">
+                                            <Label className="text-xs">Price</Label>
+                                            <Input
+                                              type="number"
+                                              min={0}
+                                              step="0.01"
+                                              className="h-8 text-right text-sm"
+                                              value={(variantPriceOverrides[combo.key] ?? combo.price ?? data.price ?? 0).toString()}
+                                              onChange={(e) => {
+                                                if (!isMatrixCellActive) {
+                                                  activateMatrixCombo(combo.key);
+                                                }
+                                                const value = e.target.valueAsNumber;
+                                                setVariantPriceOverrides((current) => ({
+                                                  ...current,
+                                                  [combo.key]: Number.isNaN(value) ? undefined : value,
+                                                }));
+                                              }}
+                                            />
+                                          </div>
+                                          <div className="space-y-2">
+                                            <Label className="text-xs">Stock</Label>
+                                            <Input
+                                              type="number"
+                                              min={0}
+                                              step={1}
+                                              className="h-8 text-right text-sm"
+                                              value={currentVariantTotalStock(combo).toString()}
+                                              readOnly={stockDisabled}
+                                              onChange={(e) => {
+                                                if (!isMatrixCellActive) {
+                                                  activateMatrixCombo(combo.key);
+                                                }
+                                                const value = e.target.valueAsNumber;
+                                                updatePreviewVariantStock(combo, value);
+                                              }}
+                                            />
+                                          </div>
+                                        </div>
+
+                                        <div className="flex items-center justify-between rounded-md border p-2">
+                                          <Label className="text-xs">Active</Label>
+                                          <Switch
+                                            checked={variantActiveOverrides[combo.key] !== undefined ? variantActiveOverrides[combo.key] : combo.active !== false}
+                                            onCheckedChange={(checked) => {
+                                              if (!isMatrixCellActive) {
+                                                activateMatrixCombo(combo.key);
+                                              }
+                                              setVariantActiveOverrides((current) => ({
+                                                ...current,
+                                                [combo.key]: checked,
+                                              }));
+                                            }}
+                                          />
+                                        </div>
+
+                                        <div className="flex justify-end gap-2">
+                                          <Button type="button" variant="ghost" size="sm" onClick={() => setOpenMatrixCellKey(null)}>
+                                            Close
+                                          </Button>
+                                          {isMatrixCellActive && (
+                                            <Button
+                                              type="button"
+                                              variant="outline"
+                                              size="sm"
+                                              onClick={() => removeMatrixCombo(combo.key)}
+                                            >
+                                              Remove
+                                            </Button>
+                                          )}
+                                        </div>
+                                      </PopoverContent>
+                                    </Popover>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+
+                      <p className="text-muted-foreground text-xs">Use arrow keys to navigate cells, Enter to edit, and Escape to close the editor.</p>
+                    </div>
+                  )}
+
+                  {variantComboPreviews.length > 0 && !isTwoAttributeMatrixMode && (
                     <div className="space-y-3">
                       <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
                         <Label>{t('items.single.variantSetup.variants')}</Label>
