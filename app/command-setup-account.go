@@ -52,6 +52,27 @@ func (s *Server) SetupAccount() {
 	console.Info("The new account was created successfully!")
 }
 
+func (s *Server) ResendAccountVerificationEmail() {
+
+	email := console.Ask("What's the owner email?")
+	account, err := s.findAccountByOwnerEmailAddress(email)
+	if err != nil {
+		console.Info("It wasn't possible to resend the email verification. Something wrong happened.", err)
+		log.Fatal(err)
+		return
+	}
+
+	// If the account is already verified, inform the operator and skip sending an email.
+	if v, ok := any(*account).(MustVerifyAccount); ok && v.HasVerifiedAccount() {
+		console.Info("The account is already verified; no verification email was sent.")
+		return
+	}
+
+	s.sendAccountVerificationNotification(*account)
+
+	console.Info(fmt.Sprintf("Verification email resent successfully to %s.", email))
+}
+
 func (s *Server) sendAccountVerificationNotification(acc account) {
 
 	var account any = acc
