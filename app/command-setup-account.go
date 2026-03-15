@@ -70,7 +70,7 @@ func (s *Server) ResendAccountVerificationEmail() {
 
 	s.sendAccountVerificationNotification(*account)
 
-	console.Info("Email verification resend was successfully!")
+	console.Info(fmt.Sprintf("Verification email resent successfully to %s.", email))
 }
 
 func (s *Server) sendAccountVerificationNotification(acc account) {
