@@ -62,6 +62,12 @@ func (s *Server) ResendAccountVerificationEmail() {
 		return
 	}
 
+	// If the account is already verified, inform the operator and skip sending an email.
+	if v, ok := any(*account).(MustVerifyAccount); ok && v.HasVerifiedAccount() {
+		console.Info("The account is already verified; no verification email was sent.")
+		return
+	}
+
 	s.sendAccountVerificationNotification(*account)
 
 	console.Info("Email verification resend was successfully!")
