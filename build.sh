@@ -39,8 +39,12 @@ export GOOS="$TARGET_OS"
 export GOARCH="$TARGET_ARCH"
 export CGO_ENABLED=0
 
-# Resolve git tag (prefer exact tag on HEAD, fallback to latest tag)
-GIT_TAG=$(git describe --tags --exact-match 2>/dev/null || git describe --tags --abbrev=0 2>/dev/null || echo "untagged")
+# Resolve git tag (prefer exact tag on HEAD, then latest tag, else commit SHA)
+GIT_TAG=$(git describe --tags --exact-match 2>/dev/null || git describe --tags --abbrev=0 2>/dev/null || echo "")
+if [ -z "$GIT_TAG" ]; then
+  # Fall back to short commit SHA when no suitable tag is found
+  GIT_TAG=$(git rev-parse --short HEAD 2>/dev/null || echo "untagged")
+fi
 GIT_TAG_SAFE=$(printf "%s" "$GIT_TAG" | tr '/ ' '--')
 
 # Compute "next" tag for artifact names only (does NOT create a git tag)
@@ -56,9 +60,17 @@ bump_patch() {
   printf "v%s.%s.%s" "$major" "$minor" "$((patch + 1))"
 }
 
-# Optional override:
-# BUILD_TAG_OVERRIDE=v1.4.0 ./build.sh darwin amd64
-NAME_TAG="${BUILD_TAG_OVERRIDE:-$(bump_patch "$LAST_TAG")}"
+# Optional overrides:
+#  - BUILD_TAG_OVERRIDE=v1.4.0 ./build.sh darwin amd64
+#  - BUILD_TAG_BUMP_NEXT_PATCH=1 ./build.sh linux arm64
+if [ -n "$BUILD_TAG_OVERRIDE" ]; then
+  NAME_TAG="$BUILD_TAG_OVERRIDE"
+elif [ -n "$BUILD_TAG_BUMP_NEXT_PATCH" ]; then
+  NAME_TAG="$(bump_patch "$LAST_TAG")"
+else
+  # Default: use the resolved git tag or commit SHA for artifact naming
+  NAME_TAG="$GIT_TAG"
+fi
 NAME_TAG_SAFE=$(printf "%s" "$NAME_TAG" | tr '/ ' '--')
 
 APP_BIN="bin/acme-${TARGET_OS}-${TARGET_ARCH}-${NAME_TAG_SAFE}${EXT}"
@@ -82,10 +94,11 @@ zip -j "$ZIP_FILE" "$APP_BIN" "$CLI_BIN"
 
 echo "=============================="
 echo " Build complete!"
-echo " Tag: $GIT_TAG"
+echo " Git ref/tag used for build: $GIT_TAG"
+echo " Artifact name tag: $NAME_TAG"
 echo " Output: $APP_BIN"
 echo " Output: $CLI_BIN"
 echo " Output: $ZIP_FILE"
-echo " Last git tag: $LAST_TAG"
-echo " Name tag used: $NAME_TAG (filename only; git tag not created)"
+echo " Last semantic git tag: $LAST_TAG"
+echo " (Note: Name tag is for filenames only; no git tag is created by this script)"
 echo "=============================="
