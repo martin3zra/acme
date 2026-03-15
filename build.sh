@@ -81,8 +81,8 @@ echo "Building Golang application..."
 go build -tags prod -ldflags="-s -w" -o "$APP_BIN" .
 go build -tags prod -ldflags="-s -w" -o "$CLI_BIN" ./cmd/cli
 
-# Zip artifacts using tag as zip name
-ZIP_FILE="bin/${NAME_TAG_SAFE}.zip"
+# Zip artifacts using tag, OS, and ARCH in the zip name to avoid overwrites
+ZIP_FILE="bin/${NAME_TAG_SAFE}-${TARGET_OS}-${TARGET_ARCH}.zip"
 rm -f "$ZIP_FILE"
 
 if ! command -v zip >/dev/null 2>&1; then
