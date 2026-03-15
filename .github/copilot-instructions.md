@@ -6,7 +6,7 @@ This is a **Go + Inertia.js + React SSR** business application combining a custo
 
 ### Stack
 - **Backend**: Go 1.23+, PostgreSQL, custom routing/middleware packages
-- **Frontend**: React 18, TypeScript, Inertia.js v2, Vite 6, Tailwind CSS v4
+- **Frontend**: React 19, TypeScript, Inertia.js v2, Vite 6, Tailwind CSS v4
 - **Deployment**: Dual binary build (web app + CLI), systemd service
 
 ## Project Structure
