@@ -48,6 +48,10 @@ func (s *Server) bootRoutes() {
 					route.DELETE("/customers/:id", s.deleteCustomerHandler())
 
 					route.GET("/vendors", s.vendorsHandler).Can("viewAny:vendor")
+					route.POST("/vendors", s.storeVendorHandler())
+					route.PUT("/vendors/:id", s.updateVendorHandler())
+					route.PUT("/vendors/:id/change-status", s.changeStatusVendorHandler())
+					route.DELETE("/vendors/:id", s.deleteVendorHandler())
 
 					route.GET("/items", s.itemsHandler).Can("viewAny:item")
 					route.POST("/items", s.storeItemHandler())

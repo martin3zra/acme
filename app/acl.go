@@ -11,11 +11,11 @@ var rolePermissionsCache = map[string]map[string]bool{}
 var groupedPermissions = map[string]map[string][]string{
 	"owner": {"*": {"*"}},
 	"admin": {
-		"view":    {"dashboard", "invoice", "estimate", "order", "customer", "item", "payment", "reports", "setting"},
-		"viewAny": {"dashboard", "invoice", "estimate", "order", "customer", "item", "payment", "reports", "setting"},
-		"create":  {"dashboard", "invoice", "estimate", "order", "customer", "item", "payment", "reports", "setting"},
-		"delete":  {"dashboard", "invoice", "estimate", "order", "customer", "item", "payment", "reports", "setting"},
-		"update":  {"dashboard", "invoice", "estimate", "order", "customer", "item", "payment", "reports", "setting", "company:sequence"},
+		"view":    {"dashboard", "invoice", "estimate", "order", "customer", "item", "payment", "reports", "setting", "vendor"},
+		"viewAny": {"dashboard", "invoice", "estimate", "order", "customer", "item", "payment", "reports", "setting", "vendor"},
+		"create":  {"dashboard", "invoice", "estimate", "order", "customer", "item", "payment", "reports", "setting", "vendor"},
+		"delete":  {"dashboard", "invoice", "estimate", "order", "customer", "item", "payment", "reports", "setting", "vendor"},
+		"update":  {"dashboard", "invoice", "estimate", "order", "customer", "item", "payment", "reports", "setting", "company:sequence", "vendor"},
 	},
 	"supervisor": {
 		"view":    {"dashboard", "customer", "item", "payment", "reports"},

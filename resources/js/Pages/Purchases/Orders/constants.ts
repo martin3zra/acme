@@ -3,7 +3,7 @@ import { BreadcrumbItem, defaultBreadcrumbs, PurchaseTransactionKind } from '@/t
 export const makeBreadcrumbs = (kind: PurchaseTransactionKind): BreadcrumbItem[] => [
   ...defaultBreadcrumbs,
   {
-    title: `${kind}.title`, // e.g. "purchases.orders.title", "purchase.receipts.title"
+    title: `${kind}.title`, // e.g. "purchases.orders.title", "purchases.receipts.title"
     href: `/${kind}s`,
   },
 ];

@@ -648,6 +648,7 @@ type RedirectPreferences struct {
 	Invoice  RedirectPreferencesValue `json:"invoice"`
 	Estimate RedirectPreferencesValue `json:"estimate"`
 	Customer RedirectPreferencesValue `json:"customer"`
+	Vendor   RedirectPreferencesValue `json:"vendor"`
 	Item     RedirectPreferencesValue `json:"item"`
 	Payment  RedirectPreferencesValue `json:"payment"`
 	Order    RedirectPreferencesValue `json:"order"`
@@ -1361,7 +1362,7 @@ func (RedirectPreferencesForm) Rules() map[string]any {
 		"invoice":  "required|in:list,detail,stay",
 		"estimate": "required|in:list,detail,stay",
 		"customer": "required|in:list,detail,stay",
-		"vendor": "required|in:list,detail,stay",
+		"vendor":   "required|in:list,detail,stay",
 		"order":    "required|in:list,detail,stay",
 		"item":     "required|in:list,detail,stay",
 		"payment":  "required|in:list,detail,stay",

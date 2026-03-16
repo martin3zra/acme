@@ -101,7 +101,7 @@ export type CustomerTypeFilter = CustomerType | 'all';
 export type InvoiceTypeFilter = 'all' | 'cash' | 'credit';
 
 export type TransactionKind = 'invoice' | 'estimate' | 'order' | 'template';
-export type PurchaseTransactionKind = 'purchases.orders' | 'purchases.receipts' | 'purchases.vendor.bills';
+export type PurchaseTransactionKind = 'purchases.orders' | 'purchases.receipts' | 'purchases.vendor-bills';
 
 export interface OpenBalance {
   invoice_id: number;
@@ -130,6 +130,32 @@ export interface Customer {
   open_balance_as_of: Date;
   created_at: string;
   updated_at: string;
+}
+
+export const VendorTypes = ['individual', 'business'] as const;
+
+export type VendorType = (typeof VendorTypes)[number];
+
+export type VendorTypeFilter = VendorType | 'all';
+
+export interface Vendor {
+  id: number;
+  uuid: string;
+  code: string;
+  name: string;
+  contact_name: string;
+  phone: string;
+  email: string;
+  address: string;
+  status: string;
+  payment_method: string;
+  payment_terms: PaymentTermValue;
+  amount_payable: number;
+  vendor_type: VendorType;
+  created_at: string;
+  updated_at: string;
+  open_balance: OpenBalance;
+  open_balance_as_of: Date;
 }
 
 export const ItemTypes = ['product', 'service'] as const;
@@ -247,6 +273,8 @@ export type InvoiceVerb = Exclude<Verb, 'trash'> | 'void' | 'record-payment' | '
 export type PaymentVerb = Verb | 'void';
 
 export type CustomerVerb = Verb | 'record-payment' | 'issue-invoice';
+
+export type VendorVerb = Verb | 'record-payment' | 'record-purchase';
 
 export type UserVerb = Verb | 'permission';
 
