@@ -49,6 +49,7 @@
     "totalReceived": "Total recibido",
     "currency": "Moneda",
     "customer": "Cliente",
+    "vendor": "Proveedor",
     "user": "Usuario",
     "company": "Compañia",
     "invoice": "Factura",

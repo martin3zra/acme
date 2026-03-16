@@ -95,6 +95,50 @@ func (form StoreCustomerForm) Authorize() bool {
 	return Can(form.User(), "create:customer")
 }
 
+type StoreVendorForm struct {
+	support.FormRequest
+	Name            string    `json:"name"`
+	Contact         string    `json:"contact"`
+	Email           string    `json:"email"`
+	Phone           string    `json:"phone"`
+	PaymentMethod   string    `json:"payment_method"`
+	PaymentTerms    string    `json:"payment_terms"`
+	CreditLimited   bool      `json:"credit_limited"`
+	CreditLimit     float64   `json:"credit_limit"`
+	VendorType      string    `json:"vendor_type"`
+	TaxReceipt      int       `json:"tax_receipt"`
+	OpenBalance     float64   `json:"open_balance"`
+	OpenBalanceAsOf time.Time `json:"open_balance_as_of"`
+}
+
+func (StoreVendorForm) Rules() map[string]any {
+	return map[string]any{
+		"name":    "required|min:3|max:120",
+		"contact": "sometimes|min:3|max:120",
+		"email": []any{
+			"required",
+			"email",
+			"min:8",
+			"max:120",
+			"lowercase",
+			validator.Rule{}.Unique("vendors", "email"),
+		},
+		"phone":              "sometimes|min:3|max:120",
+		"payment_method":     "sometimes|in:cash,ck,card,bt",
+		"payment_terms":      "sometimes|required",
+		"credit_limited":     "required",
+		"credit_limit":       "sometimes|required|min:0",
+		"vendor_type":        "sometimes|required|in:individual,business",
+		"tax_receipt":        "sometimes|exists:tax_receipts,id",
+		"open_balance":       "sometimes|min:0",
+		"open_balance_as_of": "sometimes",
+	}
+}
+
+func (form StoreVendorForm) Authorize() bool {
+	return Can(form.User(), "create:vendor")
+}
+
 type UpdateCustomerForm struct {
 	support.FormRequest
 	ID              int       `json:"id"`
@@ -133,6 +177,50 @@ func (form UpdateCustomerForm) Rules() map[string]any {
 		"payment_terms":      "sometimes|required",
 		"credit_limit":       "sometimes|required|min:0",
 		"customer_type":      "sometimes|required|in:individual,business",
+		"tax_receipt":        "sometimes|exists:tax_receipts,id",
+		"open_balance":       "sometimes|min:0",
+		"open_balance_as_of": "sometimes",
+	}
+}
+
+type UpdateVendorForm struct {
+	support.FormRequest
+	ID              int       `json:"id"`
+	Name            string    `json:"name"`
+	Contact         string    `json:"contact"`
+	Email           string    `json:"email"`
+	Phone           string    `json:"phone"`
+	PaymentMethod   string    `json:"payment_method"`
+	PaymentTerms    string    `json:"payment_terms"`
+	CreditLimited   bool      `json:"credit_limited"`
+	CreditLimit     float64   `json:"credit_limit"`
+	VendorType      string    `json:"vendor_type"`
+	TaxReceipt      int       `json:"tax_receipt"`
+	OpenBalance     float64   `json:"open_balance"`
+	OpenBalanceAsOf time.Time `json:"open_balance_as_of"`
+}
+
+func (form UpdateVendorForm) Authorize() bool {
+	return Can(form.User(), "update:vendor")
+}
+
+func (form UpdateVendorForm) Rules() map[string]any {
+	return map[string]any{
+		"name":    "required|min:3|max:120",
+		"contact": "sometimes|min:3|max:120",
+		"email": []any{
+			"required",
+			"email",
+			"min:8",
+			"max:120",
+			"lowercase",
+			validator.Rule{}.Unique("vendors", "email").Ignore(form.ID, "id"),
+		},
+		"phone":              "sometimes|min:3|max:120",
+		"payment_method":     "sometimes|in:cash,ck,card,bt",
+		"payment_terms":      "sometimes|required",
+		"credit_limit":       "sometimes|required|min:0",
+		"vendor_type":        "sometimes|required|in:individual,business",
 		"tax_receipt":        "sometimes|exists:tax_receipts,id",
 		"open_balance":       "sometimes|min:0",
 		"open_balance_as_of": "sometimes",
@@ -431,6 +519,40 @@ func (d *Recurrence) Scan(value any) error {
 	}
 
 	return json.Unmarshal(b, &d)
+}
+
+// Payable Status (AP Invoice Lifecycle)
+// Draft → invoice received, not yet submitted for approval.
+// Pending → submitted, awaiting approval.
+// Approved → approved, scheduled for payment.
+// Partial → partially paid, balance remains.
+// Paid → fully settled.
+// Cancelled → invoice voided, no payment will be made.
+type PayableStatus string
+
+const (
+	_PAYABLE_DRAFT     PayableStatus = "DRAFT"
+	_PAYABLE_PENDING   PayableStatus = "PENDING"
+	_PAYABLE_APPROVED  PayableStatus = "APPROVED"
+	_PAYABLE_PARTIAL   PayableStatus = "PARTIAL"
+	_PAYABLE_PAID      PayableStatus = "PAID"
+	_PAYABLE_CANCELLED PayableStatus = "CANCELLED"
+)
+
+var PayableStatuses = struct {
+	Draft     PayableStatus
+	Pending   PayableStatus
+	Approved  PayableStatus
+	Partial   PayableStatus
+	Paid      PayableStatus
+	Cancelled PayableStatus
+}{
+	Draft:     _PAYABLE_DRAFT,
+	Pending:   _PAYABLE_PENDING,
+	Approved:  _PAYABLE_APPROVED,
+	Partial:   _PAYABLE_PARTIAL,
+	Paid:      _PAYABLE_PAID,
+	Cancelled: _PAYABLE_CANCELLED,
 }
 
 // Paid Status (Financial Settlement)
@@ -1185,6 +1307,7 @@ type CompanySequence struct {
 	Invoice  InvoiceSequence `json:"invoice"`
 	Template SequenceConfig  `json:"template"`
 	Customer SequenceConfig  `json:"customer"`
+	Vendor   SequenceConfig  `json:"vendor"`
 	Estimate SequenceConfig  `json:"estimate"`
 	Payment  SequenceConfig  `json:"payment"`
 }
@@ -1203,9 +1326,9 @@ func (SequenceForm) Rules() map[string]any {
 		"invoice.cash.next":       "required|min:1",
 		"invoice.credit.padding":  "required|min:3",
 		"invoice.credit.next":     "required|min:1",
-		"customer":                "required",
-		"customer.padding":        "required|min:3",
-		"customer.next":           "required|min:1",
+		"vendor":                  "required",
+		"vendor.padding":          "required|min:3",
+		"vendor.next":             "required|min:1",
 		"estimate":                "required",
 		"estimate.padding":        "required|min:3",
 		"estimate.next":           "required|min:1",
@@ -1227,6 +1350,7 @@ type RedirectPreferencesForm struct {
 	Invoice  string `json:"invoice"`
 	Estimate string `json:"estimate"`
 	Customer string `json:"customer"`
+	Vendor   string `json:"vendor"`
 	Order    string `json:"order"`
 	Item     string `json:"item"`
 	Payment  string `json:"payment"`
@@ -1237,6 +1361,7 @@ func (RedirectPreferencesForm) Rules() map[string]any {
 		"invoice":  "required|in:list,detail,stay",
 		"estimate": "required|in:list,detail,stay",
 		"customer": "required|in:list,detail,stay",
+		"vendor": "required|in:list,detail,stay",
 		"order":    "required|in:list,detail,stay",
 		"item":     "required|in:list,detail,stay",
 		"payment":  "required|in:list,detail,stay",
@@ -1385,6 +1510,24 @@ func (t CustomerType) Validate() error {
 		return nil
 	default:
 		return fmt.Errorf("invalid customer type: %s", t)
+	}
+}
+
+type VendorType string
+
+const (
+	VendorTypeAll        VendorType = "all"
+	VendorTypeIndividual VendorType = "individual"
+	VendorTypeBusiness   VendorType = "business"
+)
+
+// Validate ensures the value is one of the allowed constants
+func (t VendorType) Validate() error {
+	switch t {
+	case VendorTypeAll, VendorTypeIndividual, VendorTypeBusiness:
+		return nil
+	default:
+		return fmt.Errorf("invalid vendor type: %s", t)
 	}
 }
 

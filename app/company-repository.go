@@ -226,6 +226,12 @@ func (s *Server) linkCompanyDefaultSequences(tx *sql.Tx, companyID int) error {
 			"padding": 6,
 			"format":  "{prefix}-{year}-{seq}",
 		},
+		"vendor": map[string]any{
+			"prefix":  "VEND-",
+			"next":    1,
+			"padding": 6,
+			"format":  "{prefix}-{year}-{seq}",
+		},
 		"estimate": map[string]any{
 			"prefix":  "EST-",
 			"next":    1,
@@ -250,6 +256,7 @@ func (s *Server) linkCompanyDefaultSequences(tx *sql.Tx, companyID int) error {
 		Invoice:  RedirectPreference.Stay,
 		Estimate: RedirectPreference.Stay,
 		Customer: RedirectPreference.List,
+		Vendor:   RedirectPreference.List,
 		Item:     RedirectPreference.List,
 		Payment:  RedirectPreference.List,
 		Order:    RedirectPreference.List,
