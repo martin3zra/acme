@@ -6,16 +6,23 @@ import { buildNavGroups } from '@/lib/utils';
 import { NavItem, PageProps } from '@/types';
 import { Link, usePage } from '@inertiajs/react';
 import {
+  ArrowLeftRight,
+  Boxes,
   ChartArea,
-  ClipboardList,
-  ClipboardPenLineIcon,
+  ClipboardCheck,
+  ClipboardEdit,
+  ClipboardPenLine,
   CreditCard,
-  LayoutDashboardIcon,
-  LayoutListIcon,
+  FileText,
+  LayoutDashboard,
+  PackageCheck,
   Receipt,
+  ReceiptText,
   SettingsIcon,
-  ShoppingCartIcon,
-  UsersIcon,
+  ShoppingCart,
+  Truck,
+  Users,
+  Warehouse,
 } from 'lucide-react';
 import * as React from 'react';
 import AppLogoIcon from './app-logo-icon';
@@ -24,39 +31,97 @@ const navMain: NavItem[] = [
   {
     title: 'global.navMain.dashboard',
     url: '/home',
-    icon: LayoutDashboardIcon,
+    icon: LayoutDashboard,
     requiredAbility: 'viewAny:dashboard',
   },
-  {
-    title: 'global.navMain.invoices',
-    url: '/invoices',
-    icon: ClipboardList,
-    requiredAbility: 'viewAny:invoice',
-  },
+
+  // SALES
   {
     title: 'global.navMain.estimates',
     url: '/estimates',
-    icon: ClipboardPenLineIcon,
+    icon: ClipboardPenLine,
     requiredAbility: 'viewAny:estimate',
   },
   {
     title: 'global.navMain.orders',
     url: '/orders',
-    icon: ShoppingCartIcon,
+    icon: ShoppingCart,
     requiredAbility: 'viewAny:order',
   },
   {
+    title: 'global.navMain.invoices',
+    url: '/invoices',
+    icon: FileText,
+    requiredAbility: 'viewAny:invoice',
+  },
+
+  // PURCHASING
+  {
+    title: 'global.navMain.purchaseOrders',
+    url: '/purchases/orders',
+    icon: ClipboardCheck,
+    requiredAbility: 'viewAny:purchase',
+  },
+  {
+    title: 'global.navMain.purchaseReceipts',
+    url: '/purchases/receipts',
+    icon: PackageCheck,
+    requiredAbility: 'viewAny:purchase',
+  },
+  {
+    title: 'global.navMain.vendorBills',
+    url: '/purchases/vendor-bills',
+    icon: ReceiptText,
+    requiredAbility: 'viewAny:purchase',
+  },
+
+  // INVENTORY
+  {
+    title: 'global.navMain.warehouses',
+    url: '/inventories/warehouses',
+    icon: Warehouse,
+    requiredAbility: 'viewAny:warehouse',
+  },
+  {
+    title: 'global.navMain.stock',
+    url: '/inventories/stocks',
+    icon: Boxes,
+    requiredAbility: 'viewAny:stock',
+  },
+  {
+    title: 'global.navMain.transfers',
+    url: '/inventories/transfers',
+    icon: ArrowLeftRight,
+    requiredAbility: 'viewAny:stock',
+  },
+  {
+    title: 'global.navMain.adjustments',
+    url: '/inventories/adjustments',
+    icon: ClipboardEdit,
+    requiredAbility: 'viewAny:stock',
+  },
+
+  // CATALOG
+  {
     title: 'global.navMain.customers',
     url: '/customers',
-    icon: UsersIcon,
+    icon: Users,
     requiredAbility: 'viewAny:customer',
+  },
+  {
+    title: 'global.navMain.vendors',
+    url: '/vendors',
+    icon: Truck,
+    requiredAbility: 'viewAny:vendor',
   },
   {
     title: 'global.navMain.items',
     url: '/items',
-    icon: LayoutListIcon,
+    icon: Boxes,
     requiredAbility: 'viewAny:item',
   },
+
+  // FINANCE
   {
     title: 'global.navMain.payments',
     url: '/payments',
@@ -69,6 +134,8 @@ const navMain: NavItem[] = [
     icon: Receipt,
     requiredAbility: 'viewAny:expense',
   },
+
+  // ANALYTICS
   {
     title: 'global.navMain.reports',
     url: '/reports/sales',

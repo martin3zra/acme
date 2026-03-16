@@ -202,13 +202,33 @@ export function clampISODate(value: string | undefined | null): string {
 
 const groupMap: Record<string, string> = {
   'global.navMain.dashboard': 'global.navGroups.overview',
+
+  // Sales
   'global.navMain.invoices': 'global.navGroups.sales',
   'global.navMain.estimates': 'global.navGroups.sales',
   'global.navMain.orders': 'global.navGroups.sales',
+
+  // Purchasing
+  'global.navMain.purchaseOrders': 'global.navGroups.purchasing',
+  'global.navMain.purchaseReceipts': 'global.navGroups.purchasing',
+  'global.navMain.vendorBills': 'global.navGroups.purchasing',
+
+  // Inventory
+  'global.navMain.warehouses': 'global.navGroups.inventory',
+  'global.navMain.stock': 'global.navGroups.inventory',
+  'global.navMain.transfers': 'global.navGroups.inventory',
+  'global.navMain.adjustments': 'global.navGroups.inventory',
+
+  // Catalog
   'global.navMain.customers': 'global.navGroups.customersCatalog',
+  'global.navMain.vendors': 'global.navGroups.customersCatalog',
   'global.navMain.items': 'global.navGroups.customersCatalog',
+
+  // Finance
   'global.navMain.payments': 'global.navGroups.finance',
   'global.navMain.expenses': 'global.navGroups.finance',
+
+  // Analytics
   'global.navMain.reports': 'global.navGroups.analytics',
 };
 

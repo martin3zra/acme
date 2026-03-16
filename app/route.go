@@ -47,6 +47,8 @@ func (s *Server) bootRoutes() {
 					route.PUT("/customers/:id/change-status", s.changeStatusCustomerHandler())
 					route.DELETE("/customers/:id", s.deleteCustomerHandler())
 
+					route.GET("/vendors", s.vendorsHandler).Can("viewAny:vendor")
+
 					route.GET("/items", s.itemsHandler).Can("viewAny:item")
 					route.POST("/items", s.storeItemHandler())
 					route.PUT("/items/:id", s.updateItemHandler())
@@ -78,6 +80,15 @@ func (s *Server) bootRoutes() {
 					route.PUT("/orders/:id/void", s.voidInvoiceHandler())
 					route.GET("/orders/:id/print/:hash", s.printInvoiceHandler).Middleware(Signed)
 					route.PUT("/orders/:id", s.updateInvoiceHandler())
+
+					route.GET("/purchases/orders", s.purchaseOrdersHandler).Can("viewAny:purchase")
+					route.GET("/purchases/receipts", s.purchaseReceiptsHandler).Can("viewAny:purchase")
+					route.GET("/purchases/vendor-bills", s.purchaseVendorBillsHandler).Can("viewAny:purchase")
+
+					route.GET("/inventories/warehouses", s.warehousesHandler).Can("viewAny:inventory")
+					route.GET("/inventories/stocks", s.stocksHandler).Can("viewAny:inventory")
+					route.GET("/inventories/transfers", s.transfersHandler).Can("viewAny:inventory")
+					route.GET("/inventories/adjustments", s.adjustmentsHandler).Can("viewAny:inventory")
 
 					route.GET("/payments", s.paymentsHandler).Can("viewAny:payment")
 					route.POST("/payments", s.storePaymentHandler())

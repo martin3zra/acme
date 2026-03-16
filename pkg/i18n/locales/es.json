@@ -293,6 +293,8 @@
     "navGroups": {
       "overview": "Resumen", 
       "sales": "Ventas", 
+      "purchasing": "Compras", 
+      "inventory": "Inventario", 
       "customersCatalog": "Clientes y Catálogo", 
       "finance": "Finanzas", 
       "analytics": "Análisis"
@@ -302,8 +304,16 @@
       "invoices": "Facturas",
       "estimates": "Cotizaciones",
       "orders": "Pedidos",
+      "purchaseOrders": "Órdenes de compra",
+      "purchaseReceipts": "Recibos de compra",
+      "vendorBills": "Facturas de proveedores",
       "customers": "Clientes",
+      "vendors": "Proveedores",
       "items": "Productos",
+      "warehouses": "Almacenes",
+      "stock": "Existencias",
+      "transfers": "Transferencias",
+      "adjustments": "Ajustes",
       "payments": "Pagos",
       "expenses": "Gastos",
       "reports": "Reportes"
@@ -888,6 +898,17 @@
           "variant": "primary"
         }
       }
+    }
+  },
+  "purchases": {
+    "orders": {
+      "title": "Ordenes de Compra"
+    },
+    "receipts": {
+      "title": "Recepción Ordenes de Compra"
+    },
+    "vendor-bills": {
+      "title": "Factura de Proveedores"
     }
   },
   "items": {
