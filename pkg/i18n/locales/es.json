@@ -64,6 +64,8 @@
     "estimateTo": "Cotizado A",
     "orderTo": "Pedido A",
     "item": "Producto",
+    "warehouse": "Almacén",
+    "location": "Ubicación",
     "contact": "Contacto",
     "profile": "Perfil",
     "voided": "Anulada",
@@ -1004,6 +1006,69 @@
     },
     "vendor-bills": {
       "title": "Factura de Proveedores"
+    }
+  },
+  "warehouses": {
+    "title": "Almacenes",
+    "description": "Todos los almacenes creados se muestran aquí.",
+    "searchPlaceholder": "Buscar almacén...",
+    "namePlaceholder": "Nombre del almacén",
+    "locationPlaceholder": "Ubicación / notas",
+    "single": {
+      "title": "Almacén",
+      "description": "Proporcione los detalles necesarios para configurar el almacén."
+    },
+    "viewWarehouse": {
+      "title": "Ver almacén",
+      "description": "Detalles del almacén seleccionado."
+    },
+    "newWarehouse": {
+      "title": "Nuevo almacén",
+      "description": "Crea un nuevo almacén."
+    },
+    "editWarehouse": {
+      "title": "Editar almacén",
+      "description": "Edita los detalles del almacén seleccionado"
+    },
+    "trashWarehouse": {
+      "title": "Borrar almacén",
+      "description": "Borra los detalles del almacén seleccionado."
+    },
+    "emptyState": {
+      "title": "Crea tu primer almacén",
+      "description": "Una vez que cree su almacén, aparecerá aquí."
+    },
+    "confirmsPassword": {
+      "title": "¿Estás seguro que deseas borrar a :warehouse?",
+      "description": "Una vez que se elimine :warehouse, todos sus recursos seguirán estando disponibles, pero no se podrá realizar ninguna operación nueva.",
+      "confirm": "Si, borralo",
+      "cancel": "Cancelar"
+    },
+    "statuses": {
+      "enabled": {
+        "section": {
+          "title": "Deshabilitar almacén",
+          "description": "Bloquear almacén y todos sus recursos"
+        },
+        "confirmsPassword": {
+          "title": "¿Está seguro de que desea deshabilitar :warehouse?",
+          "description": "Al desactivar este almacén, se bloquearán todos sus recursos y datos. Ingrese su contraseña para confirmar que desea desactivarlo.",
+          "confirm": "Sí, desactívalo",
+          "variant": "destructive"
+        }
+      },
+      "disabled": {
+        "section": {
+          "title": "Habilitar almacén",
+          "description": "Desbloquear almacén y todos sus recursos"
+        },
+        "confirmsPassword": {
+          "title": "¿Está seguro de que desea activar :warehouse?",
+          "description": "Al activar este almacén, se desbloquearán todos sus recursos y datos. Ingrese su contraseña para confirmar que desea activarlo.",
+          "confirm": "Sí, actívalo",
+          "variant": "primary"
+        }
+      }
     }
   },
   "items": {

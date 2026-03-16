@@ -187,6 +187,16 @@ export interface Item {
   identifiers?: ItemIdentifiers; // Optional identifiers for the item
 }
 
+export interface Warehouse {
+  id: number;
+  uuid: string;
+  name: string;
+  location: string;
+  status: string;
+  created_at?: string;
+  updated_at?: string;
+}
+
 export type LineAction = 'added' | 'updated' | 'deleted' | 'unchanged';
 
 export interface InvoiceLine extends Item {

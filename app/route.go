@@ -90,6 +90,11 @@ func (s *Server) bootRoutes() {
 					route.GET("/purchases/vendor-bills", s.purchaseVendorBillsHandler).Can("viewAny:purchase")
 
 					route.GET("/inventories/warehouses", s.warehousesHandler).Can("viewAny:inventory")
+					route.POST("/inventories/warehouses", s.storeWarehouseHandler())
+					route.PUT("/inventories/warehouses/:id", s.updateWarehouseHandler())
+					route.PUT("/inventories/warehouses/:id/change-status", s.changeStatusWarehouseHandler())
+					route.DELETE("/inventories/warehouses/:id", s.deleteWarehouseHandler())
+
 					route.GET("/inventories/stocks", s.stocksHandler).Can("viewAny:inventory")
 					route.GET("/inventories/transfers", s.transfersHandler).Can("viewAny:inventory")
 					route.GET("/inventories/adjustments", s.adjustmentsHandler).Can("viewAny:inventory")

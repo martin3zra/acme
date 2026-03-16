@@ -357,6 +357,41 @@ type UpdateItemForm struct {
 	Identifiers ItemIdentifiers `json:"identifiers,omitempty"`
 }
 
+type StoreWarehouseForm struct {
+	support.FormRequest
+	Name     string `json:"name"`
+	Location string `json:"location"`
+}
+
+func (form StoreWarehouseForm) Authorize() bool {
+	return Can(form.User(), "create:inventory")
+}
+
+func (StoreWarehouseForm) Rules() map[string]any {
+	return map[string]any{
+		"name":     []any{"required", "min:3", "max:150", validator.Rule{}.Unique("warehouses", "name")},
+		"location": "sometimes|nullable|max:2000",
+	}
+}
+
+type UpdateWarehouseForm struct {
+	support.FormRequest
+	ID       int    `json:"id"`
+	Name     string `json:"name"`
+	Location string `json:"location"`
+}
+
+func (form UpdateWarehouseForm) Authorize() bool {
+	return Can(form.User(), "update:inventory")
+}
+
+func (form UpdateWarehouseForm) Rules() map[string]any {
+	return map[string]any{
+		"name":     []any{"required", "min:3", "max:150", validator.Rule{}.Unique("warehouses", "name").Ignore(form.ID, "id")},
+		"location": "sometimes|nullable|max:2000",
+	}
+}
+
 func (form UpdateItemForm) Authorize() bool {
 	return Can(form.User(), "update:item")
 }

@@ -282,6 +282,14 @@ func resourceFromPath(path string, base bool) (string, bool) {
 		resource = parts[len(parts)-1] // last child
 	}
 
-	resource = strings.TrimSuffix(resource, "s")
+	// Basic pluralization handling for route resources.
+	// Examples: inventories -> inventory, companies -> company, taxes -> tax
+	if strings.HasSuffix(resource, "ies") {
+		resource = strings.TrimSuffix(resource, "ies") + "y"
+	} else if resource == "taxes" {
+		resource = "tax"
+	} else {
+		resource = strings.TrimSuffix(resource, "s")
+	}
 	return resource, true
 }
