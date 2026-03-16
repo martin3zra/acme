@@ -5,6 +5,7 @@ import InputError from '@/components/input-error';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { useHeader } from '@/composables/use-headers';
 import { useVerb } from '@/composables/use-verbs';
 import { useTranslation } from '@/hooks/use-translation';
 import { PageProps, Verb, Warehouse } from '@/types';
@@ -31,6 +32,7 @@ export default function CreateForm({ onFinish, params }: CreateFormProps) {
   const t = useTranslation().trans;
   const [dialogOpen, setDialogOpen] = useState(false);
   const { errors: propsErrors } = usePage<PageProps>().props;
+  const { headers } = useHeader();
 
   const { data, setData, post, put, errors, reset, processing } = useForm<Required<WarehouseForm>>({
     id: params.warehouse?.id,
@@ -42,6 +44,7 @@ export default function CreateForm({ onFinish, params }: CreateFormProps) {
   const isDisabled = params.warehouse?.status === 'disabled';
 
   const options = {
+    ...headers,
     preserveScroll: true,
     onSuccess: () => {
       reset();
