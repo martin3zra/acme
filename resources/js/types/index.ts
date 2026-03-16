@@ -150,6 +150,8 @@ export interface Vendor {
   status: string;
   payment_method: string;
   payment_terms: PaymentTermValue;
+  purchase_note: string;
+  lead_time_days: number;
   amount_payable: number;
   vendor_type: VendorType;
   created_at: string;

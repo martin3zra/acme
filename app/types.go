@@ -101,6 +101,8 @@ type StoreVendorForm struct {
 	Contact         string    `json:"contact"`
 	Email           string    `json:"email"`
 	Phone           string    `json:"phone"`
+	PurchaseNote    string    `json:"purchase_note"`
+	LeadTimeDays    int       `json:"lead_time_days"`
 	PaymentMethod   string    `json:"payment_method"`
 	PaymentTerms    string    `json:"payment_terms"`
 	CreditLimited   bool      `json:"credit_limited"`
@@ -124,6 +126,8 @@ func (StoreVendorForm) Rules() map[string]any {
 			validator.Rule{}.Unique("vendors", "email"),
 		},
 		"phone":              "sometimes|min:3|max:120",
+		"purchase_note":      "sometimes|max:2000",
+		"lead_time_days":     "sometimes|integer|min:0",
 		"payment_method":     "sometimes|in:cash,ck,card,bt",
 		"payment_terms":      "sometimes|required",
 		"credit_limited":     "required",
@@ -190,6 +194,8 @@ type UpdateVendorForm struct {
 	Contact         string    `json:"contact"`
 	Email           string    `json:"email"`
 	Phone           string    `json:"phone"`
+	PurchaseNote    string    `json:"purchase_note"`
+	LeadTimeDays    int       `json:"lead_time_days"`
 	PaymentMethod   string    `json:"payment_method"`
 	PaymentTerms    string    `json:"payment_terms"`
 	CreditLimited   bool      `json:"credit_limited"`
@@ -217,6 +223,8 @@ func (form UpdateVendorForm) Rules() map[string]any {
 			validator.Rule{}.Unique("vendors", "email").Ignore(form.ID, "id"),
 		},
 		"phone":              "sometimes|min:3|max:120",
+		"purchase_note":      "sometimes|max:2000",
+		"lead_time_days":     "sometimes|integer|min:0",
 		"payment_method":     "sometimes|in:cash,ck,card,bt",
 		"payment_terms":      "sometimes|required",
 		"credit_limit":       "sometimes|required|min:0",

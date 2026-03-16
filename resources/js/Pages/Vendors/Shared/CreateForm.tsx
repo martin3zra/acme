@@ -34,6 +34,8 @@ type VendorForm = {
   contact: string;
   email: string;
   phone: string;
+  purchase_note: string;
+  lead_time_days: number;
   payment_method?: string;
   payment_terms?: string;
   vendor_type: string;
@@ -54,6 +56,8 @@ export default function CreateForm({ onFinish, params }: CreateFormProps) {
     contact: params.vendor?.contact_name || '',
     email: params.vendor?.email || '',
     phone: params.vendor?.phone || '',
+    purchase_note: params.vendor?.purchase_note || '',
+    lead_time_days: params.vendor?.lead_time_days ?? 0,
     payment_method: params.vendor?.payment_method || '',
     payment_terms: params.vendor?.payment_terms || '',
     vendor_type: params.vendor?.vendor_type || 'business',
@@ -215,12 +219,45 @@ export default function CreateForm({ onFinish, params }: CreateFormProps) {
           <div className="col-span-6">
             <h4 className="font-medium">{t('global.additionalInfo')}</h4>
           </div>
-          <div className="col-span-6 grid grid-cols-12 space-x-2">
+          <div className="col-span-6 grid grid-cols-12 gap-4">
+            <div className="col-span-3">
+              <Label htmlFor="lead_time_days">{t('vendors.single.leadTimeDays')}</Label>
+              <Input
+                id="lead_time_days"
+                type="number"
+                min={0}
+                className="mt-2 block w-full"
+                value={data.lead_time_days}
+                onChange={(e) => {
+                  const value = e.target.valueAsNumber;
+                  setData('lead_time_days', Number.isNaN(value) ? 0 : value);
+                }}
+                placeholder="0"
+                readOnly={viewMode}
+              />
+              <InputError className="mt-2" message={errors.lead_time_days} />
+            </div>
+
+            <div className="col-span-9">
+              <Label htmlFor="purchase_note">{t('vendors.single.purchaseNote')}</Label>
+              <textarea
+                id="purchase_note"
+                className="mt-2 block w-full resize-none rounded-lg border border-gray-300 bg-gray-50 p-2.5 text-sm text-gray-900 focus:border-blue-500 focus:ring-blue-500"
+                value={data.purchase_note}
+                onChange={(e) => setData('purchase_note', e.target.value)}
+                placeholder={t('vendors.single.purchaseNote')}
+                rows={3}
+                readOnly={viewMode}
+              />
+              <InputError className="mt-2" message={errors.purchase_note} />
+            </div>
+
             {(params.vendor?.open_balance?.amount || 0) > 0 && (
               <h1 className="col-span-12 mt-2 font-extrabold text-red-500">
                 Opening Balance: {currency(params.vendor?.open_balance?.amount || 0)} → Converted to INV-{params.vendor?.open_balance.invoice_id}
               </h1>
             )}
+
             {!viewMode && (
               <>
                 <div className="col-span-3">

@@ -921,7 +921,9 @@
       "business": "Negocio",
       "paymentSection":"Sección de Pago",
       "openBalance": "Balance inicial",
-      "openBalanceDate": "Balance inicial al día"
+      "openBalanceDate": "Balance inicial al día",
+      "purchaseNote": "Nota de compra",
+      "leadTimeDays": "Tiempo de entrega (días)"
     },
     "line": {
       "form": {
