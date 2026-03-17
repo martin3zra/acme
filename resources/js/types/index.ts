@@ -101,7 +101,7 @@ export type CustomerTypeFilter = CustomerType | 'all';
 export type InvoiceTypeFilter = 'all' | 'cash' | 'credit';
 
 export type TransactionKind = 'invoice' | 'estimate' | 'order' | 'template';
-export type PurchaseTransactionKind = 'purchases.orders' | 'purchases.receipts' | 'purchases.vendor-bills';
+export type PurchaseTransactionKind = 'purchase_order' | 'purchase_receipt' | 'vendor_bill';
 
 export interface OpenBalance {
   invoice_id: number;
@@ -272,6 +272,53 @@ export interface InvoiceWithLines {
   lines: InvoiceLine[];
   pdfURL: string;
 }
+
+export type PurchaseSource = {
+  type: PurchaseTransactionKind;
+  id: string | number;
+  code?: string;
+};
+
+export interface Purchase {
+  id: number;
+  uuid: string;
+  number: string;
+  vendor: Vendor;
+  date: string;
+  due_on?: string | null;
+  terms: PaymentTermValue;
+  amount: number;
+  discount: DiscountType;
+  tax: number;
+  total: number;
+  amount_due: number;
+  status: string;
+  payment_status: PaidStatus;
+  notes: string;
+  kind: PurchaseTransactionKind;
+  source?: PurchaseSource | null;
+}
+
+export interface PurchaseWithLines {
+  header: Purchase;
+  lines: InvoiceLine[];
+}
+
+export type PurchaseHeaderForm = {
+  vendor: Vendor | undefined;
+  date: Date | undefined;
+  due: Date | undefined;
+  terms: PaymentTermValue;
+  notes: string | undefined;
+  discount: DiscountType;
+};
+
+export type PurchaseForm = {
+  header: PurchaseHeaderForm;
+  lines: LineForm[];
+  kind: PurchaseTransactionKind;
+  source: PurchaseSource;
+};
 
 export interface BreadcrumbItem {
   title: string;

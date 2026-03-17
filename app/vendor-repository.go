@@ -202,6 +202,9 @@ func (s *Server) findVendorsBySearchCriteria(ctx context.Context, term string) (
 			&row.VendorType,
 			&row.PaymentMethod,
 			&row.PaymentTerms,
+			&row.CreatedAt,
+			&row.UpdatedAt,
+			&row.DeletedAt,
 		); err != nil {
 			return data, err
 		}

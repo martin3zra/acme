@@ -53,6 +53,7 @@
     "user": "Usuario",
     "company": "Compañia",
     "invoice": "Factura",
+    "purchase": "Compra",
     "template": "Factura currente",
     "invoiced": "Facturado",
     "estimate": "Cotización",
@@ -197,13 +198,16 @@
       "resources": {
         "estimate": "la Cotización",
         "invoice": "la Factura",
+        "purchase": "la Compra",
         "item": "el Producto ó Servicio",
         "payment": "el Recibo de Ingreso",
         "customer": "el Cliente"
       },
       "missing": {
         "customers": "Debe existir al menos un cliente.",
+        "vendors": "Debe existir al menos un proveedor.",
         "items": "Debe existir al menos un producto ó servicio.",
+        "warehouses": "Debe existir al menos un almacén.",
         "tax_sequence": "La secuencia de impuestos de la factura no está configurada.",
         "order_sequence": "La secuencia de pedidos no está configurada.",
         "units": "Debe existir al menos una unidad.",
@@ -337,6 +341,11 @@
       "search": "Buscar cliente...",
       "addNew": "Registrar nuevo cliente",
       "emptyText": "No se encontraron clientes"
+    },
+    "vendorSection": {
+      "search": "Buscar proveedor...",
+      "addNew": "Registrar nuevo proveedor",
+      "emptyText": "No se encontraron proveedores"
     },
     "restricted": {
       "title": "Acceso restringido",
@@ -998,14 +1007,79 @@
     }
   },
   "purchases": {
+    "preview": {
+      "description": "Vista previa de la compra seleccionada."
+    },
+    "deletePurchase": {
+      "title": "Eliminar compra",
+      "description": "Ingrese su contraseña para confirmar que desea eliminar esta compra."
+    },
+    "line": {
+      "form": {
+        "placeholder": "Referencia o presione ⌘K",
+        "addNew": "Registrar nuevo artículo",
+        "search": "Escriba un nombre de artículo..."
+      }
+    },
     "orders": {
-      "title": "Ordenes de Compra"
+      "title": "Órdenes de compra",
+      "description": "Aquí puedes ver y gestionar todas tus órdenes de compra.",
+      "view": {
+        "description": "Detalles de la orden de compra seleccionada."
+      },
+      "new": {
+        "title": "Nueva orden de compra"
+      },
+      "emptyState": {
+        "title": "Crea tu primera orden de compra",
+        "description": "Una vez que cree su orden de compra, aparecerá aquí."
+      },
+      "newOrders": {
+        "title": "Nueva orden de compra"
+      },
+      "editOrders": {
+        "title": "Editar orden de compra"
+      }
     },
     "receipts": {
-      "title": "Recepción Ordenes de Compra"
+      "title": "Recibos de compra",
+      "description": "Aquí puedes ver y gestionar todos tus recibos de compra.",
+      "view": {
+        "description": "Detalles del recibo de compra seleccionado."
+      },
+      "new": {
+        "title": "Nuevo recibo de compra"
+      },
+      "emptyState": {
+        "title": "Crea tu primer recibo de compra",
+        "description": "Una vez que cree su recibo de compra, aparecerá aquí."
+      },
+      "newReceipts": {
+        "title": "Nuevo recibo de compra"
+      },
+      "editReceipts": {
+        "title": "Editar recibo de compra"
+      }
     },
     "vendor-bills": {
-      "title": "Factura de Proveedores"
+      "title": "Facturas de proveedores",
+      "description": "Aquí puedes ver y gestionar todas tus facturas de proveedores.",
+      "view": {
+        "description": "Detalles de la factura de proveedor seleccionada."
+      },
+      "new": {
+        "title": "Nueva factura de proveedor"
+      },
+      "emptyState": {
+        "title": "Crea tu primera factura de proveedor",
+        "description": "Una vez que cree su factura de proveedor, aparecerá aquí."
+      },
+      "newVendor-bills": {
+        "title": "Nueva factura de proveedor"
+      },
+      "editVendor-bills": {
+        "title": "Editar factura de proveedor"
+      }
     }
   },
   "warehouses": {

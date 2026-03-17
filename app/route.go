@@ -85,9 +85,21 @@ func (s *Server) bootRoutes() {
 					route.GET("/orders/:id/print/:hash", s.printInvoiceHandler).Middleware(Signed)
 					route.PUT("/orders/:id", s.updateInvoiceHandler())
 
-					route.GET("/purchases/orders", s.purchaseOrdersHandler).Can("viewAny:purchase")
-					route.GET("/purchases/receipts", s.purchaseReceiptsHandler).Can("viewAny:purchase")
-					route.GET("/purchases/vendor-bills", s.purchaseVendorBillsHandler).Can("viewAny:purchase")
+					route.GET("/purchases", s.purchasesHandler).Can("viewAny:purchase")
+					route.GET("/purchases/orders", s.purchasesHandler).Can("viewAny:purchase")
+					route.GET("/purchases/receipts", s.purchasesHandler).Can("viewAny:purchase")
+					route.GET("/purchases/vendor-bills", s.purchasesHandler).Can("viewAny:purchase")
+
+					route.POST("/purchases", s.storePurchaseHandler())
+					route.GET("/purchases/create", s.createPurchaseHandler).Can("create:purchase")
+					route.GET("/purchases/orders/create", s.createPurchaseHandler).Can("create:purchase")
+					route.GET("/purchases/receipts/create", s.createPurchaseHandler).Can("create:purchase")
+					route.GET("/purchases/vendor-bills/create", s.createPurchaseHandler).Can("create:purchase")
+
+					route.GET("/purchases/:id/edit", s.editPurchaseHandler).Can("update:purchase")
+					route.PUT("/purchases/:id", s.updatePurchaseHandler())
+					route.DELETE("/purchases/:id", s.destroyPurchaseHandler())
+					route.GET("/purchases/:id", s.showPurchaseHandler)
 
 					route.GET("/inventories/warehouses", s.warehousesHandler).Can("viewAny:inventory")
 					route.POST("/inventories/warehouses", s.storeWarehouseHandler())
