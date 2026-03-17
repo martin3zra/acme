@@ -84,5 +84,6 @@ export const defaultPurchaseForm = (kind: PurchaseTransactionKind): PurchaseForm
   },
   lines: [],
   kind,
+  code: '',
   source: { type: kind, id: '', code: '' },
 });

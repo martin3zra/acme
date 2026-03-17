@@ -12,6 +12,7 @@ import { useState } from 'react';
 import { makeBreadcrumbs, purchaseKindMeta } from './constants';
 import { List } from './List/Index';
 import { AddNewPurchase } from './Shared/AddNewPurchase';
+import { ConvertToReceiptAction } from './Shared/convert-to-receipt-action';
 import Show from './Show';
 
 export default function Index({
@@ -119,6 +120,14 @@ export default function Index({
                         <NotebookPen /> {t('global.actions.edit')}
                       </Link>
                     </Button>
+
+                    {kind === 'purchase_order' && (
+                      <ConvertToReceiptAction
+                        title={t('global.convertToReceipt')}
+                        renderedAs="button"
+                        source={purchase}
+                      />
+                    )}
                   </div>
                 </div>
               </SheetHeader>

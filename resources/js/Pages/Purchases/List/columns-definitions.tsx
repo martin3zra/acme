@@ -18,6 +18,7 @@ import {
 import type { Purchase, Replacements } from '@/types';
 import { ColumnDef } from '@tanstack/react-table';
 import { MoreHorizontal } from 'lucide-react';
+import { ConvertToReceiptAction } from '../Shared/convert-to-receipt-action';
 
 export type PurchaseVerb = 'view' | 'edit' | 'delete';
 
@@ -37,9 +38,7 @@ export const getColumns = ({ onDidClick, t }: Props): ColumnDef<Purchase>[] => {
           aria-label="Select all"
         />
       ),
-      cell: ({ row }) => (
-        <Checkbox checked={row.getIsSelected()} onCheckedChange={(value) => row.toggleSelected(!!value)} aria-label="Select row" />
-      ),
+      cell: ({ row }) => <Checkbox checked={row.getIsSelected()} onCheckedChange={(value) => row.toggleSelected(!!value)} aria-label="Select row" />,
       enableSorting: false,
       enableHiding: false,
     },
@@ -56,11 +55,7 @@ export const getColumns = ({ onDidClick, t }: Props): ColumnDef<Purchase>[] => {
       size: 200,
       header: ({ column }) => <HeaderSortCell<Purchase> title={t('global.vendor')} column={column} />,
       cell: (props) => (
-        <LinkCell
-          href={`/vendors?id=${props.row.original.vendor.uuid}`}
-          columnWidth={props.column.getSize()}
-          value={props.getValue() as string}
-        />
+        <LinkCell href={`/vendors?id=${props.row.original.vendor.uuid}`} columnWidth={props.column.getSize()} value={props.getValue() as string} />
       ),
     },
     {
@@ -125,6 +120,14 @@ export const getColumns = ({ onDidClick, t }: Props): ColumnDef<Purchase>[] => {
               <DropdownMenuSeparator />
               <DropdownMenuItem onClick={() => onDidClick(props.row.original, 'view')}>{t('global.actions.view')}</DropdownMenuItem>
               <DropdownMenuItem onClick={() => onDidClick(props.row.original, 'edit')}>{t('global.actions.edit')}</DropdownMenuItem>
+
+              {props.row.original.transaction_kind === 'purchase_order' && (
+                <>
+                  <DropdownMenuSeparator />
+                  <ConvertToReceiptAction id={props.row.original.uuid} title={t('global.convertToReceipt')} />
+                </>
+              )}
+
               <DropdownMenuSeparator />
               <DropdownMenuItem onClick={() => onDidClick(props.row.original, 'delete')}>{t('global.actions.delete')}</DropdownMenuItem>
             </DropdownMenuContent>

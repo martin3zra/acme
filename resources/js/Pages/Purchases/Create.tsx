@@ -43,6 +43,8 @@ export interface PurchaseFormData {
   discount: DiscountType;
   notes: string;
   kind: PurchaseTransactionKind;
+  transaction_kind?: PurchaseTransactionKind;
+  code?: string;
   source: any;
   [key: string]: any;
 }
@@ -73,6 +75,7 @@ export default function Create({
   const [searchVendor, setSearchVendor] = useState('');
   const debouncedVendorSearch = useDebounced(searchVendor, 500);
   const [amount, setAmount] = useState(0);
+  const [codeError, setCodeError] = useState<string | null>(null);
 
   const referenceInputRef = React.useRef<HTMLInputElement>(null);
   const qtyInputRef = React.useRef<HTMLInputElement>(null);
@@ -278,6 +281,13 @@ export default function Create({
   };
 
   const performSave = () => {
+    if (kind === 'purchase_receipt' && !isNotEmpty(purchaseForm.code ?? '')) {
+      setCodeError(t('purchases.receipts.form.vendorInvoiceNumberRequired'));
+      return;
+    }
+
+    setCodeError(null);
+
     transform((data) => {
       const payload: Record<string, any> = {
         ...data,
@@ -292,6 +302,12 @@ export default function Create({
           .filter((l) => l.action !== 'deleted')
           .map((line) => ({ id: line.id, qty: line.qty, unit: line.unit.id, price: line.price, rate: line.tax.rate, action: 'added' })),
       };
+
+      if (kind === 'purchase_receipt') {
+        payload.transaction_kind = 'purchase_receipt';
+        payload.code = purchaseForm.code ?? '';
+      }
+
       return payload;
     });
 
@@ -369,6 +385,24 @@ export default function Create({
             </div>
 
             <div className="col-span-6 flex flex-col gap-y-6">
+              {kind === 'purchase_receipt' && (
+                <div className="flex flex-col gap-y-2">
+                  <Label htmlFor="code">{t('purchases.receipts.form.vendorInvoiceNumber')}</Label>
+                  <Input
+                    id="code"
+                    name="code"
+                    value={purchaseForm.code ?? ''}
+                    placeholder={t('purchases.receipts.form.vendorInvoiceNumberPlaceholder')}
+                    onChange={(e) => {
+                      setCodeError(null);
+                      setPurchaseForm(() => ({ ...purchaseForm, code: e.target.value }));
+                    }}
+                    required
+                  />
+                  <InputError className="mt-2" message={codeError || (errors as any).code} />
+                </div>
+              )}
+
               <div className="flex flex-col gap-y-2">
                 <Label htmlFor="paymentTerms">{t('global.paymentTerms')}</Label>
                 <Select name="paymentTerms" onValueChange={handlePaymentTermsChange} value={purchaseForm.header.terms} required>

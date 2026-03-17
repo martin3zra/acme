@@ -295,7 +295,7 @@ export interface Purchase {
   status: string;
   payment_status: PaidStatus;
   notes: string;
-  kind: PurchaseTransactionKind;
+  transaction_kind: PurchaseTransactionKind;
   source?: PurchaseSource | null;
 }
 
@@ -317,6 +317,7 @@ export type PurchaseForm = {
   header: PurchaseHeaderForm;
   lines: LineForm[];
   kind: PurchaseTransactionKind;
+  code: string;
   source: PurchaseSource;
 };
 

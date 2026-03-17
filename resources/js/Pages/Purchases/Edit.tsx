@@ -106,6 +106,7 @@ export default function Edit({
       },
       lines: purchase.lines.map((l) => ({ ...l })),
       kind,
+      code: '',
       source: { type: kind, id: '' },
     };
   };

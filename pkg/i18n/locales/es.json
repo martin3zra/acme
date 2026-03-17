@@ -154,6 +154,7 @@
       }
     },
     "convertToInvoice": "Convertir a factura",
+    "convertToReceipt": "Convertir a recibo",
     "duplicateInvoice": "Duplicar factura",
     "duplicateAlert": {
       "title": "Esta es una copia",
@@ -1059,6 +1060,11 @@
       },
       "editReceipts": {
         "title": "Editar recibo de compra"
+      },
+      "form": {
+        "vendorInvoiceNumber": "Número de factura del proveedor",
+        "vendorInvoiceNumberPlaceholder": "Ej. 12345",
+        "vendorInvoiceNumberRequired": "El número de factura del proveedor es obligatorio."
       }
     },
     "vendor-bills": {
