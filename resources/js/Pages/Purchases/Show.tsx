@@ -7,6 +7,7 @@ import { cn, isNotEmpty } from '@/lib/utils';
 import type { Auth, PurchaseTransactionKind, PurchaseWithLines } from '@/types';
 import { Link } from '@inertiajs/react';
 import { format } from 'date-fns';
+import { FileText } from 'lucide-react';
 
 type Props = {
   kind: PurchaseTransactionKind;
@@ -39,6 +40,17 @@ export default function Show({ kind, purchase, auth }: Props) {
                 <Label>{format(purchase.header.due_on, 'dd-MM-yyyy')}</Label>
               </>
             )}
+            {kind === 'purchase_order' &&
+              purchase.header.linked_receipts?.map((receipt) => (
+                <Link
+                  key={receipt.id}
+                  href={`/purchases/receipts?id=${receipt.uuid}`}
+                  className="flex items-center space-x-2 rounded bg-red-200 px-2 py-1 text-sm text-red-500"
+                >
+                  <FileText className="mr-2 size-4" />
+                  {t('purchases.orders.linkedReceipt', { receipt: receipt.number })}
+                </Link>
+              ))}
           </div>
         </div>
         <Separator />

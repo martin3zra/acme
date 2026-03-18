@@ -13,26 +13,34 @@ import (
 	"github.com/martin3zra/acme/pkg/foundation"
 )
 
+type linkedPurchaseReceipt struct {
+	ID     int       `json:"id"`
+	UUID   string    `json:"uuid"`
+	Number string    `json:"number"`
+	Date   time.Time `json:"date"`
+}
+
 type purchase struct {
-	CompanyID     int                     `json:"company_id"`
-	ID            int                     `json:"id"`
-	UUID          string                  `json:"uuid"`   // computed from ID (table has no uuid)
-	Number        string                  `json:"number"` // purchases.code
-	Vendor        vendor                  `json:"vendor"`
-	WarehouseID   int                     `json:"warehouse_id"`
-	Date          time.Time               `json:"date"`
-	DueOn         *time.Time              `json:"due_on"` // purchases.due_date
-	Terms         string                  `json:"terms"`  // computed from date/due_on
-	Amount        float64                 `json:"amount"` // purchases.subtotal
-	Discount      Discount                `json:"discount"`
-	Tax           float64                 `json:"tax"` // purchases.tax_amount
-	Total         float64                 `json:"total"`
-	AmountDue     float64                 `json:"amount_due"` // computed
-	Status        string                  `json:"status"`     // purchases.purchase_status
-	PaymentStatus PaidStatus              `json:"payment_status"`
-	Notes         string                  `json:"notes"` // purchases.notes
-	Kind          PurchaseTransactionKind `json:"transaction_kind"`
-	Source        *PurchaseSource         `json:"source,omitempty"`
+	CompanyID      int                       `json:"company_id"`
+	ID             int                       `json:"id"`
+	UUID           string                    `json:"uuid"`   // computed from ID (table has no uuid)
+	Number         string                    `json:"number"` // purchases.code
+	Vendor         vendor                    `json:"vendor"`
+	WarehouseID    int                       `json:"warehouse_id"`
+	Date           time.Time                 `json:"date"`
+	DueOn          *time.Time                `json:"due_on"` // purchases.due_date
+	Terms          string                    `json:"terms"`  // computed from date/due_on
+	Amount         float64                   `json:"amount"` // purchases.subtotal
+	Discount       Discount                  `json:"discount"`
+	Tax            float64                   `json:"tax"` // purchases.tax_amount
+	Total          float64                   `json:"total"`
+	AmountDue      float64                   `json:"amount_due"` // computed
+	Status         string                    `json:"status"`     // purchases.purchase_status
+	PaymentStatus  PaidStatus                `json:"payment_status"`
+	Notes          string                    `json:"notes"` // purchases.notes
+	Kind           PurchaseTransactionKind   `json:"transaction_kind"`
+	Source         *PurchaseSource           `json:"source,omitempty"`
+	LinkedReceipts []*linkedPurchaseReceipt  `json:"linked_receipts,omitempty"`
 
 	EntityStatus foundation.Status `json:"-"` // purchases.status
 }
@@ -228,6 +236,30 @@ func (s *Server) findPurchaseLines(ctx context.Context, companyID, purchaseID in
 	return data, nil
 }
 
+func (s *Server) findLinkedReceiptsForOrder(ctx context.Context, companyID, purchaseOrderID int) ([]*linkedPurchaseReceipt, error) {
+	rows, err := s.db.QueryContext(ctx,
+		"SELECT id, code, date FROM purchases "+
+			"WHERE company_id = $1 AND source->>'id' = $2 AND transaction_kind = 'purchase_receipt' AND deleted_at IS NULL "+
+			"ORDER BY id",
+		companyID, strconv.Itoa(purchaseOrderID),
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	data := make([]*linkedPurchaseReceipt, 0)
+	for rows.Next() {
+		r := new(linkedPurchaseReceipt)
+		if err = rows.Scan(&r.ID, &r.Number, &r.Date); err != nil {
+			return nil, err
+		}
+		r.UUID = strconv.Itoa(r.ID)
+		data = append(data, r)
+	}
+	return data, nil
+}
+
 func (s *Server) storePurchase(ctx context.Context, form *StorePurchaseForm) (string, error) {
 	companyID := CurrentCompany(ctx).ID
 	var purchaseID string
@@ -356,6 +388,19 @@ func (s *Server) storePurchaseInternal(tx *sql.Tx, companyID int, form *StorePur
 
 	if err := s.attachPurchaseLines(tx, companyID, purchaseID, form); err != nil {
 		return "", err
+	}
+
+	if form.Kind == PurchaseTransactionKinds.PurchaseReceipt && form.Source != nil && form.Source.ID != "" {
+		sourceID, convErr := strconv.Atoi(form.Source.ID)
+		if convErr == nil {
+			_, err = tx.Exec(
+				"UPDATE purchases SET purchase_status = 'received', updated_at = NOW() WHERE company_id = $1 AND id = $2",
+				companyID, sourceID,
+			)
+			if err != nil {
+				return "", err
+			}
+		}
 	}
 
 	return strconv.Itoa(purchaseID), nil

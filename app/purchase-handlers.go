@@ -85,6 +85,13 @@ func (s *Server) purchasesHandler(ctx *routing.Context) {
 				return nil, err
 			}
 
+			if purchase.Kind == PurchaseTransactionKinds.PurchaseOrder {
+				purchase.LinkedReceipts, err = s.findLinkedReceiptsForOrder(ctx.Request.Context(), purchase.CompanyID, purchase.ID)
+				if err != nil {
+					return nil, err
+				}
+			}
+
 			return map[string]any{
 				"header": purchase,
 				"lines":  lines,
@@ -121,6 +128,13 @@ func (s *Server) showPurchaseHandler(ctx *routing.Context) {
 		lines, err := s.findPurchaseLines(ctx.Request.Context(), purchase.CompanyID, purchase.ID)
 		if err != nil {
 			return nil, err
+		}
+
+		if purchase.Kind == PurchaseTransactionKinds.PurchaseOrder {
+			purchase.LinkedReceipts, err = s.findLinkedReceiptsForOrder(ctx.Request.Context(), purchase.CompanyID, purchase.ID)
+			if err != nil {
+				return nil, err
+			}
 		}
 
 		return map[string]any{

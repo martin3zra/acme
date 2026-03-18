@@ -279,6 +279,13 @@ export type PurchaseSource = {
   code?: string;
 };
 
+export interface LinkedPurchaseReceipt {
+  id: number;
+  uuid: string;
+  number: string;
+  date: string;
+}
+
 export interface Purchase {
   id: number;
   uuid: string;
@@ -297,6 +304,7 @@ export interface Purchase {
   notes: string;
   transaction_kind: PurchaseTransactionKind;
   source?: PurchaseSource | null;
+  linked_receipts?: LinkedPurchaseReceipt[];
 }
 
 export interface PurchaseWithLines {
