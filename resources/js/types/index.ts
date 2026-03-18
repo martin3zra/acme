@@ -603,6 +603,8 @@ export const defaultBreadcrumbs: BreadcrumbItem[] = [
   },
 ];
 
+export type PillVariant = 'soon' | 'new' | 'beta' | 'pro';
+
 export interface NavItem {
   title: string;
   url: string;
@@ -610,7 +612,10 @@ export interface NavItem {
   isActive?: boolean;
   requiredAbility?: string;
   match?: string[];
-  // components: string[];
+  badge?: number | null; // from Inertia props
+  pill?: string | null; // "Soon", "New", "Beta"
+  pillVariant?: PillVariant;
+  disabled?: boolean; // auto-set when pill === 'soon'
 }
 
 export type Role = {

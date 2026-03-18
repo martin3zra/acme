@@ -14,10 +14,12 @@ import {
   ClipboardPenLine,
   CreditCard,
   FileText,
+  HelpCircleIcon,
   LayoutDashboard,
   PackageCheck,
   Receipt,
   ReceiptText,
+  SearchIcon,
   SettingsIcon,
   ShoppingCart,
   Truck,
@@ -87,18 +89,27 @@ const navMain: NavItem[] = [
     url: '/inventories/stocks',
     icon: Boxes,
     requiredAbility: 'viewAny:stock',
+    pill: 'Soon',
+    pillVariant: 'soon',
+    disabled: true,
   },
   {
     title: 'global.navMain.transfers',
     url: '/inventories/transfers',
     icon: ArrowLeftRight,
     requiredAbility: 'viewAny:stock',
+    pill: 'Soon',
+    pillVariant: 'soon',
+    disabled: true,
   },
   {
     title: 'global.navMain.adjustments',
     url: '/inventories/adjustments',
     icon: ClipboardEdit,
     requiredAbility: 'viewAny:stock',
+    pill: 'Soon',
+    pillVariant: 'soon',
+    disabled: true,
   },
 
   // CATALOG
@@ -152,16 +163,22 @@ const navSecondary: NavItem[] = [
     match: ['/settings'],
     icon: SettingsIcon,
   },
-  // {
-  //   title: 'global.navSecondary.get-help',
-  //   url: '#',
-  //   icon: HelpCircleIcon,
-  // },
-  // {
-  //   title: 'global.navSecondary.search',
-  //   url: '#',
-  //   icon: SearchIcon,
-  // },
+  {
+    title: 'global.navSecondary.get-help',
+    url: '#',
+    icon: HelpCircleIcon,
+    pill: 'Soon',
+    pillVariant: 'soon',
+    disabled: true,
+  },
+  {
+    title: 'global.navSecondary.search',
+    url: '#',
+    icon: SearchIcon,
+    pill: 'Soon',
+    pillVariant: 'soon',
+    disabled: true,
+  },
 ];
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
