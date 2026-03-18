@@ -1045,7 +1045,13 @@
       "editOrders": {
         "title": "Editar orden de compra"
       },
-      "linkedReceipt": "Recibo de compra :receipt"
+      "linkedReceipt": "Recibo de compra :receipt",
+      "statuses": {
+        "draft": "Borrador",
+        "open": "Abierta",
+        "received": "Recibida",
+        "partially_received": "Parcialmente recibida"
+      }
     },
     "receipts": {
       "title": "Recibos de compra",
@@ -1070,6 +1076,12 @@
         "vendorInvoiceNumber": "Número de factura del proveedor",
         "vendorInvoiceNumberPlaceholder": "Ej. 12345",
         "vendorInvoiceNumberRequired": "El número de factura del proveedor es obligatorio."
+      },
+      "statuses": {
+        "draft": "Borrador",
+        "open": "Abierta",
+        "received": "Recibida",
+        "partially_received": "Parcialmente recibida"
       }
     },
     "vendor-bills": {
@@ -1090,6 +1102,12 @@
       },
       "editVendor-bills": {
         "title": "Editar factura de proveedor"
+      },
+      "statuses": {
+        "draft": "Borrador",
+        "open": "Abierta",
+        "received": "Recibida",
+        "partially_received": "Parcialmente recibida"
       }
     }
   },

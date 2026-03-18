@@ -108,10 +108,9 @@ export const getColumns = ({ kind, onDidClick, t }: Props): ColumnDef<Purchase>[
     },
     {
       accessorKey: 'status',
-      meta: t('global.status'),
-      size: 110,
-      header: (props) => <HeaderCell title={t('global.status')} alignment="left" columnWidth={props.column.getSize()} />,
-      cell: (props) => <TextCell columnWidth={props.column.getSize()} value={String(props.getValue() ?? '')} />,
+      size: 70,
+      header: (props) => <HeaderCell title={t('global.status')} alignment="center" columnWidth={props.column.getSize()} />,
+      cell: (props) => <StatusBadge kind={kind} type="purchase" status={props.row.original.status} />,
     },
     {
       id: 'actions',

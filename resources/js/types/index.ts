@@ -242,7 +242,7 @@ export type PaidStatus = (typeof PaidStatuses)[number];
 export const Statuses = ['enabled', 'disabled'] as const;
 export type Status = (typeof Statuses)[number];
 
-export type StatusType = 'paid' | 'invoice' | 'status' | 'payment' | 'dashboard';
+export type StatusType = 'paid' | 'invoice' | 'status' | 'payment' | 'dashboard' | 'purchase';
 
 export interface Invoice {
   id: number;
