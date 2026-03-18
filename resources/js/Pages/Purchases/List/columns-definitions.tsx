@@ -15,19 +15,21 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import type { Purchase, Replacements } from '@/types';
+import type { Purchase, PurchaseTransactionKind, Replacements } from '@/types';
 import { ColumnDef } from '@tanstack/react-table';
 import { MoreHorizontal } from 'lucide-react';
 import { ConvertToReceiptAction } from '../Shared/convert-to-receipt-action';
+import { PurchaseSourceIcon } from '../Shared/purchase-source-icon';
 
 export type PurchaseVerb = 'view' | 'edit' | 'delete';
 
 type Props = {
+  kind: PurchaseTransactionKind;
   onDidClick: (item: Purchase, action: PurchaseVerb) => void;
   t: (key: string, replacements?: Replacements) => string;
 };
 
-export const getColumns = ({ onDidClick, t }: Props): ColumnDef<Purchase>[] => {
+export const getColumns = ({ kind, onDidClick, t }: Props): ColumnDef<Purchase>[] => {
   return [
     {
       id: 'select',
@@ -38,7 +40,15 @@ export const getColumns = ({ onDidClick, t }: Props): ColumnDef<Purchase>[] => {
           aria-label="Select all"
         />
       ),
-      cell: ({ row }) => <Checkbox checked={row.getIsSelected()} onCheckedChange={(value) => row.toggleSelected(!!value)} aria-label="Select row" />,
+      cell: ({ row }) => {
+        const source = row.original.source;
+        return (
+          <div className="flex space-x-3">
+            <Checkbox checked={row.getIsSelected()} onCheckedChange={(value) => row.toggleSelected(!!value)} aria-label="Select row" />
+            {source && <PurchaseSourceIcon source={source} kind={kind} />}
+          </div>
+        );
+      },
       enableSorting: false,
       enableHiding: false,
     },

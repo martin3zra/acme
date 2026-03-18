@@ -99,7 +99,7 @@ export default function Index({
           </div>
         )}
 
-        {hasPurchases && <List data={purchases} onSelectPurchase={onSelectPurchase} />}
+        {hasPurchases && <List kind={kind} data={purchases} onSelectPurchase={onSelectPurchase} />}
 
         {purchase && !loadingPurchase && (
           <Sheet open={open} onOpenChange={onOpenChange}>

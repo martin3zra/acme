@@ -2,7 +2,7 @@ import { Button } from '@/components/ui/button';
 import { DropdownMenu, DropdownMenuCheckboxItem, DropdownMenuContent, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useTranslation } from '@/hooks/use-translation';
-import type { Purchase } from '@/types';
+import type { Purchase, PurchaseTransactionKind } from '@/types';
 import {
   ColumnFiltersState,
   flexRender,
@@ -19,18 +19,19 @@ import { FC, useState } from 'react';
 import { getColumns, PurchaseVerb } from './columns-definitions';
 
 type Props = {
+  kind: PurchaseTransactionKind;
   data: Purchase[];
   onSelectPurchase: (purchase: Purchase, action: PurchaseVerb) => void;
 };
 
-export const List: FC<Props> = ({ data, onSelectPurchase }) => {
+export const List: FC<Props> = ({ kind, data, onSelectPurchase }) => {
   const t = useTranslation().trans;
   const [sorting, setSorting] = useState<SortingState>([]);
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
   const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({});
   const [rowSelection, setRowSelection] = useState({});
 
-  const columns = getColumns({ onDidClick: onSelectPurchase, t });
+  const columns = getColumns({ kind, onDidClick: onSelectPurchase, t });
   const table = useReactTable({
     data,
     columns,

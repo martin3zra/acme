@@ -391,8 +391,13 @@ func (s *Server) storePurchaseInternal(tx *sql.Tx, companyID int, form *StorePur
 
 	if form.Kind == PurchaseTransactionKinds.PurchaseReceipt && form.Source != nil && form.Source.ID != "" {
 		_, err = tx.Exec(
-			"UPDATE purchases SET purchase_status = 'received', updated_at = NOW() WHERE company_id = $1 AND uuid = $2",
+			"UPDATE purchases SET purchase_status = 'received', source = $3, updated_at = NOW() WHERE company_id = $1 AND uuid = $2",
 			companyID, form.Source.ID,
+			foundation.AsJSON(map[string]any{
+				"type": string(form.Kind),
+				"id":   purchaseUUID,
+				"code": seqInfo.Code,
+			}),
 		)
 		if err != nil {
 			return "", err
