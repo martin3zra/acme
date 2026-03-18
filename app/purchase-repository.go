@@ -4,7 +4,6 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"strconv"
 	"time"
 
 	"github.com/lib/pq"
@@ -23,7 +22,7 @@ type linkedPurchaseReceipt struct {
 type purchase struct {
 	CompanyID      int                       `json:"company_id"`
 	ID             int                       `json:"id"`
-	UUID           string                    `json:"uuid"`   // computed from ID (table has no uuid)
+	UUID           string                    `json:"uuid"`
 	Number         string                    `json:"number"` // purchases.code
 	Vendor         vendor                    `json:"vendor"`
 	WarehouseID    int                       `json:"warehouse_id"`
@@ -47,7 +46,7 @@ type purchase struct {
 
 func (s *Server) findPurchases(ctx context.Context, kind PurchaseTransactionKind) ([]*purchase, error) {
 	rows, err := s.db.Query(
-		"SELECT p.id, p.code, p.warehouse_id, p.date, p.due_date, p.subtotal, p.discount_amount, p.tax_amount, p.total, p.status, p.purchase_status, p.payment_status, COALESCE(p.notes, ''), p.transaction_kind, p.source, "+
+		"SELECT p.id, p.uuid, p.code, p.warehouse_id, p.date, p.due_date, p.subtotal, p.discount_amount, p.tax_amount, p.total, p.status, p.purchase_status, p.payment_status, COALESCE(p.notes, ''), p.transaction_kind, p.source, "+
 			"v.id, v.uuid, v.name, v.email, v.phone "+
 			"FROM purchases p "+
 			"INNER JOIN companies ON (p.company_id = companies.id) "+
@@ -66,6 +65,7 @@ func (s *Server) findPurchases(ctx context.Context, kind PurchaseTransactionKind
 		var discountAmount float64
 		if err = rows.Scan(
 			&p.ID,
+			&p.UUID,
 			&p.Number,
 			&p.WarehouseID,
 			&p.Date,
@@ -89,7 +89,6 @@ func (s *Server) findPurchases(ctx context.Context, kind PurchaseTransactionKind
 			return nil, err
 		}
 
-		p.UUID = strconv.Itoa(p.ID)
 		p.Discount = Discount{Val: discountAmount, Type: "fixed"}
 
 		p.AmountDue = p.Total
@@ -109,20 +108,21 @@ func (s *Server) findPurchases(ctx context.Context, kind PurchaseTransactionKind
 	return data, nil
 }
 
-func (s *Server) findPurchaseByID(ctx context.Context, companyID int, purchaseID int) (*purchase, error) {
+func (s *Server) findPurchaseByUUID(ctx context.Context, companyID int, uuid string) (*purchase, error) {
 	p := new(purchase)
 	var discountAmount float64
 	err := s.db.QueryRow(
-		"SELECT p.company_id, p.id, p.code, p.warehouse_id, p.date, p.due_date, p.subtotal, p.discount_amount, p.tax_amount, p.total, p.status, p.purchase_status, p.payment_status, COALESCE(p.notes, ''), p.transaction_kind, p.source, "+
+		"SELECT p.company_id, p.id, p.uuid, p.code, p.warehouse_id, p.date, p.due_date, p.subtotal, p.discount_amount, p.tax_amount, p.total, p.status, p.purchase_status, p.payment_status, COALESCE(p.notes, ''), p.transaction_kind, p.source, "+
 			"v.id, v.uuid, v.name, v.email, v.phone "+
 			"FROM purchases p "+
 			"INNER JOIN companies ON (p.company_id = companies.id) "+
 			"INNER JOIN vendors v ON (p.company_id = v.company_id AND p.vendor_id = v.id) "+
-			"WHERE p.company_id = $1 AND p.id = $2 AND p.deleted_at IS NULL",
-		companyID, purchaseID,
+			"WHERE p.company_id = $1 AND p.uuid = $2 AND p.deleted_at IS NULL",
+		companyID, uuid,
 	).Scan(
 		&p.CompanyID,
 		&p.ID,
+		&p.UUID,
 		&p.Number,
 		&p.WarehouseID,
 		&p.Date,
@@ -147,7 +147,6 @@ func (s *Server) findPurchaseByID(ctx context.Context, companyID int, purchaseID
 		return nil, err
 	}
 
-	p.UUID = strconv.Itoa(p.ID)
 	p.Discount = Discount{Val: discountAmount, Type: "fixed"}
 
 	p.AmountDue = p.Total
@@ -236,12 +235,12 @@ func (s *Server) findPurchaseLines(ctx context.Context, companyID, purchaseID in
 	return data, nil
 }
 
-func (s *Server) findLinkedReceiptsForOrder(ctx context.Context, companyID, purchaseOrderID int) ([]*linkedPurchaseReceipt, error) {
+func (s *Server) findLinkedReceiptsForOrder(ctx context.Context, companyID int, purchaseOrderUUID string) ([]*linkedPurchaseReceipt, error) {
 	rows, err := s.db.QueryContext(ctx,
-		"SELECT id, code, date FROM purchases "+
+		"SELECT id, uuid, code, date FROM purchases "+
 			"WHERE company_id = $1 AND source->>'id' = $2 AND transaction_kind = 'purchase_receipt' AND deleted_at IS NULL "+
 			"ORDER BY id",
-		companyID, strconv.Itoa(purchaseOrderID),
+		companyID, purchaseOrderUUID,
 	)
 	if err != nil {
 		return nil, err
@@ -251,10 +250,9 @@ func (s *Server) findLinkedReceiptsForOrder(ctx context.Context, companyID, purc
 	data := make([]*linkedPurchaseReceipt, 0)
 	for rows.Next() {
 		r := new(linkedPurchaseReceipt)
-		if err = rows.Scan(&r.ID, &r.Number, &r.Date); err != nil {
+		if err = rows.Scan(&r.ID, &r.UUID, &r.Number, &r.Date); err != nil {
 			return nil, err
 		}
-		r.UUID = strconv.Itoa(r.ID)
 		data = append(data, r)
 	}
 	return data, nil
@@ -364,9 +362,10 @@ func (s *Server) storePurchaseInternal(tx *sql.Tx, companyID int, form *StorePur
 	}
 
 	var purchaseID int
+	var purchaseUUID string
 	err = tx.QueryRow(
 		"INSERT INTO purchases (company_id, vendor_id, warehouse_id, transaction_kind, notes, subtotal, discount_amount, tax_amount, total, payment_status, code, source, date, due_date) "+
-			"VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14) RETURNING id",
+			"VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14) RETURNING id, uuid",
 		companyID,
 		form.VendorID,
 		warehouseID,
@@ -381,7 +380,7 @@ func (s *Server) storePurchaseInternal(tx *sql.Tx, companyID int, form *StorePur
 		source,
 		form.Date,
 		form.dueOn,
-	).Scan(&purchaseID)
+	).Scan(&purchaseID, &purchaseUUID)
 	if err != nil {
 		return "", err
 	}
@@ -391,19 +390,16 @@ func (s *Server) storePurchaseInternal(tx *sql.Tx, companyID int, form *StorePur
 	}
 
 	if form.Kind == PurchaseTransactionKinds.PurchaseReceipt && form.Source != nil && form.Source.ID != "" {
-		sourceID, convErr := strconv.Atoi(form.Source.ID)
-		if convErr == nil {
-			_, err = tx.Exec(
-				"UPDATE purchases SET purchase_status = 'received', updated_at = NOW() WHERE company_id = $1 AND id = $2",
-				companyID, sourceID,
-			)
-			if err != nil {
-				return "", err
-			}
+		_, err = tx.Exec(
+			"UPDATE purchases SET purchase_status = 'received', updated_at = NOW() WHERE company_id = $1 AND uuid = $2",
+			companyID, form.Source.ID,
+		)
+		if err != nil {
+			return "", err
 		}
 	}
 
-	return strconv.Itoa(purchaseID), nil
+	return purchaseUUID, nil
 }
 
 func (s *Server) attachPurchaseLines(tx *sql.Tx, companyID, purchaseID int, form *StorePurchaseForm) error {
@@ -447,9 +443,9 @@ func (s *Server) attachPurchaseLines(tx *sql.Tx, companyID, purchaseID int, form
 	return err
 }
 
-func (s *Server) updatePurchase(ctx context.Context, purchaseID int, form *UpdatePurchaseForm) error {
+func (s *Server) updatePurchase(ctx context.Context, uuid string, form *UpdatePurchaseForm) error {
 	companyID := CurrentCompany(ctx).ID
-	purchase, err := s.findPurchaseByID(ctx, companyID, purchaseID)
+	purchase, err := s.findPurchaseByUUID(ctx, companyID, uuid)
 	if err != nil {
 		return err
 	}
@@ -566,9 +562,9 @@ func (s *Server) processPurchaseLines(tx *sql.Tx, companyID, purchaseID int, for
 	return nil
 }
 
-func (s *Server) destroyPurchase(ctx context.Context, purchaseID int) error {
+func (s *Server) destroyPurchase(ctx context.Context, uuid string) error {
 	companyID := CurrentCompany(ctx).ID
-	purchase, err := s.findPurchaseByID(ctx, companyID, purchaseID)
+	purchase, err := s.findPurchaseByUUID(ctx, companyID, uuid)
 	if err != nil {
 		return err
 	}
@@ -582,7 +578,7 @@ func (s *Server) destroyPurchase(ctx context.Context, purchaseID int) error {
 	}
 
 	c := cache.NewPgCache(s.db)
-	key := fmt.Sprintf("preview:purchase:%d", purchaseID)
+	key := fmt.Sprintf("preview:purchase:%s", uuid)
 	_ = c.Delete(ctx, key)
 	return nil
 }

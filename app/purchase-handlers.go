@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"log"
 	"net/http"
-	"strconv"
 	"strings"
 
 	"github.com/martin3zra/acme/pkg/cache"
@@ -65,17 +64,11 @@ func (s *Server) purchasesHandler(ctx *routing.Context) {
 	}
 
 	if purchaseIDStr != "" {
-		purchaseID, err := strconv.Atoi(purchaseIDStr)
-		if err != nil || purchaseID <= 0 {
-			ctx.Error(fmt.Errorf("invalid purchase id"), http.StatusBadRequest)
-			return
-		}
-
 		company := CurrentCompany(ctx.Request.Context())
 		c := cache.NewPgCache(s.db)
-		key := fmt.Sprintf("preview:purchase:%d", purchaseID)
+		key := fmt.Sprintf("preview:purchase:%s", purchaseIDStr)
 		data, err := cache.Remember(ctx.Request.Context(), c, key, func() (map[string]any, error) {
-			purchase, err := s.findPurchaseByID(ctx.Request.Context(), company.ID, purchaseID)
+			purchase, err := s.findPurchaseByUUID(ctx.Request.Context(), company.ID, purchaseIDStr)
 			if err != nil {
 				return nil, err
 			}
@@ -86,7 +79,7 @@ func (s *Server) purchasesHandler(ctx *routing.Context) {
 			}
 
 			if purchase.Kind == PurchaseTransactionKinds.PurchaseOrder {
-				purchase.LinkedReceipts, err = s.findLinkedReceiptsForOrder(ctx.Request.Context(), purchase.CompanyID, purchase.ID)
+				purchase.LinkedReceipts, err = s.findLinkedReceiptsForOrder(ctx.Request.Context(), purchase.CompanyID, purchase.UUID)
 				if err != nil {
 					return nil, err
 				}
@@ -109,8 +102,8 @@ func (s *Server) purchasesHandler(ctx *routing.Context) {
 }
 
 func (s *Server) showPurchaseHandler(ctx *routing.Context) {
-	purchaseID := ctx.Int("id")
-	if purchaseID <= 0 {
+	uuid := ctx.Param("id")
+	if uuid == "" {
 		ctx.JSON(http.StatusBadRequest, map[string]any{
 			"status": "The given purchase ID is not valid.",
 		})
@@ -118,9 +111,9 @@ func (s *Server) showPurchaseHandler(ctx *routing.Context) {
 	}
 	company := CurrentCompany(ctx.Request.Context())
 	c := cache.NewPgCache(s.db)
-	key := fmt.Sprintf("preview:purchase:%d", purchaseID)
+	key := fmt.Sprintf("preview:purchase:%s", uuid)
 	data, err := cache.Remember(ctx.Request.Context(), c, key, func() (map[string]any, error) {
-		purchase, err := s.findPurchaseByID(ctx.Request.Context(), company.ID, purchaseID)
+		purchase, err := s.findPurchaseByUUID(ctx.Request.Context(), company.ID, uuid)
 		if err != nil {
 			return nil, err
 		}
@@ -131,7 +124,7 @@ func (s *Server) showPurchaseHandler(ctx *routing.Context) {
 		}
 
 		if purchase.Kind == PurchaseTransactionKinds.PurchaseOrder {
-			purchase.LinkedReceipts, err = s.findLinkedReceiptsForOrder(ctx.Request.Context(), purchase.CompanyID, purchase.ID)
+			purchase.LinkedReceipts, err = s.findLinkedReceiptsForOrder(ctx.Request.Context(), purchase.CompanyID, purchase.UUID)
 			if err != nil {
 				return nil, err
 			}
@@ -204,8 +197,8 @@ func (s *Server) createPurchaseHandler(ctx *routing.Context) {
 
 func (s *Server) editPurchaseHandler(ctx *routing.Context) {
 	company := CurrentCompany(ctx.Request.Context())
-	purchaseID := ctx.Int("id")
-	purchase, err := s.findPurchaseByID(ctx.Request.Context(), company.ID, purchaseID)
+	uuid := ctx.Param("id")
+	purchase, err := s.findPurchaseByUUID(ctx.Request.Context(), company.ID, uuid)
 	if err != nil {
 		ctx.Error(err)
 		return
@@ -269,8 +262,8 @@ func (s *Server) storePurchaseHandler() routing.HandlerFunc {
 
 func (s *Server) updatePurchaseHandler() routing.HandlerFunc {
 	return routing.WithRequest(func(ctx *routing.Context, form *UpdatePurchaseForm) {
-		purchaseID := ctx.Int("id")
-		err := s.updatePurchase(ctx.Request.Context(), purchaseID, form)
+		uuid := ctx.Param("id")
+		err := s.updatePurchase(ctx.Request.Context(), uuid, form)
 		if err != nil {
 			log.Printf("Error updating purchase: %v", err)
 			ctx.BackWith("status", s.trans("global.wasNotUpdated", i18n.Replacements{"subject": "@global.purchase"}))
@@ -278,7 +271,7 @@ func (s *Server) updatePurchaseHandler() routing.HandlerFunc {
 		}
 
 		c := cache.NewPgCache(s.db)
-		key := fmt.Sprintf("preview:purchase:%d", purchaseID)
+		key := fmt.Sprintf("preview:purchase:%s", uuid)
 		if err = c.Delete(ctx.Request.Context(), key); err != nil {
 			log.Printf("Error deleting cache: %v", err)
 		}
@@ -290,8 +283,8 @@ func (s *Server) updatePurchaseHandler() routing.HandlerFunc {
 
 func (s *Server) destroyPurchaseHandler() routing.HandlerFunc {
 	return routing.WithRequest(func(ctx *routing.Context, form *ConfirmsPasswords) {
-		purchaseID := ctx.Int("id")
-		err := s.destroyPurchase(ctx.Request.Context(), purchaseID)
+		uuid := ctx.Param("id")
+		err := s.destroyPurchase(ctx.Request.Context(), uuid)
 		if err != nil {
 			log.Printf("Error deleting purchase: %v", err)
 			ctx.BackWithError(err)
