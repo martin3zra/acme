@@ -361,11 +361,11 @@ func (s *Server) storePurchaseInternal(tx *sql.Tx, companyID int, form *StorePur
 		discountAmount += l.discount
 	}
 
-	var purchaseID int
-	var purchaseUUID string
-	err = tx.QueryRow(
-		"INSERT INTO purchases (company_id, vendor_id, warehouse_id, transaction_kind, notes, subtotal, discount_amount, tax_amount, total, payment_status, code, source, date, due_date) "+
-			"VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14) RETURNING id, uuid",
+	isConversionReceipt := form.Kind == PurchaseTransactionKinds.PurchaseReceipt && form.Source != nil && form.Source.ID != ""
+
+	insertCols := "INSERT INTO purchases (company_id, vendor_id, warehouse_id, transaction_kind, notes, subtotal, discount_amount, tax_amount, total, payment_status, code, source, date, due_date"
+	valuesCols := "VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14"
+	args := []any{
 		companyID,
 		form.VendorID,
 		warehouseID,
@@ -380,6 +380,19 @@ func (s *Server) storePurchaseInternal(tx *sql.Tx, companyID int, form *StorePur
 		source,
 		form.Date,
 		form.dueOn,
+	}
+
+	if isConversionReceipt {
+		insertCols += ", purchase_status"
+		valuesCols += ", $15"
+		args = append(args, "draft")
+	}
+
+	var purchaseID int
+	var purchaseUUID string
+	err = tx.QueryRow(
+		insertCols+") "+valuesCols+") RETURNING id, uuid",
+		args...,
 	).Scan(&purchaseID, &purchaseUUID)
 	if err != nil {
 		return "", err
@@ -389,10 +402,16 @@ func (s *Server) storePurchaseInternal(tx *sql.Tx, companyID int, form *StorePur
 		return "", err
 	}
 
-	if form.Kind == PurchaseTransactionKinds.PurchaseReceipt && form.Source != nil && form.Source.ID != "" {
+	if isConversionReceipt {
+		poStatus, err := resolveReceivedStatus(tx, companyID, form.Source.ID)
+		if err != nil {
+			return "", err
+		}
+
 		_, err = tx.Exec(
-			"UPDATE purchases SET purchase_status = 'received', source = $3, updated_at = NOW() WHERE company_id = $1 AND uuid = $2",
+			"UPDATE purchases SET purchase_status = $3, source = $4, updated_at = NOW() WHERE company_id = $1 AND uuid = $2",
 			companyID, form.Source.ID,
+			poStatus,
 			foundation.AsJSON(map[string]any{
 				"type": string(form.Kind),
 				"id":   purchaseUUID,
@@ -402,6 +421,10 @@ func (s *Server) storePurchaseInternal(tx *sql.Tx, companyID int, form *StorePur
 		if err != nil {
 			return "", err
 		}
+
+		// Invalidate the source PO's cached preview so the updated status is shown.
+		poCache := cache.NewPgCache(tx)
+		_ = poCache.Delete(context.Background(), fmt.Sprintf("preview:purchase:%s", form.Source.ID))
 	}
 
 	return purchaseUUID, nil
@@ -463,7 +486,7 @@ func (s *Server) updatePurchase(ctx context.Context, uuid string, form *UpdatePu
 		discountAmount += l.discount
 	}
 
-	return database.WithTransaction(s.db, func(tx *sql.Tx) error {
+	if err := database.WithTransaction(s.db, func(tx *sql.Tx) error {
 		_, err := tx.Exec(`
       UPDATE purchases
       SET vendor_id = $3,
@@ -496,8 +519,34 @@ func (s *Server) updatePurchase(ctx context.Context, uuid string, form *UpdatePu
 			return err
 		}
 
-		return s.processPurchaseLines(tx, companyID, purchase.ID, form)
-	})
+		if err := s.processPurchaseLines(tx, companyID, purchase.ID, form); err != nil {
+			return err
+		}
+
+		// Re-evaluate the source purchase order status when a receipt is updated.
+		if purchase.Kind == PurchaseTransactionKinds.PurchaseReceipt && purchase.Source != nil && purchase.Source.ID != "" {
+			poStatus, err := resolveReceivedStatus(tx, companyID, purchase.Source.ID)
+			if err != nil {
+				return err
+			}
+			_, err = tx.Exec(
+				"UPDATE purchases SET purchase_status = $3, updated_at = NOW() WHERE company_id = $1 AND uuid = $2",
+				companyID, purchase.Source.ID, poStatus,
+			)
+			if err != nil {
+				return err
+			}
+			// Invalidate the source PO's cached preview within the same transaction.
+			poCache := cache.NewPgCache(tx)
+			_ = poCache.Delete(context.Background(), fmt.Sprintf("preview:purchase:%s", purchase.Source.ID))
+		}
+
+		return nil
+	}); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func (s *Server) processPurchaseLines(tx *sql.Tx, companyID, purchaseID int, form *UpdatePurchaseForm) error {
@@ -586,4 +635,37 @@ func (s *Server) destroyPurchase(ctx context.Context, uuid string) error {
 	key := fmt.Sprintf("preview:purchase:%s", uuid)
 	_ = c.Delete(ctx, key)
 	return nil
+}
+
+// resolveReceivedStatus determines whether a purchase order should be marked
+// as 'received' or 'partially_received' by comparing the total quantity of its
+// original line items against the total quantity received across all linked
+// purchase receipts (including any just inserted in the current transaction).
+func resolveReceivedStatus(tx *sql.Tx, companyID int, sourceUUID string) (string, error) {
+	var totalOrdered, totalReceived float64
+
+	err := tx.QueryRow(
+		"SELECT COALESCE(SUM(pi.qty), 0) FROM purchase_items pi "+
+			"JOIN purchases p ON pi.purchase_id = p.id "+
+			"WHERE p.uuid = $1 AND p.company_id = $2",
+		sourceUUID, companyID,
+	).Scan(&totalOrdered)
+	if err != nil {
+		return "", err
+	}
+
+	err = tx.QueryRow(
+		"SELECT COALESCE(SUM(pi.qty), 0) FROM purchase_items pi "+
+			"JOIN purchases p ON pi.purchase_id = p.id "+
+			"WHERE p.source->>'id' = $1 AND p.transaction_kind = 'purchase_receipt' AND p.company_id = $2",
+		sourceUUID, companyID,
+	).Scan(&totalReceived)
+	if err != nil {
+		return "", err
+	}
+
+	if totalReceived >= totalOrdered {
+		return "received", nil
+	}
+	return "partially_received", nil
 }
