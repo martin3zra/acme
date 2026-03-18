@@ -1045,7 +1045,7 @@
       "editOrders": {
         "title": "Editar orden de compra"
       },
-      "linkedReceipt": "Recibo de compra: {receipt}"
+      "linkedReceipt": "Recibo de compra :receipt"
     },
     "receipts": {
       "title": "Recibos de compra",
