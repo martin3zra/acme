@@ -33,8 +33,9 @@ type purchase struct {
 	Discount       Discount                  `json:"discount"`
 	Tax            float64                   `json:"tax"` // purchases.tax_amount
 	Total          float64                   `json:"total"`
-	AmountDue      float64                   `json:"amount_due"` // computed
-	Status         string                    `json:"status"`     // purchases.purchase_status
+	AmountDue      float64                   `json:"amount_due"`    // computed
+	InvoiceNumber  string                    `json:"invoice_number,omitempty"` // vendor-supplied reference
+	Status         string                    `json:"status"`        // purchases.purchase_status
 	PaymentStatus  PaidStatus                `json:"payment_status"`
 	Notes          string                    `json:"notes"` // purchases.notes
 	Kind           PurchaseTransactionKind   `json:"transaction_kind"`
@@ -46,7 +47,7 @@ type purchase struct {
 
 func (s *Server) findPurchases(ctx context.Context, kind PurchaseTransactionKind) ([]*purchase, error) {
 	rows, err := s.db.Query(
-		"SELECT p.id, p.uuid, p.code, p.warehouse_id, p.date, p.due_date, p.subtotal, p.discount_amount, p.tax_amount, p.total, p.status, p.purchase_status, p.payment_status, COALESCE(p.notes, ''), p.transaction_kind, p.source, "+
+		"SELECT p.id, p.uuid, p.code, p.warehouse_id, p.date, p.due_date, p.subtotal, p.discount_amount, p.tax_amount, p.total, p.status, p.purchase_status, p.payment_status, COALESCE(p.notes, ''), p.transaction_kind, p.source, COALESCE(p.invoice_number, ''), "+
 			"v.id, v.uuid, v.name, v.email, v.phone "+
 			"FROM purchases p "+
 			"INNER JOIN companies ON (p.company_id = companies.id) "+
@@ -80,6 +81,7 @@ func (s *Server) findPurchases(ctx context.Context, kind PurchaseTransactionKind
 			&p.Notes,
 			&p.Kind,
 			&p.Source,
+			&p.InvoiceNumber,
 			&p.Vendor.ID,
 			&p.Vendor.UUID,
 			&p.Vendor.Name,
@@ -112,7 +114,7 @@ func (s *Server) findPurchaseByUUID(ctx context.Context, companyID int, uuid str
 	p := new(purchase)
 	var discountAmount float64
 	err := s.db.QueryRow(
-		"SELECT p.company_id, p.id, p.uuid, p.code, p.warehouse_id, p.date, p.due_date, p.subtotal, p.discount_amount, p.tax_amount, p.total, p.status, p.purchase_status, p.payment_status, COALESCE(p.notes, ''), p.transaction_kind, p.source, "+
+		"SELECT p.company_id, p.id, p.uuid, p.code, p.warehouse_id, p.date, p.due_date, p.subtotal, p.discount_amount, p.tax_amount, p.total, p.status, p.purchase_status, p.payment_status, COALESCE(p.notes, ''), p.transaction_kind, p.source, COALESCE(p.invoice_number, ''), "+
 			"v.id, v.uuid, v.name, v.email, v.phone "+
 			"FROM purchases p "+
 			"INNER JOIN companies ON (p.company_id = companies.id) "+
@@ -137,6 +139,7 @@ func (s *Server) findPurchaseByUUID(ctx context.Context, companyID int, uuid str
 		&p.Notes,
 		&p.Kind,
 		&p.Source,
+		&p.InvoiceNumber,
 		&p.Vendor.ID,
 		&p.Vendor.UUID,
 		&p.Vendor.Name,
@@ -166,6 +169,7 @@ func (s *Server) findPurchaseByUUID(ctx context.Context, companyID int, uuid str
 func (s *Server) findPurchaseLines(ctx context.Context, companyID, purchaseID int) ([]*line, error) {
 	rows, err := s.db.Query(`
     SELECT it.id,
+    pi.variant_id::bigint,
     pi.qty::bigint,
     pi.unit_price::float8,
     COALESCE(pi.unit_id, items_units.unit_id),
@@ -209,6 +213,7 @@ func (s *Server) findPurchaseLines(ctx context.Context, companyID, purchaseID in
 		l := new(line)
 		if err = rows.Scan(
 			&l.ID,
+			&l.VariantID,
 			&l.Qty,
 			&l.Price,
 			&l.Unit.ID,
@@ -233,6 +238,42 @@ func (s *Server) findPurchaseLines(ctx context.Context, companyID, purchaseID in
 	}
 
 	return data, nil
+}
+
+// enrichLinesWithRemainingQty sets RemainingQty on each line for a purchase order,
+// calculated as ordered qty minus total qty already received across all linked receipts.
+func (s *Server) enrichLinesWithRemainingQty(ctx context.Context, companyID int, purchaseOrderUUID string, lines []*line) error {
+	rows, err := s.db.QueryContext(ctx,
+		"SELECT pi.variant_id, COALESCE(SUM(pi.qty), 0)::bigint "+
+			"FROM purchase_items pi "+
+			"JOIN purchases p ON pi.purchase_id = p.id AND pi.company_id = p.company_id "+
+			"WHERE p.source->>'id' = $1 AND p.transaction_kind = 'purchase_receipt' "+
+			"AND p.company_id = $2 AND pi.deleted_at IS NULL AND p.deleted_at IS NULL "+
+			"GROUP BY pi.variant_id",
+		purchaseOrderUUID, companyID,
+	)
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+
+	received := make(map[int64]int64)
+	for rows.Next() {
+		var variantID, qty int64
+		if err = rows.Scan(&variantID, &qty); err != nil {
+			return err
+		}
+		received[variantID] = qty
+	}
+
+	for _, l := range lines {
+		remaining := l.Qty - received[l.VariantID]
+		if remaining < 0 {
+			remaining = 0
+		}
+		l.RemainingQty = &remaining
+	}
+	return nil
 }
 
 func (s *Server) findLinkedReceiptsForOrder(ctx context.Context, companyID int, purchaseOrderUUID string) ([]*linkedPurchaseReceipt, error) {
@@ -384,8 +425,14 @@ func (s *Server) storePurchaseInternal(tx *sql.Tx, companyID int, form *StorePur
 
 	if isConversionReceipt {
 		insertCols += ", purchase_status"
-		valuesCols += ", $15"
+		valuesCols += fmt.Sprintf(", $%d", len(args)+1)
 		args = append(args, "draft")
+	}
+
+	if form.InvoiceNumber != "" {
+		insertCols += ", invoice_number"
+		valuesCols += fmt.Sprintf(", $%d", len(args)+1)
+		args = append(args, form.InvoiceNumber)
 	}
 
 	var purchaseID int
@@ -400,6 +447,13 @@ func (s *Server) storePurchaseInternal(tx *sql.Tx, companyID int, form *StorePur
 
 	if err := s.attachPurchaseLines(tx, companyID, purchaseID, form); err != nil {
 		return "", err
+	}
+
+	// When saving a vendor bill, automatically create the AP entry.
+	if form.Kind == PurchaseTransactionKinds.VendorBill {
+		if err := s.createAPForVendorBill(tx, companyID, purchaseID, form.VendorID, form); err != nil {
+			return "", err
+		}
 	}
 
 	if isConversionReceipt {
@@ -428,6 +482,40 @@ func (s *Server) storePurchaseInternal(tx *sql.Tx, companyID int, form *StorePur
 	}
 
 	return purchaseUUID, nil
+}
+
+func (s *Server) createAPForVendorBill(tx *sql.Tx, companyID, purchaseID, vendorID int, form *StorePurchaseForm) error {
+	var apID int
+	err := tx.QueryRow(
+		"INSERT INTO accounts_payable "+
+			"(company_id, vendor_id, purchase_id, invoice_number, invoice_date, due_date, "+
+			"amount_total, tax_amount, discount_amount, amount_paid, "+
+			"currency, payment_terms, status, created_by) "+
+			"VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14) RETURNING id",
+		companyID,
+		vendorID,
+		purchaseID,
+		form.InvoiceNumber,
+		form.Date,
+		form.dueOn,
+		form.total,
+		form.tax,
+		0,
+		0,
+		"DOP",
+		form.Terms,
+		PayableStatuses.Pending,
+		form.User().Id,
+	).Scan(&apID)
+	if err != nil {
+		return err
+	}
+
+	if err := s.registerPayable(tx, companyID, apID, vendorID); err != nil {
+		return err
+	}
+
+	return s.updateVendorAmountPayable(tx, companyID, vendorID, form.total)
 }
 
 func (s *Server) attachPurchaseLines(tx *sql.Tx, companyID, purchaseID int, form *StorePurchaseForm) error {
@@ -478,6 +566,31 @@ func (s *Server) updatePurchase(ctx context.Context, uuid string, form *UpdatePu
 		return err
 	}
 
+	// Block edits on closed purchase orders.
+	if purchase.Kind == PurchaseTransactionKinds.PurchaseOrder &&
+		PurchaseStatus(purchase.Status) == PurchaseStatuses.Closed {
+		return fmt.Errorf("purchase order %s is closed and cannot be edited", purchase.Number)
+	}
+
+	// Lock header fields (vendor, date) once a receipt exists for the PO.
+	if purchase.Kind == PurchaseTransactionKinds.PurchaseOrder {
+		var receiptCount int
+		if err := s.db.QueryRowContext(ctx,
+			"SELECT COUNT(*) FROM purchases WHERE company_id = $1 AND source->>'id' = $2 AND transaction_kind = 'purchase_receipt' AND deleted_at IS NULL",
+			companyID, uuid,
+		).Scan(&receiptCount); err != nil {
+			return err
+		}
+		if receiptCount > 0 {
+			if purchase.Vendor.ID != form.VendorID {
+				return fmt.Errorf("vendor cannot be changed after a purchase receipt has been created for this order")
+			}
+			if !purchase.Date.Equal(form.Date) {
+				return fmt.Errorf("order date cannot be changed after a purchase receipt has been created for this order")
+			}
+		}
+	}
+
 	discountAmount := float64(0)
 	for _, l := range form.Lines {
 		if l.Action == LineActions.Deleted {
@@ -499,6 +612,7 @@ func (s *Server) updatePurchase(ctx context.Context, uuid string, form *UpdatePu
           notes = $10,
           payment_status = $11,
           transaction_kind = $12,
+          invoice_number = $13,
           updated_at = NOW()
       WHERE company_id = $1 AND id = $2
     `,
@@ -514,6 +628,7 @@ func (s *Server) updatePurchase(ctx context.Context, uuid string, form *UpdatePu
 			form.Notes,
 			form.paymentStatus,
 			form.Kind,
+			form.InvoiceNumber,
 		)
 		if err != nil {
 			return err
@@ -521,6 +636,36 @@ func (s *Server) updatePurchase(ctx context.Context, uuid string, form *UpdatePu
 
 		if err := s.processPurchaseLines(tx, companyID, purchase.ID, form); err != nil {
 			return err
+		}
+
+		// Re-sync the linked AP record when a vendor bill is updated.
+		if purchase.Kind == PurchaseTransactionKinds.VendorBill {
+			_, err = tx.Exec(
+				`UPDATE accounts_payable
+				   SET invoice_number = $3,
+				       invoice_date   = $4,
+				       due_date       = $5,
+				       amount_total   = $6,
+				       tax_amount     = $7,
+				       updated_at     = NOW()
+				 WHERE company_id = $1 AND purchase_id = $2`,
+				companyID, purchase.ID,
+				form.InvoiceNumber,
+				form.Date,
+				form.dueOn,
+				form.total,
+				form.tax,
+			)
+			if err != nil {
+				return err
+			}
+			// Adjust vendor.amount_payable by the delta.
+			delta := form.total - purchase.Total
+			if delta != 0 {
+				if err = s.updateVendorAmountPayable(tx, companyID, purchase.Vendor.ID, delta); err != nil {
+					return err
+				}
+			}
 		}
 
 		// Re-evaluate the source purchase order status when a receipt is updated.
@@ -575,6 +720,32 @@ func (s *Server) processPurchaseLines(tx *sql.Tx, companyID, purchaseID int, for
 			return fmt.Errorf("missing item variant for item_id=%d", l.ID)
 		}
 
+		// Guard: never reduce a PO line below the already-received qty.
+		if form.Kind == PurchaseTransactionKinds.PurchaseOrder &&
+			(l.Action == UPDATED || l.Action == DELETED) {
+			var alreadyReceived float64
+			err := tx.QueryRow(
+				`SELECT COALESCE(SUM(pi.qty), 0)
+				   FROM purchase_items pi
+				   JOIN purchases p ON pi.purchase_id = p.id
+				  WHERE p.company_id = $1
+				    AND p.source->>'id' = (SELECT uuid FROM purchases WHERE id = $2 LIMIT 1)
+				    AND p.transaction_kind = 'purchase_receipt'
+				    AND pi.variant_id = $3
+				    AND pi.deleted_at IS NULL`,
+				companyID, purchaseID, variantID,
+			).Scan(&alreadyReceived)
+			if err != nil {
+				return err
+			}
+			if l.Action == DELETED && alreadyReceived > 0 {
+				return fmt.Errorf("line with item_id=%d cannot be removed: %g unit(s) have already been received", l.ID, alreadyReceived)
+			}
+			if l.Action == UPDATED && float64(l.Qty) < alreadyReceived {
+				return fmt.Errorf("line with item_id=%d cannot be reduced below %g (already received)", l.ID, alreadyReceived)
+			}
+		}
+
 		switch l.Action {
 		case ADDED:
 			stmt := `
@@ -623,9 +794,47 @@ func (s *Server) destroyPurchase(ctx context.Context, uuid string) error {
 		return err
 	}
 
+	// Block deletion of purchase orders that have already been received or paid.
+	if purchase.Kind == PurchaseTransactionKinds.PurchaseOrder &&
+		lockedPurchaseStatuses[PurchaseStatus(purchase.Status)] {
+		return fmt.Errorf("purchase order %s cannot be deleted in status %q", purchase.Number, purchase.Status)
+	}
+
 	err = database.WithTransaction(s.db, func(tx *sql.Tx) error {
 		_, err := tx.Exec("UPDATE purchases SET deleted_at = NOW(), updated_at = NOW() WHERE company_id = $1 AND id = $2", companyID, purchase.ID)
-		return err
+		if err != nil {
+			return err
+		}
+
+		// Cancel the linked AP entry when a vendor bill is deleted.
+		if purchase.Kind == PurchaseTransactionKinds.VendorBill {
+			var apID int
+			var alreadyPaid float64
+			err := tx.QueryRow(
+				"SELECT id, amount_paid FROM accounts_payable WHERE company_id = $1 AND purchase_id = $2",
+				companyID, purchase.ID,
+			).Scan(&apID, &alreadyPaid)
+			if err != nil && err != sql.ErrNoRows {
+				return err
+			}
+			if apID > 0 {
+				if _, err = tx.Exec(
+					"UPDATE accounts_payable SET status = $3, updated_at = NOW() WHERE company_id = $1 AND id = $2",
+					companyID, apID, PayableStatuses.Cancelled,
+				); err != nil {
+					return err
+				}
+				// Reverse only the unpaid portion from the vendor balance.
+				remaining := purchase.Total - alreadyPaid
+				if remaining > 0 {
+					if err = s.updateVendorAmountPayable(tx, companyID, purchase.Vendor.ID, -remaining); err != nil {
+						return err
+					}
+				}
+			}
+		}
+
+		return nil
 	})
 	if err != nil {
 		return err
@@ -668,4 +877,74 @@ func resolveReceivedStatus(tx *sql.Tx, companyID int, sourceUUID string) (string
 		return "received", nil
 	}
 	return "partially_received", nil
+}
+
+// resolvePOPaymentStatus calculates the payment_status for a PO based on the sum
+// of amount_paid vs amount_payable across all linked accounts_payable records.
+func resolvePOPaymentStatus(tx *sql.Tx, companyID int, poUUID string) (PaidStatus, error) {
+	var totalPayable, totalPaid float64
+	err := tx.QueryRow(
+		`SELECT COALESCE(SUM(ap.amount_payable), 0), COALESCE(SUM(ap.amount_paid), 0)
+		   FROM accounts_payable ap
+		   JOIN purchases p ON ap.purchase_id = p.id
+		  WHERE p.source->>'id' = $1
+		    AND p.transaction_kind = 'vendor_bill'
+		    AND ap.company_id = $2
+		    AND ap.status != $3`,
+		poUUID, companyID, string(PayableStatuses.Cancelled),
+	).Scan(&totalPayable, &totalPaid)
+	if err != nil {
+		return PaidStatuses.UnPaid, err
+	}
+
+	if totalPayable == 0 {
+		return PaidStatuses.UnPaid, nil
+	}
+	if totalPaid >= totalPayable {
+		return PaidStatuses.Paid, nil
+	}
+	if totalPaid > 0 {
+		return PaidStatuses.Partial, nil
+	}
+	return PaidStatuses.UnPaid, nil
+}
+
+// updatePOPaymentStatus recalculates and writes payment_status on the source PO.
+// When fully paid it also advances purchase_status to 'closed'.
+func updatePOPaymentStatus(tx *sql.Tx, companyID int, poUUID string) error {
+	newPaymentStatus, err := resolvePOPaymentStatus(tx, companyID, poUUID)
+	if err != nil {
+		return err
+	}
+
+	if newPaymentStatus == PaidStatuses.Paid {
+		_, err = tx.Exec(
+			`UPDATE purchases
+			    SET payment_status  = $3,
+			        purchase_status = $4,
+			        updated_at      = NOW()
+			  WHERE company_id = $1 AND uuid = $2`,
+			companyID, poUUID, newPaymentStatus, string(PurchaseStatuses.Closed),
+		)
+	} else if newPaymentStatus == PaidStatuses.Partial {
+		_, err = tx.Exec(
+			`UPDATE purchases
+			    SET payment_status  = $3,
+			        purchase_status = $4,
+			        updated_at      = NOW()
+			  WHERE company_id = $1 AND uuid = $2
+			    AND purchase_status NOT IN ('closed')`,
+			companyID, poUUID, newPaymentStatus, string(PurchaseStatuses.PartiallyPaid),
+		)
+	} else {
+		_, err = tx.Exec(
+			`UPDATE purchases
+			    SET payment_status = $3,
+			        updated_at     = NOW()
+			  WHERE company_id = $1 AND uuid = $2
+			    AND payment_status != $4`,
+			companyID, poUUID, newPaymentStatus, string(PaidStatuses.Paid),
+		)
+	}
+	return err
 }

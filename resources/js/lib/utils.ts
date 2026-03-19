@@ -225,7 +225,8 @@ const groupMap: Record<string, string> = {
   'global.navMain.items': 'global.navGroups.customersCatalog',
 
   // Finance
-  'global.navMain.payments': 'global.navGroups.finance',
+  'global.navMain.receivables': 'global.navGroups.finance',
+  'global.navMain.payables': 'global.navGroups.finance',
   'global.navMain.expenses': 'global.navGroups.finance',
 
   // Analytics

@@ -7,7 +7,7 @@ import { useVerb } from '@/composables/use-verbs';
 import useCallbackState from '@/hooks/use-callback-state';
 import { useTranslation } from '@/hooks/use-translation';
 import AppLayout from '@/layouts/app-layout';
-import { PageProps, TaxReceipt, Vendor, VendorTypeFilter, VendorVerb } from '@/types';
+import { PageProps, Payable, TaxReceipt, Vendor, VendorTypeFilter, VendorVerb } from '@/types';
 import { router, usePage } from '@inertiajs/react';
 import { FileUp, Plus } from 'lucide-react';
 import { useEffect, useState } from 'react';
@@ -22,12 +22,14 @@ export default function Index({
   tax_receipts,
   currentVendorTypeFilter,
   openState,
+  payables,
 }: PageProps<{
   openState: boolean;
   vendors: Vendor[];
   vendor: Vendor;
   tax_receipts: TaxReceipt[];
   currentVendorTypeFilter: VendorTypeFilter;
+  payables?: Payable[];
 }>) {
   const t = useTranslation().trans;
   const page = usePage<PageProps>();
@@ -188,6 +190,43 @@ export default function Index({
               </SheetHeader>
               <div className="no-scrollbar grid gap-4 overflow-y-scroll px-4">
                 <CreateForm params={selectedVendor} onFinish={() => modalHandler(false)} />
+                {selectedVendor.action === 'view' && payables && payables.length > 0 && (
+                  <div className="mt-4 px-4">
+                    <div className="mb-2 flex items-center justify-between">
+                      <h3 className="text-sm font-semibold">{t('payables.title')}</h3>
+                      <a
+                        href={`/payables/create?vendor_id=${selectedVendor.vendor?.uuid}`}
+                        className="text-primary text-xs hover:underline"
+                      >
+                        {t('payables.recordPayment')}
+                      </a>
+                    </div>
+                    <table className="w-full text-sm [&_td]:p-1.5 [&_th]:p-1.5 [&_th]:text-left [&_th]:font-medium [&_th]:text-gray-500">
+                      <thead>
+                        <tr className="border-b">
+                          <th>{t('global.number')}</th>
+                          <th>{t('global.dueDate')}</th>
+                          <th className="text-right">{t('global.balance')}</th>
+                          <th>{t('global.status')}</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {payables.map((p) => (
+                          <tr key={p.uuid} className="border-b last:border-0">
+                            <td>{p.invoice_number}</td>
+                            <td>{p.due_date}</td>
+                            <td className="text-right">{(p.amount_payable - p.amount_paid).toFixed(2)}</td>
+                            <td>
+                              <span className={`rounded px-1.5 py-0.5 text-xs font-medium ${p.status === 'PAID' ? 'bg-green-100 text-green-700' : new Date(p.due_date) < new Date() ? 'bg-red-100 text-red-700' : 'bg-yellow-100 text-yellow-700'}`}>
+                                {p.status}
+                              </span>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
               </div>
             </SheetContent>
           </Sheet>

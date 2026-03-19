@@ -12,7 +12,6 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useHeader } from '@/composables/use-headers';
 import { useNumber } from '@/composables/use-number';
@@ -20,132 +19,110 @@ import { useDebounced } from '@/hooks/use-debounced';
 import { usePersistedState } from '@/hooks/use-persisted-state';
 import { useTranslation } from '@/hooks/use-translation';
 import AppLayout from '@/layouts/app-layout';
-import { BTForm, CardForm, CashForm, CheckForm, Customer, PageProps, PaymentForm, PaymentMethod, Receivable, ReceivableInvoiceForm } from '@/types';
+import { BTForm, CardForm, CashForm, CheckForm, PageProps, Payable, PaymentMethod, Vendor, VendorPaymentForm } from '@/types';
 import { Textarea } from '@headlessui/react';
 import { router, useForm, usePage } from '@inertiajs/react';
 import { RowSelectionState } from '@tanstack/table-core/build/lib/features/RowSelection';
 import React, { useEffect } from 'react';
 import CheckoutForm from '../Invoices/Shared/checkout-form';
-import { CustomerSection } from '../Invoices/Shared/customer-section';
-import { createPaymentBreadcrumbs } from '../Payments/constants';
-import { buildReceivableState, buildRowSelection } from './build-receivables-state';
-import { defaultPaymentForm } from './constants';
+import { VendorSection } from '../Purchases/Shared/vendor-section';
+import { createPayableBreadcrumbs, defaultVendorPaymentForm } from './constants';
+import { PayableLineRow } from './Shared/columns-definitions';
 import { List } from './Shared/lines-payment';
 
-export default function Create({
-  auth,
-  customer,
-  customers,
-  receivables,
-  invoice_uuid,
-  forceInitial,
-}: PageProps<{ customer: Customer; customers: Customer[]; receivables: Receivable[]; invoice_uuid: string; forceInitial: boolean }>) {
+export default function Create({ auth, vendor, vendors, payables }: PageProps<{ vendor?: Vendor; vendors: Vendor[]; payables: Payable[] }>) {
   const t = useTranslation().trans;
   const { currency } = useNumber();
   const [openCancelConfirmation, setCancelConfirmation] = React.useState(false);
   const [openCheckout, setCheckout] = React.useState(false);
   const [loading, setLoading] = React.useState(false);
   const [bulkPayment, setBulkPayment] = React.useState<number>(0);
-  const [bulkDiscount, setBulkDiscount] = React.useState<number>(0);
   const [open, setOpen] = React.useState(false);
   const [search, setSearch] = React.useState('');
-  const dedbouncedSearch = useDebounced(search, 500);
-  const [paymentForm, setPaymentForm, removePaymentForm] = usePersistedState<PaymentForm>(
-    'payment',
-    { ...defaultPaymentForm, header: { ...defaultPaymentForm.header, customer } },
-    forceInitial,
-  );
+  const debouncedSearch = useDebounced(search, 500);
   const [rowSelection, setRowSelection] = React.useState<RowSelectionState>({});
   const { headers } = useHeader();
   const { errors: propsErrors } = usePage<PageProps>().props;
+
+  const [paymentForm, setPaymentForm, removePaymentForm] = usePersistedState<VendorPaymentForm>(
+    'vendor_payment',
+    {
+      ...defaultVendorPaymentForm(),
+      header: { ...defaultVendorPaymentForm().header, vendor },
+    } as VendorPaymentForm,
+    false,
+  );
+
   const { post, transform, processing, errors } = useForm({
-    customer_id: 0,
+    vendor_id: 0,
     date: new Date(),
     lines: [],
   });
 
+  const buildLines = (payables: Payable[]): PayableLineRow[] =>
+    payables.map((p) => ({
+      ...p,
+      amount_due: p.amount_payable - p.amount_paid,
+      payment: 0,
+      action: 'unchanged' as const,
+    }));
+
   useEffect(() => {
-    if (!receivables) return;
-
-    const { lines, rowSelection } = buildReceivableState(receivables, invoice_uuid);
-
-    setRowSelection(rowSelection);
+    if (!payables) return;
     setPaymentForm((prev) => ({
       ...prev,
-      lines,
+      lines: buildLines(payables) as any,
     }));
-  }, [receivables, invoice_uuid, setPaymentForm]);
+  }, [payables]);
 
   useEffect(() => {
-    const searchCustomer = () => {
-      router.reload({ only: ['customers'], data: { search: dedbouncedSearch }, preserveUrl: true });
-    };
+    if (!debouncedSearch) return;
+    router.reload({ only: ['vendors'], data: { search: debouncedSearch }, preserveUrl: true });
+  }, [debouncedSearch]);
 
-    if (dedbouncedSearch) searchCustomer();
-  }, [dedbouncedSearch]);
-
-  const totalPaid = (): number => {
-    return paymentForm.lines.reduce((acc, line) => {
-      return acc + line.payment;
-    }, 0);
-  };
+  const totalPaid = (): number => (paymentForm.lines as any[]).reduce((acc: number, line: any) => acc + (line.payment || 0), 0);
 
   const handleRecordPayment = (event: React.MouseEvent<HTMLButtonElement>) => {
     event.preventDefault();
     const payload = {
-      customer_id: paymentForm.header.customer?.uuid,
+      vendor_id: paymentForm.header.vendor?.uuid,
       date: paymentForm.header.date,
       amount: totalPaid(),
       notes: paymentForm.header.notes,
-      lines: paymentForm.lines
-        .filter((line) => line.payment > 0)
-        .map((line) => {
-          return { uuid: line.uuid, amount_due: line.amount_due, payment: line.payment, discount: line.discount };
-        }),
+      lines: (paymentForm.lines as any[])
+        .filter((line: any) => line.payment > 0)
+        .map((line: any) => ({
+          uuid: line.invoice_uuid,
+          amount_due: line.amount_due,
+          payment: line.payment,
+        })),
       payment: paymentForm.payment,
     };
-    transform((data) => ({
-      ...data,
-      ...payload,
-    }));
+    transform((data) => ({ ...data, ...payload }));
 
-    post('/payments', {
+    post('/payables', {
       ...headers,
       preserveState: 'errors',
       onSuccess: () => {
         removePaymentForm();
-        router.get('/payments');
+        router.get('/payables');
       },
     });
   };
 
-  const handleCustomerSelection = (customer: Customer | undefined) => {
-    setPaymentForm(() => {
-      return { ...paymentForm, header: { ...paymentForm.header, customer }, lines: [] };
-    });
+  const handleVendorSelection = (vendor: Vendor | undefined) => {
+    setPaymentForm(() => ({ ...paymentForm, header: { ...paymentForm.header, vendor }, lines: [] }));
     setOpen(false);
-    if (customer !== undefined) {
+    if (vendor !== undefined) {
       router.reload({
-        only: ['receivables'],
-        data: { customer_id: customer.uuid },
+        only: ['payables'],
+        data: { vendor_id: vendor.uuid },
         preserveUrl: true,
         onStart: () => setLoading(true),
         onSuccess: (page) => {
-          const receivables = page.props.receivables as Receivable[];
-          // Reset before applying new data
+          const payables = page.props.payables as Payable[];
           setRowSelection({});
-          setPaymentForm((prev) => ({
-            ...prev,
-            lines: [],
-          }));
-
-          const { lines, rowSelection } = buildReceivableState(receivables, invoice_uuid);
-
-          setRowSelection(rowSelection);
-          setPaymentForm((prev) => ({
-            ...prev,
-            lines,
-          }));
+          setPaymentForm((prev) => ({ ...prev, lines: buildLines(payables) as any }));
         },
         onFinish: () => setLoading(false),
       });
@@ -153,119 +130,86 @@ export default function Create({
   };
 
   const handleDateChange = (date: unknown) => {
-    setPaymentForm(() => {
-      return { ...paymentForm, header: { ...paymentForm.header, date: date as Date } };
-    });
+    setPaymentForm(() => ({ ...paymentForm, header: { ...paymentForm.header, date: date as Date } }));
   };
 
   const handleCellChange = (rowId: string, columnId: string, newValue: string | number) => {
     setPaymentForm((prev) => {
-      const lines = prev.lines.map((line) => {
+      const lines = (prev.lines as any[]).map((line: any) => {
         if (line.id.toString() === rowId) {
           const payment = columnId === 'payment' ? Number(newValue) : line.payment || 0;
-          const discount = columnId === 'discount' ? Number(newValue) : line.discount || 0;
-
-          return {
-            ...line,
-            [columnId]: columnId === 'payment' || columnId === 'discount' ? Number(newValue) : newValue,
-            remaining: (line.amount_due || 0) - payment - discount,
-          };
+          return { ...line, [columnId]: Number(newValue), remaining: (line.amount_due || 0) - payment };
         }
         return line;
       });
 
-      // recompute totals from updated lines
       const totals = lines.reduce(
-        (acc, line) => {
+        (acc: any, line: any) => {
           acc.totalPayment += line.payment || 0;
-          acc.totalDiscount += line.discount || 0;
-          acc.totalRemaining += line.remaining || 0;
+          acc.totalRemaining += (line.amount_due || 0) - (line.payment || 0);
           return acc;
         },
-        { totalPayment: 0, totalDiscount: 0, totalRemaining: 0 },
+        { totalPayment: 0, totalRemaining: 0 },
       );
 
       return { ...prev, lines, totals };
     });
 
-    // auto-select the row when edited
-    setRowSelection((prev) => ({
-      ...prev,
-      [rowId]: true,
-    }));
+    setRowSelection((prev) => ({ ...prev, [rowId]: true }));
   };
 
   const onSelectionChange = (selection: RowSelectionState) => {
-    paymentForm.lines = paymentForm.lines.map((line) => ({ ...line, payment: 0, balance: line.amount_due }));
-    const selectedIds = Object.keys(selection);
-    selectedIds.map((id) => {
-      const index = paymentForm.lines.findIndex((l: ReceivableInvoiceForm) => l.id === Number(id));
-      if (index === -1) return;
-      paymentForm.lines[index].payment = paymentForm.lines[index].amount_due;
+    const lines = (paymentForm.lines as any[]).map((line: any) => ({ ...line, payment: 0 }));
+    Object.keys(selection).forEach((id) => {
+      const index = lines.findIndex((l: any) => l.id === Number(id));
+      if (index >= 0) lines[index].payment = lines[index].amount_due;
     });
-
-    setPaymentForm((prev) => ({
-      ...prev,
-      lines: [...paymentForm.lines],
-    }));
+    setPaymentForm((prev) => ({ ...prev, lines: [...lines] }));
   };
 
   const performPaymentCancelation = (event: React.MouseEvent<HTMLButtonElement>) => {
     event.preventDefault();
-    router.get('/payments');
-    setTimeout(() => {
-      removePaymentForm();
-    }, 300);
+    router.get('/payables');
+    setTimeout(() => removePaymentForm(), 300);
   };
 
   const handleCheckout = (event: React.MouseEvent<HTMLButtonElement>) => {
     event.preventDefault();
     if (totalPaid() === 0) return;
-
     setCheckout(true);
   };
 
   const handleCheckoutChange = (method: PaymentMethod, form: CashForm | CheckForm | CardForm | BTForm) => {
-    // Recalculate totals if the value is set.
-    setPaymentForm(() => {
-      return { ...paymentForm, payment: { ...paymentForm.payment, [method]: form } };
-    });
+    setPaymentForm(() => ({ ...paymentForm, payment: { ...paymentForm.payment, [method]: form } }));
   };
 
-  const distributePayment = (amount: number, discount: number) => {
+  const distributePayment = (amount: number) => {
     let remaining = amount;
-
     setPaymentForm((prev) => {
-      const updatedLines = prev.lines.map((line: ReceivableInvoiceForm) => {
-        if (remaining <= 0) {
-          return { ...line, payment: 0, discount: 0, remaining: line.amount_due };
-        }
-
-        const discountAmount = (line.amount_due * discount) / 100;
-        const netDue = line.amount_due - discountAmount;
-
-        if (remaining >= netDue) {
-          // Fully pay this invoice
-          remaining -= netDue;
-          return { ...line, payment: netDue, discount: discountAmount, remaining: 0 };
+      const updatedLines = (prev.lines as any[]).map((line: any) => {
+        if (remaining <= 0) return { ...line, payment: 0 };
+        if (remaining >= line.amount_due) {
+          remaining -= line.amount_due;
+          return { ...line, payment: line.amount_due };
         } else {
-          const partialDiscount = (remaining * discount) / 100;
-          const partialPayment = remaining;
+          const partial = remaining;
           remaining = 0;
-          return { ...line, payment: partialPayment, discount: partialDiscount, remaining: line.amount_due - (partialPayment + partialDiscount) };
+          return { ...line, payment: partial };
         }
       });
 
-      setRowSelection(buildRowSelection(updatedLines));
-      return {
-        ...prev,
-        lines: updatedLines,
-      };
+      const newRowSelection: RowSelectionState = {};
+      updatedLines.forEach((line: any) => {
+        if (line.payment > 0) newRowSelection[line.id.toString()] = true;
+      });
+      setRowSelection(newRowSelection);
+
+      return { ...prev, lines: updatedLines };
     });
   };
 
   return (
-    <AppLayout user={auth.user} breadcrumbs={createPaymentBreadcrumbs}>
+    <AppLayout user={auth.user} breadcrumbs={createPayableBreadcrumbs}>
       <AppLayout.Actions>
         <div className="flex justify-end gap-x-6">
           <Button variant={'secondary'} onClick={() => setCancelConfirmation(true)}>
@@ -283,15 +227,15 @@ export default function Create({
           </div>
         )}
         <div className="z-50 col-span-12 grid min-h-42 grid-cols-2 gap-x-6">
-          <CustomerSection
-            customer={paymentForm.header.customer}
-            customers={customers}
+          <VendorSection
+            vendor={paymentForm.header.vendor}
+            vendors={vendors}
             errors={errors}
-            handleCustomerSelection={handleCustomerSelection}
+            handleVendorSelection={handleVendorSelection}
             setSearch={setSearch}
             setOpen={setOpen}
             open={open}
-            dedbouncedSearch={dedbouncedSearch}
+            debouncedSearch={debouncedSearch}
           />
           <div className="grid grid-cols-12">
             <div className="col-span-6 flex flex-col gap-y-6">
@@ -313,11 +257,7 @@ export default function Create({
                     rows={4}
                     className="focus:no-data-focus:outline-none block resize-none rounded-lg border px-3 py-1.5 text-sm/6 data-focus:outline-2 data-focus:-outline-offset-2 data-focus:outline-white/25"
                     defaultValue={paymentForm.header.notes}
-                    onChange={(e) =>
-                      setPaymentForm(() => {
-                        return { ...paymentForm, header: { ...paymentForm.header, notes: e.currentTarget.value } };
-                      })
-                    }
+                    onChange={(e) => setPaymentForm(() => ({ ...paymentForm, header: { ...paymentForm.header, notes: e.currentTarget.value } }))}
                   />
                 </div>
               </div>
@@ -327,31 +267,14 @@ export default function Create({
                 <Label htmlFor="bulkPayment">{t('global.bulkPayment')}</Label>
                 <MoneyInput name="bulkPayment" value={bulkPayment} onChange={(value) => setBulkPayment(value)} className="text-end" />
               </div>
-              <div className="flex flex-col items-end space-y-2">
-                <Label htmlFor="bulkDiscount">{t('global.bulkDiscount')}</Label>
-                <Input
-                  type="number"
-                  name="bulkDiscount"
-                  min={0}
-                  max={100}
-                  value={bulkDiscount}
-                  onChange={(event) => {
-                    let value = event.target.valueAsNumber;
-                    if (value < 0) value = 0;
-                    if (value > 100) value = 100; // clamp to max
-                    setBulkDiscount(value);
-                  }}
-                  className="w-45 text-end"
-                />
-              </div>
-              <Button disabled={bulkPayment === 0} onClick={() => distributePayment(bulkPayment, bulkDiscount)}>
-                {t('payments.applyBulkPayment')}
+              <Button disabled={bulkPayment === 0} onClick={() => distributePayment(bulkPayment)}>
+                {t('payables.applyBulkPayment')}
               </Button>
-            </div>
-            <div className="col-span-12 grid place-items-end">
-              <div className="flex flex-col gap-x-2">
-                <Label className="text-muted-foreground block text-end text-lg">{t('global.totalReceived')}</Label>
-                <Label className="block text-end text-4xl">{currency(totalPaid())}</Label>
+              <div className="col-span-12 grid place-items-end">
+                <div className="flex flex-col gap-x-2">
+                  <Label className="text-muted-foreground block text-end text-lg">{t('global.totalReceived')}</Label>
+                  <Label className="block text-end text-4xl">{currency(totalPaid())}</Label>
+                </div>
               </div>
             </div>
           </div>
@@ -359,11 +282,11 @@ export default function Create({
         <div className="col-span-12">
           <List
             loading={loading}
-            data={paymentForm.lines}
+            data={paymentForm.lines as unknown as PayableLineRow[]}
             totals={paymentForm.totals}
             rowSelection={rowSelection}
             setRowSelection={setRowSelection}
-            onSelectPaymentLine={() => {}}
+            onSelectPayableLine={() => {}}
             onValueChange={handleCellChange}
             onSelectionChange={onSelectionChange}
           />

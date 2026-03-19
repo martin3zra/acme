@@ -119,6 +119,12 @@ func (s *Server) bootRoutes() {
 					route.GET("/payments/:id/print/:hash", s.printPaymentHandler).Middleware(Signed)
 					route.PUT("/payments/:id", s.updatePaymentHandler())
 
+				route.GET("/payables", s.payablesHandler).Can("viewAny:payable")
+				route.GET("/payables/create", s.createVendorPaymentHandler).Can("create:payable")
+				route.POST("/payables", s.storeVendorPaymentHandler())
+				route.PUT("/payables/:id/void", s.voidVendorPaymentHandler())
+				route.GET("/payables/:id", s.showVendorPaymentHandler)
+
 					route.GET("/expenses", s.expensesHandler).Can("viewAny:expense")
 					route.POST("/expenses", s.storeExpenseHandler())
 					route.DELETE("/expenses/:id", s.deleteExpenseHandler())

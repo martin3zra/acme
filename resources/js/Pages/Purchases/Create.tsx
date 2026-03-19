@@ -1,4 +1,5 @@
 import { AlertDestructive } from '@/components/alert-destructive';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import { DatePickerField } from '@/components/date-picker';
 import InputError from '@/components/input-error';
 import {
@@ -26,6 +27,7 @@ import type { DiscountType, Item, LineForm, PageProps, PaymentTermValue, Purchas
 import { Textarea } from '@headlessui/react';
 import { router, useForm, usePage } from '@inertiajs/react';
 import { format } from 'date-fns';
+import { Info } from 'lucide-react';
 import React, { useCallback, useEffect, useState } from 'react';
 import { defaultDiscount, defaultPurchaseForm, makeCreateBreadcrumbs, paymentTerms, purchaseKindMeta } from './constants';
 import { Lines } from './Shared/lines';
@@ -46,6 +48,7 @@ export interface PurchaseFormData {
   transaction_kind?: PurchaseTransactionKind;
   code?: string;
   source: any;
+  invoice_number?: string;
   [key: string]: any;
 }
 
@@ -305,7 +308,12 @@ export default function Create({
 
       if (kind === 'purchase_receipt') {
         payload.transaction_kind = 'purchase_receipt';
-        payload.code = purchaseForm.code ?? '';
+        payload.invoice_number = purchaseForm.code ?? '';
+      }
+
+      if (kind === 'vendor_bill') {
+        payload.transaction_kind = 'vendor_bill';
+        payload.invoice_number = purchaseForm.header.invoice_number ?? '';
       }
 
       return payload;
@@ -349,6 +357,15 @@ export default function Create({
         {propsErrors.status && (
           <div className="col-span-12">
             <AlertDestructive description={propsErrors.status} onDestroy={() => delete propsErrors.status} />
+          </div>
+        )}
+
+        {kind === 'purchase_receipt' && purchaseForm.source?.type === 'purchase_order' && (
+          <div className="col-span-12">
+            <Alert>
+              <Info className="size-4" />
+              <AlertDescription>{t('purchases.receipts.partialReceiptNotice')}</AlertDescription>
+            </Alert>
           </div>
         )}
 
@@ -400,6 +417,22 @@ export default function Create({
                     required
                   />
                   <InputError className="mt-2" message={codeError || (errors as any).code} />
+                </div>
+              )}
+
+              {kind === 'vendor_bill' && (
+                <div className="flex flex-col gap-y-2">
+                  <Label htmlFor="invoice_number">{t('purchases.vendorBills.form.vendorInvoiceNumber')}</Label>
+                  <Input
+                    id="invoice_number"
+                    name="invoice_number"
+                    value={purchaseForm.header.invoice_number ?? ''}
+                    placeholder={t('purchases.vendorBills.form.vendorInvoiceNumberPlaceholder')}
+                    onChange={(e) => {
+                      setPurchaseForm(() => ({ ...purchaseForm, header: { ...purchaseForm.header, invoice_number: e.target.value } }));
+                    }}
+                  />
+                  <InputError className="mt-2" message={(errors as any).invoice_number} />
                 </div>
               )}
 

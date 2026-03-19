@@ -1,5 +1,5 @@
 {
-  "global":{
+  "global": {
     "ok": "Aceptar",
     "cancel": "Cancelar",
     "default": "Predeterminado",
@@ -162,10 +162,10 @@
     },
     "nouns": {
       "customer": {
-        "gender":"m"
+        "gender": "m"
       },
       "invoice": {
-        "gender":"f"
+        "gender": "f"
       }
     },
     "platform": "Plataforma",
@@ -299,12 +299,12 @@
       "selectedOf": ":rows de :total seleccionadas"
     },
     "navGroups": {
-      "overview": "Resumen", 
-      "sales": "Ventas", 
-      "purchasing": "Compras", 
-      "inventory": "Inventario", 
-      "customersCatalog": "Clientes y Catálogo", 
-      "finance": "Finanzas", 
+      "overview": "Resumen",
+      "sales": "Ventas",
+      "purchasing": "Compras",
+      "inventory": "Inventario",
+      "customersCatalog": "Clientes y Catálogo",
+      "finance": "Finanzas",
       "analytics": "Análisis"
     },
     "navMain": {
@@ -322,9 +322,10 @@
       "stock": "Existencias",
       "transfers": "Transferencias",
       "adjustments": "Ajustes",
-      "payments": "Pagos",
       "expenses": "Gastos",
-      "reports": "Reportes"
+      "reports": "Reportes",
+      "payables": "Cuentas por pagar",
+      "receivables": "Cuentas por cobrar"
     },
     "navSecondary": {
       "settings": "Ajustes",
@@ -351,7 +352,11 @@
     "restricted": {
       "title": "Acceso restringido",
       "description": "Aún no estás asociado a una cuenta comercial, por lo que no puedes acceder a la aplicación."
-    }
+    },
+    "openMenu": "Abrir menú",
+    "paid": "Pagado",
+    "invoiceNumber": "Número de factura",
+    "convertToVendorBill": "Convertir a factura de proveedor"
   },
   "dashboard": {
     "due_invoices": "Facturas vencidas",
@@ -839,7 +844,7 @@
       "type": "Tipo de cliente",
       "individual": "Individuo",
       "business": "Negocio",
-      "paymentSection":"Sección de Pago",
+      "paymentSection": "Sección de Pago",
       "openBalance": "Balance inicial",
       "openBalanceAsOf": "Balance inicial al día"
     },
@@ -887,7 +892,7 @@
       "cancel": "Cancelar"
     },
     "statuses": {
-      "enabled":{
+      "enabled": {
         "section": {
           "title": "Deshabilitar cliente",
           "description": "Bloquear cliente y todos sus recursos"
@@ -899,7 +904,7 @@
           "variant": "destructive"
         }
       },
-      "disabled":{
+      "disabled": {
         "section": {
           "title": "Habilitar cliente",
           "description": "Desbloquear cliente y todos sus recursos"
@@ -931,7 +936,7 @@
       "type": "Tipo de proveedor",
       "individual": "Individuo",
       "business": "Negocio",
-      "paymentSection":"Sección de Pago",
+      "paymentSection": "Sección de Pago",
       "openBalance": "Balance inicial",
       "openBalanceDate": "Balance inicial al día",
       "purchaseNote": "Nota de compra",
@@ -981,7 +986,7 @@
       "cancel": "Cancelar"
     },
     "statuses": {
-      "enabled":{
+      "enabled": {
         "section": {
           "title": "Deshabilitar proveedor",
           "description": "Bloquear proveedor y todos sus recursos"
@@ -993,7 +998,7 @@
           "variant": "destructive"
         }
       },
-      "disabled":{
+      "disabled": {
         "section": {
           "title": "Habilitar proveedor",
           "description": "Desbloquear proveedor y todos sus recursos"
@@ -1010,7 +1015,8 @@
   "purchases": {
     "source": {
       "purchase_order": "Creado desde la orden :purchase_order",
-      "purchase_receipt": "Convertido en recibo :purchase_receipt"
+      "purchase_receipt": "Convertido en recibo :purchase_receipt",
+      "vendor_bill": "Creado desde factura de proveedor :vendor_bill"
     },
     "preview": {
       "description": "Vista previa de la compra seleccionada."
@@ -1050,7 +1056,9 @@
         "draft": "Borrador",
         "open": "Abierta",
         "received": "Recibida",
-        "partially_received": "Parcialmente recibida"
+        "partially_received": "Parcialmente recibida",
+        "partially_paid": "Parcialmente pagada",
+        "closed": "Cerrada"
       }
     },
     "receipts": {
@@ -1081,8 +1089,11 @@
         "draft": "Borrador",
         "open": "Abierta",
         "received": "Recibida",
-        "partially_received": "Parcialmente recibida"
-      }
+        "partially_received": "Parcialmente recibida",
+        "partially_paid": "Parcialmente pagada",
+        "closed": "Cerrada"
+      },
+      "partialReceiptNotice": "Esta orden ya fue parcialmente recibida. Las cantidades reflejan los artículos pendientes por recibir."
     },
     "vendor-bills": {
       "title": "Facturas de proveedores",
@@ -1107,7 +1118,44 @@
         "draft": "Borrador",
         "open": "Abierta",
         "received": "Recibida",
-        "partially_received": "Parcialmente recibida"
+        "partially_received": "Parcialmente recibida",
+        "partially_paid": "Parcialmente pagada",
+        "closed": "Cerrada"
+      }
+    },
+    "vendorBills": {
+      "title": "Facturas de proveedores",
+      "description": "Aquí puedes ver y gestionar todas tus facturas de proveedores.",
+      "view": {
+        "description": "Detalles de la factura de proveedor seleccionada."
+      },
+      "new": {
+        "title": "Nueva factura de proveedor"
+      },
+      "emptyState": {
+        "title": "Crea tu primera factura de proveedor",
+        "description": "Una vez que cree su factura de proveedor, aparecerá aquí."
+      },
+      "newVendorBills": {
+        "title": "Nueva factura de proveedor"
+      },
+      "editVendorBills": {
+        "title": "Editar factura de proveedor"
+      },
+      "form": {
+        "vendorInvoiceNumber": "Número de factura del proveedor",
+        "vendorInvoiceNumberPlaceholder": "Ej. OD-INV-98765"
+      },
+      "statuses": {
+        "draft": "Borrador",
+        "open": "Abierta",
+        "received": "Recibida",
+        "partially_received": "Parcialmente recibida",
+        "partially_paid": "Parcialmente pagada",
+        "closed": "Cerrada"
+      },
+      "source": {
+        "purchase_receipt": "Convertido desde recibo :purchase_receipt"
       }
     }
   },
@@ -1237,7 +1285,7 @@
       "cancel": "Cancelar"
     },
     "statuses": {
-      "enabled":{
+      "enabled": {
         "section": {
           "title": "Deshabilitar producto",
           "description": "Bloquear producto y todos sus recursos"
@@ -1249,7 +1297,7 @@
           "variant": "destructive"
         }
       },
-      "disabled":{
+      "disabled": {
         "section": {
           "title": "Habilitar producto",
           "description": "Desbloquear producto y todos sus recursos"
@@ -1416,7 +1464,7 @@
           "title": "Unidades",
           "description": "Antes de comenzar a vender o registrar inventario, necesitas establecer la unidad de medida de tu producto. Esto asegura claridad en precios, cantidades y reportes (por ejemplo: pieza, caja, litro, kilogramo)."
         },
-        "redirectPreferences":{
+        "redirectPreferences": {
           "title": "Preferencias de redirección",
           "description": "Gestiona a dónde quieres ser redirigido después de la creación de una factura, un cliente, un presupuesto o un pedido.",
           "afterCreatingInvoice": "Después de crear una factura",
@@ -1443,5 +1491,56 @@
         "description": "Borra los detalles de la compañia seleccionada."
       }
     }
+  },
+  "payables": {
+    "title": "Cuentas por pagar",
+    "description": "Todas las cuentas por pagar registradas se muestran aquí.",
+    "create": {
+      "title": "Registrar pago"
+    },
+    "newPayment": {
+      "title": "Nuevo pago a proveedor"
+    },
+    "viewPayment": {
+      "title": "Ver pago",
+      "description": "Detalles del pago al proveedor seleccionado."
+    },
+    "viewPayable": {
+      "title": "Ver cuenta por pagar"
+    },
+    "voidPayable": {
+      "title": "Anular pago"
+    },
+    "single": {
+      "title": "Pago a proveedor",
+      "bill": "Factura de proveedor",
+      "description": "Detalles del pago al proveedor seleccionado.",
+      "totalSummary": "Resumen total del pago"
+    },
+    "emptyState": {
+      "title": "Registra tu primer pago a proveedor",
+      "description": "Una vez que registres tus pagos a proveedores, aparecerán aquí."
+    },
+    "confirmsPassword": {
+      "title": "¿Estás seguro que deseas anular el pago :payment?",
+      "description": "¿Estás seguro de que deseas anular este pago? Esta acción no se puede deshacer. Una vez anulado el pago pasará de :total a $0.00.",
+      "confirm": "Sí, anularlo",
+      "cancel": "Cancelar"
+    },
+    "confirmsCancelation": {
+      "title": "¿Estás seguro que deseas cancelar?",
+      "description": "Esta acción no se puede deshacer. Eliminará permanentemente los cambios sin guardar.",
+      "confirm": "Sí, continuar",
+      "cancel": "Cancelar"
+    },
+    "statuses": {
+      "DRAFT": "Borrador",
+      "PENDING": "Pendiente",
+      "APPROVED": "Aprobada",
+      "PARTIAL": "Parcial",
+      "PAID": "Pagada",
+      "CANCELLED": "Cancelada"
+    },
+    "applyBulkPayment": "Aplicar pago masivo a proveedor"
   }
 }

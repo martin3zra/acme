@@ -19,6 +19,7 @@ import type { Purchase, PurchaseTransactionKind, Replacements } from '@/types';
 import { ColumnDef } from '@tanstack/react-table';
 import { MoreHorizontal } from 'lucide-react';
 import { ConvertToReceiptAction } from '../Shared/convert-to-receipt-action';
+import { ConvertToVendorBillAction } from '../Shared/convert-to-vendor-bill-action';
 import { PurchaseSourceIcon } from '../Shared/purchase-source-icon';
 
 export type PurchaseVerb = 'view' | 'edit' | 'delete';
@@ -128,17 +129,30 @@ export const getColumns = ({ kind, onDidClick, t }: Props): ColumnDef<Purchase>[
               <DropdownMenuLabel>{t('global.actions.title')}</DropdownMenuLabel>
               <DropdownMenuSeparator />
               <DropdownMenuItem onClick={() => onDidClick(props.row.original, 'view')}>{t('global.actions.view')}</DropdownMenuItem>
-              <DropdownMenuItem onClick={() => onDidClick(props.row.original, 'edit')}>{t('global.actions.edit')}</DropdownMenuItem>
+              {!(props.row.original.transaction_kind === 'purchase_order' && ['received', 'partially_received', 'partially_paid', 'closed'].includes(props.row.original.status)) && (
+                <DropdownMenuItem onClick={() => onDidClick(props.row.original, 'edit')}>{t('global.actions.edit')}</DropdownMenuItem>
+              )}
 
-              {props.row.original.transaction_kind === 'purchase_order' && (
+              {props.row.original.transaction_kind === 'purchase_order' && props.row.original.status !== 'received' && (
                 <>
                   <DropdownMenuSeparator />
                   <ConvertToReceiptAction id={props.row.original.uuid} title={t('global.convertToReceipt')} />
                 </>
               )}
 
-              <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={() => onDidClick(props.row.original, 'delete')}>{t('global.actions.delete')}</DropdownMenuItem>
+              {props.row.original.transaction_kind === 'purchase_receipt' && (
+                <>
+                  <DropdownMenuSeparator />
+                  <ConvertToVendorBillAction id={props.row.original.uuid} title={t('global.convertToVendorBill')} />
+                </>
+              )}
+
+              {!(props.row.original.transaction_kind === 'purchase_order' && ['received', 'partially_received', 'partially_paid', 'closed'].includes(props.row.original.status)) && (
+                <>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={() => onDidClick(props.row.original, 'delete')}>{t('global.actions.delete')}</DropdownMenuItem>
+                </>
+              )}
             </DropdownMenuContent>
           </DropdownMenu>
         );

@@ -83,6 +83,9 @@ func (s *Server) purchasesHandler(ctx *routing.Context) {
 				if err != nil {
 					return nil, err
 				}
+				if err = s.enrichLinesWithRemainingQty(ctx.Request.Context(), purchase.CompanyID, purchase.UUID, lines); err != nil {
+					return nil, err
+				}
 			}
 
 			return map[string]any{
@@ -126,6 +129,9 @@ func (s *Server) showPurchaseHandler(ctx *routing.Context) {
 		if purchase.Kind == PurchaseTransactionKinds.PurchaseOrder {
 			purchase.LinkedReceipts, err = s.findLinkedReceiptsForOrder(ctx.Request.Context(), purchase.CompanyID, purchase.UUID)
 			if err != nil {
+				return nil, err
+			}
+			if err = s.enrichLinesWithRemainingQty(ctx.Request.Context(), purchase.CompanyID, purchase.UUID, lines); err != nil {
 				return nil, err
 			}
 		}

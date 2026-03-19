@@ -8,6 +8,7 @@ import type { Auth, PurchaseTransactionKind, PurchaseWithLines } from '@/types';
 import { Link } from '@inertiajs/react';
 import { format } from 'date-fns';
 import { FileText } from 'lucide-react';
+import { ConvertToVendorBillAction } from './Shared/convert-to-vendor-bill-action';
 
 type Props = {
   kind: PurchaseTransactionKind;
@@ -29,6 +30,12 @@ export default function Show({ kind, purchase, auth }: Props) {
               <Label>{t('global.purchase')}</Label>
               <Label>#{purchase.header.number}</Label>
             </div>
+            {isNotEmpty(purchase.header.invoice_number) && (
+              <div>
+                <Label>{t('global.invoiceNumber')}</Label>
+                <Label>{purchase.header.invoice_number}</Label>
+              </div>
+            )}
           </div>
           <div className="col-span-6 flex items-center gap-x-2 [&_[data-slot=label]]:font-normal">
             <Label>{t('global.date')}</Label>
@@ -188,6 +195,13 @@ export default function Show({ kind, purchase, auth }: Props) {
         <Separator />
         <div className="text-muted-foreground text-sm">{t('purchases.preview.description')}</div>
         <div className="text-muted-foreground text-xs">{kind}</div>
+        {kind === 'purchase_receipt' && (
+          <ConvertToVendorBillAction
+            title={t('global.convertToVendorBill')}
+            renderedAs="button"
+            source={purchase}
+          />
+        )}
       </div>
     </div>
   );

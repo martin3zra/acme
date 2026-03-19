@@ -1,12 +1,12 @@
 import { addDays, getDaysFromTerm } from '@/lib/utils';
 import type { LineForm, PurchaseForm, PurchaseSource, PurchaseWithLines } from '@/types';
 
-export function convertToReceipt(source: PurchaseWithLines): PurchaseForm {
+export function convertToVendorBill(source: PurchaseWithLines): PurchaseForm {
   const date = new Date();
   const terms = source.header.terms;
 
   const purchaseSource: PurchaseSource = {
-    type: 'purchase_order',
+    type: 'purchase_receipt',
     id: source.header.uuid,
   };
 
@@ -18,13 +18,13 @@ export function convertToReceipt(source: PurchaseWithLines): PurchaseForm {
       terms,
       notes: source.header.notes,
       discount: source.header.discount,
+      invoice_number: source.header.invoice_number ?? '',
     },
     lines: source.lines.map((line) => ({
       ...line,
-      qty: line.remaining_qty ?? line.qty,
       action: 'added',
     })) as unknown as LineForm[],
-    kind: 'purchase_receipt',
+    kind: 'vendor_bill',
     code: '',
     source: purchaseSource,
   };

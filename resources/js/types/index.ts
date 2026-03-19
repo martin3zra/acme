@@ -201,6 +201,7 @@ export type LineAction = 'added' | 'updated' | 'deleted' | 'unchanged';
 
 export interface InvoiceLine extends Item {
   qty: number;
+  remaining_qty?: number;
   amount: number;
   total: number;
   tax: TaxWithAmount;
@@ -242,7 +243,7 @@ export type PaidStatus = (typeof PaidStatuses)[number];
 export const Statuses = ['enabled', 'disabled'] as const;
 export type Status = (typeof Statuses)[number];
 
-export type StatusType = 'paid' | 'invoice' | 'status' | 'payment' | 'dashboard' | 'purchase';
+export type StatusType = 'paid' | 'invoice' | 'status' | 'payment' | 'dashboard' | 'purchase' | 'payable';
 
 export interface Invoice {
   id: number;
@@ -305,6 +306,7 @@ export interface Purchase {
   transaction_kind: PurchaseTransactionKind;
   source?: PurchaseSource | null;
   linked_receipts?: LinkedPurchaseReceipt[];
+  invoice_number?: string;
 }
 
 export interface PurchaseWithLines {
@@ -319,6 +321,7 @@ export type PurchaseHeaderForm = {
   terms: PaymentTermValue;
   notes: string | undefined;
   discount: DiscountType;
+  invoice_number?: string;
 };
 
 export type PurchaseForm = {
@@ -576,6 +579,81 @@ export interface PaymentWithLines {
   lines: PaymentLine[];
   pdfURL: string;
 }
+
+// ─── Accounts Payable / Vendor Payments ──────────────────────────────────────
+
+export interface Payable {
+  id: number;
+  uuid: string;
+  invoice_id: number;
+  invoice_uuid: string;
+  invoice_number: string;
+  invoice_date: string;
+  due_date: string;
+  amount_total: number;
+  amount_payable: number;
+  amount_paid: number;
+  status: PayableStatus;
+  notes?: string;
+}
+
+export type PayableStatus = 'DRAFT' | 'PENDING' | 'APPROVED' | 'PARTIAL' | 'PAID' | 'CANCELLED';
+
+export type PayableVerb = 'view' | 'void';
+
+export interface VendorPayment {
+  id: number;
+  uuid: string;
+  code: string;
+  date: string;
+  amount: number;
+  notes: string;
+  status: string;
+  vendor: Vendor;
+  payment: PaymentMethodsForm;
+}
+
+export interface VendorPaymentLine {
+  id: number;
+  ap_id: number;
+  ap_uuid: string;
+  bill_number: string;
+  bill_date: string;
+  due_date: string;
+  amount_due: number;
+  payment: number;
+  paid_status: string;
+}
+
+export interface VendorPaymentWithLines {
+  header: VendorPayment;
+  lines: VendorPaymentLine[];
+}
+
+export type PayableForm = {
+  invoice_uuid: string;
+  amount_due: number;
+  payment: number;
+  action: LineAction;
+};
+
+export type VendorPaymentHeaderForm = {
+  vendor: Vendor | undefined;
+  date: Date | undefined;
+  notes: string;
+};
+
+export type VendorPaymentTotals = {
+  totalPayment: number;
+  totalRemaining: number;
+};
+
+export type VendorPaymentForm = {
+  header: VendorPaymentHeaderForm;
+  lines: PayableForm[];
+  payment: PaymentMethodsForm;
+  totals: VendorPaymentTotals;
+};
 
 export type onValueChangeType = (rowId: string, columnId: string, newValue: string | number) => void;
 

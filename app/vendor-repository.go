@@ -257,7 +257,7 @@ func (s *Server) storeVendorOpenBalance(tx *sql.Tx, companyID int, vendorID int,
 		"INSERT INTO accounts_payable " +
 			"(company_id, vendor_id, invoice_number, invoice_date, due_date, " +
 			"amount_total, tax_amount, discount_amount, amount_paid, " +
-			"currency_code, payment_terms, payment_method, status, notes, created_by) " +
+			"currency, payment_terms, payment_method, status, notes, created_by) " +
 			"VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15) " +
 			"RETURNING id")
 	if err != nil {

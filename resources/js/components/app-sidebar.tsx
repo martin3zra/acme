@@ -14,6 +14,7 @@ import {
   ClipboardPenLine,
   CreditCard,
   FileText,
+  Landmark,
   HelpCircleIcon,
   LayoutDashboard,
   PackageCheck,
@@ -134,10 +135,16 @@ const navMain: NavItem[] = [
 
   // FINANCE
   {
-    title: 'global.navMain.payments',
+    title: 'global.navMain.receivables',
     url: '/payments',
     icon: CreditCard,
     requiredAbility: 'viewAny:payment',
+  },
+  {
+    title: 'global.navMain.payables',
+    url: '/payables',
+    icon: Landmark,
+    requiredAbility: 'viewAny:payable',
   },
   {
     title: 'global.navMain.expenses',

@@ -50,6 +50,7 @@ export interface PurchaseFormData {
   notes: string;
   kind: PurchaseTransactionKind;
   source: any;
+  invoice_number?: string;
   [key: string]: any;
 }
 
@@ -294,6 +295,11 @@ export default function Edit({
           action: line.action,
         })),
       };
+
+      if (kind === 'vendor_bill') {
+        payload.invoice_number = purchaseForm.header.invoice_number ?? '';
+      }
+
       return payload;
     });
 
@@ -366,6 +372,21 @@ export default function Edit({
             </div>
 
             <div className="col-span-6 flex flex-col gap-y-6">
+              {kind === 'vendor_bill' && (
+                <div className="flex flex-col gap-y-2">
+                  <Label htmlFor="invoice_number">{t('purchases.vendorBills.form.vendorInvoiceNumber')}</Label>
+                  <Input
+                    id="invoice_number"
+                    name="invoice_number"
+                    value={purchaseForm.header.invoice_number ?? ''}
+                    placeholder={t('purchases.vendorBills.form.vendorInvoiceNumberPlaceholder')}
+                    onChange={(e) => {
+                      setPurchaseForm(() => ({ ...purchaseForm, header: { ...purchaseForm.header, invoice_number: e.target.value } }));
+                    }}
+                  />
+                  <InputError className="mt-2" message={(errors as any).invoice_number} />
+                </div>
+              )}
               <div className="flex flex-col gap-y-2">
                 <Label htmlFor="paymentTerms">{t('global.paymentTerms')}</Label>
                 <Select name="paymentTerms" onValueChange={handlePaymentTermsChange} value={purchaseForm.header.terms} required>

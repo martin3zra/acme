@@ -38,7 +38,9 @@ type invoice struct {
 
 type line struct {
 	ID          int64           `json:"id"`
+	VariantID   int64           `json:"-"`
 	Qty         int64           `json:"qty"`
+	RemainingQty *int64         `json:"remaining_qty,omitempty"`
 	Price       float64         `json:"price"`
 	Name        string          `json:"name"`
 	Description string          `json:"description"`
