@@ -1496,6 +1496,7 @@
   "payables": {
     "title": "Cuentas por pagar",
     "description": "Todas las cuentas por pagar registradas se muestran aquí.",
+    "paidStatus": "Pagada",
     "create": {
       "title": "Registrar pago"
     },
@@ -1535,12 +1536,12 @@
       "cancel": "Cancelar"
     },
     "statuses": {
-      "DRAFT": "Borrador",
-      "PENDING": "Pendiente",
-      "APPROVED": "Aprobada",
-      "PARTIAL": "Parcial",
-      "PAID": "Pagada",
-      "CANCELLED": "Cancelada"
+      "draft": "Borrador",
+      "pending": "Pendiente",
+      "approved": "Aprobada",
+      "partial": "Parcial",
+      "paid": "Pagada",
+      "void": "Nula"
     },
     "applyBulkPayment": "Aplicar pago masivo a proveedor"
   }

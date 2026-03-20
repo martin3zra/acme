@@ -1,6 +1,7 @@
 import { CurrencyCell } from '@/components/data-table/currency-cell';
 import { DateCell } from '@/components/data-table/date-cell';
 import { HeaderCell } from '@/components/data-table/header-cell';
+import { TextCell } from '@/components/data-table/text-cell';
 import { StatusBadge } from '@/components/status-badge';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -12,7 +13,6 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { TextCell } from '@/components/data-table/text-cell';
 import { Payable, PayableVerb, Replacements } from '@/types';
 import { ColumnDef } from '@tanstack/react-table';
 import { MoreHorizontal } from 'lucide-react';
@@ -33,9 +33,7 @@ export const getColumns = ({ onDidClick, t }: Props): ColumnDef<Payable>[] => {
           aria-label="Select all"
         />
       ),
-      cell: ({ row }) => (
-        <Checkbox checked={row.getIsSelected()} onCheckedChange={(value) => row.toggleSelected(!!value)} aria-label="Select row" />
-      ),
+      cell: ({ row }) => <Checkbox checked={row.getIsSelected()} onCheckedChange={(value) => row.toggleSelected(!!value)} aria-label="Select row" />,
       enableSorting: false,
       enableHiding: false,
     },
@@ -59,7 +57,7 @@ export const getColumns = ({ onDidClick, t }: Props): ColumnDef<Payable>[] => {
         const dueDate = props.getValue() as string;
         const isOverdue = new Date(dueDate) < new Date() && props.row.original.paid_status !== 'paid' && props.row.original.status !== 'void';
         return (
-          <span className={isOverdue ? 'text-red-600 font-medium' : ''}>
+          <span className={isOverdue ? 'font-medium text-red-600' : ''}>
             <DateCell columnWidth={props.column.getSize()} value={dueDate} />
           </span>
         );
@@ -95,9 +93,9 @@ export const getColumns = ({ onDidClick, t }: Props): ColumnDef<Payable>[] => {
     },
     {
       accessorKey: 'paid_status',
-      meta: t('global.paymentStatus'),
+      meta: t('payables.paidStatus'),
       size: 90,
-      header: (props) => <HeaderCell title={t('global.paymentStatus')} alignment="center" columnWidth={props.column.getSize()} />,
+      header: (props) => <HeaderCell title={t('payables.paidStatus')} alignment="center" columnWidth={props.column.getSize()} />,
       cell: (props) => <StatusBadge type="paid" status={props.row.original.paid_status} />,
     },
     {
@@ -116,15 +114,11 @@ export const getColumns = ({ onDidClick, t }: Props): ColumnDef<Payable>[] => {
             <DropdownMenuContent align="end" className="**:data-[slot=dropdown-menu-item]:cursor-pointer">
               <DropdownMenuLabel>{t('global.actions.title')}</DropdownMenuLabel>
               <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={() => onDidClick(props.row.original, 'view')}>
-                {t('payables.viewPayable.title')}
-              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => onDidClick(props.row.original, 'view')}>{t('payables.viewPayable.title')}</DropdownMenuItem>
               {canVoid && (
                 <>
                   <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={() => onDidClick(props.row.original, 'void')}>
-                    {t('payables.voidPayable.title')}
-                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => onDidClick(props.row.original, 'void')}>{t('payables.voidPayable.title')}</DropdownMenuItem>
                 </>
               )}
             </DropdownMenuContent>
