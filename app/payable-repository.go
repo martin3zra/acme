@@ -50,7 +50,7 @@ func (s *Server) findPayables(ctx context.Context) ([]*Payable, error) {
 		INNER JOIN accounts_payable ap ON (p.company_id = ap.company_id AND p.vendor_id = ap.vendor_id AND p.accounts_payable_id = ap.id)
 		INNER JOIN vendors          ON (p.company_id = vendors.company_id AND p.vendor_id = vendors.id)
 		WHERE p.company_id = $1
-		  AND ap.status NOT IN ('PAID', 'CANCELLED')
+		  AND ap.status NOT IN ('paid', 'void')
 		ORDER BY ap.due_date ASC`,
 		CurrentCompany(ctx).ID,
 	)
@@ -156,17 +156,17 @@ func (s *Server) updateAPBalance(tx *sql.Tx, companyID int, apID int64, paymentA
 		return err
 	}
 
-	var newStatus PayableStatus
+	var newStatus PaidStatus
 	switch {
 	case newPaid >= amountPayable:
-		newStatus = PayableStatuses.Paid
+		newStatus = PaidStatuses.Paid
 	case newPaid > 0:
-		newStatus = PayableStatuses.Partial
+		newStatus = PaidStatuses.Partial
 	default:
-		newStatus = PayableStatuses.Pending
+		newStatus = PaidStatuses.UnPaid
 	}
 
-	if newStatus == PayableStatuses.Paid {
+	if newStatus == PaidStatuses.Paid {
 		_, err = tx.Exec(
 			"UPDATE accounts_payable SET status = $3, paid_at = NOW(), updated_at = NOW() WHERE company_id = $1 AND id = $2",
 			companyID, apID, newStatus,

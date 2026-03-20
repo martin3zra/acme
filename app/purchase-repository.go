@@ -854,7 +854,7 @@ func (s *Server) destroyPurchase(ctx context.Context, uuid string) error {
 			if apID > 0 {
 				if _, err = tx.Exec(
 					"UPDATE accounts_payable SET status = $3, updated_at = NOW() WHERE company_id = $1 AND id = $2",
-					companyID, apID, PayableStatuses.Cancelled,
+					companyID, apID, PayableStatuses.Void,
 				); err != nil {
 					return err
 				}
@@ -925,7 +925,7 @@ func resolvePOPaymentStatus(tx *sql.Tx, companyID int, poUUID string) (PaidStatu
 		    AND p.transaction_kind = 'vendor_bill'
 		    AND ap.company_id = $2
 		    AND ap.status != $3`,
-		poUUID, companyID, string(PayableStatuses.Cancelled),
+		poUUID, companyID, string(PayableStatuses.Void),
 	).Scan(&totalPayable, &totalPaid)
 	if err != nil {
 		return PaidStatuses.UnPaid, err

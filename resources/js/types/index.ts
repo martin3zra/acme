@@ -598,7 +598,7 @@ export interface Payable {
   notes?: string;
 }
 
-export type PayableStatus = 'DRAFT' | 'PENDING' | 'APPROVED' | 'PARTIAL' | 'PAID' | 'CANCELLED';
+export type PayableStatus = 'draft' | 'pending' | 'approved' | 'rejected' | 'void';
 
 export type PayableVerb = 'view' | 'void';
 

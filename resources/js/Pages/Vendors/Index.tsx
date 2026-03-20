@@ -217,7 +217,7 @@ export default function Index({
                             <td>{p.due_date}</td>
                             <td className="text-right">{(p.amount_payable - p.amount_paid).toFixed(2)}</td>
                             <td>
-                              <span className={`rounded px-1.5 py-0.5 text-xs font-medium ${p.status === 'PAID' ? 'bg-green-100 text-green-700' : new Date(p.due_date) < new Date() ? 'bg-red-100 text-red-700' : 'bg-yellow-100 text-yellow-700'}`}>
+                              <span className={`rounded px-1.5 py-0.5 text-xs font-medium ${p.status === 'paid' ? 'bg-green-100 text-green-700' : new Date(p.due_date) < new Date() ? 'bg-red-100 text-red-700' : 'bg-yellow-100 text-yellow-700'}`}>
                                 {p.status}
                               </span>
                             </td>

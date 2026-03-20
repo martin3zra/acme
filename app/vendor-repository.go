@@ -106,7 +106,7 @@ func (s *Server) findVendorByUUID(ctx context.Context, vendorID string) (*vendor
 			"v.created_at, v.updated_at, v.deleted_at "+
 			"FROM vendors v "+
 			"INNER JOIN companies ON (v.company_id = companies.id) "+
-			"LEFT JOIN (SELECT id, vendor_id, invoice_date, amount_total FROM accounts_payable WHERE accounts_payable.status = 'DRAFT'::payable_status) ap ON ap.vendor_id = v.id "+
+			"LEFT JOIN (SELECT id, vendor_id, invoice_date, amount_total FROM accounts_payable WHERE accounts_payable.status = 'draft') ap ON ap.vendor_id = v.id "+
 			"WHERE v.company_id = $1 "+
 			"AND v.uuid = $2 "+
 			"AND v.deleted_at IS NULL",
@@ -366,7 +366,7 @@ func (s *Server) findVendorPayables(ctx context.Context, vendorID string) ([]*Pa
 		INNER JOIN accounts_payable ap ON (p.company_id = ap.company_id AND p.vendor_id = ap.vendor_id AND p.accounts_payable_id = ap.id)
 		INNER JOIN vendors          ON (p.company_id = vendors.company_id AND p.vendor_id = vendors.id)
 		WHERE p.company_id = $1
-		AND ap.status != 'PAID'::payable_status
+		AND ap.status != 'paid'
 		AND vendors.uuid = $2
 	`, CurrentCompany(ctx).ID, vendorID)
 	if err != nil {

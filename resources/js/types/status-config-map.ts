@@ -238,6 +238,28 @@ export const statusConfig: Record<StatusType, Record<string, StatusConfig>> = {
       text: 'text-blue-800',
       Icon: ShieldCheck,
     },
+    rejected: {
+      label: 'Rejected',
+      bg: 'bg-red-100',
+      border: 'border-red-500',
+      text: 'text-red-800',
+      Icon: ShieldBan,
+    },
+    void: {
+      label: 'Void',
+      bg: 'bg-gray-100',
+      border: 'border-gray-400',
+      text: 'text-gray-600',
+      Icon: CircleSlash,
+    },
+    // Payment-state values written by updateAPBalance
+    unpaid: {
+      label: 'Unpaid',
+      bg: 'bg-red-100',
+      border: 'border-red-500',
+      text: 'text-red-800',
+      Icon: XCircle,
+    },
     partial: {
       label: 'Partial',
       bg: 'bg-teal-100',
@@ -251,13 +273,6 @@ export const statusConfig: Record<StatusType, Record<string, StatusConfig>> = {
       border: 'border-green-500',
       text: 'text-green-800',
       Icon: CheckCircle,
-    },
-    cancelled: {
-      label: 'Cancelled',
-      bg: 'bg-red-100',
-      border: 'border-red-500',
-      text: 'text-red-800',
-      Icon: XCircle,
     },
   },
 };

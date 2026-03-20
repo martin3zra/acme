@@ -652,28 +652,25 @@ func (d *Recurrence) Scan(value any) error {
 type PayableStatus string
 
 const (
-	_PAYABLE_DRAFT     PayableStatus = "DRAFT"
-	_PAYABLE_PENDING   PayableStatus = "PENDING"
-	_PAYABLE_APPROVED  PayableStatus = "APPROVED"
-	_PAYABLE_PARTIAL   PayableStatus = "PARTIAL"
-	_PAYABLE_PAID      PayableStatus = "PAID"
-	_PAYABLE_CANCELLED PayableStatus = "CANCELLED"
+	_PAYABLE_DRAFT     PayableStatus = "draft"
+	_PAYABLE_PENDING   PayableStatus = "pending"
+	_PAYABLE_APPROVED  PayableStatus = "approved"
+	_PAYABLE_REJECTED  PayableStatus = "rejected"
+	_PAYABLE_VOID      PayableStatus = "void"
 )
 
 var PayableStatuses = struct {
-	Draft     PayableStatus
-	Pending   PayableStatus
-	Approved  PayableStatus
-	Partial   PayableStatus
-	Paid      PayableStatus
-	Cancelled PayableStatus
+	Draft    PayableStatus
+	Pending  PayableStatus
+	Approved PayableStatus
+	Rejected PayableStatus
+	Void     PayableStatus
 }{
-	Draft:     _PAYABLE_DRAFT,
-	Pending:   _PAYABLE_PENDING,
-	Approved:  _PAYABLE_APPROVED,
-	Partial:   _PAYABLE_PARTIAL,
-	Paid:      _PAYABLE_PAID,
-	Cancelled: _PAYABLE_CANCELLED,
+	Draft:    _PAYABLE_DRAFT,
+	Pending:  _PAYABLE_PENDING,
+	Approved: _PAYABLE_APPROVED,
+	Rejected: _PAYABLE_REJECTED,
+	Void:     _PAYABLE_VOID,
 }
 
 // Paid Status (Financial Settlement)

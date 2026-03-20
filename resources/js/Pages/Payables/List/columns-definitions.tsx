@@ -57,7 +57,7 @@ export const getColumns = ({ onDidClick, t }: Props): ColumnDef<Payable>[] => {
       header: (props) => <HeaderCell title={t('global.dueDate')} alignment="left" columnWidth={props.column.getSize()} />,
       cell: (props) => {
         const dueDate = props.getValue() as string;
-        const isOverdue = new Date(dueDate) < new Date() && props.row.original.status !== 'PAID' && props.row.original.status !== 'CANCELLED';
+        const isOverdue = new Date(dueDate) < new Date() && props.row.original.status !== 'paid' && props.row.original.status !== 'void';
         return (
           <span className={isOverdue ? 'text-red-600 font-medium' : ''}>
             <DateCell columnWidth={props.column.getSize()} value={dueDate} />
@@ -91,13 +91,13 @@ export const getColumns = ({ onDidClick, t }: Props): ColumnDef<Payable>[] => {
       meta: t('global.status'),
       size: 90,
       header: (props) => <HeaderCell title={t('global.status')} alignment="center" columnWidth={props.column.getSize()} />,
-      cell: (props) => <StatusBadge type="payable" status={props.row.original.status.toLowerCase()} />,
+      cell: (props) => <StatusBadge type="payable" status={props.row.original.status} />,
     },
     {
       id: 'actions',
       enableHiding: false,
       cell: (props) => {
-        const canVoid = !['PAID', 'CANCELLED'].includes(props.row.original.status);
+        const canVoid = !['paid', 'void'].includes(props.row.original.status);
         return (
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
