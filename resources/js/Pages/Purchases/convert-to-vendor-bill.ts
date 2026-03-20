@@ -8,6 +8,7 @@ export function convertToVendorBill(source: PurchaseWithLines): PurchaseForm {
   const purchaseSource: PurchaseSource = {
     type: 'purchase_receipt',
     id: source.header.uuid,
+    code: source.header.number,
   };
 
   return {

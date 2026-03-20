@@ -8,6 +8,7 @@ export function convertToReceipt(source: PurchaseWithLines): PurchaseForm {
   const purchaseSource: PurchaseSource = {
     type: 'purchase_order',
     id: source.header.uuid,
+    code: source.header.number,
   };
 
   return {
