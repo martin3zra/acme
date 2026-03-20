@@ -3,6 +3,7 @@ package app
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"fmt"
 	"time"
 
@@ -479,6 +480,39 @@ func (s *Server) storePurchaseInternal(tx *sql.Tx, companyID int, form *StorePur
 		// Invalidate the source PO's cached preview so the updated status is shown.
 		poCache := cache.NewPgCache(tx)
 		_ = poCache.Delete(context.Background(), fmt.Sprintf("preview:purchase:%s", form.Source.ID))
+	}
+
+	// When saving a vendor bill that was converted from a receipt, stamp the
+	// receipt's source.target so the receipt list view can show a forward link.
+	isConversionVendorBill := form.Kind == PurchaseTransactionKinds.VendorBill && form.Source != nil && form.Source.ID != ""
+	if isConversionVendorBill {
+		var rawSource []byte
+		err := tx.QueryRow(
+			"SELECT COALESCE(source, '{}'::jsonb) FROM purchases WHERE company_id = $1 AND uuid = $2",
+			companyID, form.Source.ID,
+		).Scan(&rawSource)
+		if err != nil {
+			return "", err
+		}
+
+		var existingSource map[string]any
+		if jsonErr := json.Unmarshal(rawSource, &existingSource); jsonErr != nil {
+			existingSource = map[string]any{}
+		}
+		existingSource["target"] = map[string]any{
+			"type": string(PurchaseTransactionKinds.VendorBill),
+			"id":   purchaseUUID,
+			"code": seqInfo.Code,
+		}
+
+		_, err = tx.Exec(
+			"UPDATE purchases SET source = $3, updated_at = NOW() WHERE company_id = $1 AND uuid = $2",
+			companyID, form.Source.ID,
+			foundation.AsJSON(existingSource),
+		)
+		if err != nil {
+			return "", err
+		}
 	}
 
 	return purchaseUUID, nil

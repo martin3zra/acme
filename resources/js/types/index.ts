@@ -278,6 +278,7 @@ export type PurchaseSource = {
   type: PurchaseTransactionKind;
   id: string | number;
   code?: string;
+  target?: PurchaseSource;
 };
 
 export interface LinkedPurchaseReceipt {

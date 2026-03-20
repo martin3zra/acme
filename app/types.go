@@ -562,9 +562,10 @@ func (d *TransactionSource) Scan(value any) error {
 }
 
 type PurchaseSource struct {
-	Type PurchaseTransactionKind `json:"type,omitempty"`
-	ID   string                  `json:"id,omitempty"`
-	Code string                  `json:"code,omitempty"`
+	Type   PurchaseTransactionKind `json:"type,omitempty"`
+	ID     string                  `json:"id,omitempty"`
+	Code   string                  `json:"code,omitempty"`
+	Target *PurchaseSource         `json:"target,omitempty"`
 }
 
 func (d *PurchaseSource) Value() (driver.Value, error) {

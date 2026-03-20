@@ -1015,8 +1015,9 @@
   "purchases": {
     "source": {
       "purchase_order": "Creado desde la orden :purchase_order",
-      "purchase_receipt": "Convertido en recibo :purchase_receipt",
-      "vendor_bill": "Creado desde factura de proveedor :vendor_bill"
+      "purchase_receipt": "Creado desde la recepción :purchase_receipt",
+      "vendor_bill": "Creado desde factura de proveedor :vendor_bill",
+      "to_vendor_bill": "Convertido en factura :vendor_bill"
     },
     "preview": {
       "description": "Vista previa de la compra seleccionada."
