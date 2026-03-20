@@ -44,13 +44,14 @@ func (s *Server) findPayables(ctx context.Context) ([]*Payable, error) {
 			ap.uuid, ap.id, ap.invoice_number,
 			ap.invoice_date, ap.due_date,
 			ap.amount_total, ap.amount_payable, ap.amount_paid,
-			ap.status, COALESCE(ap.notes, '')
+			ap.status, ap.paid_status, COALESCE(ap.notes, '')
 		FROM payables p
 		INNER JOIN companies        ON (p.company_id = companies.id)
 		INNER JOIN accounts_payable ap ON (p.company_id = ap.company_id AND p.vendor_id = ap.vendor_id AND p.accounts_payable_id = ap.id)
 		INNER JOIN vendors          ON (p.company_id = vendors.company_id AND p.vendor_id = vendors.id)
 		WHERE p.company_id = $1
-		  AND ap.status NOT IN ('paid', 'void')
+		  AND ap.status != 'void'
+		  AND ap.paid_status != 'paid'
 		ORDER BY ap.due_date ASC`,
 		CurrentCompany(ctx).ID,
 	)
@@ -75,6 +76,7 @@ func (s *Server) findPayables(ctx context.Context) ([]*Payable, error) {
 			&row.AmountPayable,
 			&row.AmountPaid,
 			&row.Status,
+			&row.PaidStatus,
 			&notes,
 		); err != nil {
 			return data, err
@@ -168,12 +170,12 @@ func (s *Server) updateAPBalance(tx *sql.Tx, companyID int, apID int64, paymentA
 
 	if newStatus == PaidStatuses.Paid {
 		_, err = tx.Exec(
-			"UPDATE accounts_payable SET status = $3, paid_at = NOW(), updated_at = NOW() WHERE company_id = $1 AND id = $2",
+			"UPDATE accounts_payable SET paid_status = $3, paid_at = NOW(), updated_at = NOW() WHERE company_id = $1 AND id = $2",
 			companyID, apID, newStatus,
 		)
 	} else {
 		_, err = tx.Exec(
-			"UPDATE accounts_payable SET status = $3, updated_at = NOW() WHERE company_id = $1 AND id = $2",
+			"UPDATE accounts_payable SET paid_status = $3, updated_at = NOW() WHERE company_id = $1 AND id = $2",
 			companyID, apID, newStatus,
 		)
 	}

@@ -524,8 +524,8 @@ func (s *Server) createAPForVendorBill(tx *sql.Tx, companyID, purchaseID, vendor
 		"INSERT INTO accounts_payable "+
 			"(company_id, vendor_id, purchase_id, invoice_number, invoice_date, due_date, "+
 			"amount_total, tax_amount, discount_amount, amount_paid, "+
-			"currency, payment_terms, status, created_by) "+
-			"VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14) RETURNING id",
+			"currency, payment_terms, status, paid_status, created_by) "+
+			"VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15) RETURNING id",
 		companyID,
 		vendorID,
 		purchaseID,
@@ -539,6 +539,7 @@ func (s *Server) createAPForVendorBill(tx *sql.Tx, companyID, purchaseID, vendor
 		"DOP",
 		form.Terms,
 		PayableStatuses.Pending,
+		PaidStatuses.UnPaid,
 		form.User().Id,
 	).Scan(&apID)
 	if err != nil {

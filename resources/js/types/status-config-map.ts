@@ -252,27 +252,5 @@ export const statusConfig: Record<StatusType, Record<string, StatusConfig>> = {
       text: 'text-gray-600',
       Icon: CircleSlash,
     },
-    // Payment-state values written by updateAPBalance
-    unpaid: {
-      label: 'Unpaid',
-      bg: 'bg-red-100',
-      border: 'border-red-500',
-      text: 'text-red-800',
-      Icon: XCircle,
-    },
-    partial: {
-      label: 'Partial',
-      bg: 'bg-teal-100',
-      border: 'border-teal-500',
-      text: 'text-teal-800',
-      Icon: CircleDashed,
-    },
-    paid: {
-      label: 'Paid',
-      bg: 'bg-green-100',
-      border: 'border-green-500',
-      text: 'text-green-800',
-      Icon: CheckCircle,
-    },
   },
 };

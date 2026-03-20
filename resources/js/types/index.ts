@@ -595,6 +595,7 @@ export interface Payable {
   amount_payable: number;
   amount_paid: number;
   status: PayableStatus;
+  paid_status: PaidStatus;
   notes?: string;
 }
 

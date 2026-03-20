@@ -71,8 +71,9 @@ type Payable struct {
 	PaymentMethod *string `json:"payment_method,omitempty"`
 
 	// Status & notes
-	Status PayableStatus `json:"status"`
-	Notes  *string       `json:"notes,omitempty"`
+	Status     PayableStatus `json:"status"`
+	PaidStatus PaidStatus    `json:"paid_status"`
+	Notes      *string       `json:"notes,omitempty"`
 
 	foundation.Timestamps
 }
@@ -257,8 +258,8 @@ func (s *Server) storeVendorOpenBalance(tx *sql.Tx, companyID int, vendorID int,
 		"INSERT INTO accounts_payable " +
 			"(company_id, vendor_id, invoice_number, invoice_date, due_date, " +
 			"amount_total, tax_amount, discount_amount, amount_paid, " +
-			"currency, payment_terms, payment_method, status, notes, created_by) " +
-			"VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15) " +
+			"currency, payment_terms, payment_method, status, paid_status, notes, created_by) " +
+			"VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16) " +
 			"RETURNING id")
 	if err != nil {
 		return err
@@ -282,7 +283,8 @@ func (s *Server) storeVendorOpenBalance(tx *sql.Tx, companyID int, vendorID int,
 		"USD",                // currency_code — adjust to your default
 		form.PaymentTerms,
 		form.PaymentMethod,
-		PayableStatuses.Pending, // PENDING: needs attention but not yet approved
+		PayableStatuses.Pending, // status: lifecycle
+		PaidStatuses.UnPaid,     // paid_status: payment state
 		"Saldo inicial",
 		createdBy,
 	).Scan(&apID)
@@ -360,13 +362,13 @@ func (s *Server) findVendorPayables(ctx context.Context, vendorID string) ([]*Pa
 			ap.uuid, ap.id, ap.invoice_number,
 			ap.invoice_date, ap.due_date,
 			ap.amount_total, ap.amount_payable, ap.amount_paid,
-			ap.status, ap.notes
+			ap.status, ap.paid_status, ap.notes
 		FROM payables p
 		INNER JOIN companies        ON (p.company_id = companies.id)
 		INNER JOIN accounts_payable ap ON (p.company_id = ap.company_id AND p.vendor_id = ap.vendor_id AND p.accounts_payable_id = ap.id)
 		INNER JOIN vendors          ON (p.company_id = vendors.company_id AND p.vendor_id = vendors.id)
 		WHERE p.company_id = $1
-		AND ap.status != 'paid'
+		AND ap.paid_status != 'paid'
 		AND vendors.uuid = $2
 	`, CurrentCompany(ctx).ID, vendorID)
 	if err != nil {
@@ -388,6 +390,7 @@ func (s *Server) findVendorPayables(ctx context.Context, vendorID string) ([]*Pa
 			&row.AmountPayable,
 			&row.AmountPaid,
 			&row.Status,
+			&row.PaidStatus,
 			&row.Notes,
 		); err != nil {
 			return data, err
