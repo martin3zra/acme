@@ -97,6 +97,7 @@ func (s *Server) bootRoutes() {
 					route.GET("/purchases/vendor-bills/create", s.createPurchaseHandler).Can("create:purchase")
 
 					route.GET("/purchases/:id/edit", s.editPurchaseHandler).Can("update:purchase")
+					route.PUT("/purchases/:id/confirm", s.confirmPurchaseHandler()).Can("confirm:purchase")
 					route.PUT("/purchases/:id", s.updatePurchaseHandler())
 					route.DELETE("/purchases/:id", s.destroyPurchaseHandler())
 					route.GET("/purchases/:id", s.showPurchaseHandler)
@@ -110,6 +111,7 @@ func (s *Server) bootRoutes() {
 					route.GET("/inventories/stocks", s.stocksHandler).Can("viewAny:inventory")
 					route.GET("/inventories/transfers", s.transfersHandler).Can("viewAny:inventory")
 					route.GET("/inventories/adjustments", s.adjustmentsHandler).Can("viewAny:inventory")
+					route.POST("/inventories/adjustments", s.storeAdjustmentHandler()).Can("create:adjustment")
 
 					route.GET("/payments", s.paymentsHandler).Can("viewAny:payment")
 					route.POST("/payments", s.storePaymentHandler())

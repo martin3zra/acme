@@ -8,6 +8,7 @@ import type { Auth, PurchaseTransactionKind, PurchaseWithLines } from '@/types';
 import { Link } from '@inertiajs/react';
 import { format } from 'date-fns';
 import { FileText } from 'lucide-react';
+import { ConfirmPurchaseAction } from './Shared/confirm-purchase-action';
 import { ConvertToVendorBillAction } from './Shared/convert-to-vendor-bill-action';
 
 type Props = {
@@ -195,7 +196,10 @@ export default function Show({ kind, purchase, auth }: Props) {
         <Separator />
         <div className="text-muted-foreground text-sm">{t('purchases.preview.description')}</div>
         <div className="text-muted-foreground text-xs">{kind}</div>
-        {kind === 'purchase_receipt' && (
+        {(kind === 'purchase_receipt' || kind === 'vendor_bill') && (
+          <ConfirmPurchaseAction purchase={purchase} kind={kind} />
+        )}
+        {kind === 'purchase_receipt' && purchase.header.status !== 'draft' && (
           <ConvertToVendorBillAction
             title={t('global.convertToVendorBill')}
             renderedAs="button"

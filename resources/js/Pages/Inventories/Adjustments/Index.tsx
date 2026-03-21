@@ -1,12 +1,232 @@
-import { FeatureNotImplemented } from '@/components/feature-not-implemented';
 import AppLayout from '@/layouts/app-layout';
-import { PageProps } from '@/types';
-import { makeBreadcrumbs } from './constants';
+import { PageProps, Warehouse } from '@/types';
+import { breadcrumbs } from './constants';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
+import HeadingSmall from '@/components/heading-small';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from '@/components/ui/dialog';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { useForm, usePage } from '@inertiajs/react';
+import { useState } from 'react';
+import { Plus } from 'lucide-react';
 
-export default function Index({ auth }: PageProps) {
+type AdjustmentRow = {
+  id: number;
+  variant_id: number;
+  variant_name: string;
+  sku: string;
+  item_name: string;
+  warehouse_id: number;
+  warehouse: string;
+  qty: number;
+  reason: string;
+  notes: string;
+  created_at: string;
+};
+
+type ItemVariant = {
+  id: number;
+  name: string;
+  item_name: string;
+  sku: string;
+};
+
+type AdjustmentPageProps = {
+  adjustments: AdjustmentRow[];
+  variants: ItemVariant[];
+  warehouses: Warehouse[];
+};
+
+type AdjustmentForm = {
+  variant_id: string;
+  warehouse_id: string;
+  qty: string;
+  reason: string;
+  notes: string;
+};
+
+function NewAdjustmentDialog({ variants, warehouses }: { variants: ItemVariant[]; warehouses: Warehouse[] }) {
+  const [open, setOpen] = useState(false);
+  const { data, setData, post, reset, errors, processing } = useForm<AdjustmentForm>({
+    variant_id: '',
+    warehouse_id: '',
+    qty: '',
+    reason: '',
+    notes: '',
+  });
+
+  const submit = (e: React.FormEvent) => {
+    e.preventDefault();
+    post('/inventories/adjustments', {
+      onSuccess: () => {
+        reset();
+        setOpen(false);
+      },
+    });
+  };
+
   return (
-    <AppLayout user={auth.user} breadcrumbs={makeBreadcrumbs('invoice')}>
-      <FeatureNotImplemented />
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild>
+        <Button size="sm">
+          <Plus className="h-4 w-4 mr-1" />
+          New Adjustment
+        </Button>
+      </DialogTrigger>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>Record Stock Adjustment</DialogTitle>
+        </DialogHeader>
+        <form onSubmit={submit} className="flex flex-col gap-4 mt-2">
+          <div className="flex flex-col gap-1">
+            <label className="text-sm font-medium">Item Variant</label>
+            <Select value={data.variant_id} onValueChange={(v) => setData('variant_id', v)}>
+              <SelectTrigger>
+                <SelectValue placeholder="Select variant…" />
+              </SelectTrigger>
+              <SelectContent>
+                {variants.map((v) => (
+                  <SelectItem key={v.id} value={String(v.id)}>
+                    {v.item_name} — {v.name} {v.sku ? `(${v.sku})` : ''}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {errors.variant_id && <p className="text-sm text-destructive">{errors.variant_id}</p>}
+          </div>
+
+          <div className="flex flex-col gap-1">
+            <label className="text-sm font-medium">Warehouse</label>
+            <Select value={data.warehouse_id} onValueChange={(v) => setData('warehouse_id', v)}>
+              <SelectTrigger>
+                <SelectValue placeholder="Select warehouse…" />
+              </SelectTrigger>
+              <SelectContent>
+                {warehouses.map((w) => (
+                  <SelectItem key={w.id} value={String(w.id)}>
+                    {w.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {errors.warehouse_id && <p className="text-sm text-destructive">{errors.warehouse_id}</p>}
+          </div>
+
+          <div className="flex flex-col gap-1">
+            <label className="text-sm font-medium">Quantity (use negative to remove stock)</label>
+            <Input
+              type="number"
+              step="any"
+              value={data.qty}
+              onChange={(e) => setData('qty', e.target.value)}
+              placeholder="e.g. 10 or -5"
+            />
+            {errors.qty && <p className="text-sm text-destructive">{errors.qty}</p>}
+          </div>
+
+          <div className="flex flex-col gap-1">
+            <label className="text-sm font-medium">Reason</label>
+            <Input
+              value={data.reason}
+              onChange={(e) => setData('reason', e.target.value)}
+              placeholder="e.g. Physical count correction"
+            />
+            {errors.reason && <p className="text-sm text-destructive">{errors.reason}</p>}
+          </div>
+
+          <div className="flex flex-col gap-1">
+            <label className="text-sm font-medium">Notes (optional)</label>
+            <Input
+              value={data.notes}
+              onChange={(e) => setData('notes', e.target.value)}
+              placeholder="Additional notes…"
+            />
+          </div>
+
+          <Button type="submit" disabled={processing}>
+            {processing ? 'Saving…' : 'Save Adjustment'}
+          </Button>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+export default function Index({
+  auth,
+  adjustments,
+  variants,
+  warehouses,
+}: PageProps<AdjustmentPageProps>) {
+  return (
+    <AppLayout user={auth.user} breadcrumbs={breadcrumbs}>
+      <div className="flex flex-col gap-4 p-4">
+        <div className="flex items-center justify-between">
+          <HeadingSmall title="Stock Adjustments" description="Manual inventory adjustments" />
+          <NewAdjustmentDialog variants={variants ?? []} warehouses={warehouses ?? []} />
+        </div>
+
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Date</TableHead>
+              <TableHead>Item / Variant</TableHead>
+              <TableHead>SKU</TableHead>
+              <TableHead>Warehouse</TableHead>
+              <TableHead className="text-right">Qty</TableHead>
+              <TableHead>Reason</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {adjustments.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
+                  No adjustments recorded yet.
+                </TableCell>
+              </TableRow>
+            ) : (
+              adjustments.map((a) => (
+                <TableRow key={a.id}>
+                  <TableCell className="text-sm text-muted-foreground">{a.created_at}</TableCell>
+                  <TableCell>
+                    <span className="font-medium">{a.item_name}</span>
+                    {a.variant_name && a.variant_name !== a.item_name && (
+                      <span className="text-muted-foreground ml-1 text-sm">· {a.variant_name}</span>
+                    )}
+                  </TableCell>
+                  <TableCell className="text-muted-foreground">{a.sku || '—'}</TableCell>
+                  <TableCell>{a.warehouse}</TableCell>
+                  <TableCell className={`text-right font-mono ${a.qty < 0 ? 'text-destructive' : 'text-green-600'}`}>
+                    {a.qty > 0 ? '+' : ''}{a.qty.toFixed(4)}
+                  </TableCell>
+                  <TableCell className="text-muted-foreground text-sm">{a.reason}</TableCell>
+                </TableRow>
+              ))
+            )}
+          </TableBody>
+        </Table>
+      </div>
     </AppLayout>
   );
 }
+

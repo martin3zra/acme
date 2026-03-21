@@ -302,6 +302,27 @@ func (s *Server) destroyPurchaseHandler() routing.HandlerFunc {
 	})
 }
 
+func (s *Server) confirmPurchaseHandler() routing.HandlerFunc {
+	return routing.WithRequest(func(ctx *routing.Context, form *ConfirmsPasswords) {
+		uuid := ctx.Param("id")
+		err := s.confirmPurchase(ctx.Request.Context(), uuid)
+		if err != nil {
+			log.Printf("Error confirming purchase: %v", err)
+			ctx.BackWith("status", err.Error())
+			return
+		}
+
+		c := cache.NewPgCache(s.db)
+		key := fmt.Sprintf("preview:purchase:%s", uuid)
+		if err = c.Delete(ctx.Request.Context(), key); err != nil {
+			log.Printf("Error deleting cache: %v", err)
+		}
+
+		ctx.Flash("success", s.trans("global.wasUpdated", i18n.Replacements{"subject": "@global.purchase"}))
+		ctx.Back()
+	})
+}
+
 func (s *Server) purchaseOrdersHandler(ctx *routing.Context)      { s.purchasesHandler(ctx) }
 func (s *Server) purchaseReceiptsHandler(ctx *routing.Context)    { s.purchasesHandler(ctx) }
 func (s *Server) purchaseVendorBillsHandler(ctx *routing.Context) { s.purchasesHandler(ctx) }

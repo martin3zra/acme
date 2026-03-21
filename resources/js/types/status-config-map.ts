@@ -180,13 +180,6 @@ export const statusConfig: Record<StatusType, Record<string, StatusConfig>> = {
       text: 'text-gray-700',
       Icon: FileText,
     },
-    open: {
-      label: 'Open',
-      bg: 'bg-gray-100',
-      border: 'border-gray-500',
-      text: 'text-gray-700',
-      Icon: Package,
-    },
     received: {
       label: 'Received',
       bg: 'bg-green-100',
@@ -214,6 +207,13 @@ export const statusConfig: Record<StatusType, Record<string, StatusConfig>> = {
       border: 'border-green-700',
       text: 'text-green-900',
       Icon: Archive,
+    },
+    posted: {
+      label: 'Posted',
+      bg: 'bg-purple-100',
+      border: 'border-purple-500',
+      text: 'text-purple-800',
+      Icon: CircleCheckBig,
     },
   },
   payable: {

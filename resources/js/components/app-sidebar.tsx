@@ -107,10 +107,7 @@ const navMain: NavItem[] = [
     title: 'global.navMain.adjustments',
     url: '/inventories/adjustments',
     icon: ClipboardEdit,
-    requiredAbility: 'viewAny:stock',
-    pill: 'Soon',
-    pillVariant: 'soon',
-    disabled: true,
+    requiredAbility: 'viewAny:inventory',
   },
 
   // CATALOG

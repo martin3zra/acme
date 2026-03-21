@@ -48,7 +48,7 @@ type purchase struct {
 
 func (s *Server) findPurchases(ctx context.Context, kind PurchaseTransactionKind) ([]*purchase, error) {
 	rows, err := s.db.Query(
-		"SELECT p.id, p.uuid, p.code, p.warehouse_id, p.date, p.due_date, p.subtotal, p.discount_amount, p.tax_amount, p.total, p.status, p.purchase_status, p.payment_status, COALESCE(p.notes, ''), p.transaction_kind, p.source, COALESCE(p.invoice_number, ''), "+
+		"SELECT p.id, p.uuid, p.code, p.warehouse_id, p.date, p.due_date, p.subtotal, p.discount_amount, p.tax_amount, p.total, p.status, COALESCE(p.purchase_status::text, ''), p.payment_status, COALESCE(p.notes, ''), p.transaction_kind, p.source, COALESCE(p.invoice_number, ''), "+
 			"v.id, v.uuid, v.name, v.email, v.phone "+
 			"FROM purchases p "+
 			"INNER JOIN companies ON (p.company_id = companies.id) "+
@@ -115,7 +115,7 @@ func (s *Server) findPurchaseByUUID(ctx context.Context, companyID int, uuid str
 	p := new(purchase)
 	var discountAmount float64
 	err := s.db.QueryRow(
-		"SELECT p.company_id, p.id, p.uuid, p.code, p.warehouse_id, p.date, p.due_date, p.subtotal, p.discount_amount, p.tax_amount, p.total, p.status, p.purchase_status, p.payment_status, COALESCE(p.notes, ''), p.transaction_kind, p.source, COALESCE(p.invoice_number, ''), "+
+		"SELECT p.company_id, p.id, p.uuid, p.code, p.warehouse_id, p.date, p.due_date, p.subtotal, p.discount_amount, p.tax_amount, p.total, p.status, COALESCE(p.purchase_status::text, ''), p.payment_status, COALESCE(p.notes, ''), p.transaction_kind, p.source, COALESCE(p.invoice_number, ''), "+
 			"v.id, v.uuid, v.name, v.email, v.phone "+
 			"FROM purchases p "+
 			"INNER JOIN companies ON (p.company_id = companies.id) "+
@@ -405,6 +405,12 @@ func (s *Server) storePurchaseInternal(tx *sql.Tx, companyID int, form *StorePur
 
 	isConversionReceipt := form.Kind == PurchaseTransactionKinds.PurchaseReceipt && form.Source != nil && form.Source.ID != ""
 
+	// Receipts and vendor bills are always created in 'draft' so the user can
+	// review them before explicitly confirming. Confirmation triggers inventory
+	// movements and advances the status to 'received' (receipt) or 'posted' (bill).
+	needsDraftStatus := form.Kind == PurchaseTransactionKinds.PurchaseReceipt ||
+		form.Kind == PurchaseTransactionKinds.VendorBill
+
 	insertCols := "INSERT INTO purchases (company_id, vendor_id, warehouse_id, transaction_kind, notes, subtotal, discount_amount, tax_amount, total, payment_status, code, source, date, due_date"
 	valuesCols := "VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14"
 	args := []any{
@@ -424,7 +430,7 @@ func (s *Server) storePurchaseInternal(tx *sql.Tx, companyID int, form *StorePur
 		form.dueOn,
 	}
 
-	if isConversionReceipt {
+	if needsDraftStatus {
 		insertCols += ", purchase_status"
 		valuesCols += fmt.Sprintf(", $%d", len(args)+1)
 		args = append(args, "draft")
@@ -514,6 +520,11 @@ func (s *Server) storePurchaseInternal(tx *sql.Tx, companyID int, form *StorePur
 			return "", err
 		}
 	}
+
+	// Inventory IN movements are NOT recorded at creation time.
+	// They are deferred to the explicit "confirm" action (PUT /purchases/:id/confirm)
+	// which transitions the document from 'draft' to 'received' (receipt) or 'posted'
+	// (vendor bill) and atomically records the movements.
 
 	return purchaseUUID, nil
 }
@@ -841,6 +852,18 @@ func (s *Server) destroyPurchase(ctx context.Context, uuid string) error {
 			return err
 		}
 
+		// Reverse inventory movements recorded for this purchase.
+		var movementRecorded bool
+		_ = s.db.QueryRowContext(ctx,
+			"SELECT movement_recorded FROM purchases WHERE company_id = $1 AND id = $2",
+			companyID, purchase.ID,
+		).Scan(&movementRecorded)
+		if movementRecorded {
+			if err := s.reverseMovements(tx, companyID, "purchase", purchase.ID, InventoryMovementKinds.PurchaseReturn); err != nil {
+				return err
+			}
+		}
+
 		// Cancel the linked AP entry when a vendor bill is deleted.
 		if purchase.Kind == PurchaseTransactionKinds.VendorBill {
 			var apID int
@@ -982,4 +1005,126 @@ func updatePOPaymentStatus(tx *sql.Tx, companyID int, poUUID string) error {
 		)
 	}
 	return err
+}
+
+// recordPurchaseMovements reads the purchase_items for the given purchase and
+// records an IN movement for each line that has track_inventory enabled.
+// warehouseID is taken from the purchase header; kind distinguishes receipt vs vendor_bill.
+func (s *Server) recordPurchaseMovements(tx *sql.Tx, companyID, purchaseID, warehouseID int, kind InventoryMovementKind) error {
+	rows, err := tx.Query(
+		`SELECT variant_id, qty, unit_id, unit_price
+		   FROM purchase_items
+		  WHERE company_id = $1 AND purchase_id = $2 AND deleted_at IS NULL`,
+		companyID, purchaseID,
+	)
+	if err != nil {
+		return fmt.Errorf("recordPurchaseMovements: query lines: %w", err)
+	}
+
+	type line struct {
+		variantID, unitID int
+		qty, unitPrice    float64
+	}
+	var lines []line
+	for rows.Next() {
+		var l line
+		if err := rows.Scan(&l.variantID, &l.qty, &l.unitID, &l.unitPrice); err != nil {
+			rows.Close()
+			return fmt.Errorf("recordPurchaseMovements: scan: %w", err)
+		}
+		lines = append(lines, l)
+	}
+	if err := rows.Close(); err != nil {
+		return fmt.Errorf("recordPurchaseMovements: rows close: %w", err)
+	}
+	if err := rows.Err(); err != nil {
+		return fmt.Errorf("recordPurchaseMovements: rows: %w", err)
+	}
+
+	for _, l := range lines {
+		if err := s.recordMovement(
+			tx, companyID,
+			l.variantID, warehouseID, l.unitID,
+			l.qty, l.unitPrice,
+			kind,
+			"purchase", purchaseID,
+		); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// confirmPurchase transitions a purchase receipt or vendor bill from 'draft' to
+// its confirmed state ('received' for receipts, 'posted' for vendor bills) and
+// atomically records the inventory IN movements. This is the single place where
+// stock is committed for incoming goods — movements are NEVER recorded at
+// creation time.
+//
+// Rules:
+//   - Only purchase_receipt and vendor_bill documents can be confirmed.
+//   - The document must currently be in 'draft' status.
+//   - For a vendor_bill linked to a purchase_receipt, the receipt already moved
+//     the stock at confirmation time; only the status is advanced here.
+//   - For a vendor_bill with no linked receipt (or linked to a PO), movements
+//     are recorded now.
+func (s *Server) confirmPurchase(ctx context.Context, uuid string) error {
+	companyID := CurrentCompany(ctx).ID
+
+	purchase, err := s.findPurchaseByUUID(ctx, companyID, uuid)
+	if err != nil {
+		return err
+	}
+
+	if purchase.Kind != PurchaseTransactionKinds.PurchaseReceipt &&
+		purchase.Kind != PurchaseTransactionKinds.VendorBill {
+		return fmt.Errorf("only purchase receipts and vendor bills can be confirmed")
+	}
+
+	if PurchaseStatus(purchase.Status) != PurchaseStatuses.Draft &&
+		purchase.Status != "" {
+		return fmt.Errorf("purchase %s is not in draft status", purchase.Number)
+	}
+
+	return database.WithTransaction(s.db, func(tx *sql.Tx) error {
+		var targetStatus PurchaseStatus
+		if purchase.Kind == PurchaseTransactionKinds.PurchaseReceipt {
+			targetStatus = PurchaseStatuses.Received
+		} else {
+			targetStatus = PurchaseStatuses.Posted
+		}
+
+		// Determine whether this document should record inventory movements.
+		// A vendor bill converted from a purchase receipt skips movement recording
+		// because the receipt already committed those movements.
+		linkedToReceipt := purchase.Source != nil &&
+			purchase.Source.Type == PurchaseTransactionKinds.PurchaseReceipt
+		needsMovements := purchase.Kind == PurchaseTransactionKinds.PurchaseReceipt ||
+			(purchase.Kind == PurchaseTransactionKinds.VendorBill && !linkedToReceipt)
+
+		if needsMovements {
+			var movementKind InventoryMovementKind
+			if purchase.Kind == PurchaseTransactionKinds.PurchaseReceipt {
+				movementKind = InventoryMovementKinds.PurchaseReceipt
+			} else {
+				movementKind = InventoryMovementKinds.VendorBill
+			}
+
+			if err := s.recordPurchaseMovements(tx, companyID, purchase.ID, purchase.WarehouseID, movementKind); err != nil {
+				return err
+			}
+		}
+
+		_, err := tx.Exec(
+			`UPDATE purchases
+			    SET purchase_status   = $3,
+			        movement_recorded = $4,
+			        updated_at        = NOW()
+			  WHERE company_id = $1 AND id = $2`,
+			companyID, purchase.ID,
+			string(targetStatus),
+			needsMovements,
+		)
+		return err
+	})
 }

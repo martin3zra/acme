@@ -507,27 +507,27 @@ type PurchaseStatus string
 
 const (
 	_PURCHASE_STATUS_DRAFT              PurchaseStatus = "draft"
-	_PURCHASE_STATUS_OPEN               PurchaseStatus = "open"
 	_PURCHASE_STATUS_PARTIALLY_RECEIVED PurchaseStatus = "partially_received"
 	_PURCHASE_STATUS_RECEIVED           PurchaseStatus = "received"
 	_PURCHASE_STATUS_PARTIALLY_PAID     PurchaseStatus = "partially_paid"
 	_PURCHASE_STATUS_CLOSED             PurchaseStatus = "closed"
+	_PURCHASE_STATUS_POSTED             PurchaseStatus = "posted"
 )
 
 var PurchaseStatuses = struct {
 	Draft              PurchaseStatus
-	Open               PurchaseStatus
 	PartiallyReceived  PurchaseStatus
 	Received           PurchaseStatus
 	PartiallyPaid      PurchaseStatus
 	Closed             PurchaseStatus
+	Posted             PurchaseStatus
 }{
 	Draft:             _PURCHASE_STATUS_DRAFT,
-	Open:              _PURCHASE_STATUS_OPEN,
 	PartiallyReceived: _PURCHASE_STATUS_PARTIALLY_RECEIVED,
 	Received:          _PURCHASE_STATUS_RECEIVED,
 	PartiallyPaid:     _PURCHASE_STATUS_PARTIALLY_PAID,
 	Closed:            _PURCHASE_STATUS_CLOSED,
+	Posted:            _PURCHASE_STATUS_POSTED,
 }
 
 // lockedPurchaseStatuses lists purchase statuses where edits and deletes are prohibited.
@@ -536,6 +536,7 @@ var lockedPurchaseStatuses = map[PurchaseStatus]bool{
 	PurchaseStatuses.PartiallyReceived: true,
 	PurchaseStatuses.PartiallyPaid:     true,
 	PurchaseStatuses.Closed:            true,
+	PurchaseStatuses.Posted:            true,
 }
 
 type TransactionSource struct {
@@ -877,16 +878,17 @@ func (d *Payment) Scan(value any) error {
 }
 
 type Line struct {
-	ID       int        `json:"id"`
-	Unit     int        `json:"unit"`
-	Qty      int        `json:"qty"`
-	Price    float64    `json:"price"`
-	Rate     float64    `json:"rate"`
-	Action   LineAction `json:"action"`
-	tax      float64
-	amount   float64
-	discount float64
-	total    float64
+	ID          int        `json:"id"`
+	Unit        int        `json:"unit"`
+	Qty         int        `json:"qty"`
+	Price       float64    `json:"price"`
+	Rate        float64    `json:"rate"`
+	Action      LineAction `json:"action"`
+	WarehouseID int        `json:"warehouse_id"`
+	tax         float64
+	amount      float64
+	discount    float64
+	total       float64
 }
 
 type StoreInvoiceForm struct {
@@ -943,6 +945,7 @@ func (form StoreInvoiceForm) Rules() map[string]any {
 		"lines.*.price":           "required",
 		"lines.*.rate":            "required",
 		"lines.*.action":          "required|in:added",
+		"lines.*.warehouse_id":    "required|exists:warehouses,id",
 		"discount":                "required",
 		"discount.value": []any{
 			"sometimes",
@@ -1049,6 +1052,7 @@ func (form UpdateInvoiceForm) Rules() map[string]any {
 		"lines.*.price":  "required",
 		"lines.*.rate":   "required",
 		"lines.*.action": "required|in:added,updated,deleted,unchanged",
+		"lines.*.warehouse_id": "required_unless:lines.*.action,deleted,unchanged|exists:warehouses,id",
 		"discount":       "required",
 		"discount.value": []any{
 			"sometimes",
@@ -2013,4 +2017,63 @@ func (d Date) MarshalJSON() ([]byte, error) {
 
 	formatted := d.Format("2006-01-02")
 	return []byte(`"` + formatted + `"`), nil
+}
+
+// ── Inventory ─────────────────────────────────────────────────────────────────
+
+// InventoryMovementKind maps to the inv_transaction_kind enum on inventory_movements.
+type InventoryMovementKind string
+
+const (
+	_INV_MOVEMENT_SALE             InventoryMovementKind = "sale"
+	_INV_MOVEMENT_SALE_RETURN      InventoryMovementKind = "sale_return"
+	_INV_MOVEMENT_PURCHASE_ORDER   InventoryMovementKind = "purchase_order"
+	_INV_MOVEMENT_PURCHASE_RECEIPT InventoryMovementKind = "purchase_receipt"
+	_INV_MOVEMENT_PURCHASE_RETURN  InventoryMovementKind = "purchase_return"
+	_INV_MOVEMENT_VENDOR_BILL      InventoryMovementKind = "vendor_bill"
+	_INV_MOVEMENT_ADJUSTMENT       InventoryMovementKind = "adjustment"
+	_INV_MOVEMENT_TRANSFER         InventoryMovementKind = "transfer"
+)
+
+var InventoryMovementKinds = struct {
+	Sale            InventoryMovementKind
+	SaleReturn      InventoryMovementKind
+	PurchaseOrder   InventoryMovementKind
+	PurchaseReceipt InventoryMovementKind
+	PurchaseReturn  InventoryMovementKind
+	VendorBill      InventoryMovementKind
+	Adjustment      InventoryMovementKind
+	Transfer        InventoryMovementKind
+}{
+	Sale:            _INV_MOVEMENT_SALE,
+	SaleReturn:      _INV_MOVEMENT_SALE_RETURN,
+	PurchaseOrder:   _INV_MOVEMENT_PURCHASE_ORDER,
+	PurchaseReceipt: _INV_MOVEMENT_PURCHASE_RECEIPT,
+	PurchaseReturn:  _INV_MOVEMENT_PURCHASE_RETURN,
+	VendorBill:      _INV_MOVEMENT_VENDOR_BILL,
+	Adjustment:      _INV_MOVEMENT_ADJUSTMENT,
+	Transfer:        _INV_MOVEMENT_TRANSFER,
+}
+
+type StoreAdjustmentForm struct {
+	support.FormRequest
+	VariantID   int     `json:"variant_id"`
+	WarehouseID int     `json:"warehouse_id"`
+	Qty         float64 `json:"qty"`
+	Reason      string  `json:"reason"`
+	Notes       string  `json:"notes"`
+}
+
+func (form StoreAdjustmentForm) Authorize() bool {
+	return Can(form.User(), "create:adjustment")
+}
+
+func (form StoreAdjustmentForm) Rules() map[string]any {
+	return map[string]any{
+		"variant_id":   "bail|required|exists:items_variants,id",
+		"warehouse_id": "bail|required|exists:warehouses,id",
+		"qty":          "bail|required",
+		"reason":       "bail|required|min:3|max:255",
+		"notes":        "sometimes|max:1000",
+	}
 }

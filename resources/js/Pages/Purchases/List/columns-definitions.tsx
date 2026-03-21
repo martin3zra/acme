@@ -129,7 +129,9 @@ export const getColumns = ({ kind, onDidClick, t }: Props): ColumnDef<Purchase>[
               <DropdownMenuLabel>{t('global.actions.title')}</DropdownMenuLabel>
               <DropdownMenuSeparator />
               <DropdownMenuItem onClick={() => onDidClick(props.row.original, 'view')}>{t('global.actions.view')}</DropdownMenuItem>
-              {!(props.row.original.transaction_kind === 'purchase_order' && ['received', 'partially_received', 'partially_paid', 'closed'].includes(props.row.original.status)) && (
+              {!(props.row.original.transaction_kind === 'purchase_order' && ['received', 'partially_received', 'partially_paid', 'closed'].includes(props.row.original.status)) &&
+               !(props.row.original.transaction_kind === 'purchase_receipt' && props.row.original.status === 'received') &&
+               !(props.row.original.transaction_kind === 'vendor_bill' && props.row.original.status === 'posted') && (
                 <DropdownMenuItem onClick={() => onDidClick(props.row.original, 'edit')}>{t('global.actions.edit')}</DropdownMenuItem>
               )}
 
@@ -140,14 +142,16 @@ export const getColumns = ({ kind, onDidClick, t }: Props): ColumnDef<Purchase>[
                 </>
               )}
 
-              {props.row.original.transaction_kind === 'purchase_receipt' && (
+              {props.row.original.transaction_kind === 'purchase_receipt' && props.row.original.status !== 'received' && (
                 <>
                   <DropdownMenuSeparator />
                   <ConvertToVendorBillAction id={props.row.original.uuid} title={t('global.convertToVendorBill')} />
                 </>
               )}
 
-              {!(props.row.original.transaction_kind === 'purchase_order' && ['received', 'partially_received', 'partially_paid', 'closed'].includes(props.row.original.status)) && (
+              {!(props.row.original.transaction_kind === 'purchase_order' && ['received', 'partially_received', 'partially_paid', 'closed'].includes(props.row.original.status)) &&
+               !(props.row.original.transaction_kind === 'purchase_receipt' && props.row.original.status === 'received') &&
+               !(props.row.original.transaction_kind === 'vendor_bill' && props.row.original.status === 'posted') && (
                 <>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem onClick={() => onDidClick(props.row.original, 'delete')}>{t('global.actions.delete')}</DropdownMenuItem>

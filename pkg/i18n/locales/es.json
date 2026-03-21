@@ -1092,9 +1092,12 @@
         "received": "Recibida",
         "partially_received": "Parcialmente recibida",
         "partially_paid": "Parcialmente pagada",
-        "closed": "Cerrada"
+        "closed": "Cerrada",
+        "posted": "Publicada"
       },
-      "partialReceiptNotice": "Esta orden ya fue parcialmente recibida. Las cantidades reflejan los artículos pendientes por recibir."
+      "partialReceiptNotice": "Esta orden ya fue parcialmente recibida. Las cantidades reflejan los artículos pendientes por recibir.",
+      "confirm": "Confirmar recibo",
+      "confirmDescription": "Ingrese su contraseña para confirmar la recepción de los artículos. Este proceso registrará los movimientos de inventario."
     },
     "vendor-bills": {
       "title": "Facturas de proveedores",
@@ -1121,7 +1124,8 @@
         "received": "Recibida",
         "partially_received": "Parcialmente recibida",
         "partially_paid": "Parcialmente pagada",
-        "closed": "Cerrada"
+        "closed": "Cerrada",
+        "posted": "Publicada"
       }
     },
     "vendorBills": {
@@ -1153,11 +1157,14 @@
         "received": "Recibida",
         "partially_received": "Parcialmente recibida",
         "partially_paid": "Parcialmente pagada",
-        "closed": "Cerrada"
+        "closed": "Cerrada",
+        "posted": "Publicada"
       },
       "source": {
         "purchase_receipt": "Convertido desde recibo :purchase_receipt"
-      }
+      },
+      "post": "Publicar factura",
+      "postDescription": "Ingrese su contraseña para publicar la factura del proveedor. Este proceso registrará los movimientos de inventario si aplica."
     }
   },
   "warehouses": {
