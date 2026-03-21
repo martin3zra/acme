@@ -26,10 +26,13 @@ export function TaxReceipts({ uuid, taxReceipts }: Props) {
   const [open, setOpen] = React.useState(false);
 
   React.useEffect(() => {
+    const initialActive: Record<number | string, boolean> = {};
     const initialRanges: Record<number | string, { start: number; end: number }> = {};
     taxReceipts.forEach((r) => {
+      initialActive[r.id] = (r.sequence_start ?? 0) > 0 && (r.sequence_end ?? 0) > 0;
       initialRanges[r.id] = { start: r.sequence_start ?? 0, end: r.sequence_end ?? 0 };
     });
+    setActive(initialActive);
     setRanges(initialRanges);
   }, [taxReceipts]);
 
@@ -40,7 +43,7 @@ export function TaxReceipts({ uuid, taxReceipts }: Props) {
   const handleChange = (id: number | string, field: 'start' | 'end', value: number) => {
     setRanges((prev) => ({
       ...prev,
-      [id]: { ...prev[id], [field]: value },
+      [id]: { ...prev[id], [field]: Number.isNaN(value) ? 0 : value },
     }));
   };
 
@@ -50,6 +53,10 @@ export function TaxReceipts({ uuid, taxReceipts }: Props) {
   };
 
   const selectedReceipts = taxReceipts.filter((r) => active[r.id]);
+  const hasInvalidSelectedRanges = selectedReceipts.some((r) => {
+    const range = ranges[r.id] ?? { start: 0, end: 0 };
+    return !validateRange(range.start, range.end);
+  });
 
   const handleSave = () => {
     // Send data to server via Inertia
@@ -119,7 +126,7 @@ export function TaxReceipts({ uuid, taxReceipts }: Props) {
       </Table>
 
       <div className="mt-4">
-        <Button onClick={() => setOpen(true)} disabled={selectedReceipts.length === 0}>
+        <Button onClick={() => setOpen(true)} disabled={selectedReceipts.length === 0 || hasInvalidSelectedRanges}>
           {t('global.save')}
         </Button>
       </div>

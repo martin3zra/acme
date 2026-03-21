@@ -360,6 +360,9 @@ func (v *Validator) evaluateMultipleValueRule(key, rule string, value reflect.Va
 }
 
 func (v *Validator) evaluateSingleValueRule(key, rule string, ruleValue any, value reflect.Value) {
+	// 👇 Handle pointers
+	value = unwrapValue(value)
+
 	castedRuleValue, _ := strconv.Atoi(ruleValue.(string))
 	switch value.Kind() {
 	case reflect.Int:
@@ -461,4 +464,14 @@ func getDataTypeUsingReflection(value reflect.Value) string {
 	default:
 		return "string"
 	}
+}
+
+func unwrapValue(v reflect.Value) reflect.Value {
+	for v.Kind() == reflect.Ptr {
+		if v.IsNil() {
+			return v
+		}
+		v = v.Elem()
+	}
+	return v
 }
