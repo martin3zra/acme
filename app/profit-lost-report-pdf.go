@@ -8,7 +8,7 @@ import (
 
 	"codeberg.org/go-pdf/fpdf"
 	"github.com/martin3zra/forge/foundation"
-	"github.com/martin3zra/acme/pkg/i18n"
+	"github.com/martin3zra/forge/i18n"
 )
 
 type ProfitLostReportPDF struct {

@@ -11,7 +11,7 @@ import (
 	"time"
 
 	"codeberg.org/go-pdf/fpdf"
-	"github.com/martin3zra/acme/pkg/i18n"
+	"github.com/martin3zra/forge/i18n"
 )
 
 func filter[T any](s []T, predicate func(T) bool) []T {
@@ -25,7 +25,7 @@ func filter[T any](s []T, predicate func(T) bool) []T {
 }
 
 func trans(namespaces ...string) map[string]string {
-	translations, err := i18n.LoadTranslations("es", "en", namespaces...)
+	translations, err := i18n.LoadTranslations(localesFS, defaultLang, fallbackLang, namespaces...)
 	if err != nil {
 		panic(err)
 	}

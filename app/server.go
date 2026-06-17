@@ -13,7 +13,7 @@ import (
 	"time"
 
 	"github.com/martin3zra/acme/app/mail"
-	"github.com/martin3zra/acme/pkg/i18n"
+	"github.com/martin3zra/forge/i18n"
 	"github.com/martin3zra/forge/inertia"
 	"github.com/martin3zra/forge/mailer"
 	"github.com/martin3zra/forge/routing"
@@ -45,7 +45,7 @@ func NewServer(assets, resources embed.FS) *Server {
 	if err != nil {
 		panic(err)
 	}
-	translator := i18n.NewTranslator(trans("global", "companies", "profile"))
+	translator := i18n.NewTranslator(localesFS, defaultLang, fallbackLang, trans("global", "companies", "profile"))
 
 	server := &Server{
 		qs:         qs,
