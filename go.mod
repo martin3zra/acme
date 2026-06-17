@@ -4,9 +4,7 @@ go 1.23.6
 
 require github.com/romsar/gonertia/v2 v2.0.3
 
-require github.com/martin3zra/forge v0.0.0
-
-replace github.com/martin3zra/forge => ../forge
+require github.com/martin3zra/forge v0.1.0
 
 require (
 	github.com/google/uuid v1.6.0
