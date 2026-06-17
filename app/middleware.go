@@ -11,9 +11,8 @@ import (
 	"github.com/martin3zra/forge/auth"
 	"github.com/martin3zra/forge/database"
 	"github.com/martin3zra/forge/foundation"
-	"github.com/martin3zra/acme/pkg/routing"
+	"github.com/martin3zra/forge/routing"
 	"github.com/martin3zra/forge/session"
-	"github.com/martin3zra/acme/pkg/support"
 	"github.com/romsar/gonertia/v2"
 )
 
@@ -164,12 +163,12 @@ func AuthenticatedMiddleware(next routing.HandlerFunc) routing.HandlerFunc {
 		ac := getAccount(attrsMap)
 		cc, _ := getCurrentCompany(attrsMap)
 
-		acCtx := context.WithValue(userCtx, support.AccountKey{}, ac)
+		acCtx := context.WithValue(userCtx, AccountKey{}, ac)
 		if cc == nil {
 			next(ctx.WithContext(acCtx))
 			return
 		}
-		ccCtx := context.WithValue(acCtx, support.CompanyKey{}, cc)
+		ccCtx := context.WithValue(acCtx, CompanyKey{}, cc)
 
 		ctxWithProps := context.WithValue(ccCtx, routing.PermissionKey{}, permissions(cc.UserRole))
 

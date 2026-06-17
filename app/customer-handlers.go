@@ -7,8 +7,8 @@ import (
 	"github.com/martin3zra/forge/cache"
 	"github.com/martin3zra/forge/foundation"
 	"github.com/martin3zra/acme/pkg/i18n"
-	"github.com/martin3zra/acme/pkg/routing"
-	"github.com/martin3zra/acme/pkg/validator/locale"
+	"github.com/martin3zra/forge/routing"
+	"github.com/martin3zra/forge/validator/locale"
 )
 
 func (s *Server) customersHandler(ctx *routing.Context) {

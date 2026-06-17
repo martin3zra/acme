@@ -16,10 +16,9 @@ import (
 	"github.com/martin3zra/acme/pkg/i18n"
 	"github.com/martin3zra/forge/inertia"
 	"github.com/martin3zra/forge/mailer"
-	"github.com/martin3zra/acme/pkg/routing"
+	"github.com/martin3zra/forge/routing"
 	"github.com/martin3zra/forge/session"
 	"github.com/martin3zra/forge/store"
-	"github.com/martin3zra/acme/pkg/support"
 )
 
 //go:embed sql/*.sql
@@ -175,7 +174,7 @@ func (s *Server) abortWhenPrerequisiteMissing(ctx *routing.Context, resource str
 		return false
 	}
 
-	account := ctx.Request.Context().Value(support.AccountKey{}).(map[string]any)
+	account := ctx.Request.Context().Value(AccountKey{}).(map[string]any)
 	if account == nil {
 		log.Println("account not found in context")
 		return false

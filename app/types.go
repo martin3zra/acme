@@ -17,9 +17,9 @@ import (
 	"github.com/martin3zra/forge/database"
 	"github.com/martin3zra/forge/foundation"
 	"github.com/martin3zra/forge/mailer"
-	"github.com/martin3zra/acme/pkg/routing"
-	"github.com/martin3zra/acme/pkg/support"
-	"github.com/martin3zra/acme/pkg/validator"
+	"github.com/martin3zra/forge/routing"
+	"github.com/martin3zra/forge/support"
+	"github.com/martin3zra/forge/validator"
 	"golang.org/x/text/encoding"
 	"golang.org/x/text/encoding/charmap"
 )
@@ -1583,7 +1583,7 @@ func (u *User) currentCompany(db *sql.DB) (*Company, error) {
 }
 
 func CurrentCompany(ctx context.Context) *Company {
-	cc := ctx.Value(support.CompanyKey{})
+	cc := ctx.Value(CompanyKey{})
 	if cc == nil {
 		return nil
 	}
@@ -1592,7 +1592,7 @@ func CurrentCompany(ctx context.Context) *Company {
 }
 
 func CurrentAccount(ctx context.Context) int {
-	ac := ctx.Value(support.AccountKey{})
+	ac := ctx.Value(AccountKey{})
 	if ac == nil {
 		return 0
 	}

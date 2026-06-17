@@ -8,7 +8,7 @@ import (
 
 	"github.com/martin3zra/forge/cache"
 	"github.com/martin3zra/acme/pkg/i18n"
-	"github.com/martin3zra/acme/pkg/routing"
+	"github.com/martin3zra/forge/routing"
 	inertia "github.com/romsar/gonertia/v2"
 )
 
