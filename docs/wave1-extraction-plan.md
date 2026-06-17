@@ -59,10 +59,18 @@ single auth-dependent rule into the app and extract the rest of validator now.
   - acme builds (`-tags prod`), `go vet` clean. Only `pkg/routing` `TestWithRequest_Success` fails —
     confirmed pre-existing on clean `HEAD` (unrelated: `ParseRequest` returns `UnprocessableEntity`
     for non-`FormRequestContract` bodies → session panic in test without a session).
-- **Still in acme (next):** move the now-clean `foundation`, `auth`, `session`, `routing` → forge.
-  Caveats: `support` still declares tenant keys `AccountKey`/`CompanyKey` (business concept in a
-  framework pkg); `validator` imports `auth`; `i18n` locale lock. Resolve those before moving
-  support/validator/i18n.
+- **Clean cluster extracted: DONE.** `foundation`, `auth`, `session` moved to forge (commits: forge
+  `99abe7f`, acme `3a406bd`). forge now holds 9 packages: `store mailer inertia database console cache
+  foundation auth session`. Zero forge→acme import edges; both modules build (`-tags prod`), vet
+  clean, pinned go 1.23.6 / x-crypto v0.1.0 / x-text v0.26.0.
+- **`routing` deferred (blocked):** `routing/request-bind.go` calls `support.ParseRequest`, and
+  `support` stays in acme — moving routing alone would create a forge→acme edge.
+- **Still in acme (next, needs refactor):**
+  - `support` — declares tenant keys `AccountKey`/`CompanyKey` (business concept in a framework pkg);
+    blocks both support and routing.
+  - `validator` — imports `auth` (now in forge, OK) but also app-coupled rules; review before moving.
+  - `i18n` — locale-locked to `es`.
+  Resolve `support`'s tenant keys first; that unblocks `routing` too.
 
 ## Topology decision
 
