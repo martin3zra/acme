@@ -69,11 +69,19 @@ single auth-dependent rule into the app and extract the rest of validator now.
   `support.ParseRequest`) followed. forge now holds **12 packages**: `store mailer inertia database
   console cache foundation auth session validator support routing`. Zero forge→acme edges; both
   modules build (`-tags prod`), vet clean, app tests pass. Pinned lib/pq v1.10.9.
-- **`acme/pkg` now contains only `i18n`** — kept back: it embeds only `locales/es.json` (Spanish
-  locale lock). Extracting it would ship an es-only default in the framework. Needs locale
-  generalization (ship empty/`en`, app provides locale files) before moving. Dependency-wise it is
-  already clean (zero internal imports), so the move itself is trivial once the locale concern is
-  addressed.
+- **`i18n` generalized + extracted: DONE** (commits: forge `3d8311d`, acme `0caa421`). i18n no longer
+  embeds locale files or hardcodes a language — `LoadTranslations` and `NewTranslator` take an
+  `fs.FS` plus primary/fallback language from the caller. The app now owns its locales
+  (`app/locales/es.json` via `app/locales.go`, `defaultLang`/`fallbackLang` constants).
+- **EXTRACTION COMPLETE.** `acme/pkg` no longer exists; acme is purely the application on top of the
+  `forge` module. forge holds all **13 packages**: `store mailer inertia database console cache
+  foundation auth session validator support routing i18n`. Zero forge→acme edges; both modules build
+  (`-tags prod`), vet clean, app tests pass.
+  - *Residual (non-blocking):* the `Trans` action-suffix grammar still defaults to Spanish `"o"/"a"`,
+    but it is data-driven from `global.nouns.*.gender` keys in the app's locale file — a content
+    concern, not a dependency lock.
+  - *Remaining optional follow-ups:* tag a forge version and drop the local `replace` for a pinned
+    require; push branches / open PRs.
 - **Known pre-existing test failures (now in forge):** `mailer` `TestSendWithAttachment` (needs local
   SMTP `:1025`) and `routing` `TestWithRequest_Success` (session panic for non-`FormRequestContract`
   body) — both reproduce on the original `HEAD`, unrelated to extraction.
