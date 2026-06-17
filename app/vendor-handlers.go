@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"log"
 
-	"github.com/martin3zra/acme/pkg/cache"
+	"github.com/martin3zra/forge/cache"
 	"github.com/martin3zra/acme/pkg/foundation"
 	"github.com/martin3zra/acme/pkg/i18n"
 	"github.com/martin3zra/acme/pkg/routing"

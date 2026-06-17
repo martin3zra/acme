@@ -14,9 +14,9 @@ import (
 
 	"github.com/martin3zra/acme/app/mail"
 	"github.com/martin3zra/acme/pkg/auth"
-	"github.com/martin3zra/acme/pkg/database"
+	"github.com/martin3zra/forge/database"
 	"github.com/martin3zra/acme/pkg/foundation"
-	"github.com/martin3zra/acme/pkg/mailer"
+	"github.com/martin3zra/forge/mailer"
 	"github.com/martin3zra/acme/pkg/routing"
 	"github.com/martin3zra/acme/pkg/support"
 	"github.com/martin3zra/acme/pkg/validator"
@@ -1438,7 +1438,7 @@ func (form StoreUserForm) Rules() map[string]any {
 }
 
 type User struct {
-	foundation.User
+	AuthUser
 	account *account
 	Linked  int `json:"linked"`
 }
@@ -1542,16 +1542,16 @@ func (u *User) IsOrphan(db *sql.DB) bool {
 }
 
 func UserFromContext(ctx context.Context) *User {
-	u := auth.User(ctx)
-	return &User{
-		User: *u,
-	}
+	return UserFromFoundationUser(auth.User(ctx))
 }
 
-func UserFromFoundationUser(u *foundation.User) *User {
-	// TODO set the role here.
+func UserFromFoundationUser(u foundation.Authenticatable) *User {
+	au, ok := u.(*AuthUser)
+	if !ok || au == nil {
+		return &User{}
+	}
 	return &User{
-		User: *u,
+		AuthUser: *au,
 	}
 }
 

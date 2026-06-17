@@ -8,8 +8,8 @@ import (
 	"time"
 
 	"github.com/lib/pq"
-	"github.com/martin3zra/acme/pkg/cache"
-	"github.com/martin3zra/acme/pkg/database"
+	"github.com/martin3zra/forge/cache"
+	"github.com/martin3zra/forge/database"
 	"github.com/martin3zra/acme/pkg/foundation"
 )
 
@@ -551,7 +551,7 @@ func (s *Server) createAPForVendorBill(tx *sql.Tx, companyID, purchaseID, vendor
 		form.Terms,
 		PayableStatuses.Pending,
 		PaidStatuses.UnPaid,
-		form.User().Id,
+		form.User().GetAuthIdentifier(),
 	).Scan(&apID)
 	if err != nil {
 		return err

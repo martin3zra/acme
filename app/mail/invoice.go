@@ -1,7 +1,7 @@
 package mail
 
 import (
-	"github.com/martin3zra/acme/pkg/mailer"
+	"github.com/martin3zra/forge/mailer"
 )
 
 type InvoiceMail struct {

@@ -14,11 +14,11 @@ import (
 
 	"github.com/martin3zra/acme/app/mail"
 	"github.com/martin3zra/acme/pkg/i18n"
-	"github.com/martin3zra/acme/pkg/inertia"
-	"github.com/martin3zra/acme/pkg/mailer"
+	"github.com/martin3zra/forge/inertia"
+	"github.com/martin3zra/forge/mailer"
 	"github.com/martin3zra/acme/pkg/routing"
 	"github.com/martin3zra/acme/pkg/session"
-	"github.com/martin3zra/acme/pkg/store"
+	"github.com/martin3zra/forge/store"
 	"github.com/martin3zra/acme/pkg/support"
 )
 

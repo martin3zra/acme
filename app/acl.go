@@ -66,8 +66,8 @@ func permissions(role string) map[string]bool {
 	return flatPermissions
 }
 
-func Can(user *foundation.User, actionModule string) bool {
-	permissions := permissions(user.Role)
+func Can(user foundation.Authenticatable, actionModule string) bool {
+	permissions := permissions(user.GetRole())
 
 	// If the user requests "*" (full access check), return true if full access exists
 	if actionModule == "*" {

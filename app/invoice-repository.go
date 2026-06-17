@@ -7,8 +7,8 @@ import (
 	"log"
 	"time"
 
-	"github.com/martin3zra/acme/pkg/cache"
-	"github.com/martin3zra/acme/pkg/database"
+	"github.com/martin3zra/forge/cache"
+	"github.com/martin3zra/forge/database"
 	"github.com/martin3zra/acme/pkg/foundation"
 )
 
@@ -37,15 +37,15 @@ type invoice struct {
 }
 
 type line struct {
-	ID          int64           `json:"id"`
-	VariantID   int64           `json:"-"`
-	Qty         int64           `json:"qty"`
-	RemainingQty *int64         `json:"remaining_qty,omitempty"`
-	Price       float64         `json:"price"`
-	Name        string          `json:"name"`
-	Description string          `json:"description"`
-	Identifier  ItemIdentifiers `json:"identifiers"`
-	Unit        struct {
+	ID           int64           `json:"id"`
+	VariantID    int64           `json:"-"`
+	Qty          int64           `json:"qty"`
+	RemainingQty *int64          `json:"remaining_qty,omitempty"`
+	Price        float64         `json:"price"`
+	Name         string          `json:"name"`
+	Description  string          `json:"description"`
+	Identifier   ItemIdentifiers `json:"identifiers"`
+	Unit         struct {
 		ID   int64  `json:"id"`
 		Name string `json:"name"`
 	} `json:"unit"`
@@ -602,6 +602,12 @@ func (s *Server) storeInvoiceInternal(tx *sql.Tx, companyID int, form *StoreInvo
 		return invoiceUUID, err
 	}
 
+	// Set default warehouse to 1 for all lines if not specified
+	for _, line := range form.Lines {
+		if line.WarehouseID == 0 {
+			line.WarehouseID = 1
+		}
+	}
 	if err = s.attachInvoiceLines(tx, companyID, invoiceID, form); err != nil {
 		return invoiceUUID, err
 	}
@@ -692,29 +698,29 @@ func (s *Server) purgeCacheByID(tx *sql.Tx, kind TransactionKind, uuid string) e
 // recordInvoiceMovements resolves the variant_id for each invoice line and
 // records an OUT movement (negative qty) per line.
 func (s *Server) recordInvoiceMovements(tx *sql.Tx, companyID, invoiceID int, lines []*Line) error {
-itemIDs := make([]int, 0, len(lines))
-for _, l := range lines {
-itemIDs = append(itemIDs, l.ID)
-}
+	itemIDs := make([]int, 0, len(lines))
+	for _, l := range lines {
+		itemIDs = append(itemIDs, l.ID)
+	}
 
-variantIDs, err := resolveItemVariantIDs(tx, companyID, itemIDs)
-if err != nil {
-return fmt.Errorf("recordInvoiceMovements: resolve variants: %w", err)
-}
+	variantIDs, err := resolveItemVariantIDs(tx, companyID, itemIDs)
+	if err != nil {
+		return fmt.Errorf("recordInvoiceMovements: resolve variants: %w", err)
+	}
 
-for _, l := range lines {
-if l.Action == LineActions.Deleted {
-continue
-}
-variantID, ok := variantIDs[l.ID]
-if !ok {
-// Item has no default variant; skip silently.
-continue
-}
-if l.WarehouseID == 0 {
-continue
-}
-// OUT movement: qty is negative.
+	for _, l := range lines {
+		if l.Action == LineActions.Deleted {
+			continue
+		}
+		variantID, ok := variantIDs[l.ID]
+		if !ok {
+			// Item has no default variant; skip silently.
+			continue
+		}
+		if l.WarehouseID == 0 {
+			continue
+		}
+		// OUT movement: qty is negative.
 		if err := s.recordMovement(
 			tx, companyID,
 			variantID, l.WarehouseID, l.Unit,
@@ -724,6 +730,6 @@ continue
 		); err != nil {
 			return err
 		}
-}
-return nil
+	}
+	return nil
 }

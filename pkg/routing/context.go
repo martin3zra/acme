@@ -33,7 +33,7 @@ type Context struct {
 }
 
 // User fetch user from Request Context
-func (c *Context) User() *foundation.User {
+func (c *Context) User() foundation.Authenticatable {
 	return auth.User(c.Request.Context())
 }
 

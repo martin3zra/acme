@@ -3,16 +3,39 @@ package auth
 import (
 	"context"
 	"database/sql"
-	"encoding/json"
 	"errors"
-	"fmt"
 	"log"
 
-	"github.com/martin3zra/acme/pkg/database"
 	"github.com/martin3zra/acme/pkg/foundation"
+	"github.com/martin3zra/forge/database"
 )
 
 type ContextUserID struct{}
+
+// CredentialResolver retrieves an identity by an arbitrary column/value pair.
+// The application registers it so auth never needs to know the user schema.
+type CredentialResolver func(db *sql.DB, column string, value any) (foundation.Authenticatable, error)
+
+// PasswordResolver returns the stored password hash for a user id.
+type PasswordResolver func(db *sql.DB, userID int) (string, error)
+
+// UserDecoder rebuilds the authenticated identity from the request context.
+type UserDecoder func(ctx context.Context) foundation.Authenticatable
+
+var (
+	credentialResolver CredentialResolver
+	passwordResolver   PasswordResolver
+	userDecoder        UserDecoder
+)
+
+// SetCredentialResolver registers the application's identity lookup.
+func SetCredentialResolver(r CredentialResolver) { credentialResolver = r }
+
+// SetPasswordResolver registers the application's password lookup.
+func SetPasswordResolver(r PasswordResolver) { passwordResolver = r }
+
+// SetUserDecoder registers the application's context decoder.
+func SetUserDecoder(d UserDecoder) { userDecoder = d }
 
 type Auth struct {
 	db       *sql.DB
@@ -60,50 +83,33 @@ func (a *Auth) EnsureIsCurrentPassword(hashed, password string) bool {
 	return a.Hashable.Check(password, hashed)
 }
 
-func (a *Auth) attempt(column, value any) (foundation.Authenticatable, error) {
-	user := new(foundation.User)
-	err := a.db.QueryRow(fmt.Sprintf("SELECT * FROM users WHERE %s = $1", column), value).
-		Scan(&user.Id, &user.Name, &user.Email,
-			&user.Password, &user.EmailVerifiedAt, &user.LastPasswordReset, &user.CreatedAt,
-			&user.UpdatedAt, &user.DeletedAt, &user.UUID, &user.Status, &user.MustChangePassword, &user.PendingEmail)
-	if err != nil {
-		return nil, err
+func (a *Auth) attempt(column string, value any) (foundation.Authenticatable, error) {
+	if credentialResolver == nil {
+		return nil, errors.New("auth: credential resolver not registered")
 	}
-	return user, nil
+	return credentialResolver(a.db, column, value)
 }
 
 func (a *Auth) GetCurrentPassword(userId int) (string, error) {
-	var password string
-	err := a.db.QueryRow("SELECT password FROM users WHERE id = $1", userId).
-		Scan(&password)
-	if err != nil {
-		return password, err
+	if passwordResolver == nil {
+		return "", errors.New("auth: password resolver not registered")
 	}
-	return password, nil
+	return passwordResolver(a.db, userId)
 }
 
-// Retrieve the currently authenticated user...
-func User(ctx context.Context) *foundation.User {
-	var user foundation.User
-	userCtx := ctx.Value(ContextUserID{})
-	if userCtx != nil {
-		userJson, _ := json.Marshal(userCtx.(map[string]any))
-
-		json.Unmarshal([]byte(userJson), &user)
+// User retrieves the currently authenticated identity from context.
+func User(ctx context.Context) foundation.Authenticatable {
+	if userDecoder == nil {
+		return nil
 	}
-
-	return &user
+	return userDecoder(ctx)
 }
 
-// Retrieve the currently authenticated user's ID...
+// ID retrieves the currently authenticated user's id.
 func ID(ctx context.Context) int {
-	var user foundation.User
-	userCtx := ctx.Value(ContextUserID{}).(map[string]any)
-	if userCtx != nil {
-		userJson, _ := json.Marshal(userCtx)
-
-		json.Unmarshal([]byte(userJson), &user)
+	user := User(ctx)
+	if user == nil {
+		return 0
 	}
-
-	return user.Id
+	return user.GetAuthIdentifier()
 }

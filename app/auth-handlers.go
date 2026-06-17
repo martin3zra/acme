@@ -5,7 +5,6 @@ import (
 	"time"
 
 	"github.com/martin3zra/acme/pkg/auth"
-	"github.com/martin3zra/acme/pkg/foundation"
 	"github.com/martin3zra/acme/pkg/routing"
 	"github.com/martin3zra/acme/pkg/session"
 	"github.com/martin3zra/acme/pkg/support"
@@ -39,7 +38,7 @@ func (s *Server) authHandler(ctx *routing.Context) {
 		return
 	}
 
-	userCtx := UserFromFoundationUser(user.(*foundation.User))
+	userCtx := UserFromFoundationUser(user)
 	attrs := map[string]any{"current_company": nil, "account": nil}
 	account, err := userCtx.OwnedBy(s.db)
 	if err == nil {

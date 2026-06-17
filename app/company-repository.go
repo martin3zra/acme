@@ -15,7 +15,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/lib/pq"
-	"github.com/martin3zra/acme/pkg/database"
+	"github.com/martin3zra/forge/database"
 	"github.com/martin3zra/acme/pkg/foundation"
 )
 
@@ -464,7 +464,7 @@ func (s *Server) failUpload(id string, message string) error {
 func (s *Server) storeImport(id string, form *ImportForm) error {
 	_, err := s.db.Exec(`
     INSERT INTO imports (id, upload_id, user_id, source, status)
-    VALUES ($1, $2, $3, $4, 'queued')`, id, form.UploadID, form.User().UUID, form.Type)
+    VALUES ($1, $2, $3, $4, 'queued')`, id, form.UploadID, UserFromFoundationUser(form.User()).UUID, form.Type)
 	return err
 }
 

@@ -9,7 +9,7 @@ import (
 	"strings"
 
 	"github.com/martin3zra/acme/pkg/auth"
-	"github.com/martin3zra/acme/pkg/database"
+	"github.com/martin3zra/forge/database"
 	"github.com/martin3zra/acme/pkg/foundation"
 	"github.com/martin3zra/acme/pkg/routing"
 	"github.com/martin3zra/acme/pkg/session"
@@ -101,8 +101,8 @@ func EnsurePasswordHasBeenChanged(next routing.HandlerFunc) routing.HandlerFunc 
 func Verified(next routing.HandlerFunc) routing.HandlerFunc {
 	return func(ctx *routing.Context) {
 
-		user := auth.User(ctx.Request.Context())
-		if user != nil && !user.IsEmpty() && user.EmailVerifiedAt == nil {
+		user := AuthUserFromContext(ctx.Request.Context())
+		if !user.IsEmpty() && user.EmailVerifiedAt == nil {
 			ctx.Redirect("/verify-email")
 			return
 		}
@@ -114,8 +114,8 @@ func Verified(next routing.HandlerFunc) routing.HandlerFunc {
 func EnforceVerifiedUserAccess(next routing.HandlerFunc) routing.HandlerFunc {
 	return func(ctx *routing.Context) {
 		db := ctx.Request.Context().Value(database.ConnectionKey{}).(*sql.DB)
-		loggedUser := auth.User(ctx.Request.Context())
-		if loggedUser == nil || loggedUser.IsEmpty() {
+		loggedUser := AuthUserFromContext(ctx.Request.Context())
+		if loggedUser.IsEmpty() {
 			next(ctx)
 			return
 		}

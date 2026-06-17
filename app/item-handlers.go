@@ -164,7 +164,7 @@ func (s *Server) startUploadChunkHandler() routing.HandlerFunc {
 
 		if err := s.storeUploadSession(&UploadSession{
 			ID:        uploadID,
-			UserID:    int64(ctx.User().Id),
+			UserID:    int64(ctx.User().GetAuthIdentifier()),
 			Filename:  form.Filename,
 			FileSize:  form.Size,
 			Delimiter: form.Delimiter,

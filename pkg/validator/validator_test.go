@@ -5,7 +5,7 @@ import (
 	"database/sql"
 	"testing"
 
-	"github.com/martin3zra/acme/pkg/database"
+	"github.com/martin3zra/forge/database"
 	"github.com/martin3zra/acme/pkg/validator"
 
 	_ "github.com/lib/pq"

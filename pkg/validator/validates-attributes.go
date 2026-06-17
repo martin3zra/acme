@@ -150,7 +150,7 @@ func (va *ValidatesAttributes) validateCurrentPassword(password reflect.Value) b
 	user := auth.User(va.ctx)
 	// match the given password against the logged user.
 	guard := auth.NewAuth(va.ctx)
-	authPassword, err := guard.GetCurrentPassword(user.Id)
+	authPassword, err := guard.GetCurrentPassword(user.GetAuthIdentifier())
 	if err != nil {
 		return false
 	}

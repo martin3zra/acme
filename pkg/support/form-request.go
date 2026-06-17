@@ -21,7 +21,7 @@ type FormRequestContract interface {
 	Errors() validator.Errors
 	SetContext(ctx context.Context)
 	Context() context.Context
-	User() *foundation.User
+	User() foundation.Authenticatable
 	SetPathParams(params map[string]string)
 	Param(key string) string
 	Messages() map[string]string
@@ -30,7 +30,7 @@ type FormRequestContract interface {
 type FormRequest struct {
 	validator *validator.Validator
 	ctx       context.Context
-	user      *foundation.User
+	user      foundation.Authenticatable
 	params    map[string]string
 }
 
@@ -101,7 +101,7 @@ func (f *FormRequest) FailedAuthorization() {
 	// return here everything for a 403 status code
 }
 
-func (f *FormRequest) User() *foundation.User {
+func (f *FormRequest) User() foundation.Authenticatable {
 	return f.user
 }
 
