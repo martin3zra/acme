@@ -63,14 +63,20 @@ single auth-dependent rule into the app and extract the rest of validator now.
   `99abe7f`, acme `3a406bd`). forge now holds 9 packages: `store mailer inertia database console cache
   foundation auth session`. Zero forge→acme import edges; both modules build (`-tags prod`), vet
   clean, pinned go 1.23.6 / x-crypto v0.1.0 / x-text v0.26.0.
-- **`routing` deferred (blocked):** `routing/request-bind.go` calls `support.ParseRequest`, and
-  `support` stays in acme — moving routing alone would create a forge→acme edge.
-- **Still in acme (next, needs refactor):**
-  - `support` — declares tenant keys `AccountKey`/`CompanyKey` (business concept in a framework pkg);
-    blocks both support and routing.
-  - `validator` — imports `auth` (now in forge, OK) but also app-coupled rules; review before moving.
-  - `i18n` — locale-locked to `es`.
-  Resolve `support`'s tenant keys first; that unblocks `routing` too.
+- **`validator` + `support` + `routing` extracted: DONE** (commits: forge `32e8b76`, acme `7f365c3`).
+  Unblocked by moving the tenant context keys `AccountKey`/`CompanyKey` out of `support` into the app
+  (`app/context-keys.go`) — `support` no longer names business concepts, and `routing` (which used
+  `support.ParseRequest`) followed. forge now holds **12 packages**: `store mailer inertia database
+  console cache foundation auth session validator support routing`. Zero forge→acme edges; both
+  modules build (`-tags prod`), vet clean, app tests pass. Pinned lib/pq v1.10.9.
+- **`acme/pkg` now contains only `i18n`** — kept back: it embeds only `locales/es.json` (Spanish
+  locale lock). Extracting it would ship an es-only default in the framework. Needs locale
+  generalization (ship empty/`en`, app provides locale files) before moving. Dependency-wise it is
+  already clean (zero internal imports), so the move itself is trivial once the locale concern is
+  addressed.
+- **Known pre-existing test failures (now in forge):** `mailer` `TestSendWithAttachment` (needs local
+  SMTP `:1025`) and `routing` `TestWithRequest_Success` (session panic for non-`FormRequestContract`
+  body) — both reproduce on the original `HEAD`, unrelated to extraction.
 
 ## Topology decision
 
