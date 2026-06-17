@@ -17,7 +17,7 @@ import (
 	"github.com/martin3zra/forge/inertia"
 	"github.com/martin3zra/forge/mailer"
 	"github.com/martin3zra/acme/pkg/routing"
-	"github.com/martin3zra/acme/pkg/session"
+	"github.com/martin3zra/forge/session"
 	"github.com/martin3zra/forge/store"
 	"github.com/martin3zra/acme/pkg/support"
 )

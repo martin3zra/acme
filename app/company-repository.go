@@ -16,7 +16,7 @@ import (
 
 	"github.com/lib/pq"
 	"github.com/martin3zra/forge/database"
-	"github.com/martin3zra/acme/pkg/foundation"
+	"github.com/martin3zra/forge/foundation"
 )
 
 type Company struct {

@@ -17,9 +17,9 @@ import (
 	"strings"
 	"text/template"
 
-	"github.com/martin3zra/acme/pkg/auth"
-	"github.com/martin3zra/acme/pkg/foundation"
-	"github.com/martin3zra/acme/pkg/session"
+	"github.com/martin3zra/forge/auth"
+	"github.com/martin3zra/forge/foundation"
+	"github.com/martin3zra/forge/session"
 	"github.com/romsar/gonertia/v2"
 )
 

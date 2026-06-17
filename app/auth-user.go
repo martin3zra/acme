@@ -7,8 +7,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/martin3zra/acme/pkg/auth"
-	"github.com/martin3zra/acme/pkg/foundation"
+	"github.com/martin3zra/forge/auth"
+	"github.com/martin3zra/forge/foundation"
 )
 
 // AuthUser is the application's user identity. It owns the users-table schema and

@@ -9,7 +9,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/martin3zra/acme/pkg/auth"
+	"github.com/martin3zra/forge/auth"
 )
 
 type ValidatesAttributes struct {

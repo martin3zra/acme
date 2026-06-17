@@ -3,8 +3,8 @@ package support
 import (
 	"context"
 
-	"github.com/martin3zra/acme/pkg/auth"
-	"github.com/martin3zra/acme/pkg/foundation"
+	"github.com/martin3zra/forge/auth"
+	"github.com/martin3zra/forge/foundation"
 	"github.com/martin3zra/acme/pkg/validator"
 )
 
