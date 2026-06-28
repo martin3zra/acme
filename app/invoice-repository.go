@@ -7,9 +7,9 @@ import (
 	"log"
 	"time"
 
-	"github.com/martin3zra/acme/pkg/cache"
-	"github.com/martin3zra/acme/pkg/database"
-	"github.com/martin3zra/acme/pkg/foundation"
+	"github.com/martin3zra/forge/cache"
+	"github.com/martin3zra/forge/database"
+	"github.com/martin3zra/forge/foundation"
 )
 
 type invoice struct {
@@ -37,13 +37,15 @@ type invoice struct {
 }
 
 type line struct {
-	ID          int64           `json:"id"`
-	Qty         int64           `json:"qty"`
-	Price       float64         `json:"price"`
-	Name        string          `json:"name"`
-	Description string          `json:"description"`
-	Identifier  ItemIdentifiers `json:"identifiers"`
-	Unit        struct {
+	ID           int64           `json:"id"`
+	VariantID    int64           `json:"-"`
+	Qty          int64           `json:"qty"`
+	RemainingQty *int64          `json:"remaining_qty,omitempty"`
+	Price        float64         `json:"price"`
+	Name         string          `json:"name"`
+	Description  string          `json:"description"`
+	Identifier   ItemIdentifiers `json:"identifiers"`
+	Unit         struct {
 		ID   int64  `json:"id"`
 		Name string `json:"name"`
 	} `json:"unit"`
@@ -342,6 +344,18 @@ func (s *Server) voidInvoice(ctx context.Context, kind TransactionKind, uuid str
 			return err
 		}
 
+		// Reverse any inventory movements that were recorded for this invoice.
+		var movementRecorded bool
+		_ = s.db.QueryRowContext(ctx,
+			"SELECT movement_recorded FROM invoices WHERE company_id = $1 AND id = $2",
+			companyID, invoice.ID,
+		).Scan(&movementRecorded)
+		if movementRecorded {
+			if err = s.reverseMovements(tx, companyID, "invoice", invoice.ID, InventoryMovementKinds.SaleReturn); err != nil {
+				return err
+			}
+		}
+
 		return nil
 	})
 }
@@ -349,11 +363,11 @@ func (s *Server) voidInvoice(ctx context.Context, kind TransactionKind, uuid str
 func (s *Server) attachInvoiceLines(tx *sql.Tx, companyId, invoiceId int, form *StoreInvoiceForm) error {
 	vals := []any{}
 	for _, line := range form.Lines {
-		vals = append(vals, companyId, invoiceId, line.ID, line.Unit, line.Qty, line.Price, line.Rate, line.amount, line.tax, line.total)
+		vals = append(vals, companyId, invoiceId, line.ID, line.Unit, line.Qty, line.Price, line.Rate, line.amount, line.tax, line.total, line.WarehouseID)
 	}
 
-	stmt := "INSERT INTO invoices_items (company_id, invoice_id, item_id, unit_id, qty, price, rate, amount, tax, total) VALUES "
-	stmt += database.PrepareBulkInsert(10, len(form.Lines))
+	stmt := "INSERT INTO invoices_items (company_id, invoice_id, item_id, unit_id, qty, price, rate, amount, tax, total, warehouse_id) VALUES "
+	stmt += database.PrepareBulkInsert(11, len(form.Lines))
 
 	_, err := tx.Exec(stmt, vals...)
 
@@ -366,13 +380,13 @@ func (s *Server) processInvoiceLines(tx *sql.Tx, companyId, invoiceId int, form 
 	for _, line := range lines {
 		switch line.Action {
 		case ADDED:
-			stmt := "INSERT INTO invoices_items (company_id, invoice_id, item_id, unit_id, qty, price, tax) VALUES($1,$2,$3,$4,$5,$6,$7) "
-			if _, err := tx.Exec(stmt, companyId, invoiceId, line.ID, line.Unit, line.Qty, line.Price, line.Rate); err != nil {
+			stmt := "INSERT INTO invoices_items (company_id, invoice_id, item_id, unit_id, qty, price, tax, warehouse_id) VALUES($1,$2,$3,$4,$5,$6,$7,$8) "
+			if _, err := tx.Exec(stmt, companyId, invoiceId, line.ID, line.Unit, line.Qty, line.Price, line.Rate, line.WarehouseID); err != nil {
 				return err
 			}
 		case UPDATED:
-			stmt := "UPDATE invoices_items SET qty = $4, unit_id = $5 WHERE company_id = $1 AND invoice_id = $2 AND item_id = $3 "
-			if _, err := tx.Exec(stmt, companyId, invoiceId, line.ID, line.Qty, line.Unit); err != nil {
+			stmt := "UPDATE invoices_items SET qty = $4, unit_id = $5, warehouse_id = $6 WHERE company_id = $1 AND invoice_id = $2 AND item_id = $3 "
+			if _, err := tx.Exec(stmt, companyId, invoiceId, line.ID, line.Qty, line.Unit, line.WarehouseID); err != nil {
 				return err
 			}
 		case DELETED:
@@ -588,8 +602,30 @@ func (s *Server) storeInvoiceInternal(tx *sql.Tx, companyID int, form *StoreInvo
 		return invoiceUUID, err
 	}
 
+	// Set default warehouse to 1 for all lines if not specified
+	for _, line := range form.Lines {
+		if line.WarehouseID == 0 {
+			line.WarehouseID = 1
+		}
+	}
 	if err = s.attachInvoiceLines(tx, companyID, invoiceID, form); err != nil {
 		return invoiceUUID, err
+	}
+
+	// Record inventory OUT movements for invoices and orders that are live
+	// (sent or closed). Estimates and templates never affect stock.
+	if form.Kind == TransactionKinds.Invoice || form.Kind == TransactionKinds.Order {
+		if form.status == InvoiceStatuses.Sent || form.status == InvoiceStatuses.Closed {
+			if err = s.recordInvoiceMovements(tx, companyID, invoiceID, form.Lines); err != nil {
+				return invoiceUUID, err
+			}
+			if _, err = tx.Exec(
+				"UPDATE invoices SET movement_recorded = TRUE WHERE company_id = $1 AND id = $2",
+				companyID, invoiceID,
+			); err != nil {
+				return invoiceUUID, err
+			}
+		}
 	}
 
 	if form.Source != nil && form.Source.ID != "" {
@@ -655,6 +691,45 @@ func (s *Server) purgeCacheByID(tx *sql.Tx, kind TransactionKind, uuid string) e
 	if err := c.Delete(context.Background(), key); err != nil {
 		log.Printf("Error deleting cache: %v", err)
 		return err
+	}
+	return nil
+}
+
+// recordInvoiceMovements resolves the variant_id for each invoice line and
+// records an OUT movement (negative qty) per line.
+func (s *Server) recordInvoiceMovements(tx *sql.Tx, companyID, invoiceID int, lines []*Line) error {
+	itemIDs := make([]int, 0, len(lines))
+	for _, l := range lines {
+		itemIDs = append(itemIDs, l.ID)
+	}
+
+	variantIDs, err := resolveItemVariantIDs(tx, companyID, itemIDs)
+	if err != nil {
+		return fmt.Errorf("recordInvoiceMovements: resolve variants: %w", err)
+	}
+
+	for _, l := range lines {
+		if l.Action == LineActions.Deleted {
+			continue
+		}
+		variantID, ok := variantIDs[l.ID]
+		if !ok {
+			// Item has no default variant; skip silently.
+			continue
+		}
+		if l.WarehouseID == 0 {
+			continue
+		}
+		// OUT movement: qty is negative.
+		if err := s.recordMovement(
+			tx, companyID,
+			variantID, l.WarehouseID, l.Unit,
+			-float64(l.Qty), l.Price,
+			InventoryMovementKinds.Sale,
+			"invoice", invoiceID,
+		); err != nil {
+			return err
+		}
 	}
 	return nil
 }

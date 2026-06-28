@@ -15,8 +15,8 @@ import (
 	"unicode/utf8"
 
 	"github.com/lib/pq"
-	"github.com/martin3zra/acme/pkg/database"
-	"github.com/martin3zra/acme/pkg/foundation"
+	"github.com/martin3zra/forge/database"
+	"github.com/martin3zra/forge/foundation"
 )
 
 type Company struct {
@@ -226,6 +226,12 @@ func (s *Server) linkCompanyDefaultSequences(tx *sql.Tx, companyID int) error {
 			"padding": 6,
 			"format":  "{prefix}-{year}-{seq}",
 		},
+		"vendor": map[string]any{
+			"prefix":  "VEND-",
+			"next":    1,
+			"padding": 6,
+			"format":  "{prefix}-{year}-{seq}",
+		},
 		"estimate": map[string]any{
 			"prefix":  "EST-",
 			"next":    1,
@@ -250,6 +256,7 @@ func (s *Server) linkCompanyDefaultSequences(tx *sql.Tx, companyID int) error {
 		Invoice:  RedirectPreference.Stay,
 		Estimate: RedirectPreference.Stay,
 		Customer: RedirectPreference.List,
+		Vendor:   RedirectPreference.List,
 		Item:     RedirectPreference.List,
 		Payment:  RedirectPreference.List,
 		Order:    RedirectPreference.List,
@@ -457,7 +464,7 @@ func (s *Server) failUpload(id string, message string) error {
 func (s *Server) storeImport(id string, form *ImportForm) error {
 	_, err := s.db.Exec(`
     INSERT INTO imports (id, upload_id, user_id, source, status)
-    VALUES ($1, $2, $3, $4, 'queued')`, id, form.UploadID, form.User().UUID, form.Type)
+    VALUES ($1, $2, $3, $4, 'queued')`, id, form.UploadID, UserFromFoundationUser(form.User()).UUID, form.Type)
 	return err
 }
 
@@ -548,12 +555,18 @@ func (s *Server) processRows(
 			}
 		}
 
-		if source == "items" {
+		switch source {
+		case "items":
 			if err := s.storeItemFromRecord(companyID, unitID, taxes, importID, row, rowNum, record, &warnings); err != nil {
 				failed++
 				continue
 			}
-		} else {
+		case "vendors":
+			if err := s.storeVendorFromRecord(companyID, importID, row, rowNum, record, &warnings); err != nil {
+				failed++
+				continue
+			}
+		default: // customers
 			if err := s.storeCustomerFromRecord(companyID, importID, row, rowNum, record, &warnings); err != nil {
 				failed++
 				continue
@@ -661,6 +674,44 @@ func (s *Server) storeCustomerFromRecord(companyID int, importID string, row []s
 	// 🔥 ONE ROW = ONE TRANSACTION
 	if err := database.WithTransaction(s.db, func(tx *sql.Tx) error {
 		return s.storeCustomerInternal(tx, companyID, *code, form)
+	}); err != nil {
+		log.Println("storing record", err)
+		if saveErr := database.WithTransaction(s.db, func(tx *sql.Tx) error {
+			return s.saveRowIssue(tx, importID, ImportIssue{
+				Row:     rowNum,
+				Column:  "all",
+				Level:   IssueLevel.Error,
+				Message: err.Error(),
+				Value:   strings.Join(row, ","),
+			})
+		}); saveErr != nil {
+			log.Println("storing record", err)
+			return err
+		}
+	}
+	return nil
+}
+
+func (s *Server) storeVendorFromRecord(companyID int, importID string, row []string, rowNum int, record map[string]any, warnings *[]ImportIssue) error {
+	form, code, err := mapToStoreVendorForm(rowNum, record, warnings)
+	if form == nil || code == nil {
+		if err := database.WithTransaction(s.db, func(tx *sql.Tx) error {
+			return s.saveRowIssue(tx, importID, ImportIssue{
+				Row:     rowNum,
+				Column:  "all",
+				Level:   IssueLevel.Error,
+				Message: err.Error(),
+				Value:   strings.Join(row, ","),
+			})
+		}); err != nil {
+			log.Println("saving row error", err)
+			return err
+		}
+		return errors.New("Unable to map the record to the desired type")
+	}
+	// 🔥 ONE ROW = ONE TRANSACTION — honor the CSV `code` column.
+	if err := database.WithTransaction(s.db, func(tx *sql.Tx) error {
+		return s.storeVendorInternal(tx, companyID, *code, form)
 	}); err != nil {
 		log.Println("storing record", err)
 		if saveErr := database.WithTransaction(s.db, func(tx *sql.Tx) error {

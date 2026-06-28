@@ -3,7 +3,7 @@ package app
 import (
 	"strings"
 
-	"github.com/martin3zra/acme/pkg/foundation"
+	"github.com/martin3zra/forge/foundation"
 )
 
 var rolePermissionsCache = map[string]map[string]bool{}
@@ -11,18 +11,20 @@ var rolePermissionsCache = map[string]map[string]bool{}
 var groupedPermissions = map[string]map[string][]string{
 	"owner": {"*": {"*"}},
 	"admin": {
-		"view":    {"dashboard", "invoice", "estimate", "order", "customer", "item", "payment", "reports", "setting"},
-		"viewAny": {"dashboard", "invoice", "estimate", "order", "customer", "item", "payment", "reports", "setting"},
-		"create":  {"dashboard", "invoice", "estimate", "order", "customer", "item", "payment", "reports", "setting"},
-		"delete":  {"dashboard", "invoice", "estimate", "order", "customer", "item", "payment", "reports", "setting"},
-		"update":  {"dashboard", "invoice", "estimate", "order", "customer", "item", "payment", "reports", "setting", "company:sequence"},
+		"view":    {"dashboard", "invoice", "estimate", "order", "purchase", "customer", "item", "vendor", "inventory", "payment", "payable", "reports", "setting"},
+		"viewAny": {"dashboard", "invoice", "estimate", "order", "purchase", "customer", "item", "vendor", "inventory", "movement", "payment", "payable", "reports", "setting"},
+		"create":  {"dashboard", "invoice", "estimate", "order", "purchase", "customer", "item", "vendor", "inventory", "adjustment", "transfer", "payment", "payable", "reports", "setting"},
+		"delete":  {"dashboard", "invoice", "estimate", "order", "purchase", "customer", "item", "vendor", "inventory", "payment", "payable", "reports", "setting"},
+		"update":  {"dashboard", "invoice", "estimate", "order", "purchase", "customer", "item", "vendor", "inventory", "payment", "payable", "reports", "setting", "company:sequence"},
+		"confirm": {"purchase"},
 	},
 	"supervisor": {
-		"view":    {"dashboard", "customer", "item", "payment", "reports"},
-		"viewAny": {"dashboard", "invoice", "estimate", "order", "customer", "item", "payment", "reports"},
-		"create":  {"dashboard", "invoice", "estimate", "order", "customer", "item", "payment", "reports"},
-		"delete":  {"dashboard", "invoice", "estimate", "order", "customer", "item", "payment", "reports"},
-		"update":  {"dashboard", "invoice", "estimate", "order", "customer", "item", "payment", "reports"},
+		"view":    {"dashboard", "customer", "item", "inventory", "payment", "reports"},
+		"viewAny": {"dashboard", "invoice", "estimate", "order", "purchase", "customer", "item", "inventory", "movement", "payment", "payable", "reports"},
+		"create":  {"dashboard", "invoice", "estimate", "order", "purchase", "customer", "item", "inventory", "adjustment", "transfer", "payment", "payable", "reports"},
+		"delete":  {"dashboard", "invoice", "estimate", "order", "purchase", "customer", "item", "inventory", "payment", "reports"},
+		"update":  {"dashboard", "invoice", "estimate", "order", "purchase", "customer", "item", "inventory", "payment", "reports"},
+		"confirm": {"purchase"},
 	},
 	"standard": {
 		"view":   {"invoice", "customer"},
@@ -64,8 +66,8 @@ func permissions(role string) map[string]bool {
 	return flatPermissions
 }
 
-func Can(user *foundation.User, actionModule string) bool {
-	permissions := permissions(user.Role)
+func Can(user foundation.Authenticatable, actionModule string) bool {
+	permissions := permissions(user.GetRole())
 
 	// If the user requests "*" (full access check), return true if full access exists
 	if actionModule == "*" {

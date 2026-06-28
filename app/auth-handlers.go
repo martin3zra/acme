@@ -4,11 +4,10 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/martin3zra/acme/pkg/auth"
-	"github.com/martin3zra/acme/pkg/foundation"
-	"github.com/martin3zra/acme/pkg/routing"
-	"github.com/martin3zra/acme/pkg/session"
-	"github.com/martin3zra/acme/pkg/support"
+	"github.com/martin3zra/forge/auth"
+	"github.com/martin3zra/forge/routing"
+	"github.com/martin3zra/forge/session"
+	"github.com/martin3zra/forge/support"
 )
 
 func (s *Server) login(ctx *routing.Context) {
@@ -39,7 +38,7 @@ func (s *Server) authHandler(ctx *routing.Context) {
 		return
 	}
 
-	userCtx := UserFromFoundationUser(user.(*foundation.User))
+	userCtx := UserFromFoundationUser(user)
 	attrs := map[string]any{"current_company": nil, "account": nil}
 	account, err := userCtx.OwnedBy(s.db)
 	if err == nil {

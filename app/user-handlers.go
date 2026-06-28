@@ -3,9 +3,9 @@ package app
 import (
 	"fmt"
 
-	"github.com/martin3zra/acme/pkg/foundation"
-	"github.com/martin3zra/acme/pkg/i18n"
-	"github.com/martin3zra/acme/pkg/routing"
+	"github.com/martin3zra/forge/foundation"
+	"github.com/martin3zra/forge/i18n"
+	"github.com/martin3zra/forge/routing"
 )
 
 func (s *Server) storeUserHandler() routing.HandlerFunc {

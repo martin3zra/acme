@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"log"
 
-	"github.com/martin3zra/acme/pkg/console"
-	"github.com/martin3zra/acme/pkg/database"
-	"github.com/martin3zra/acme/pkg/foundation"
+	"github.com/martin3zra/forge/console"
+	"github.com/martin3zra/forge/database"
+	"github.com/martin3zra/forge/foundation"
 )
 
 func (s *Server) SetupAccount() {

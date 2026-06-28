@@ -66,7 +66,7 @@ const DELIMITERS = ['auto', ',', ';', '\t', '|'] as const;
 type Delimiter = (typeof DELIMITERS)[number];
 
 type Props = {
-  source: 'items' | 'customers';
+  source: 'items' | 'customers' | 'vendors';
   openImportDrawer: boolean;
   setImportDrawer: React.Dispatch<React.SetStateAction<boolean>>;
 };

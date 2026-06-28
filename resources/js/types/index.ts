@@ -101,6 +101,7 @@ export type CustomerTypeFilter = CustomerType | 'all';
 export type InvoiceTypeFilter = 'all' | 'cash' | 'credit';
 
 export type TransactionKind = 'invoice' | 'estimate' | 'order' | 'template';
+export type PurchaseTransactionKind = 'purchase_order' | 'purchase_receipt' | 'vendor_bill';
 
 export interface OpenBalance {
   invoice_id: number;
@@ -131,6 +132,34 @@ export interface Customer {
   updated_at: string;
 }
 
+export const VendorTypes = ['individual', 'business'] as const;
+
+export type VendorType = (typeof VendorTypes)[number];
+
+export type VendorTypeFilter = VendorType | 'all';
+
+export interface Vendor {
+  id: number;
+  uuid: string;
+  code: string;
+  name: string;
+  contact_name: string;
+  phone: string;
+  email: string;
+  address: string;
+  status: string;
+  payment_method: string;
+  payment_terms: PaymentTermValue;
+  purchase_note: string;
+  lead_time_days: number;
+  amount_payable: number;
+  vendor_type: VendorType;
+  created_at: string;
+  updated_at: string;
+  open_balance: OpenBalance;
+  open_balance_as_of: Date;
+}
+
 export const ItemTypes = ['product', 'service'] as const;
 
 export type ItemType = (typeof ItemTypes)[number];
@@ -158,10 +187,21 @@ export interface Item {
   identifiers?: ItemIdentifiers; // Optional identifiers for the item
 }
 
+export interface Warehouse {
+  id: number;
+  uuid: string;
+  name: string;
+  location: string;
+  status: string;
+  created_at?: string;
+  updated_at?: string;
+}
+
 export type LineAction = 'added' | 'updated' | 'deleted' | 'unchanged';
 
 export interface InvoiceLine extends Item {
   qty: number;
+  remaining_qty?: number;
   amount: number;
   total: number;
   tax: TaxWithAmount;
@@ -203,7 +243,7 @@ export type PaidStatus = (typeof PaidStatuses)[number];
 export const Statuses = ['enabled', 'disabled'] as const;
 export type Status = (typeof Statuses)[number];
 
-export type StatusType = 'paid' | 'invoice' | 'status' | 'payment' | 'dashboard';
+export type StatusType = 'paid' | 'invoice' | 'status' | 'payment' | 'dashboard' | 'purchase' | 'payable';
 
 export interface Invoice {
   id: number;
@@ -234,6 +274,65 @@ export interface InvoiceWithLines {
   pdfURL: string;
 }
 
+export type PurchaseSource = {
+  type: PurchaseTransactionKind;
+  id: string | number;
+  code?: string;
+  target?: PurchaseSource;
+};
+
+export interface LinkedPurchaseReceipt {
+  id: number;
+  uuid: string;
+  number: string;
+  date: string;
+}
+
+export interface Purchase {
+  id: number;
+  uuid: string;
+  number: string;
+  vendor: Vendor;
+  date: string;
+  due_on?: string | null;
+  terms: PaymentTermValue;
+  amount: number;
+  discount: DiscountType;
+  tax: number;
+  total: number;
+  amount_due: number;
+  status: string;
+  payment_status: PaidStatus;
+  notes: string;
+  transaction_kind: PurchaseTransactionKind;
+  source?: PurchaseSource | null;
+  linked_receipts?: LinkedPurchaseReceipt[];
+  invoice_number?: string;
+}
+
+export interface PurchaseWithLines {
+  header: Purchase;
+  lines: InvoiceLine[];
+}
+
+export type PurchaseHeaderForm = {
+  vendor: Vendor | undefined;
+  date: Date | undefined;
+  due: Date | undefined;
+  terms: PaymentTermValue;
+  notes: string | undefined;
+  discount: DiscountType;
+  invoice_number?: string;
+};
+
+export type PurchaseForm = {
+  header: PurchaseHeaderForm;
+  lines: LineForm[];
+  kind: PurchaseTransactionKind;
+  code: string;
+  source: PurchaseSource;
+};
+
 export interface BreadcrumbItem {
   title: string;
   href: string;
@@ -246,6 +345,8 @@ export type InvoiceVerb = Exclude<Verb, 'trash'> | 'void' | 'record-payment' | '
 export type PaymentVerb = Verb | 'void';
 
 export type CustomerVerb = Verb | 'record-payment' | 'issue-invoice';
+
+export type VendorVerb = Verb | 'record-payment' | 'record-purchase';
 
 export type UserVerb = Verb | 'permission';
 
@@ -480,6 +581,82 @@ export interface PaymentWithLines {
   pdfURL: string;
 }
 
+// ─── Accounts Payable / Vendor Payments ──────────────────────────────────────
+
+export interface Payable {
+  id: number;
+  uuid: string;
+  invoice_id: number;
+  invoice_uuid: string;
+  invoice_number: string;
+  invoice_date: string;
+  due_date: string;
+  amount_total: number;
+  amount_payable: number;
+  amount_paid: number;
+  status: PayableStatus;
+  paid_status: PaidStatus;
+  notes?: string;
+}
+
+export type PayableStatus = 'draft' | 'pending' | 'approved' | 'rejected' | 'void';
+
+export type PayableVerb = 'view' | 'void';
+
+export interface VendorPayment {
+  id: number;
+  uuid: string;
+  code: string;
+  date: string;
+  amount: number;
+  notes: string;
+  status: string;
+  vendor: Vendor;
+  payment: PaymentMethodsForm;
+}
+
+export interface VendorPaymentLine {
+  id: number;
+  ap_id: number;
+  ap_uuid: string;
+  bill_number: string;
+  bill_date: string;
+  due_date: string;
+  amount_due: number;
+  payment: number;
+  paid_status: string;
+}
+
+export interface VendorPaymentWithLines {
+  header: VendorPayment;
+  lines: VendorPaymentLine[];
+}
+
+export type PayableForm = {
+  invoice_uuid: string;
+  amount_due: number;
+  payment: number;
+  action: LineAction;
+};
+
+export type VendorPaymentHeaderForm = {
+  vendor: Vendor | undefined;
+  date: Date | undefined;
+  notes: string;
+};
+
+export type VendorPaymentTotals = {
+  totalPayment: number;
+  totalRemaining: number;
+};
+
+export type VendorPaymentForm = {
+  header: VendorPaymentHeaderForm;
+  lines: PayableForm[];
+  payment: PaymentMethodsForm;
+  totals: VendorPaymentTotals;
+};
+
 export type onValueChangeType = (rowId: string, columnId: string, newValue: string | number) => void;
 
 export function mapPaymentLineToReceivableInvoice(paymentLine: PaymentLine): ReceivableInvoiceForm {
@@ -514,6 +691,8 @@ export const defaultBreadcrumbs: BreadcrumbItem[] = [
   },
 ];
 
+export type PillVariant = 'soon' | 'new' | 'beta' | 'pro';
+
 export interface NavItem {
   title: string;
   url: string;
@@ -521,7 +700,10 @@ export interface NavItem {
   isActive?: boolean;
   requiredAbility?: string;
   match?: string[];
-  // components: string[];
+  badge?: number | null; // from Inertia props
+  pill?: string | null; // "Soon", "New", "Beta"
+  pillVariant?: PillVariant;
+  disabled?: boolean; // auto-set when pill === 'soon'
 }
 
 export type Role = {

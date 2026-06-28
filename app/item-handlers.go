@@ -15,8 +15,8 @@ import (
 	"strings"
 
 	"github.com/google/uuid"
-	"github.com/martin3zra/acme/pkg/i18n"
-	"github.com/martin3zra/acme/pkg/routing"
+	"github.com/martin3zra/forge/i18n"
+	"github.com/martin3zra/forge/routing"
 	inertia "github.com/romsar/gonertia/v2"
 	"golang.org/x/text/transform"
 )
@@ -164,7 +164,7 @@ func (s *Server) startUploadChunkHandler() routing.HandlerFunc {
 
 		if err := s.storeUploadSession(&UploadSession{
 			ID:        uploadID,
-			UserID:    int64(ctx.User().Id),
+			UserID:    int64(ctx.User().GetAuthIdentifier()),
 			Filename:  form.Filename,
 			FileSize:  form.Size,
 			Delimiter: form.Delimiter,
@@ -558,6 +558,21 @@ func mapHeaders(headers []string, source string) (map[int]string, error) {
 			"TIPO_NCFTP":      "tax_receipt_id",
 			"CODIGO":          "code",
 			"LIMITE_CRE":      "credit_limited",
+		}
+	}
+
+	if source == "vendors" {
+		mapping = map[string]string{
+			"NOMBRE":          "name",
+			"NOMBRE_CONTACTO": "contact_name",
+			"TELEFONO":        "phone",
+			"CORREO":          "email",
+			"PAGO":            "payment_method",
+			"CONDICIONES":     "payment_terms",
+			"NOTA_COMPRA":     "purchase_note",
+			"TIEMPO_ENTREGA":  "lead_time_days",
+			"CODIGO":          "code",
+			"TIPO":            "vendor_type",
 		}
 	}
 

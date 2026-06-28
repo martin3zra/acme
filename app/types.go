@@ -13,13 +13,13 @@ import (
 	"time"
 
 	"github.com/martin3zra/acme/app/mail"
-	"github.com/martin3zra/acme/pkg/auth"
-	"github.com/martin3zra/acme/pkg/database"
-	"github.com/martin3zra/acme/pkg/foundation"
-	"github.com/martin3zra/acme/pkg/mailer"
-	"github.com/martin3zra/acme/pkg/routing"
-	"github.com/martin3zra/acme/pkg/support"
-	"github.com/martin3zra/acme/pkg/validator"
+	"github.com/martin3zra/forge/auth"
+	"github.com/martin3zra/forge/database"
+	"github.com/martin3zra/forge/foundation"
+	"github.com/martin3zra/forge/mailer"
+	"github.com/martin3zra/forge/routing"
+	"github.com/martin3zra/forge/support"
+	"github.com/martin3zra/forge/validator"
 	"golang.org/x/text/encoding"
 	"golang.org/x/text/encoding/charmap"
 )
@@ -95,6 +95,54 @@ func (form StoreCustomerForm) Authorize() bool {
 	return Can(form.User(), "create:customer")
 }
 
+type StoreVendorForm struct {
+	support.FormRequest
+	Name            string    `json:"name"`
+	Contact         string    `json:"contact"`
+	Email           string    `json:"email"`
+	Phone           string    `json:"phone"`
+	PurchaseNote    string    `json:"purchase_note"`
+	LeadTimeDays    int       `json:"lead_time_days"`
+	PaymentMethod   string    `json:"payment_method"`
+	PaymentTerms    string    `json:"payment_terms"`
+	CreditLimited   bool      `json:"credit_limited"`
+	CreditLimit     float64   `json:"credit_limit"`
+	VendorType      string    `json:"vendor_type"`
+	TaxReceipt      int       `json:"tax_receipt"`
+	OpenBalance     float64   `json:"open_balance"`
+	OpenBalanceAsOf time.Time `json:"open_balance_as_of"`
+}
+
+func (StoreVendorForm) Rules() map[string]any {
+	return map[string]any{
+		"name":    "required|min:3|max:120",
+		"contact": "sometimes|min:3|max:120",
+		"email": []any{
+			"required",
+			"email",
+			"min:8",
+			"max:120",
+			"lowercase",
+			validator.Rule{}.Unique("vendors", "email"),
+		},
+		"phone":              "sometimes|min:3|max:120",
+		"purchase_note":      "sometimes|max:2000",
+		"lead_time_days":     "sometimes|integer|min:0",
+		"payment_method":     "sometimes|in:cash,ck,card,bt",
+		"payment_terms":      "sometimes|required",
+		"credit_limited":     "required",
+		"credit_limit":       "sometimes|required|min:0",
+		"vendor_type":        "sometimes|required|in:individual,business",
+		"tax_receipt":        "sometimes|exists:tax_receipts,id",
+		"open_balance":       "sometimes|min:0",
+		"open_balance_as_of": "sometimes",
+	}
+}
+
+func (form StoreVendorForm) Authorize() bool {
+	return Can(form.User(), "create:vendor")
+}
+
 type UpdateCustomerForm struct {
 	support.FormRequest
 	ID              int       `json:"id"`
@@ -133,6 +181,54 @@ func (form UpdateCustomerForm) Rules() map[string]any {
 		"payment_terms":      "sometimes|required",
 		"credit_limit":       "sometimes|required|min:0",
 		"customer_type":      "sometimes|required|in:individual,business",
+		"tax_receipt":        "sometimes|exists:tax_receipts,id",
+		"open_balance":       "sometimes|min:0",
+		"open_balance_as_of": "sometimes",
+	}
+}
+
+type UpdateVendorForm struct {
+	support.FormRequest
+	ID              int       `json:"id"`
+	Name            string    `json:"name"`
+	Contact         string    `json:"contact"`
+	Email           string    `json:"email"`
+	Phone           string    `json:"phone"`
+	PurchaseNote    string    `json:"purchase_note"`
+	LeadTimeDays    int       `json:"lead_time_days"`
+	PaymentMethod   string    `json:"payment_method"`
+	PaymentTerms    string    `json:"payment_terms"`
+	CreditLimited   bool      `json:"credit_limited"`
+	CreditLimit     float64   `json:"credit_limit"`
+	VendorType      string    `json:"vendor_type"`
+	TaxReceipt      int       `json:"tax_receipt"`
+	OpenBalance     float64   `json:"open_balance"`
+	OpenBalanceAsOf time.Time `json:"open_balance_as_of"`
+}
+
+func (form UpdateVendorForm) Authorize() bool {
+	return Can(form.User(), "update:vendor")
+}
+
+func (form UpdateVendorForm) Rules() map[string]any {
+	return map[string]any{
+		"name":    "required|min:3|max:120",
+		"contact": "sometimes|min:3|max:120",
+		"email": []any{
+			"required",
+			"email",
+			"min:8",
+			"max:120",
+			"lowercase",
+			validator.Rule{}.Unique("vendors", "email").Ignore(form.ID, "id"),
+		},
+		"phone":              "sometimes|min:3|max:120",
+		"purchase_note":      "sometimes|max:2000",
+		"lead_time_days":     "sometimes|integer|min:0",
+		"payment_method":     "sometimes|in:cash,ck,card,bt",
+		"payment_terms":      "sometimes|required",
+		"credit_limit":       "sometimes|required|min:0",
+		"vendor_type":        "sometimes|required|in:individual,business",
 		"tax_receipt":        "sometimes|exists:tax_receipts,id",
 		"open_balance":       "sometimes|min:0",
 		"open_balance_as_of": "sometimes",
@@ -261,6 +357,41 @@ type UpdateItemForm struct {
 	Identifiers ItemIdentifiers `json:"identifiers,omitempty"`
 }
 
+type StoreWarehouseForm struct {
+	support.FormRequest
+	Name     string `json:"name"`
+	Location string `json:"location"`
+}
+
+func (form StoreWarehouseForm) Authorize() bool {
+	return Can(form.User(), "create:inventory")
+}
+
+func (StoreWarehouseForm) Rules() map[string]any {
+	return map[string]any{
+		"name":     []any{"required", "min:3", "max:150", validator.Rule{}.Unique("warehouses", "name")},
+		"location": "sometimes|nullable|max:2000",
+	}
+}
+
+type UpdateWarehouseForm struct {
+	support.FormRequest
+	ID       int    `json:"id"`
+	Name     string `json:"name"`
+	Location string `json:"location"`
+}
+
+func (form UpdateWarehouseForm) Authorize() bool {
+	return Can(form.User(), "update:inventory")
+}
+
+func (form UpdateWarehouseForm) Rules() map[string]any {
+	return map[string]any{
+		"name":     []any{"required", "min:3", "max:150", validator.Rule{}.Unique("warehouses", "name").Ignore(form.ID, "id")},
+		"location": "sometimes|nullable|max:2000",
+	}
+}
+
 func (form UpdateItemForm) Authorize() bool {
 	return Can(form.User(), "update:item")
 }
@@ -353,6 +484,61 @@ var TransactionKinds = struct {
 	Template: _TRANSACTION_KIND_TEMPLATE,
 }
 
+type PurchaseTransactionKind string
+
+const (
+	_PURCHASE_ORDER   PurchaseTransactionKind = "purchase_order"
+	_PURCHASE_RECEIPT PurchaseTransactionKind = "purchase_receipt"
+	_VENDOR_BILL      PurchaseTransactionKind = "vendor_bill"
+)
+
+var PurchaseTransactionKinds = struct {
+	PurchaseOrder   PurchaseTransactionKind
+	PurchaseReceipt PurchaseTransactionKind
+	VendorBill      PurchaseTransactionKind
+}{
+	PurchaseOrder:   _PURCHASE_ORDER,
+	PurchaseReceipt: _PURCHASE_RECEIPT,
+	VendorBill:      _VENDOR_BILL,
+}
+
+// PurchaseStatus represents the lifecycle state of a purchase (purchase_status column).
+type PurchaseStatus string
+
+const (
+	_PURCHASE_STATUS_DRAFT              PurchaseStatus = "draft"
+	_PURCHASE_STATUS_PARTIALLY_RECEIVED PurchaseStatus = "partially_received"
+	_PURCHASE_STATUS_RECEIVED           PurchaseStatus = "received"
+	_PURCHASE_STATUS_PARTIALLY_PAID     PurchaseStatus = "partially_paid"
+	_PURCHASE_STATUS_CLOSED             PurchaseStatus = "closed"
+	_PURCHASE_STATUS_POSTED             PurchaseStatus = "posted"
+)
+
+var PurchaseStatuses = struct {
+	Draft              PurchaseStatus
+	PartiallyReceived  PurchaseStatus
+	Received           PurchaseStatus
+	PartiallyPaid      PurchaseStatus
+	Closed             PurchaseStatus
+	Posted             PurchaseStatus
+}{
+	Draft:             _PURCHASE_STATUS_DRAFT,
+	PartiallyReceived: _PURCHASE_STATUS_PARTIALLY_RECEIVED,
+	Received:          _PURCHASE_STATUS_RECEIVED,
+	PartiallyPaid:     _PURCHASE_STATUS_PARTIALLY_PAID,
+	Closed:            _PURCHASE_STATUS_CLOSED,
+	Posted:            _PURCHASE_STATUS_POSTED,
+}
+
+// lockedPurchaseStatuses lists purchase statuses where edits and deletes are prohibited.
+var lockedPurchaseStatuses = map[PurchaseStatus]bool{
+	PurchaseStatuses.Received:          true,
+	PurchaseStatuses.PartiallyReceived: true,
+	PurchaseStatuses.PartiallyPaid:     true,
+	PurchaseStatuses.Closed:            true,
+	PurchaseStatuses.Posted:            true,
+}
+
 type TransactionSource struct {
 	Type TransactionKind `json:"type,omitempty"`
 	ID   string          `json:"id,omitempty"`
@@ -364,6 +550,30 @@ func (d *TransactionSource) Value() (driver.Value, error) {
 }
 
 func (d *TransactionSource) Scan(value any) error {
+	if value == nil {
+		return nil
+	}
+
+	b, ok := value.([]byte)
+	if !ok {
+		return errors.New("type assertion to []byte failed")
+	}
+
+	return json.Unmarshal(b, &d)
+}
+
+type PurchaseSource struct {
+	Type   PurchaseTransactionKind `json:"type,omitempty"`
+	ID     string                  `json:"id,omitempty"`
+	Code   string                  `json:"code,omitempty"`
+	Target *PurchaseSource         `json:"target,omitempty"`
+}
+
+func (d *PurchaseSource) Value() (driver.Value, error) {
+	return json.Marshal(d)
+}
+
+func (d *PurchaseSource) Scan(value any) error {
 	if value == nil {
 		return nil
 	}
@@ -431,6 +641,37 @@ func (d *Recurrence) Scan(value any) error {
 	}
 
 	return json.Unmarshal(b, &d)
+}
+
+// Payable Status (AP Invoice Lifecycle)
+// Draft → invoice received, not yet submitted for approval.
+// Pending → submitted, awaiting approval.
+// Approved → approved, scheduled for payment.
+// Partial → partially paid, balance remains.
+// Paid → fully settled.
+// Cancelled → invoice voided, no payment will be made.
+type PayableStatus string
+
+const (
+	_PAYABLE_DRAFT     PayableStatus = "draft"
+	_PAYABLE_PENDING   PayableStatus = "pending"
+	_PAYABLE_APPROVED  PayableStatus = "approved"
+	_PAYABLE_REJECTED  PayableStatus = "rejected"
+	_PAYABLE_VOID      PayableStatus = "void"
+)
+
+var PayableStatuses = struct {
+	Draft    PayableStatus
+	Pending  PayableStatus
+	Approved PayableStatus
+	Rejected PayableStatus
+	Void     PayableStatus
+}{
+	Draft:    _PAYABLE_DRAFT,
+	Pending:  _PAYABLE_PENDING,
+	Approved: _PAYABLE_APPROVED,
+	Rejected: _PAYABLE_REJECTED,
+	Void:     _PAYABLE_VOID,
 }
 
 // Paid Status (Financial Settlement)
@@ -526,6 +767,7 @@ type RedirectPreferences struct {
 	Invoice  RedirectPreferencesValue `json:"invoice"`
 	Estimate RedirectPreferencesValue `json:"estimate"`
 	Customer RedirectPreferencesValue `json:"customer"`
+	Vendor   RedirectPreferencesValue `json:"vendor"`
 	Item     RedirectPreferencesValue `json:"item"`
 	Payment  RedirectPreferencesValue `json:"payment"`
 	Order    RedirectPreferencesValue `json:"order"`
@@ -636,16 +878,17 @@ func (d *Payment) Scan(value any) error {
 }
 
 type Line struct {
-	ID       int        `json:"id"`
-	Unit     int        `json:"unit"`
-	Qty      int        `json:"qty"`
-	Price    float64    `json:"price"`
-	Rate     float64    `json:"rate"`
-	Action   LineAction `json:"action"`
-	tax      float64
-	amount   float64
-	discount float64
-	total    float64
+	ID          int        `json:"id"`
+	Unit        int        `json:"unit"`
+	Qty         int        `json:"qty"`
+	Price       float64    `json:"price"`
+	Rate        float64    `json:"rate"`
+	Action      LineAction `json:"action"`
+	WarehouseID int        `json:"warehouse_id"`
+	tax         float64
+	amount      float64
+	discount    float64
+	total       float64
 }
 
 type StoreInvoiceForm struct {
@@ -702,6 +945,7 @@ func (form StoreInvoiceForm) Rules() map[string]any {
 		"lines.*.price":           "required",
 		"lines.*.rate":            "required",
 		"lines.*.action":          "required|in:added",
+		"lines.*.warehouse_id":    "required|exists:warehouses,id",
 		"discount":                "required",
 		"discount.value": []any{
 			"sometimes",
@@ -808,12 +1052,208 @@ func (form UpdateInvoiceForm) Rules() map[string]any {
 		"lines.*.price":  "required",
 		"lines.*.rate":   "required",
 		"lines.*.action": "required|in:added,updated,deleted,unchanged",
+		"lines.*.warehouse_id": "required_unless:lines.*.action,deleted,unchanged|exists:warehouses,id",
 		"discount":       "required",
 		"discount.value": []any{
 			"sometimes",
 			validator.Rule{}.When(form.Discount.Type == "percentage", "between:0,100", "min:0"),
 		},
 		"discount.type": "required|in:percentage,fixed",
+	}
+}
+
+type StorePurchaseForm struct {
+	support.FormRequest
+	VendorID int                     `json:"vendor_id"`
+	Date     time.Time               `json:"date"`
+	Terms    string                  `json:"terms"`
+	Discount Discount                `json:"discount"`
+	Notes    string                  `json:"notes"`
+	Lines    []*Line                 `json:"lines"`
+	Kind          PurchaseTransactionKind `json:"kind"`
+	Source        *PurchaseSource         `json:"source"`
+	InvoiceNumber string                  `json:"invoice_number"`
+	// protected
+	amount        float64
+	amountDue     float64
+	tax           float64
+	total         float64
+	paymentStatus PaidStatus
+	dueOn         *time.Time
+}
+
+func (form StorePurchaseForm) Authorize() bool {
+	return Can(form.User(), "create:purchase")
+}
+
+func (form StorePurchaseForm) Rules() map[string]any {
+	return map[string]any{
+		"vendor_id":      "bail|required|exists:vendors,id",
+		"kind":           "bail|required|in:purchase_order,purchase_receipt,vendor_bill",
+		"source":         "sometimes",
+		"source.type":    "bail|sometimes|in:purchase_order,purchase_receipt,vendor_bill",
+		"date":           "bail|required|date|after:yesterday",
+		"terms":          "bail|sometimes|min:1",
+		"lines":          "required|min:1",
+		"lines.*.id":     "required|exists:items,id",
+		"lines.*.unit":   "required|exists:units,id",
+		"lines.*.qty":    "required|min:1",
+		"lines.*.price":  "required",
+		"lines.*.rate":   "required",
+		"lines.*.action": "required|in:added",
+		"invoice_number": validator.Rule{}.When(string(form.Kind) == "vendor_bill", "required|min:1|max:100", "sometimes"),
+		"discount":       "required",
+		"discount.value": []any{
+			"sometimes",
+			validator.Rule{}.When(form.Discount.Type == "percentage", "between:0,100", "min:0"),
+		},
+		"discount.type": "required|in:percentage,fixed",
+	}
+}
+
+func (StorePurchaseForm) Messages() map[string]string {
+	return map[string]string{
+		"vendor_id.required": "You must specify the vendor you want to purchase from.",
+		"lines.min":          "You must specify at least one item.",
+	}
+}
+
+func (form *StorePurchaseForm) Compute() {
+	form.computeTax()
+
+	form.amountDue = form.total
+	form.paymentStatus = PaidStatuses.UnPaid
+	form.dueOn = nil
+
+	termInDays := getNetDays(form.Terms)
+	if termInDays >= 0 {
+		dueDate := form.Date.AddDate(0, 0, termInDays)
+		form.dueOn = &dueDate
+	}
+}
+
+func (form *StorePurchaseForm) PassedValidation() {
+	form.Compute()
+}
+
+func (form *StorePurchaseForm) computeTax() {
+	discountPercentage := form.Discount.Val
+	if form.Discount.Type == "fixed" {
+		totalAmount := float64(0)
+		for _, line := range form.Lines {
+			totalAmount += (line.Price * float64(line.Qty))
+		}
+
+		if totalAmount > 0 {
+			discountPercentage = float64(discountPercentage/totalAmount) * 100
+		}
+	}
+
+	for _, line := range form.Lines {
+		if line.Action == LineActions.Deleted {
+			continue
+		}
+		line.amount = round(line.Price*float64(line.Qty), 2)
+		line.discount = round(line.amount*(discountPercentage/100), 2)
+		line.tax = round((line.amount-line.discount)*(line.Rate/100), 2)
+		line.total = round(line.amount-line.discount+line.tax, 2)
+
+		form.tax += line.tax
+		form.amount += line.amount
+		form.total += line.total
+	}
+}
+
+type UpdatePurchaseForm struct {
+	StorePurchaseForm
+}
+
+func (form UpdatePurchaseForm) Authorize() bool {
+	return Can(form.User(), "update:purchase")
+}
+
+func (form UpdatePurchaseForm) Rules() map[string]any {
+	return map[string]any{
+		"vendor_id":      "bail|required|exists:vendors,id",
+		"kind":           "bail|required|in:purchase_order,purchase_receipt,vendor_bill",
+		"date":           "bail|required|date",
+		"terms":          "bail|sometimes|min:1",
+		"lines":          "required|min:1",
+		"lines.*.id":     "required|exists:items,id",
+		"lines.*.unit":   "required|exists:units,id",
+		"lines.*.qty":    "required|min:1",
+		"lines.*.price":  "required",
+		"lines.*.rate":   "required",
+		"lines.*.action": "required|in:added,updated,deleted,unchanged",
+		"discount":       "required",
+		"discount.value": []any{
+			"sometimes",
+			validator.Rule{}.When(form.Discount.Type == "percentage", "between:0,100", "min:0"),
+		},
+		"discount.type": "required|in:percentage,fixed",
+	}
+}
+
+// VendorPaymentLine is a single AP bill being settled in a vendor payment.
+type VendorPaymentLine struct {
+	ID        int        `json:"id"`
+	UUID      string     `json:"uuid"`
+	AmountDue float64    `json:"amount_due"`
+	Payment   float64    `json:"payment"`
+	Action    LineAction `json:"action"`
+}
+
+type StoreVendorPaymentForm struct {
+	support.FormRequest
+	VendorID string               `json:"vendor_id"`
+	Date     time.Time            `json:"date"`
+	Notes    string               `json:"notes"`
+	Lines    []*VendorPaymentLine `json:"lines"`
+	Payment  Payment              `json:"payment"`
+	Amount   float64              `json:"amount"`
+}
+
+func (form StoreVendorPaymentForm) Authorize() bool {
+	return Can(form.User(), "create:payable")
+}
+
+func (form StoreVendorPaymentForm) Rules() map[string]any {
+	return map[string]any{
+		"vendor_id":          "bail|required|exists:vendors,uuid",
+		"date":               "bail|required|date|after:yesterday",
+		"notes":              "sometime",
+		"lines":              "required|min:1",
+		"lines.*.uuid":       "required|exists:accounts_payable,uuid",
+		"lines.*.amount_due": "required",
+		"lines.*.payment":    "required|min:0",
+	}
+}
+
+type UpdateVendorPaymentForm struct {
+	support.FormRequest
+	VendorID string               `json:"vendor_id"`
+	Date     time.Time            `json:"date"`
+	Notes    string               `json:"notes"`
+	Lines    []*VendorPaymentLine `json:"lines"`
+	Payment  Payment              `json:"payment"`
+	Amount   float64              `json:"amount"`
+}
+
+func (form UpdateVendorPaymentForm) Authorize() bool {
+	return Can(form.User(), "update:payable")
+}
+
+func (form UpdateVendorPaymentForm) Rules() map[string]any {
+	return map[string]any{
+		"vendor_id":          "bail|required|exists:vendors,uuid",
+		"date":               "bail|required|date",
+		"notes":              "sometime",
+		"lines":              "required|min:1",
+		"lines.*.id":         "required|exists:vendor_payment_items,id",
+		"lines.*.uuid":       "required|exists:accounts_payable,uuid",
+		"lines.*.amount_due": "required",
+		"lines.*.payment":    "required|min:0",
+		"lines.*.action":     "required|in:added,updated,deleted,unchanged",
 	}
 }
 
@@ -998,7 +1438,7 @@ func (form StoreUserForm) Rules() map[string]any {
 }
 
 type User struct {
-	foundation.User
+	AuthUser
 	account *account
 	Linked  int `json:"linked"`
 }
@@ -1102,16 +1542,16 @@ func (u *User) IsOrphan(db *sql.DB) bool {
 }
 
 func UserFromContext(ctx context.Context) *User {
-	u := auth.User(ctx)
-	return &User{
-		User: *u,
-	}
+	return UserFromFoundationUser(auth.User(ctx))
 }
 
-func UserFromFoundationUser(u *foundation.User) *User {
-	// TODO set the role here.
+func UserFromFoundationUser(u foundation.Authenticatable) *User {
+	au, ok := u.(*AuthUser)
+	if !ok || au == nil {
+		return &User{}
+	}
 	return &User{
-		User: *u,
+		AuthUser: *au,
 	}
 }
 
@@ -1143,7 +1583,7 @@ func (u *User) currentCompany(db *sql.DB) (*Company, error) {
 }
 
 func CurrentCompany(ctx context.Context) *Company {
-	cc := ctx.Value(support.CompanyKey{})
+	cc := ctx.Value(CompanyKey{})
 	if cc == nil {
 		return nil
 	}
@@ -1152,7 +1592,7 @@ func CurrentCompany(ctx context.Context) *Company {
 }
 
 func CurrentAccount(ctx context.Context) int {
-	ac := ctx.Value(support.AccountKey{})
+	ac := ctx.Value(AccountKey{})
 	if ac == nil {
 		return 0
 	}
@@ -1185,6 +1625,7 @@ type CompanySequence struct {
 	Invoice  InvoiceSequence `json:"invoice"`
 	Template SequenceConfig  `json:"template"`
 	Customer SequenceConfig  `json:"customer"`
+	Vendor   SequenceConfig  `json:"vendor"`
 	Estimate SequenceConfig  `json:"estimate"`
 	Payment  SequenceConfig  `json:"payment"`
 }
@@ -1203,9 +1644,9 @@ func (SequenceForm) Rules() map[string]any {
 		"invoice.cash.next":       "required|min:1",
 		"invoice.credit.padding":  "required|min:3",
 		"invoice.credit.next":     "required|min:1",
-		"customer":                "required",
-		"customer.padding":        "required|min:3",
-		"customer.next":           "required|min:1",
+		"vendor":                  "required",
+		"vendor.padding":          "required|min:3",
+		"vendor.next":             "required|min:1",
 		"estimate":                "required",
 		"estimate.padding":        "required|min:3",
 		"estimate.next":           "required|min:1",
@@ -1227,6 +1668,7 @@ type RedirectPreferencesForm struct {
 	Invoice  string `json:"invoice"`
 	Estimate string `json:"estimate"`
 	Customer string `json:"customer"`
+	Vendor   string `json:"vendor"`
 	Order    string `json:"order"`
 	Item     string `json:"item"`
 	Payment  string `json:"payment"`
@@ -1237,6 +1679,7 @@ func (RedirectPreferencesForm) Rules() map[string]any {
 		"invoice":  "required|in:list,detail,stay",
 		"estimate": "required|in:list,detail,stay",
 		"customer": "required|in:list,detail,stay",
+		"vendor":   "required|in:list,detail,stay",
 		"order":    "required|in:list,detail,stay",
 		"item":     "required|in:list,detail,stay",
 		"payment":  "required|in:list,detail,stay",
@@ -1388,6 +1831,24 @@ func (t CustomerType) Validate() error {
 	}
 }
 
+type VendorType string
+
+const (
+	VendorTypeAll        VendorType = "all"
+	VendorTypeIndividual VendorType = "individual"
+	VendorTypeBusiness   VendorType = "business"
+)
+
+// Validate ensures the value is one of the allowed constants
+func (t VendorType) Validate() error {
+	switch t {
+	case VendorTypeAll, VendorTypeIndividual, VendorTypeBusiness:
+		return nil
+	default:
+		return fmt.Errorf("invalid vendor type: %s", t)
+	}
+}
+
 type ItemType string
 
 const (
@@ -1495,7 +1956,7 @@ type ImportForm struct {
 func (ImportForm) Rules() map[string]any {
 	return map[string]any{
 		"upload_id": "required",
-		"type":      "required|in:items,customers",
+		"type":      "required|in:items,customers,vendors",
 	}
 }
 
@@ -1556,4 +2017,86 @@ func (d Date) MarshalJSON() ([]byte, error) {
 
 	formatted := d.Format("2006-01-02")
 	return []byte(`"` + formatted + `"`), nil
+}
+
+// ── Inventory ─────────────────────────────────────────────────────────────────
+
+// InventoryMovementKind maps to the inv_transaction_kind enum on inventory_movements.
+type InventoryMovementKind string
+
+const (
+	_INV_MOVEMENT_SALE             InventoryMovementKind = "sale"
+	_INV_MOVEMENT_SALE_RETURN      InventoryMovementKind = "sale_return"
+	_INV_MOVEMENT_PURCHASE_ORDER   InventoryMovementKind = "purchase_order"
+	_INV_MOVEMENT_PURCHASE_RECEIPT InventoryMovementKind = "purchase_receipt"
+	_INV_MOVEMENT_PURCHASE_RETURN  InventoryMovementKind = "purchase_return"
+	_INV_MOVEMENT_VENDOR_BILL      InventoryMovementKind = "vendor_bill"
+	_INV_MOVEMENT_ADJUSTMENT       InventoryMovementKind = "adjustment"
+	_INV_MOVEMENT_TRANSFER         InventoryMovementKind = "transfer"
+)
+
+var InventoryMovementKinds = struct {
+	Sale            InventoryMovementKind
+	SaleReturn      InventoryMovementKind
+	PurchaseOrder   InventoryMovementKind
+	PurchaseReceipt InventoryMovementKind
+	PurchaseReturn  InventoryMovementKind
+	VendorBill      InventoryMovementKind
+	Adjustment      InventoryMovementKind
+	Transfer        InventoryMovementKind
+}{
+	Sale:            _INV_MOVEMENT_SALE,
+	SaleReturn:      _INV_MOVEMENT_SALE_RETURN,
+	PurchaseOrder:   _INV_MOVEMENT_PURCHASE_ORDER,
+	PurchaseReceipt: _INV_MOVEMENT_PURCHASE_RECEIPT,
+	PurchaseReturn:  _INV_MOVEMENT_PURCHASE_RETURN,
+	VendorBill:      _INV_MOVEMENT_VENDOR_BILL,
+	Adjustment:      _INV_MOVEMENT_ADJUSTMENT,
+	Transfer:        _INV_MOVEMENT_TRANSFER,
+}
+
+type StoreAdjustmentForm struct {
+	support.FormRequest
+	VariantID   int     `json:"variant_id"`
+	WarehouseID int     `json:"warehouse_id"`
+	Qty         float64 `json:"qty"`
+	Reason      string  `json:"reason"`
+	Notes       string  `json:"notes"`
+}
+
+func (form StoreAdjustmentForm) Authorize() bool {
+	return Can(form.User(), "create:adjustment")
+}
+
+func (form StoreAdjustmentForm) Rules() map[string]any {
+	return map[string]any{
+		"variant_id":   "bail|required|exists:items_variants,id",
+		"warehouse_id": "bail|required|exists:warehouses,id",
+		"qty":          "bail|required",
+		"reason":       "bail|required|min:3|max:255",
+		"notes":        "sometimes|max:1000",
+	}
+}
+
+type StoreTransferForm struct {
+	support.FormRequest
+	VariantID       int     `json:"variant_id"`
+	FromWarehouseID int     `json:"from_warehouse_id"`
+	ToWarehouseID   int     `json:"to_warehouse_id"`
+	Qty             float64 `json:"qty"`
+	Notes           string  `json:"notes"`
+}
+
+func (form StoreTransferForm) Authorize() bool {
+	return Can(form.User(), "create:transfer")
+}
+
+func (form StoreTransferForm) Rules() map[string]any {
+	return map[string]any{
+		"variant_id":        "bail|required|exists:items_variants,id",
+		"from_warehouse_id": "bail|required|exists:warehouses,id",
+		"to_warehouse_id":   "bail|required|exists:warehouses,id",
+		"qty":               "bail|required|gt:0",
+		"notes":             "sometimes|max:1000",
+	}
 }

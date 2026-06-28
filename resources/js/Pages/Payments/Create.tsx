@@ -296,7 +296,6 @@ export default function Create({
           <div className="grid grid-cols-12">
             <div className="col-span-6 flex flex-col gap-y-6">
               <div className="flex flex-col gap-y-2">
-                <Label htmlFor="date">{t('global.date')}</Label>
                 <DatePickerField
                   id="date"
                   label={t('global.date')}

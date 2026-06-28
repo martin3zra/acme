@@ -13,13 +13,12 @@ import (
 	"time"
 
 	"github.com/martin3zra/acme/app/mail"
-	"github.com/martin3zra/acme/pkg/i18n"
-	"github.com/martin3zra/acme/pkg/inertia"
-	"github.com/martin3zra/acme/pkg/mailer"
-	"github.com/martin3zra/acme/pkg/routing"
-	"github.com/martin3zra/acme/pkg/session"
-	"github.com/martin3zra/acme/pkg/store"
-	"github.com/martin3zra/acme/pkg/support"
+	"github.com/martin3zra/forge/i18n"
+	"github.com/martin3zra/forge/inertia"
+	"github.com/martin3zra/forge/mailer"
+	"github.com/martin3zra/forge/routing"
+	"github.com/martin3zra/forge/session"
+	"github.com/martin3zra/forge/store"
 )
 
 //go:embed sql/*.sql
@@ -46,7 +45,7 @@ func NewServer(assets, resources embed.FS) *Server {
 	if err != nil {
 		panic(err)
 	}
-	translator := i18n.NewTranslator(trans("global", "companies", "profile"))
+	translator := i18n.NewTranslator(localesFS, defaultLang, fallbackLang, trans("global", "companies", "profile"))
 
 	server := &Server{
 		qs:         qs,
@@ -175,7 +174,7 @@ func (s *Server) abortWhenPrerequisiteMissing(ctx *routing.Context, resource str
 		return false
 	}
 
-	account := ctx.Request.Context().Value(support.AccountKey{}).(map[string]any)
+	account := ctx.Request.Context().Value(AccountKey{}).(map[string]any)
 	if account == nil {
 		log.Println("account not found in context")
 		return false

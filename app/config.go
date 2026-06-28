@@ -7,7 +7,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/martin3zra/acme/pkg/mailer"
+	"github.com/martin3zra/forge/mailer"
 )
 
 type ConfigKey struct{}

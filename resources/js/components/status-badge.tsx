@@ -1,11 +1,17 @@
 import { useTranslation } from '@/hooks/use-translation';
 import { cn } from '@/lib/utils';
-import type { StatusType, TransactionKind } from '@/types/index';
+import type { PurchaseTransactionKind, StatusType, TransactionKind } from '@/types/index';
 import { statusConfig } from '@/types/status-config-map';
 import React from 'react';
 
+const purchaseKindPath: Record<PurchaseTransactionKind, string> = {
+  purchase_order: 'purchases.orders',
+  purchase_receipt: 'purchases.receipts',
+  vendor_bill: 'purchases.vendor-bills',
+};
+
 interface StatusBadgeProps {
-  kind?: TransactionKind;
+  kind?: TransactionKind | PurchaseTransactionKind;
   type: StatusType;
   status: string;
   className?: string;
@@ -32,6 +38,8 @@ export const StatusBadge: React.FC<StatusBadgeProps> = ({ kind, type, status, cl
       paid: t('global.paidStatuses.' + status),
       payment: t('global.paidStatuses.' + status),
       dashboard: t('dashboard.statuses.' + status),
+      purchase: t((purchaseKindPath[path as PurchaseTransactionKind] ?? path) + '.statuses.' + status),
+      payable: t('payables.statuses.' + status),
     }[type];
   };
 

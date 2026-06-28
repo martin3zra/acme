@@ -8,12 +8,11 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/martin3zra/acme/pkg/auth"
-	"github.com/martin3zra/acme/pkg/database"
-	"github.com/martin3zra/acme/pkg/foundation"
-	"github.com/martin3zra/acme/pkg/routing"
-	"github.com/martin3zra/acme/pkg/session"
-	"github.com/martin3zra/acme/pkg/support"
+	"github.com/martin3zra/forge/auth"
+	"github.com/martin3zra/forge/database"
+	"github.com/martin3zra/forge/foundation"
+	"github.com/martin3zra/forge/routing"
+	"github.com/martin3zra/forge/session"
 	"github.com/romsar/gonertia/v2"
 )
 
@@ -101,8 +100,8 @@ func EnsurePasswordHasBeenChanged(next routing.HandlerFunc) routing.HandlerFunc 
 func Verified(next routing.HandlerFunc) routing.HandlerFunc {
 	return func(ctx *routing.Context) {
 
-		user := auth.User(ctx.Request.Context())
-		if user != nil && !user.IsEmpty() && user.EmailVerifiedAt == nil {
+		user := AuthUserFromContext(ctx.Request.Context())
+		if !user.IsEmpty() && user.EmailVerifiedAt == nil {
 			ctx.Redirect("/verify-email")
 			return
 		}
@@ -114,8 +113,8 @@ func Verified(next routing.HandlerFunc) routing.HandlerFunc {
 func EnforceVerifiedUserAccess(next routing.HandlerFunc) routing.HandlerFunc {
 	return func(ctx *routing.Context) {
 		db := ctx.Request.Context().Value(database.ConnectionKey{}).(*sql.DB)
-		loggedUser := auth.User(ctx.Request.Context())
-		if loggedUser == nil || loggedUser.IsEmpty() {
+		loggedUser := AuthUserFromContext(ctx.Request.Context())
+		if loggedUser.IsEmpty() {
 			next(ctx)
 			return
 		}
@@ -164,12 +163,12 @@ func AuthenticatedMiddleware(next routing.HandlerFunc) routing.HandlerFunc {
 		ac := getAccount(attrsMap)
 		cc, _ := getCurrentCompany(attrsMap)
 
-		acCtx := context.WithValue(userCtx, support.AccountKey{}, ac)
+		acCtx := context.WithValue(userCtx, AccountKey{}, ac)
 		if cc == nil {
 			next(ctx.WithContext(acCtx))
 			return
 		}
-		ccCtx := context.WithValue(acCtx, support.CompanyKey{}, cc)
+		ccCtx := context.WithValue(acCtx, CompanyKey{}, cc)
 
 		ctxWithProps := context.WithValue(ccCtx, routing.PermissionKey{}, permissions(cc.UserRole))
 
@@ -282,6 +281,14 @@ func resourceFromPath(path string, base bool) (string, bool) {
 		resource = parts[len(parts)-1] // last child
 	}
 
-	resource = strings.TrimSuffix(resource, "s")
+	// Basic pluralization handling for route resources.
+	// Examples: inventories -> inventory, companies -> company, taxes -> tax
+	if strings.HasSuffix(resource, "ies") {
+		resource = strings.TrimSuffix(resource, "ies") + "y"
+	} else if resource == "taxes" {
+		resource = "tax"
+	} else {
+		resource = strings.TrimSuffix(resource, "s")
+	}
 	return resource, true
 }
