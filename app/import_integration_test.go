@@ -35,7 +35,7 @@ func tableCount(t *testing.T, db *sql.DB, table string, companyID int) int {
 // Proves the import-dispatch fix: source=vendors rows are stored in `vendors`,
 // not `customers`, with the CSV code honored.
 func TestIntegration_ImportVendors_LandInVendorsNotCustomers(t *testing.T) {
-	db, cleanup := newTestDB(t)
+	db, _, cleanup := newTestDB(t)
 	defer cleanup()
 	f := seedInventory(t, db) // provides a company
 	srv := testServer(db)
@@ -84,7 +84,7 @@ func TestIntegration_ImportVendors_LandInVendorsNotCustomers(t *testing.T) {
 // A blank-but-present required column (name) is rejected per-row and recorded
 // as an import issue, without aborting the whole import.
 func TestIntegration_ImportVendors_BadRowRecordsIssue(t *testing.T) {
-	db, cleanup := newTestDB(t)
+	db, _, cleanup := newTestDB(t)
 	defer cleanup()
 	f := seedInventory(t, db)
 	srv := testServer(db)

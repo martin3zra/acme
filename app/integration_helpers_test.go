@@ -24,6 +24,7 @@ import (
 
 	"github.com/martin3zra/camel"
 	"github.com/martin3zra/forge/i18n"
+	"github.com/martin3zra/playsql"
 
 	_ "github.com/lib/pq"
 )
@@ -49,7 +50,7 @@ func repoRoot() string {
 
 // newTestDB creates a uniquely-named database, applies the Camel baseline to
 // it, and returns a connection plus a cleanup that drops the database.
-func newTestDB(t *testing.T) (*sql.DB, func()) {
+func newTestDB(t *testing.T) (*sql.DB, *playsql.DB, func()) {
 	t.Helper()
 
 	admin, err := sql.Open("postgres", dsnFor("postgres"))
@@ -88,7 +89,14 @@ func newTestDB(t *testing.T) (*sql.DB, func()) {
 		t.Fatalf("open test db: %v", err)
 	}
 
+	play, err := playsql.OpenDSN("postgres", dsnFor(name))
+	if err != nil {
+		db.Close()
+		t.Fatalf("open playsql test db: %v", err)
+	}
+
 	cleanup := func() {
+		play.Close()
 		db.Close()
 		// Terminate stragglers so DROP DATABASE succeeds.
 		admin.Exec(`SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = $1`, name)
@@ -97,7 +105,7 @@ func newTestDB(t *testing.T) (*sql.DB, func()) {
 		}
 		admin.Close()
 	}
-	return db, cleanup
+	return db, play, cleanup
 }
 
 func testServer(db *sql.DB) *Server {

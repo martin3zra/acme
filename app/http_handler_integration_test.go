@@ -56,7 +56,7 @@ func movementCount(t *testing.T, db *sql.DB, companyID int) int {
 // A valid admin request transfers stock end-to-end through the handler:
 // binding, validation, ACL, and storeTransfer.
 func TestIntegration_TransferHandler_HappyPath(t *testing.T) {
-	db, cleanup := newTestDB(t)
+	db, _, cleanup := newTestDB(t)
 	defer cleanup()
 	f := seedInventory(t, db)
 	srv := testServer(db)
@@ -88,7 +88,7 @@ func TestIntegration_TransferHandler_HappyPath(t *testing.T) {
 // A valid admin request that references a non-existent warehouse fails the
 // `exists` validation at the HTTP boundary (422) and persists nothing.
 func TestIntegration_TransferHandler_RejectsUnknownWarehouse(t *testing.T) {
-	db, cleanup := newTestDB(t)
+	db, _, cleanup := newTestDB(t)
 	defer cleanup()
 	f := seedInventory(t, db)
 	srv := testServer(db)
@@ -111,7 +111,7 @@ func TestIntegration_TransferHandler_RejectsUnknownWarehouse(t *testing.T) {
 // A role without create:transfer is rejected by Authorize before the handler
 // body runs, and nothing is persisted.
 func TestIntegration_TransferHandler_RejectsUnauthorizedRole(t *testing.T) {
-	db, cleanup := newTestDB(t)
+	db, _, cleanup := newTestDB(t)
 	defer cleanup()
 	f := seedInventory(t, db)
 	srv := testServer(db)

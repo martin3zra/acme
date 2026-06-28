@@ -10,7 +10,7 @@ import (
 // Confirming a draft purchase receipt posts inventory movements for each line
 // and transitions the purchase to received.
 func TestIntegration_ConfirmPurchase_ReceiptRecordsMovements(t *testing.T) {
-	db, cleanup := newTestDB(t)
+	db, _, cleanup := newTestDB(t)
 	defer cleanup()
 	f := seedInventory(t, db)
 	srv := testServer(db)
@@ -74,7 +74,7 @@ func TestIntegration_ConfirmPurchase_ReceiptRecordsMovements(t *testing.T) {
 // Deleting a confirmed receipt reverses its inventory movements, returning the
 // balance to zero and recording purchase_return entries.
 func TestIntegration_DestroyConfirmedReceipt_ReversesMovements(t *testing.T) {
-	db, cleanup := newTestDB(t)
+	db, _, cleanup := newTestDB(t)
 	defer cleanup()
 	f := seedInventory(t, db)
 	srv := testServer(db)
@@ -136,7 +136,7 @@ func TestIntegration_DestroyConfirmedReceipt_ReversesMovements(t *testing.T) {
 
 // A receipt already confirmed cannot be confirmed again.
 func TestIntegration_ConfirmPurchase_RejectsDoubleConfirm(t *testing.T) {
-	db, cleanup := newTestDB(t)
+	db, _, cleanup := newTestDB(t)
 	defer cleanup()
 	f := seedInventory(t, db)
 	srv := testServer(db)
@@ -180,7 +180,7 @@ func TestIntegration_ConfirmPurchase_RejectsDoubleConfirm(t *testing.T) {
 
 // A purchase order (not a receipt or vendor bill) cannot be confirmed.
 func TestIntegration_ConfirmPurchase_RejectsPurchaseOrder(t *testing.T) {
-	db, cleanup := newTestDB(t)
+	db, _, cleanup := newTestDB(t)
 	defer cleanup()
 	f := seedInventory(t, db)
 	srv := testServer(db)

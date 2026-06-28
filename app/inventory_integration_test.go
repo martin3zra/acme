@@ -8,7 +8,7 @@ import (
 )
 
 func TestIntegration_RecordMovement_UpsertsBalance(t *testing.T) {
-	db, cleanup := newTestDB(t)
+	db, _, cleanup := newTestDB(t)
 	defer cleanup()
 	f := seedInventory(t, db)
 	srv := testServer(db)
@@ -39,7 +39,7 @@ func TestIntegration_RecordMovement_UpsertsBalance(t *testing.T) {
 }
 
 func TestIntegration_RecordMovement_SkipsUntrackedVariant(t *testing.T) {
-	db, cleanup := newTestDB(t)
+	db, _, cleanup := newTestDB(t)
 	defer cleanup()
 	f := seedInventory(t, db)
 	srv := testServer(db)
@@ -73,7 +73,7 @@ func TestIntegration_RecordMovement_SkipsUntrackedVariant(t *testing.T) {
 }
 
 func TestIntegration_RecordMovement_AppliesUnitConversion(t *testing.T) {
-	db, cleanup := newTestDB(t)
+	db, _, cleanup := newTestDB(t)
 	defer cleanup()
 	f := seedInventory(t, db)
 	srv := testServer(db)
@@ -100,7 +100,7 @@ func TestIntegration_RecordMovement_AppliesUnitConversion(t *testing.T) {
 }
 
 func TestIntegration_StoreAdjustment_PositiveAndNegative(t *testing.T) {
-	db, cleanup := newTestDB(t)
+	db, _, cleanup := newTestDB(t)
 	defer cleanup()
 	f := seedInventory(t, db)
 	srv := testServer(db)
@@ -139,7 +139,7 @@ func TestIntegration_StoreAdjustment_PositiveAndNegative(t *testing.T) {
 }
 
 func TestIntegration_StoreTransfer_HappyPath(t *testing.T) {
-	db, cleanup := newTestDB(t)
+	db, _, cleanup := newTestDB(t)
 	defer cleanup()
 	f := seedInventory(t, db)
 	srv := testServer(db)
@@ -179,7 +179,7 @@ func TestIntegration_StoreTransfer_HappyPath(t *testing.T) {
 }
 
 func TestIntegration_StoreTransfer_ExactAvailableSucceeds(t *testing.T) {
-	db, cleanup := newTestDB(t)
+	db, _, cleanup := newTestDB(t)
 	defer cleanup()
 	f := seedInventory(t, db)
 	srv := testServer(db)
@@ -209,7 +209,7 @@ func TestIntegration_StoreTransfer_ExactAvailableSucceeds(t *testing.T) {
 }
 
 func TestIntegration_StoreTransfer_InsufficientStock(t *testing.T) {
-	db, cleanup := newTestDB(t)
+	db, _, cleanup := newTestDB(t)
 	defer cleanup()
 	f := seedInventory(t, db)
 	srv := testServer(db)
@@ -242,7 +242,7 @@ func TestIntegration_StoreTransfer_InsufficientStock(t *testing.T) {
 }
 
 func TestIntegration_StoreTransfer_SameWarehouseRejected(t *testing.T) {
-	db, cleanup := newTestDB(t)
+	db, _, cleanup := newTestDB(t)
 	defer cleanup()
 	f := seedInventory(t, db)
 	srv := testServer(db)

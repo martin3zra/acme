@@ -20,7 +20,7 @@ import (
 // vendor's outstanding payable. Built through ParseRequest so the form carries
 // the authenticated user that createAPForVendorBill records as created_by.
 func TestIntegration_VendorBill_CreatesAccountsPayable(t *testing.T) {
-	db, cleanup := newTestDB(t)
+	db, _, cleanup := newTestDB(t)
 	defer cleanup()
 	f := seedInventory(t, db)
 	srv := testServer(db)

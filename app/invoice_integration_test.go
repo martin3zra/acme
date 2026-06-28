@@ -7,7 +7,7 @@ import "testing"
 // Recording invoice (sale) movements draws stock down; reversing them — the
 // path a voided invoice takes — restores it as sale_return entries.
 func TestIntegration_InvoiceSaleMovementsAndReversal(t *testing.T) {
-	db, cleanup := newTestDB(t)
+	db, _, cleanup := newTestDB(t)
 	defer cleanup()
 	f := seedInventory(t, db)
 	srv := testServer(db)

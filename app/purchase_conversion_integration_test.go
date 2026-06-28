@@ -40,7 +40,7 @@ func purchaseForm(kind PurchaseTransactionKind, f inventoryFixtures, vendorID, u
 // Converting a purchase order into a receipt links the two, and confirming the
 // receipt posts inventory movements.
 func TestIntegration_ConvertPurchaseOrderToReceipt(t *testing.T) {
-	db, cleanup := newTestDB(t)
+	db, _, cleanup := newTestDB(t)
 	defer cleanup()
 	f := seedInventory(t, db)
 	srv := testServer(db)
