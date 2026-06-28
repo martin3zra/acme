@@ -15,6 +15,7 @@ require (
 
 require (
 	codeberg.org/go-pdf/fpdf v0.11.1
+	github.com/martin3zra/camel v0.1.0
 	golang.org/x/text v0.26.0
 )
 
@@ -24,7 +25,6 @@ require (
 	github.com/go-sql-driver/mysql v1.9.2 // indirect
 	github.com/golang-sql/civil v0.0.0-20220223132316-b832511892a9 // indirect
 	github.com/golang-sql/sqlexp v0.1.0 // indirect
-	github.com/martin3zra/camel v0.1.0 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect
 	github.com/microsoft/go-mssqldb v1.9.3 // indirect
 	github.com/ncruces/go-strftime v0.1.9 // indirect
