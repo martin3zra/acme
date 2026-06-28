@@ -179,3 +179,8 @@ func must(t *testing.T, err error) {
 		t.Fatalf("setup: %v", err)
 	}
 }
+
+func exec(db *sql.DB, q string, args ...any) error {
+	_, err := db.Exec(q, args...)
+	return err
+}
