@@ -134,6 +134,50 @@ func TestIntegration_DestroyConfirmedReceipt_ReversesMovements(t *testing.T) {
 	}
 }
 
+// A receipt already confirmed cannot be confirmed again.
+func TestIntegration_ConfirmPurchase_RejectsDoubleConfirm(t *testing.T) {
+	db, cleanup := newTestDB(t)
+	defer cleanup()
+	f := seedInventory(t, db)
+	srv := testServer(db)
+	ctx := companyCtx(f.CompanyID)
+
+	var vendorID int
+	must(t, db.QueryRow(
+		`INSERT INTO vendors (company_id, name) VALUES ($1, 'Acme Supply') RETURNING id`,
+		f.CompanyID).Scan(&vendorID))
+	var unitID int
+	must(t, db.QueryRow(
+		`INSERT INTO units (company_id, name, base_qty) VALUES ($1, 'unit', 1) RETURNING id`,
+		f.CompanyID).Scan(&unitID))
+
+	var purchaseID int
+	var uuid string
+	must(t, db.QueryRow(
+		`INSERT INTO purchases (company_id, vendor_id, warehouse_id, code, transaction_kind)
+		 VALUES ($1, $2, $3, 'PR-001', 'purchase_receipt') RETURNING id, uuid`,
+		f.CompanyID, vendorID, f.WHFrom).Scan(&purchaseID, &uuid))
+	must(t, exec(db,
+		`INSERT INTO purchase_items (company_id, purchase_id, variant_id, qty, unit_price, unit_id)
+		 VALUES ($1, $2, $3, 4, 5, $4)`, f.CompanyID, purchaseID, f.VariantID, unitID))
+
+	if err := srv.confirmPurchase(ctx, uuid); err != nil {
+		t.Fatalf("first confirm: %v", err)
+	}
+	if err := srv.confirmPurchase(ctx, uuid); err == nil {
+		t.Fatal("second confirm should be rejected (not in draft status)")
+	}
+
+	// Movements were posted exactly once.
+	var n int
+	must(t, db.QueryRow(
+		`SELECT count(*) FROM inventory_movements
+		  WHERE company_id=$1 AND transaction_kind='purchase_receipt'`, f.CompanyID).Scan(&n))
+	if n != 1 {
+		t.Errorf("purchase_receipt movements: want 1 (no double posting), got %d", n)
+	}
+}
+
 // A purchase order (not a receipt or vendor bill) cannot be confirmed.
 func TestIntegration_ConfirmPurchase_RejectsPurchaseOrder(t *testing.T) {
 	db, cleanup := newTestDB(t)
