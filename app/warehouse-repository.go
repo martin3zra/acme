@@ -31,25 +31,17 @@ func (s *Server) findWarehouseByID(ctx context.Context, warehouseID int) (*wareh
 	return &w, nil
 }
 
+// findWarehouses lists active warehouses for the current company. Pilot:
+// served by playsql (no enum predicate, so the whole query runs through it).
 func (s *Server) findWarehouses(ctx context.Context) ([]*warehouse, error) {
-	rows, err := s.db.Query(
-		"SELECT w.id, w.uuid, w.name, COALESCE(w.location, ''), w.status, w.created_at, w.updated_at, w.deleted_at "+
-			"FROM warehouses w "+
-			"WHERE w.company_id = $1 AND w.deleted_at IS NULL ORDER BY w.name",
-		CurrentCompany(ctx).ID,
-	)
+	models, err := listWarehousesByCompany(ctx, s.play, CurrentCompany(ctx).ID)
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
 
-	data := make([]*warehouse, 0)
-	for rows.Next() {
-		w := new(warehouse)
-		if err := rows.Scan(&w.ID, &w.UUID, &w.Name, &w.Location, &w.Status, &w.CreatedAt, &w.UpdatedAt, &w.DeletedAt); err != nil {
-			return nil, err
-		}
-		data = append(data, w)
+	data := make([]*warehouse, 0, len(models))
+	for _, m := range models {
+		data = append(data, toWarehouse(m))
 	}
 	return data, nil
 }
