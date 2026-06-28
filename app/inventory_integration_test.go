@@ -38,6 +38,45 @@ func TestIntegration_RecordMovement_UpsertsBalance(t *testing.T) {
 	}
 }
 
+func TestIntegration_StoreAdjustment_PositiveAndNegative(t *testing.T) {
+	db, cleanup := newTestDB(t)
+	defer cleanup()
+	f := seedInventory(t, db)
+	srv := testServer(db)
+	ctx := companyCtx(f.CompanyID)
+
+	steps := []struct {
+		qty  float64
+		want float64
+	}{
+		{10, 10},
+		{-4, 6},
+		{-10, -4}, // adjustments may drive the balance negative
+	}
+	for _, s := range steps {
+		form := &StoreAdjustmentForm{
+			VariantID:   f.VariantID,
+			WarehouseID: f.WHFrom,
+			Qty:         s.qty,
+			Reason:      "count correction",
+		}
+		if err := srv.storeAdjustment(ctx, form); err != nil {
+			t.Fatalf("storeAdjustment(%v): %v", s.qty, err)
+		}
+		if got, _ := balanceQty(t, db, f.CompanyID, f.VariantID, f.WHFrom); got != s.want {
+			t.Errorf("after qty %v: balance want %v, got %v", s.qty, s.want, got)
+		}
+	}
+
+	var n int
+	must(t, db.QueryRow(
+		`SELECT count(*) FROM inventory_movements
+		  WHERE company_id=$1 AND transaction_kind='adjustment'`, f.CompanyID).Scan(&n))
+	if n != 3 {
+		t.Errorf("adjustment movements: want 3, got %d", n)
+	}
+}
+
 func TestIntegration_StoreTransfer_HappyPath(t *testing.T) {
 	db, cleanup := newTestDB(t)
 	defer cleanup()

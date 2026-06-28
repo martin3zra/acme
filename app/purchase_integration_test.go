@@ -2,7 +2,10 @@
 
 package app
 
-import "testing"
+import (
+	"database/sql"
+	"testing"
+)
 
 // Confirming a draft purchase receipt posts inventory movements for each line
 // and transitions the purchase to received.
@@ -65,6 +68,69 @@ func TestIntegration_ConfirmPurchase_ReceiptRecordsMovements(t *testing.T) {
 	}
 	if !recorded {
 		t.Error("movement_recorded should be true after confirm")
+	}
+}
+
+// Deleting a confirmed receipt reverses its inventory movements, returning the
+// balance to zero and recording purchase_return entries.
+func TestIntegration_DestroyConfirmedReceipt_ReversesMovements(t *testing.T) {
+	db, cleanup := newTestDB(t)
+	defer cleanup()
+	f := seedInventory(t, db)
+	srv := testServer(db)
+	ctx := companyCtx(f.CompanyID)
+
+	var vendorID int
+	must(t, db.QueryRow(
+		`INSERT INTO vendors (company_id, name) VALUES ($1, 'Acme Supply') RETURNING id`,
+		f.CompanyID).Scan(&vendorID))
+	var unitID int
+	must(t, db.QueryRow(
+		`INSERT INTO units (company_id, name, base_qty) VALUES ($1, 'unit', 1) RETURNING id`,
+		f.CompanyID).Scan(&unitID))
+
+	var purchaseID int
+	var purchaseUUID string
+	must(t, db.QueryRow(
+		`INSERT INTO purchases (company_id, vendor_id, warehouse_id, code, transaction_kind)
+		 VALUES ($1, $2, $3, 'PR-001', 'purchase_receipt') RETURNING id, uuid`,
+		f.CompanyID, vendorID, f.WHFrom).Scan(&purchaseID, &purchaseUUID))
+	must(t, exec(db,
+		`INSERT INTO purchase_items (company_id, purchase_id, variant_id, qty, unit_price, unit_id)
+		 VALUES ($1, $2, $3, 12, 5, $4)`,
+		f.CompanyID, purchaseID, f.VariantID, unitID))
+
+	if err := srv.confirmPurchase(ctx, purchaseUUID); err != nil {
+		t.Fatalf("confirmPurchase: %v", err)
+	}
+	if qty, _ := balanceQty(t, db, f.CompanyID, f.VariantID, f.WHFrom); qty != 12 {
+		t.Fatalf("precondition: balance should be 12 after confirm, got %v", qty)
+	}
+
+	if err := srv.destroyPurchase(ctx, purchaseUUID); err != nil {
+		t.Fatalf("destroyPurchase: %v", err)
+	}
+
+	// Reversal returns the balance to zero.
+	if qty, _ := balanceQty(t, db, f.CompanyID, f.VariantID, f.WHFrom); qty != 0 {
+		t.Errorf("balance after reversal: want 0, got %v", qty)
+	}
+
+	// A purchase_return movement was recorded.
+	var returns int
+	must(t, db.QueryRow(
+		`SELECT count(*) FROM inventory_movements
+		  WHERE company_id=$1 AND transaction_kind='purchase_return'`, f.CompanyID).Scan(&returns))
+	if returns == 0 {
+		t.Error("expected at least one purchase_return movement")
+	}
+
+	// The purchase is soft-deleted.
+	var deletedAt sql.NullTime
+	must(t, db.QueryRow(
+		`SELECT deleted_at FROM purchases WHERE id=$1`, purchaseID).Scan(&deletedAt))
+	if !deletedAt.Valid {
+		t.Error("purchase should be soft-deleted")
 	}
 }
 
