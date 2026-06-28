@@ -1230,6 +1230,26 @@
       }
     }
   },
+  "movements": {
+    "title": "Movimientos de inventario",
+    "description": "Registro de todas las entradas y salidas de stock.",
+    "newTransfer": "Nueva transferencia",
+    "dialogTitle": "Transferir stock entre almacenes",
+    "variant": "Variante del producto",
+    "selectVariant": "Selecciona una variante…",
+    "fromWarehouse": "Almacén de origen",
+    "toWarehouse": "Almacén de destino",
+    "selectWarehouse": "Selecciona un almacén…",
+    "qty": "Cantidad",
+    "qtyPlaceholder": "Ej. 10",
+    "notes": "Notas (opcional)",
+    "notesPlaceholder": "Notas adicionales…",
+    "save": "Guardar transferencia",
+    "errors": {
+      "sameWarehouse": "El almacén de origen y destino deben ser diferentes.",
+      "insufficientStock": "Stock insuficiente en el almacén de origen."
+    }
+  },
   "items": {
     "title": "Productos",
     "description": "Todos los productos creados se muestran aquí.",

@@ -110,6 +110,7 @@ func (s *Server) bootRoutes() {
 
 					route.GET("/inventories/stocks", s.stocksHandler).Can("viewAny:inventory")
 					route.GET("/inventories/transfers", s.transfersHandler).Can("viewAny:inventory")
+					route.POST("/inventories/transfers", s.storeTransferHandler()).Can("create:transfer")
 					route.GET("/inventories/adjustments", s.adjustmentsHandler).Can("viewAny:inventory")
 					route.POST("/inventories/adjustments", s.storeAdjustmentHandler()).Can("create:adjustment")
 

@@ -3,8 +3,15 @@ package app
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"time"
+)
+
+// Sentinel errors for stock transfers, mapped to form fields by the handler.
+var (
+	ErrSameWarehouse     = errors.New("source and destination warehouse must be different")
+	ErrInsufficientStock = errors.New("insufficient stock at the source warehouse")
 )
 
 // ── Internal structs ─────────────────────────────────────────────────────────
@@ -338,6 +345,60 @@ func (s *Server) storeAdjustment(ctx context.Context, form *StoreAdjustmentForm)
 		form.Qty, 0,
 		InventoryMovementKinds.Adjustment,
 		form.Reason, 0,
+	); err != nil {
+		return err
+	}
+
+	return tx.Commit()
+}
+
+func (s *Server) storeTransfer(ctx context.Context, form *StoreTransferForm) error {
+	if form.FromWarehouseID == form.ToWarehouseID {
+		return ErrSameWarehouse
+	}
+
+	companyID := CurrentCompany(ctx).ID
+
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	// Lock the source balance row and ensure there is enough on hand before
+	// moving stock. A missing row means zero quantity available.
+	var available float64
+	err = tx.QueryRow(
+		`SELECT quantity FROM inventory_balances
+		  WHERE company_id = $1 AND variant_id = $2 AND warehouse_id = $3
+		  FOR UPDATE`,
+		companyID, form.VariantID, form.FromWarehouseID,
+	).Scan(&available)
+	if err != nil && err != sql.ErrNoRows {
+		return err
+	}
+	if available < form.Qty {
+		return ErrInsufficientStock
+	}
+
+	// OUT from source (negative), IN to destination (positive).
+	// unitID=0 → base units, no conversion (same as adjustments).
+	if err := s.recordMovement(
+		tx, companyID,
+		form.VariantID, form.FromWarehouseID, 0,
+		-form.Qty, 0,
+		InventoryMovementKinds.Transfer,
+		form.Notes, 0,
+	); err != nil {
+		return err
+	}
+
+	if err := s.recordMovement(
+		tx, companyID,
+		form.VariantID, form.ToWarehouseID, 0,
+		form.Qty, 0,
+		InventoryMovementKinds.Transfer,
+		form.Notes, 0,
 	); err != nil {
 		return err
 	}

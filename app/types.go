@@ -1956,7 +1956,7 @@ type ImportForm struct {
 func (ImportForm) Rules() map[string]any {
 	return map[string]any{
 		"upload_id": "required",
-		"type":      "required|in:items,customers",
+		"type":      "required|in:items,customers,vendors",
 	}
 }
 
@@ -2075,5 +2075,28 @@ func (form StoreAdjustmentForm) Rules() map[string]any {
 		"qty":          "bail|required",
 		"reason":       "bail|required|min:3|max:255",
 		"notes":        "sometimes|max:1000",
+	}
+}
+
+type StoreTransferForm struct {
+	support.FormRequest
+	VariantID       int     `json:"variant_id"`
+	FromWarehouseID int     `json:"from_warehouse_id"`
+	ToWarehouseID   int     `json:"to_warehouse_id"`
+	Qty             float64 `json:"qty"`
+	Notes           string  `json:"notes"`
+}
+
+func (form StoreTransferForm) Authorize() bool {
+	return Can(form.User(), "create:transfer")
+}
+
+func (form StoreTransferForm) Rules() map[string]any {
+	return map[string]any{
+		"variant_id":        "bail|required|exists:items_variants,id",
+		"from_warehouse_id": "bail|required|exists:warehouses,id",
+		"to_warehouse_id":   "bail|required|exists:warehouses,id",
+		"qty":               "bail|required|gt:0",
+		"notes":             "sometimes|max:1000",
 	}
 }

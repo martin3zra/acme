@@ -18,7 +18,17 @@ const CUSTOMER_CSV_CONTENT: string = `Nombre,Nombre del contacto,Telefono,Correo
 "Ferretería Central","Juan Pérez","8095550123","juan@central.com",1500.00,Negocio,ck,50000.00,30,"Crédito Fiscal","CLI-001",TRUE
 "María López","María López","8295559876","maria.l@gmail.com",0.00,Individuo,cash,0.00,0,"Consumo","CLI-002",FALSE`;
 
-type Source = 'items' | 'customers';
+// Vendor headers must match the server-side column map (see mapHeaders in
+// item-handlers.go); they are compared case-insensitively against these keys.
+const VENDOR_CSV_CONTENT: string = `NOMBRE,NOMBRE_CONTACTO,TELEFONO,CORREO,PAGO,CONDICIONES,NOTA_COMPRA,TIEMPO_ENTREGA,CODIGO,TIPO
+"Distribuidora Andina","Carlos Gómez","8095550123","ventas@andina.com",ck,30,"Entregar en almacén central",7,"PRV-001",Negocio
+"Suministros López","Ana López","8295559876","ana@suministros.com",bt,15,"",3,"PRV-002",Individuo`;
+
+const VENDOR_TXT_CONTENT: string = `NOMBRE\tNOMBRE_CONTACTO\tTELEFONO\tCORREO\tPAGO\tCONDICIONES\tNOTA_COMPRA\tTIEMPO_ENTREGA\tCODIGO\tTIPO
+"Distribuidora Andina"\t"Carlos Gómez"\t"8095550123"\t"ventas@andina.com"\tck\t30\t"Entregar en almacén central"\t7\t"PRV-001"\tNegocio
+"Suministros López"\t"Ana López"\t"8295559876"\t"ana@suministros.com"\tbt\t15\t""\t3\t"PRV-002"\tIndividuo`;
+
+type Source = 'items' | 'customers' | 'vendors';
 
 const configs: Record<Source, { contentCsv: string; contentTxt: string; baseName: string }> = {
   items: {
@@ -30,6 +40,11 @@ const configs: Record<Source, { contentCsv: string; contentTxt: string; baseName
     contentCsv: CUSTOMER_CSV_CONTENT,
     contentTxt: CUSTOMER_TXT_CONTENT,
     baseName: 'plantilla_clientes',
+  },
+  vendors: {
+    contentCsv: VENDOR_CSV_CONTENT,
+    contentTxt: VENDOR_TXT_CONTENT,
+    baseName: 'plantilla_proveedores',
   },
 };
 

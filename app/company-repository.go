@@ -555,12 +555,18 @@ func (s *Server) processRows(
 			}
 		}
 
-		if source == "items" {
+		switch source {
+		case "items":
 			if err := s.storeItemFromRecord(companyID, unitID, taxes, importID, row, rowNum, record, &warnings); err != nil {
 				failed++
 				continue
 			}
-		} else {
+		case "vendors":
+			if err := s.storeVendorFromRecord(companyID, importID, row, rowNum, record, &warnings); err != nil {
+				failed++
+				continue
+			}
+		default: // customers
 			if err := s.storeCustomerFromRecord(companyID, importID, row, rowNum, record, &warnings); err != nil {
 				failed++
 				continue
@@ -668,6 +674,44 @@ func (s *Server) storeCustomerFromRecord(companyID int, importID string, row []s
 	// 🔥 ONE ROW = ONE TRANSACTION
 	if err := database.WithTransaction(s.db, func(tx *sql.Tx) error {
 		return s.storeCustomerInternal(tx, companyID, *code, form)
+	}); err != nil {
+		log.Println("storing record", err)
+		if saveErr := database.WithTransaction(s.db, func(tx *sql.Tx) error {
+			return s.saveRowIssue(tx, importID, ImportIssue{
+				Row:     rowNum,
+				Column:  "all",
+				Level:   IssueLevel.Error,
+				Message: err.Error(),
+				Value:   strings.Join(row, ","),
+			})
+		}); saveErr != nil {
+			log.Println("storing record", err)
+			return err
+		}
+	}
+	return nil
+}
+
+func (s *Server) storeVendorFromRecord(companyID int, importID string, row []string, rowNum int, record map[string]any, warnings *[]ImportIssue) error {
+	form, code, err := mapToStoreVendorForm(rowNum, record, warnings)
+	if form == nil || code == nil {
+		if err := database.WithTransaction(s.db, func(tx *sql.Tx) error {
+			return s.saveRowIssue(tx, importID, ImportIssue{
+				Row:     rowNum,
+				Column:  "all",
+				Level:   IssueLevel.Error,
+				Message: err.Error(),
+				Value:   strings.Join(row, ","),
+			})
+		}); err != nil {
+			log.Println("saving row error", err)
+			return err
+		}
+		return errors.New("Unable to map the record to the desired type")
+	}
+	// 🔥 ONE ROW = ONE TRANSACTION — honor the CSV `code` column.
+	if err := database.WithTransaction(s.db, func(tx *sql.Tx) error {
+		return s.storeVendorInternal(tx, companyID, *code, form)
 	}); err != nil {
 		log.Println("storing record", err)
 		if saveErr := database.WithTransaction(s.db, func(tx *sql.Tx) error {

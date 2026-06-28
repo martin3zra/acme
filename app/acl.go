@@ -13,7 +13,7 @@ var groupedPermissions = map[string]map[string][]string{
 	"admin": {
 		"view":    {"dashboard", "invoice", "estimate", "order", "purchase", "customer", "item", "vendor", "inventory", "payment", "payable", "reports", "setting"},
 		"viewAny": {"dashboard", "invoice", "estimate", "order", "purchase", "customer", "item", "vendor", "inventory", "movement", "payment", "payable", "reports", "setting"},
-		"create":  {"dashboard", "invoice", "estimate", "order", "purchase", "customer", "item", "vendor", "inventory", "adjustment", "payment", "payable", "reports", "setting"},
+		"create":  {"dashboard", "invoice", "estimate", "order", "purchase", "customer", "item", "vendor", "inventory", "adjustment", "transfer", "payment", "payable", "reports", "setting"},
 		"delete":  {"dashboard", "invoice", "estimate", "order", "purchase", "customer", "item", "vendor", "inventory", "payment", "payable", "reports", "setting"},
 		"update":  {"dashboard", "invoice", "estimate", "order", "purchase", "customer", "item", "vendor", "inventory", "payment", "payable", "reports", "setting", "company:sequence"},
 		"confirm": {"purchase"},
@@ -21,7 +21,7 @@ var groupedPermissions = map[string]map[string][]string{
 	"supervisor": {
 		"view":    {"dashboard", "customer", "item", "inventory", "payment", "reports"},
 		"viewAny": {"dashboard", "invoice", "estimate", "order", "purchase", "customer", "item", "inventory", "movement", "payment", "payable", "reports"},
-		"create":  {"dashboard", "invoice", "estimate", "order", "purchase", "customer", "item", "inventory", "adjustment", "payment", "payable", "reports"},
+		"create":  {"dashboard", "invoice", "estimate", "order", "purchase", "customer", "item", "inventory", "adjustment", "transfer", "payment", "payable", "reports"},
 		"delete":  {"dashboard", "invoice", "estimate", "order", "purchase", "customer", "item", "inventory", "payment", "reports"},
 		"update":  {"dashboard", "invoice", "estimate", "order", "purchase", "customer", "item", "inventory", "payment", "reports"},
 		"confirm": {"purchase"},

@@ -561,6 +561,21 @@ func mapHeaders(headers []string, source string) (map[int]string, error) {
 		}
 	}
 
+	if source == "vendors" {
+		mapping = map[string]string{
+			"NOMBRE":          "name",
+			"NOMBRE_CONTACTO": "contact_name",
+			"TELEFONO":        "phone",
+			"CORREO":          "email",
+			"PAGO":            "payment_method",
+			"CONDICIONES":     "payment_terms",
+			"NOTA_COMPRA":     "purchase_note",
+			"TIEMPO_ENTREGA":  "lead_time_days",
+			"CODIGO":          "code",
+			"TIPO":            "vendor_type",
+		}
+	}
+
 	result := map[int]string{}
 
 	for i, h := range headers {
