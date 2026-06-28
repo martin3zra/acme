@@ -114,6 +114,7 @@ func companyCtx(companyID int) context.Context {
 // inventoryFixtures holds the seeded ids used by inventory tests.
 type inventoryFixtures struct {
 	CompanyID int
+	ItemID    int
 	VariantID int
 	WHFrom    int
 	WHTo      int
@@ -144,15 +145,14 @@ func seedInventory(t *testing.T, db *sql.DB) inventoryFixtures {
 		`INSERT INTO taxes (company_id, name) VALUES ($1, 'ITBIS') RETURNING id`,
 		f.CompanyID).Scan(&taxID))
 
-	var itemID int
 	must(t, db.QueryRow(
 		`INSERT INTO items (company_id, name, description, tax_id)
-		 VALUES ($1, 'Widget', 'A widget', $2) RETURNING id`, f.CompanyID, taxID).Scan(&itemID))
+		 VALUES ($1, 'Widget', 'A widget', $2) RETURNING id`, f.CompanyID, taxID).Scan(&f.ItemID))
 
 	// track_inventory defaults to true.
 	must(t, db.QueryRow(
 		`INSERT INTO items_variants (company_id, item_id, name)
-		 VALUES ($1, $2, 'Default') RETURNING id`, f.CompanyID, itemID).Scan(&f.VariantID))
+		 VALUES ($1, $2, 'Default') RETURNING id`, f.CompanyID, f.ItemID).Scan(&f.VariantID))
 
 	must(t, db.QueryRow(
 		`INSERT INTO warehouses (company_id, name) VALUES ($1, 'Main') RETURNING id`,
