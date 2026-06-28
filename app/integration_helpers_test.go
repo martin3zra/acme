@@ -114,6 +114,7 @@ func companyCtx(companyID int) context.Context {
 // inventoryFixtures holds the seeded ids used by inventory tests.
 type inventoryFixtures struct {
 	CompanyID int
+	UserID    int
 	ItemID    int
 	VariantID int
 	WHFrom    int
@@ -127,14 +128,13 @@ func seedInventory(t *testing.T, db *sql.DB) inventoryFixtures {
 	t.Helper()
 	var f inventoryFixtures
 
-	var userID int
 	must(t, db.QueryRow(
 		`INSERT INTO users (name, email, password)
-		 VALUES ('Tester', 'tester@example.com', 'x') RETURNING id`).Scan(&userID))
+		 VALUES ('Tester', 'tester@example.com', 'x') RETURNING id`).Scan(&f.UserID))
 
 	var accountID int
 	must(t, db.QueryRow(
-		`INSERT INTO accounts (owner_id) VALUES ($1) RETURNING id`, userID).Scan(&accountID))
+		`INSERT INTO accounts (owner_id) VALUES ($1) RETURNING id`, f.UserID).Scan(&accountID))
 
 	must(t, db.QueryRow(
 		`INSERT INTO companies (name, city, address, account_id)
