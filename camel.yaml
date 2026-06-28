@@ -1,0 +1,18 @@
+# camel.yaml — explicit database migrations for acme
+#
+# Camel reads .env first, then real environment variables. The connection
+# string below is a non-secret placeholder; provide the real DSN at runtime
+# via DB_SOURCE (or DATABASE_URL) so no credentials live in version control:
+#
+#   export DB_SOURCE="postgres://postgres:PASSWORD@localhost:5433/acme?sslmode=disable"
+#   camel status
+#
+db:
+  driver: "postgres"
+  source: "postgres://postgres@localhost:5433/acme?sslmode=disable"
+
+migration:
+  # Camel YAML migrations live here alongside the (Camel-ignored) legacy .sql
+  # migration; the *.yaml pattern keeps the two from colliding.
+  directory: "db/migrations"
+  pattern: "*.yaml"
