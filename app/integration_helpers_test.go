@@ -23,6 +23,8 @@ import (
 	"time"
 
 	"github.com/martin3zra/camel"
+	"github.com/martin3zra/forge/i18n"
+
 	_ "github.com/lib/pq"
 )
 
@@ -99,7 +101,10 @@ func newTestDB(t *testing.T) (*sql.DB, func()) {
 }
 
 func testServer(db *sql.DB) *Server {
-	return &Server{db: db}
+	return &Server{
+		db:         db,
+		translator: i18n.NewTranslator(localesFS, defaultLang, fallbackLang, trans("global")),
+	}
 }
 
 func companyCtx(companyID int) context.Context {
