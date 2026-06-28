@@ -129,44 +129,22 @@ func (s *Server) findVendorByUUID(ctx context.Context, vendorID string) (*vendor
 	return &v, nil
 }
 
+// findVendors lists active vendors for the current company. Pilot: the query is
+// served by playsql; the vendor_type filter is applied in Go because the column
+// is a Postgres enum and playsql binds the parameter as text (an enum = text
+// comparison needs an explicit cast the builder does not emit).
 func (s *Server) findVendors(ctx context.Context, vendorType VendorType) ([]*vendor, error) {
-
-	rows, err := s.db.Query("SELECT v.id, v.uuid, v.code, v.name, v.contact_name, v.phone, v.email, v.status, v.amount_payable, v.purchase_note, v.lead_time_days, "+
-		"v.vendor_type, v.payment_method, v.payment_terms, v.created_at, v.updated_at, v.deleted_at "+
-		"FROM vendors v "+
-		"INNER JOIN companies ON (v.company_id = companies.id) "+
-		"WHERE v.company_id = $1 "+
-		"AND v.deleted_at IS NULL AND ($2 = 'all' OR v.vendor_type = $2::vendor_types) ORDER BY v.name", CurrentCompany(ctx).ID, vendorType)
+	models, err := listVendorsByCompany(ctx, s.play, CurrentCompany(ctx).ID)
 	if err != nil {
 		return nil, err
 	}
-	data := make([]*vendor, 0)
-	for rows.Next() {
-		row := new(vendor)
-		if err = rows.Scan(
-			&row.ID,
-			&row.UUID,
-			&row.Code,
-			&row.Name,
-			&row.ContactName,
-			&row.Phone,
-			&row.Email,
-			&row.Status,
-			&row.AmountPayable,
-			&row.PurchaseNote,
-			&row.LeadTimeDays,
-			&row.VendorType,
-			&row.PaymentMethod,
-			&row.PaymentTerms,
-			&row.CreatedAt,
-			&row.UpdatedAt,
-			&row.DeletedAt,
-		); err != nil {
-			return data, err
-		}
-		row.Address = "LOUISVILLE, Selby 3864 Johnson Street, United States of America"
 
-		data = append(data, row)
+	data := make([]*vendor, 0, len(models))
+	for _, m := range models {
+		if vendorType != "all" && VendorType(m.VendorType) != vendorType {
+			continue
+		}
+		data = append(data, toVendor(m))
 	}
 
 	return data, nil

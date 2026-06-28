@@ -19,6 +19,7 @@ import (
 	"github.com/martin3zra/forge/routing"
 	"github.com/martin3zra/forge/session"
 	"github.com/martin3zra/forge/store"
+	"github.com/martin3zra/playsql"
 )
 
 //go:embed sql/*.sql
@@ -27,6 +28,7 @@ var sqlQueriesFS embed.FS
 type Server struct {
 	qs             store.Query
 	db             *sql.DB
+	play           *playsql.DB
 	config         *Config
 	sessionManager *session.SessionManager
 	mailer         mailer.Mailer
