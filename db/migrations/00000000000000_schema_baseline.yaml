@@ -1,0 +1,1919 @@
+# Camel schema baseline for acme — generated from pg_dump --schema-only.
+# action: raw so native enum types, functions and triggers survive verbatim
+# (Camel's DSL cannot express PG enum types / plpgsql). New schema changes
+# going forward should be authored as readable Camel YAML migrations.
+up:
+  schema:
+    action: raw
+    statements:
+      - |
+        CREATE TYPE public.currency AS ENUM (
+            'DOP',
+            'USD'
+        );
+      - |
+        CREATE TYPE public.customer_types AS ENUM (
+            'individual',
+            'business'
+        );
+      - |
+        CREATE TYPE public.discount_types AS ENUM (
+            'fixed',
+            'percentage'
+        );
+      - |
+        CREATE TYPE public.entity_status AS ENUM (
+            'enabled',
+            'disabled'
+        );
+      - |
+        CREATE TYPE public.inv_transaction_kind AS ENUM (
+            'sale',
+            'sale_return',
+            'purchase_order',
+            'purchase_receipt',
+            'purchase_return',
+            'vendor_bill',
+            'adjustment',
+            'transfer'
+        );
+      - |
+        CREATE TYPE public.invoice_status AS ENUM (
+            'draft',
+            'sent',
+            'overdue',
+            'void',
+            'uncollectible',
+            'closed',
+            'rejected',
+            'accepted'
+        );
+      - |
+        CREATE TYPE public.invoice_terms AS ENUM (
+            'cash',
+            'credit',
+            'opening'
+        );
+      - |
+        CREATE TYPE public.item_type AS ENUM (
+            'product',
+            'service'
+        );
+      - |
+        CREATE TYPE public.notes_type AS ENUM (
+            'invoice',
+            'estimate',
+            'payment'
+        );
+      - |
+        CREATE TYPE public.paid_status AS ENUM (
+            'unpaid',
+            'partial',
+            'paid',
+            'refunded'
+        );
+      - |
+        CREATE TYPE public.payable_status AS ENUM (
+            'draft',
+            'pending',
+            'approved',
+            'rejected',
+            'void'
+        );
+      - |
+        CREATE TYPE public.payment_methods AS ENUM (
+            'cash',
+            'card',
+            'ck',
+            'bt'
+        );
+      - |
+        CREATE TYPE public.payment_status AS ENUM (
+            'void',
+            'pending',
+            'completed',
+            'failed'
+        );
+      - |
+        CREATE TYPE public.payment_terms AS ENUM (
+            'pia',
+            'net7',
+            'net10',
+            'net15',
+            'net30',
+            'net60',
+            'net90',
+            'net120',
+            'net0'
+        );
+      - |
+        CREATE TYPE public.purchase_status AS ENUM (
+            'draft',
+            'pending_approval',
+            'approved',
+            'sent',
+            'partially_received',
+            'received',
+            'billed',
+            'partially_paid',
+            'paid',
+            'cancelled',
+            'closed',
+            'posted'
+        );
+      - |
+        CREATE TYPE public.purchase_transaction_kind AS ENUM (
+            'purchase_order',
+            'purchase_receipt',
+            'vendor_bill'
+        );
+      - |
+        CREATE TYPE public.roles AS ENUM (
+            'developer',
+            'owner',
+            'supervisor',
+            'standard',
+            'admin'
+        );
+      - |
+        CREATE TYPE public.tax_receipts_type AS ENUM (
+            'fiscal',
+            'especial',
+            'e-CF'
+        );
+      - |
+        CREATE TYPE public.transaction_kind AS ENUM (
+            'invoice',
+            'estimate',
+            'order',
+            'template'
+        );
+      - |
+        CREATE TYPE public.user_status AS ENUM (
+            'enabled',
+            'disabled',
+            'onboarding',
+            'active',
+            'banned'
+        );
+      - |
+        CREATE TYPE public.vendor_types AS ENUM (
+            'individual',
+            'business'
+        );
+      - |
+        CREATE FUNCTION public.assert_resource_prerequisites(p_resource text, p_business_id uuid) RETURNS void
+            LANGUAGE plpgsql
+            AS $$
+        DECLARE
+            result jsonb;
+        BEGIN
+            result := check_resource_prerequisites(p_resource, p_business_id);
+        
+            IF NOT (result->>'ok')::boolean THEN
+                RAISE EXCEPTION
+                    'Missing prerequisites for %: %',
+                    p_resource,
+                    result->'missing'
+                USING ERRCODE = 'check_violation';
+            END IF;
+        END;
+        $$;
+      - |
+        CREATE FUNCTION public.check_resource_prerequisites(p_resource text, p_company_id bigint) RETURNS jsonb
+            LANGUAGE plpgsql
+            AS $_$
+        DECLARE
+            r record;
+            missing jsonb := '[]'::jsonb;
+            exists_bool boolean;
+        BEGIN
+            FOR r IN
+                SELECT *
+                FROM resource_prerequisites
+                WHERE resource = p_resource
+                  AND enabled
+            LOOP
+        
+                -- TABLE EXISTS CHECK
+                IF r.dependency_type = 'table_exists' THEN
+                    EXECUTE format(
+                        'SELECT EXISTS (SELECT 1 FROM %I WHERE company_id = $1)',
+                        r.target
+                    )
+                    INTO exists_bool
+                    USING p_company_id;
+        
+                -- JSONB KEY EXISTS CHECK
+                ELSIF r.dependency_type = 'jsonb_key_exists' THEN
+                    EXECUTE format(
+        		        'SELECT (%I -> %L) IS NOT NULL
+        		         FROM companies_settings
+        		         WHERE company_id = $1',
+        		        split_part(r.target, '.', 1),
+        		        split_part(r.target, '.', 2)
+        		    )
+        		    INTO exists_bool
+        		    USING p_company_id;
+        
+        		-- JSONB OBJECT HAS KEYS EXISTS CHECK
+        		ELSIF r.dependency_type = 'jsonb_object_has_keys' THEN
+        		    EXECUTE format(
+        		        'SELECT (%I -> %L) ?& string_to_array(%L, '','')
+        		         FROM companies_settings
+        		         WHERE company_id = $1',
+        		        split_part(split_part(r.target, ':', 1), '.', 1),
+        		        split_part(split_part(r.target, ':', 1), '.', 2),
+        		        split_part(r.target, ':', 2)
+        		    )
+        		    INTO exists_bool
+        		    USING p_company_id;
+        
+                -- CUSTOM CHECK (target contains SQL returning boolean)
+                ELSIF r.dependency_type = 'custom_check' THEN
+                    EXECUTE r.target INTO exists_bool USING p_company_id;
+                END IF;
+        
+                -- Collect missing dependencies
+                IF NOT exists_bool THEN
+                    missing := missing || jsonb_build_object(
+                        'key', r.dependency_key,
+                        'message', r.error_message
+                    );
+                END IF;
+        
+            END LOOP;
+        
+            RETURN jsonb_build_object(
+                'resource', p_resource,
+                'ok', jsonb_array_length(missing) = 0,
+                'missing', missing
+            );
+        END;
+        $_$;
+      - |
+        CREATE FUNCTION public.copy_shared_data(p_company_id integer) RETURNS void
+            LANGUAGE plpgsql
+            AS $$
+        BEGIN
+            INSERT INTO units (company_id, name, base_qty, created_at, updated_at)
+            SELECT p_company_id, name, base_qty, NOW(), NOW()
+            FROM shared_units;
+        END;
+        $$;
+      - |
+        CREATE FUNCTION public.sync_recurrence_next_run_at() RETURNS trigger
+            LANGUAGE plpgsql
+            AS $$
+        BEGIN
+          IF NEW.recurrence ? 'next_run_at' THEN
+            NEW.recurrence_next_run_at :=
+              (NEW.recurrence->>'next_run_at')::timestamp;
+          ELSE
+            NEW.recurrence_next_run_at := NULL;
+          END IF;
+        
+          RETURN NEW;
+        END;
+        $$;
+      - |
+        CREATE FUNCTION public.trg_prevent_ap_overpayment() RETURNS trigger
+            LANGUAGE plpgsql
+            AS $$
+        BEGIN
+            -- Only check when amount_paid is being increased.
+            IF NEW.amount_paid > OLD.amount_paid AND OLD.paid_status = 'paid'::paid_status THEN
+                RAISE EXCEPTION
+                    'Accounts payable entry % is already fully paid and cannot receive additional payments.',
+                    OLD.invoice_number
+                    USING ERRCODE = 'check_violation';
+            END IF;
+            RETURN NEW;
+        END;
+        $$;
+      - |
+        CREATE FUNCTION public.trg_prevent_locked_po_delete() RETURNS trigger
+            LANGUAGE plpgsql
+            AS $$
+        BEGIN
+            IF OLD.transaction_kind = 'purchase_order'
+               AND OLD.paid_status IN ('partial','paid','refunded')
+            THEN
+                RAISE EXCEPTION
+                    'Purchase order % cannot be deleted in status "%".',
+                    OLD.code, OLD.paid_status
+                    USING ERRCODE = 'check_violation';
+            END IF;
+            RETURN OLD;
+        END;
+        $$;
+      - |
+        CREATE FUNCTION public.trg_prevent_po_header_change() RETURNS trigger
+            LANGUAGE plpgsql
+            AS $$
+        DECLARE
+            receipt_count INT;
+        BEGIN
+            IF NEW.transaction_kind = 'purchase_order' THEN
+                IF (OLD.vendor_id IS DISTINCT FROM NEW.vendor_id)
+                   OR (OLD.date IS DISTINCT FROM NEW.date)
+                THEN
+                    SELECT COUNT(*) INTO receipt_count
+                      FROM purchases
+                     WHERE company_id      = NEW.company_id
+                       AND source->>'id'   = NEW.uuid::text
+                       AND transaction_kind = 'purchase_receipt'
+                       AND deleted_at IS NULL;
+        
+                    IF receipt_count > 0 THEN
+                        RAISE EXCEPTION
+                            'Vendor and order date cannot be changed after a receipt has been created for purchase order %.',
+                            NEW.code
+                            USING ERRCODE = 'check_violation';
+                    END IF;
+                END IF;
+            END IF;
+            RETURN NEW;
+        END;
+        $$;
+      - |
+        CREATE FUNCTION public.trg_prevent_po_status_reversal() RETURNS trigger
+            LANGUAGE plpgsql
+            AS $$
+        BEGIN
+            -- Once a PO reaches 'closed', its purchase_status cannot be changed back.
+            IF OLD.transaction_kind = 'purchase_order'
+               AND OLD.purchase_status = 'closed'
+               AND NEW.purchase_status IS DISTINCT FROM OLD.purchase_status
+            THEN
+                RAISE EXCEPTION
+                    'Purchase order % is closed and its status cannot be changed.',
+                    OLD.code
+                    USING ERRCODE = 'check_violation';
+            END IF;
+            RETURN NEW;
+        END;
+        $$;
+      - |
+        CREATE FUNCTION public.trg_set_updated_at() RETURNS trigger
+            LANGUAGE plpgsql
+            AS $$
+        BEGIN
+            NEW.updated_at = NOW();
+            RETURN NEW;
+        END;
+        $$;
+      - |
+        CREATE FUNCTION public.upsert_tax_receipts(p_company_id integer, p_receipts jsonb) RETURNS void
+            LANGUAGE plpgsql
+            AS $$
+        DECLARE
+            r JSONB;
+            v_id INT;
+            v_start_seq INT;
+            v_end_seq INT;
+        BEGIN
+            FOR r IN SELECT jsonb_array_elements(p_receipts)
+            LOOP
+                v_id := (r->>'id')::INT;
+                v_start_seq := (r->>'start')::INT;
+                v_end_seq   := (r->>'end')::INT;
+        
+                INSERT INTO tax_receipts (
+                    company_id,
+                    name,
+                    serie,
+                    type,
+                    sequence_start,
+                    sequence_end,
+                    current,
+                    created_at,
+                    updated_at,
+                    shared_tax_receipt_id
+                )
+                SELECT
+                    p_company_id,
+                    s.name,
+                    s.serie,
+                    s.type,
+                    v_start_seq,
+                    v_end_seq,
+                    v_start_seq,
+                    NOW(),
+                    NOW(),
+                    s.id
+                FROM shared_tax_receipts s
+                WHERE s.id = v_id
+                ON CONFLICT (company_id, id)
+                DO UPDATE SET
+                    sequence_start = v_start_seq,
+                    sequence_end = v_end_seq,
+                    updated_at = NOW();
+            END LOOP;
+        END;
+        $$;
+      - |
+        CREATE FUNCTION public.validate_resource_sequences(p_sequences jsonb) RETURNS boolean
+            LANGUAGE plpgsql
+            AS $$
+        DECLARE
+            v record;
+        BEGIN
+            -- Must be a JSON object
+            IF jsonb_typeof(p_sequences) <> 'object' THEN
+                RETURN false;
+            END IF;
+        
+            -- Must have at least one variant
+            IF NOT EXISTS (
+                SELECT 1 FROM jsonb_each(p_sequences)
+            ) THEN
+                RETURN false;
+            END IF;
+        
+            -- Validate each variant
+            FOR v IN
+                SELECT key, value
+                FROM jsonb_each(p_sequences)
+            LOOP
+                -- Variant must be an object
+                IF jsonb_typeof(v.value) <> 'object' THEN
+                    RETURN false;
+                END IF;
+        
+                -- Required fields
+                IF NOT (
+                    v.value ? 'next'
+                    AND v.value ? 'prefix'
+                    AND v.value ? 'padding'
+                ) THEN
+                    RETURN false;
+                END IF;
+        
+                -- Type validation
+                IF jsonb_typeof(v.value->'next') <> 'number'
+                   OR jsonb_typeof(v.value->'padding') <> 'number'
+                   OR jsonb_typeof(v.value->'prefix') <> 'string' THEN
+                    RETURN false;
+                END IF;
+            END LOOP;
+        
+            RETURN true;
+        END;
+        $$;
+      - |
+        CREATE TABLE public.accounts (
+            id integer NOT NULL,
+            uuid uuid DEFAULT gen_random_uuid(),
+            owner_id bigint NOT NULL,
+            status public.entity_status DEFAULT 'disabled'::public.entity_status,
+            verified_at timestamp without time zone,
+            created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+            updated_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+            deleted_at timestamp without time zone
+        );
+      - |
+        CREATE SEQUENCE public.accounts_id_seq
+            AS integer
+            START WITH 1
+            INCREMENT BY 1
+            NO MINVALUE
+            NO MAXVALUE
+            CACHE 1;
+      - |
+        ALTER SEQUENCE public.accounts_id_seq OWNED BY public.accounts.id;
+      - |
+        CREATE TABLE public.accounts_payable (
+            id bigint NOT NULL,
+            uuid uuid DEFAULT gen_random_uuid() NOT NULL,
+            company_id bigint NOT NULL,
+            invoice_number character varying(100) NOT NULL,
+            vendor_id bigint NOT NULL,
+            purchase_id bigint,
+            approved_by bigint,
+            created_by bigint NOT NULL,
+            invoice_date date NOT NULL,
+            due_date date NOT NULL,
+            paid_at timestamp with time zone,
+            amount_total numeric(15,2) NOT NULL,
+            tax_amount numeric(15,2) DEFAULT 0.00 NOT NULL,
+            discount_amount numeric(15,2) DEFAULT 0.00 NOT NULL,
+            amount_payable numeric(15,2) GENERATED ALWAYS AS (((amount_total + tax_amount) - discount_amount)) STORED,
+            amount_paid numeric(15,2) DEFAULT 0.00 NOT NULL,
+            currency public.currency DEFAULT 'DOP'::public.currency NOT NULL,
+            payment_terms public.payment_terms DEFAULT 'net30'::public.payment_terms,
+            payment_method public.payment_methods DEFAULT 'ck'::public.payment_methods,
+            status public.payable_status DEFAULT 'draft'::public.payable_status NOT NULL,
+            notes text,
+            created_at timestamp with time zone DEFAULT now() NOT NULL,
+            updated_at timestamp with time zone DEFAULT now() NOT NULL,
+            balance_due numeric(15,2) GENERATED ALWAYS AS ((((amount_total + tax_amount) - discount_amount) - amount_paid)) STORED,
+            partially_paid_at timestamp without time zone,
+            overdue_at timestamp with time zone,
+            cancellation_reason text,
+            payment_reference character varying(100) DEFAULT NULL::character varying,
+            paid_status public.paid_status DEFAULT 'unpaid'::public.paid_status NOT NULL,
+            CONSTRAINT accounts_payable_amount_paid_check CHECK ((amount_paid >= (0)::numeric)),
+            CONSTRAINT accounts_payable_amount_total_check CHECK ((amount_total >= (0)::numeric)),
+            CONSTRAINT accounts_payable_discount_amount_check CHECK ((discount_amount >= (0)::numeric)),
+            CONSTRAINT accounts_payable_tax_amount_check CHECK ((tax_amount >= (0)::numeric)),
+            CONSTRAINT chk_ap_amount_paid_lte_payable CHECK ((amount_paid <= ((amount_total + tax_amount) - discount_amount)))
+        );
+      - |
+        COMMENT ON TABLE public.accounts_payable IS 'Vendor invoices awaiting or having received payment (AP module).';
+      - |
+        COMMENT ON COLUMN public.accounts_payable.uuid IS 'Public-safe immutable identifier exposed to external systems/APIs.';
+      - |
+        COMMENT ON COLUMN public.accounts_payable.company_id IS 'Tenant identifier (BIGINT) — references companies(id).';
+      - |
+        COMMENT ON COLUMN public.accounts_payable.invoice_number IS 'Vendor-issued invoice number, unique within a company.';
+      - |
+        COMMENT ON COLUMN public.accounts_payable.paid_at IS 'Timestamp of final payment; NULL while invoice is open.';
+      - |
+        COMMENT ON COLUMN public.accounts_payable.amount_total IS 'Gross invoice amount before tax adjustments.';
+      - |
+        COMMENT ON COLUMN public.accounts_payable.tax_amount IS 'Tax portion included in or added to the invoice.';
+      - |
+        COMMENT ON COLUMN public.accounts_payable.discount_amount IS 'Early-payment or negotiated discount to be deducted.';
+      - |
+        COMMENT ON COLUMN public.accounts_payable.amount_payable IS 'Net amount owed: amount_total + tax_amount - discount_amount (generated).';
+      - |
+        COMMENT ON COLUMN public.accounts_payable.amount_paid IS 'Running total of payments applied against this invoice.';
+      - |
+        COMMENT ON COLUMN public.accounts_payable.status IS 'Lifecycle state: DRAFT → PENDING → APPROVED → PARTIAL/PAID, or CANCELLED.';
+      - |
+        COMMENT ON COLUMN public.accounts_payable.balance_due IS 'Remaining balance owed: amount_payable - amount_paid (generated, always current).';
+      - |
+        COMMENT ON COLUMN public.accounts_payable.partially_paid_at IS 'Timestamp of first partial payment; NULL while invoice is unpaid.';
+      - |
+        COMMENT ON COLUMN public.accounts_payable.overdue_at IS 'Timestamp when the invoice crossed its due date unpaid; NULL if still current.';
+      - |
+        COMMENT ON COLUMN public.accounts_payable.cancellation_reason IS 'Reason for cancellation; populated only when status = CANCELLED.';
+      - |
+        COMMENT ON COLUMN public.accounts_payable.payment_reference IS 'External payment reference: check number, ACH trace ID, wire ref, etc.';
+      - |
+        CREATE SEQUENCE public.accounts_payable_id_seq
+            START WITH 1
+            INCREMENT BY 1
+            NO MINVALUE
+            NO MAXVALUE
+            CACHE 1;
+      - |
+        ALTER SEQUENCE public.accounts_payable_id_seq OWNED BY public.accounts_payable.id;
+      - |
+        CREATE TABLE public.accounts_users (
+            id integer NOT NULL,
+            account_id bigint NOT NULL,
+            user_id bigint NOT NULL,
+            created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+            updated_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+            deleted_at timestamp without time zone
+        );
+      - |
+        CREATE SEQUENCE public.accounts_users_id_seq
+            AS integer
+            START WITH 1
+            INCREMENT BY 1
+            NO MINVALUE
+            NO MAXVALUE
+            CACHE 1;
+      - |
+        ALTER SEQUENCE public.accounts_users_id_seq OWNED BY public.accounts_users.id;
+      - |
+        CREATE TABLE public.companies (
+            id bigint NOT NULL,
+            name character varying(255) NOT NULL,
+            identifier character varying(15),
+            city character varying(100) NOT NULL,
+            address character varying(255) NOT NULL,
+            created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
+            updated_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
+            deleted_at timestamp without time zone,
+            uuid uuid DEFAULT gen_random_uuid() NOT NULL,
+            account_id bigint NOT NULL
+        );
+      - |
+        CREATE SEQUENCE public.companies_id_seq
+            START WITH 1
+            INCREMENT BY 1
+            NO MINVALUE
+            NO MAXVALUE
+            CACHE 1;
+      - |
+        ALTER SEQUENCE public.companies_id_seq OWNED BY public.companies.id;
+      - |
+        CREATE TABLE public.companies_settings (
+            id integer NOT NULL,
+            uuid uuid DEFAULT gen_random_uuid() NOT NULL,
+            company_id bigint NOT NULL,
+            sequences jsonb DEFAULT '{}'::jsonb NOT NULL,
+            created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+            updated_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+            redirect_preferences jsonb DEFAULT '{}'::jsonb NOT NULL
+        );
+      - |
+        CREATE SEQUENCE public.companies_settings_id_seq
+            AS integer
+            START WITH 1
+            INCREMENT BY 1
+            NO MINVALUE
+            NO MAXVALUE
+            CACHE 1;
+      - |
+        ALTER SEQUENCE public.companies_settings_id_seq OWNED BY public.companies_settings.id;
+      - |
+        CREATE TABLE public.companies_users (
+            id integer NOT NULL,
+            company_id bigint NOT NULL,
+            user_id bigint NOT NULL,
+            current boolean DEFAULT false,
+            role public.roles DEFAULT 'standard'::public.roles,
+            created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+            updated_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+            deleted_at timestamp without time zone,
+            abilities jsonb DEFAULT '{}'::jsonb
+        );
+      - |
+        CREATE SEQUENCE public.companies_users_id_seq
+            AS integer
+            START WITH 1
+            INCREMENT BY 1
+            NO MINVALUE
+            NO MAXVALUE
+            CACHE 1;
+      - |
+        ALTER SEQUENCE public.companies_users_id_seq OWNED BY public.companies_users.id;
+      - |
+        CREATE TABLE public.customers (
+            id bigint NOT NULL,
+            company_id bigint NOT NULL,
+            name character varying(255) NOT NULL,
+            contact_name character varying(255) NOT NULL,
+            phone character varying(20) NOT NULL,
+            email character varying(255) NOT NULL,
+            status public.entity_status DEFAULT 'enabled'::public.entity_status NOT NULL,
+            amount_due numeric(16,2) DEFAULT 0 NOT NULL,
+            created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+            updated_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+            deleted_at timestamp without time zone,
+            uuid uuid DEFAULT gen_random_uuid(),
+            customer_type public.customer_types DEFAULT 'individual'::public.customer_types,
+            payment_method public.payment_methods DEFAULT 'cash'::public.payment_methods,
+            credit_limit numeric(16,2) DEFAULT 0 NOT NULL,
+            payment_terms public.payment_terms DEFAULT 'pia'::public.payment_terms NOT NULL,
+            tax_receipt_id bigint,
+            code character varying(20) NOT NULL,
+            credit_limited boolean DEFAULT false NOT NULL
+        );
+      - |
+        CREATE SEQUENCE public.customers_id_seq
+            START WITH 1
+            INCREMENT BY 1
+            NO MINVALUE
+            NO MAXVALUE
+            CACHE 1;
+      - |
+        ALTER SEQUENCE public.customers_id_seq OWNED BY public.customers.id;
+      - |
+        CREATE TABLE public.expenses_categories (
+            id bigint NOT NULL,
+            company_id bigint NOT NULL,
+            name character varying(255) NOT NULL,
+            description text NOT NULL,
+            created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+            updated_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+            deleted_at timestamp without time zone,
+            uuid uuid DEFAULT gen_random_uuid()
+        );
+      - |
+        CREATE SEQUENCE public.expense_categories_id_seq
+            START WITH 1
+            INCREMENT BY 1
+            NO MINVALUE
+            NO MAXVALUE
+            CACHE 1;
+      - |
+        ALTER SEQUENCE public.expense_categories_id_seq OWNED BY public.expenses_categories.id;
+      - |
+        CREATE TABLE public.expenses (
+            id integer NOT NULL,
+            uuid uuid DEFAULT gen_random_uuid(),
+            company_id bigint NOT NULL,
+            category_id bigint NOT NULL,
+            date date NOT NULL,
+            amount numeric(16,2) NOT NULL,
+            notes text,
+            receipt_url character varying,
+            created_at timestamp with time zone DEFAULT now() NOT NULL,
+            updated_at timestamp with time zone DEFAULT now() NOT NULL,
+            deleted_at timestamp with time zone
+        );
+      - |
+        CREATE SEQUENCE public.expenses_id_seq
+            AS integer
+            START WITH 1
+            INCREMENT BY 1
+            NO MINVALUE
+            NO MAXVALUE
+            CACHE 1;
+      - |
+        ALTER SEQUENCE public.expenses_id_seq OWNED BY public.expenses.id;
+      - |
+        CREATE TABLE public.import_row_issues (
+            id bigint NOT NULL,
+            import_id uuid NOT NULL,
+            row_number integer NOT NULL,
+            column_name text,
+            level text NOT NULL,
+            message text NOT NULL,
+            value text,
+            created_at timestamp with time zone DEFAULT now() NOT NULL,
+            CONSTRAINT import_row_issues_level_check CHECK ((level = ANY (ARRAY['error'::text, 'warning'::text, 'info'::text])))
+        );
+      - |
+        CREATE SEQUENCE public.import_row_issues_id_seq
+            START WITH 1
+            INCREMENT BY 1
+            NO MINVALUE
+            NO MAXVALUE
+            CACHE 1;
+      - |
+        ALTER SEQUENCE public.import_row_issues_id_seq OWNED BY public.import_row_issues.id;
+      - |
+        CREATE TABLE public.imports (
+            id uuid NOT NULL,
+            upload_id uuid NOT NULL,
+            user_id uuid NOT NULL,
+            source text NOT NULL,
+            status text NOT NULL,
+            phase text,
+            total_rows integer DEFAULT 0,
+            processed_rows integer DEFAULT 0,
+            success_rows integer DEFAULT 0,
+            failed_rows integer DEFAULT 0,
+            warning_rows integer DEFAULT 0,
+            error_message text,
+            created_at timestamp with time zone DEFAULT now(),
+            started_at timestamp with time zone,
+            finished_at timestamp with time zone
+        );
+      - |
+        CREATE TABLE public.inventory_balances (
+            company_id bigint NOT NULL,
+            variant_id bigint NOT NULL,
+            warehouse_id bigint NOT NULL,
+            quantity numeric(18,6) DEFAULT 0 NOT NULL,
+            updated_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL
+        );
+      - |
+        CREATE TABLE public.inventory_movements (
+            id bigint NOT NULL,
+            company_id bigint NOT NULL,
+            variant_id bigint NOT NULL,
+            warehouse_id bigint NOT NULL,
+            qty numeric(18,6) NOT NULL,
+            unit_cost numeric(15,2) DEFAULT 0 NOT NULL,
+            reference_type character varying(50),
+            reference_id bigint,
+            created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+            transaction_kind public.inv_transaction_kind DEFAULT 'transfer'::public.inv_transaction_kind NOT NULL,
+            CONSTRAINT inventory_movements_qty_check CHECK ((qty <> (0)::numeric))
+        );
+      - |
+        CREATE SEQUENCE public.inventory_movements_id_seq
+            START WITH 1
+            INCREMENT BY 1
+            NO MINVALUE
+            NO MAXVALUE
+            CACHE 1;
+      - |
+        ALTER SEQUENCE public.inventory_movements_id_seq OWNED BY public.inventory_movements.id;
+      - |
+        CREATE TABLE public.invoices (
+            id bigint NOT NULL,
+            company_id bigint NOT NULL,
+            tax_receipt_id bigint,
+            tax_receipt_sequence bigint,
+            customer_id bigint NOT NULL,
+            date date NOT NULL,
+            type public.invoice_terms DEFAULT 'cash'::public.invoice_terms,
+            due_on date,
+            amount numeric(16,2) DEFAULT 0 NOT NULL,
+            discount jsonb,
+            tax numeric(16,2) DEFAULT 0 NOT NULL,
+            total numeric(16,2) DEFAULT 0 NOT NULL,
+            amount_due numeric(16,2) DEFAULT 0 NOT NULL,
+            note text NOT NULL,
+            status public.invoice_status DEFAULT 'draft'::public.invoice_status NOT NULL,
+            paid_status public.paid_status DEFAULT 'unpaid'::public.paid_status NOT NULL,
+            created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+            updated_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+            deleted_at timestamp without time zone,
+            payment jsonb,
+            uuid uuid DEFAULT gen_random_uuid(),
+            code character varying(20) NOT NULL,
+            tax_number character varying(20),
+            transaction_kind public.transaction_kind DEFAULT 'invoice'::public.transaction_kind NOT NULL,
+            source jsonb,
+            recurrence jsonb,
+            recurrence_next_run_at timestamp without time zone,
+            movement_recorded boolean DEFAULT false NOT NULL,
+            CONSTRAINT recurrence_format_check CHECK (((recurrence IS NULL) OR ((jsonb_typeof(recurrence) = 'object'::text) AND (recurrence ? 'enabled'::text) AND (recurrence ? 'name'::text) AND (recurrence ? 'type'::text) AND (recurrence ? 'send_email'::text) AND (recurrence ? 'frequency'::text) AND (recurrence ? 'interval'::text) AND (recurrence ? 'timezone'::text) AND (recurrence ? 'start_date'::text) AND (recurrence ? 'until'::text)))),
+            CONSTRAINT source_valid CHECK (((source IS NULL) OR ((source ? 'type'::text) AND (source ? 'id'::text) AND ((source ->> 'type'::text) = ANY (ARRAY['estimate'::text, 'order'::text, 'quote'::text, 'invoice'::text, 'template'::text])) AND (((source ->> 'id'::text) ~ '^[0-9]+$'::text) OR ((source ->> 'id'::text) ~ '^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$'::text) OR ((source ->> 'id'::text) ~ '^[A-Za-z0-9_-]+$'::text)))))
+        );
+      - |
+        CREATE SEQUENCE public.invoices_id_seq
+            START WITH 1
+            INCREMENT BY 1
+            NO MINVALUE
+            NO MAXVALUE
+            CACHE 1;
+      - |
+        ALTER SEQUENCE public.invoices_id_seq OWNED BY public.invoices.id;
+      - |
+        CREATE TABLE public.invoices_items (
+            id bigint NOT NULL,
+            company_id bigint NOT NULL,
+            invoice_id bigint NOT NULL,
+            item_id bigint NOT NULL,
+            unit_id bigint NOT NULL,
+            qty integer DEFAULT 0 NOT NULL,
+            price numeric(16,2) DEFAULT 0 NOT NULL,
+            rate numeric(16,2) DEFAULT 0 NOT NULL,
+            created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+            updated_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+            deleted_at timestamp without time zone,
+            amount numeric(16,2) DEFAULT 0 NOT NULL,
+            tax numeric(16,2) DEFAULT 0 NOT NULL,
+            total numeric(16,2) DEFAULT 0 NOT NULL,
+            warehouse_id bigint
+        );
+      - |
+        CREATE SEQUENCE public.invoices_items_id_seq
+            START WITH 1
+            INCREMENT BY 1
+            NO MINVALUE
+            NO MAXVALUE
+            CACHE 1;
+      - |
+        ALTER SEQUENCE public.invoices_items_id_seq OWNED BY public.invoices_items.id;
+      - |
+        CREATE TABLE public.items (
+            id bigint NOT NULL,
+            company_id bigint NOT NULL,
+            name character varying(255) NOT NULL,
+            description text NOT NULL,
+            price numeric(16,2) DEFAULT 0 NOT NULL,
+            tax_id bigint NOT NULL,
+            status public.entity_status DEFAULT 'enabled'::public.entity_status NOT NULL,
+            created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+            updated_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+            deleted_at timestamp without time zone,
+            uuid uuid DEFAULT gen_random_uuid(),
+            item_type public.item_type DEFAULT 'product'::public.item_type NOT NULL,
+            identifiers jsonb DEFAULT '{}'::jsonb
+        );
+      - |
+        CREATE SEQUENCE public.items_id_seq
+            START WITH 1
+            INCREMENT BY 1
+            NO MINVALUE
+            NO MAXVALUE
+            CACHE 1;
+      - |
+        ALTER SEQUENCE public.items_id_seq OWNED BY public.items.id;
+      - |
+        CREATE TABLE public.items_units (
+            id bigint NOT NULL,
+            company_id bigint NOT NULL,
+            unit_id bigint NOT NULL,
+            item_id bigint NOT NULL,
+            created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+            updated_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+            deleted_at timestamp without time zone
+        );
+      - |
+        CREATE SEQUENCE public.items_units_id_seq
+            START WITH 1
+            INCREMENT BY 1
+            NO MINVALUE
+            NO MAXVALUE
+            CACHE 1;
+      - |
+        ALTER SEQUENCE public.items_units_id_seq OWNED BY public.items_units.id;
+      - |
+        CREATE TABLE public.items_variants (
+            id bigint NOT NULL,
+            uuid uuid DEFAULT gen_random_uuid() NOT NULL,
+            company_id bigint NOT NULL,
+            item_id bigint NOT NULL,
+            name character varying(255) NOT NULL,
+            sku character varying(100),
+            combination_signature character varying(255) DEFAULT 'default'::character varying NOT NULL,
+            reference character varying(100),
+            barcode character varying(100),
+            vendor_reference character varying(100),
+            price numeric(15,2) DEFAULT 0 NOT NULL,
+            cost_price numeric(15,2) DEFAULT 0 NOT NULL,
+            is_default boolean DEFAULT false NOT NULL,
+            track_inventory boolean DEFAULT true NOT NULL,
+            status public.entity_status DEFAULT 'enabled'::public.entity_status NOT NULL,
+            created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+            updated_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+            deleted_at timestamp without time zone
+        );
+      - |
+        CREATE SEQUENCE public.items_variants_id_seq
+            START WITH 1
+            INCREMENT BY 1
+            NO MINVALUE
+            NO MAXVALUE
+            CACHE 1;
+      - |
+        ALTER SEQUENCE public.items_variants_id_seq OWNED BY public.items_variants.id;
+      - |
+        CREATE TABLE public.notes (
+            id bigint NOT NULL,
+            company_id bigint NOT NULL,
+            name character varying(255) NOT NULL,
+            type public.notes_type,
+            content text NOT NULL,
+            created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+            updated_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+            deleted_at timestamp without time zone
+        );
+      - |
+        CREATE SEQUENCE public.notes_id_seq
+            START WITH 1
+            INCREMENT BY 1
+            NO MINVALUE
+            NO MAXVALUE
+            CACHE 1;
+      - |
+        ALTER SEQUENCE public.notes_id_seq OWNED BY public.notes.id;
+      - |
+        CREATE TABLE public.oauth_access_tokens (
+            id integer NOT NULL,
+            user_id integer,
+            token text NOT NULL,
+            revoked smallint NOT NULL,
+            created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
+            updated_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
+            expires_at timestamp without time zone
+        );
+      - |
+        CREATE SEQUENCE public.oauth_access_tokens_id_seq
+            AS integer
+            START WITH 1
+            INCREMENT BY 1
+            NO MINVALUE
+            NO MAXVALUE
+            CACHE 1;
+      - |
+        ALTER SEQUENCE public.oauth_access_tokens_id_seq OWNED BY public.oauth_access_tokens.id;
+      - |
+        CREATE TABLE public.oauth_refresh_tokens (
+            id integer NOT NULL,
+            user_id integer,
+            refresh_token text NOT NULL,
+            revoked smallint NOT NULL,
+            created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
+            updated_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
+            expires_at timestamp without time zone
+        );
+      - |
+        CREATE SEQUENCE public.oauth_refresh_tokens_id_seq
+            AS integer
+            START WITH 1
+            INCREMENT BY 1
+            NO MINVALUE
+            NO MAXVALUE
+            CACHE 1;
+      - |
+        ALTER SEQUENCE public.oauth_refresh_tokens_id_seq OWNED BY public.oauth_refresh_tokens.id;
+      - |
+        CREATE TABLE public.payables (
+            id bigint NOT NULL,
+            uuid uuid DEFAULT gen_random_uuid() NOT NULL,
+            company_id bigint NOT NULL,
+            accounts_payable_id bigint NOT NULL,
+            vendor_id bigint NOT NULL,
+            created_at timestamp with time zone DEFAULT now() NOT NULL,
+            updated_at timestamp with time zone DEFAULT now() NOT NULL
+        );
+      - |
+        COMMENT ON TABLE public.payables IS 'Tracks AP invoices registered as liabilities, mirrors the receivables table on the AR side.';
+      - |
+        COMMENT ON COLUMN public.payables.accounts_payable_id IS 'One-to-one reference to the accounts_payable entry.';
+      - |
+        CREATE SEQUENCE public.payables_id_seq
+            START WITH 1
+            INCREMENT BY 1
+            NO MINVALUE
+            NO MAXVALUE
+            CACHE 1;
+      - |
+        ALTER SEQUENCE public.payables_id_seq OWNED BY public.payables.id;
+      - |
+        CREATE UNLOGGED TABLE public.preview_cache (
+            key text NOT NULL,
+            payload jsonb NOT NULL,
+            updated_at timestamp with time zone DEFAULT now() NOT NULL
+        );
+      - |
+        CREATE TABLE public.purchase_items (
+            id bigint NOT NULL,
+            company_id bigint NOT NULL,
+            purchase_id bigint NOT NULL,
+            variant_id bigint NOT NULL,
+            qty numeric(18,6) NOT NULL,
+            unit_price numeric(15,2) NOT NULL,
+            line_total numeric(15,2) DEFAULT 0 NOT NULL,
+            created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+            updated_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+            unit_id bigint,
+            received_qty numeric(18,6) DEFAULT 0 NOT NULL,
+            discount numeric(15,2) DEFAULT 0 NOT NULL,
+            tax_id bigint,
+            tax_amount numeric(15,2) DEFAULT 0 NOT NULL,
+            notes text,
+            deleted_at timestamp without time zone,
+            CONSTRAINT purchase_items_qty_check CHECK ((qty > (0)::numeric)),
+            CONSTRAINT purchase_items_received_lte_qty CHECK ((received_qty <= qty)),
+            CONSTRAINT purchase_items_unit_price_check CHECK ((unit_price >= (0)::numeric))
+        );
+      - |
+        CREATE SEQUENCE public.purchase_items_id_seq
+            START WITH 1
+            INCREMENT BY 1
+            NO MINVALUE
+            NO MAXVALUE
+            CACHE 1;
+      - |
+        ALTER SEQUENCE public.purchase_items_id_seq OWNED BY public.purchase_items.id;
+      - |
+        CREATE TABLE public.purchases (
+            id bigint NOT NULL,
+            company_id bigint NOT NULL,
+            vendor_id bigint NOT NULL,
+            warehouse_id bigint NOT NULL,
+            transaction_kind public.purchase_transaction_kind DEFAULT 'purchase_order'::public.purchase_transaction_kind NOT NULL,
+            status public.entity_status DEFAULT 'enabled'::public.entity_status NOT NULL,
+            notes text,
+            subtotal numeric(15,2) DEFAULT 0 NOT NULL,
+            total numeric(15,2) DEFAULT 0 NOT NULL,
+            created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+            updated_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+            deleted_at timestamp without time zone,
+            code character varying(20) NOT NULL,
+            source jsonb,
+            date date DEFAULT CURRENT_DATE NOT NULL,
+            due_date date,
+            purchase_status public.purchase_status DEFAULT 'draft'::public.purchase_status NOT NULL,
+            approved_by bigint,
+            approved_at timestamp without time zone,
+            currency public.currency DEFAULT 'DOP'::public.currency NOT NULL,
+            exchange_rate numeric(18,6) DEFAULT 1 NOT NULL,
+            discount_amount numeric(15,2) DEFAULT 0 NOT NULL,
+            tax_amount numeric(15,2) DEFAULT 0 NOT NULL,
+            payment_status public.paid_status DEFAULT 'unpaid'::public.paid_status NOT NULL,
+            uuid uuid DEFAULT gen_random_uuid(),
+            invoice_number character varying(100) DEFAULT NULL::character varying,
+            movement_recorded boolean DEFAULT false NOT NULL,
+            CONSTRAINT purchases_approval_consistency CHECK ((((approved_by IS NULL) AND (approved_at IS NULL)) OR ((approved_by IS NOT NULL) AND (approved_at IS NOT NULL)))),
+            CONSTRAINT purchases_source_check CHECK (((source IS NULL) OR ((source ? 'type'::text) AND (source ? 'id'::text) AND ((source ->> 'type'::text) = ANY (ARRAY['purchase_order'::text, 'purchase_receipt'::text, 'vendor_bill'::text])) AND (((source ->> 'id'::text) ~ '^[0-9]+$'::text) OR ((source ->> 'id'::text) ~ '^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$'::text) OR ((source ->> 'id'::text) ~ '^[A-Za-z0-9_-]+$'::text)))))
+        );
+      - |
+        CREATE SEQUENCE public.purchases_id_seq
+            START WITH 1
+            INCREMENT BY 1
+            NO MINVALUE
+            NO MAXVALUE
+            CACHE 1;
+      - |
+        ALTER SEQUENCE public.purchases_id_seq OWNED BY public.purchases.id;
+      - |
+        CREATE TABLE public.receivables (
+            id bigint NOT NULL,
+            company_id bigint NOT NULL,
+            invoice_id bigint NOT NULL,
+            customer_id bigint NOT NULL,
+            created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+            updated_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+            deleted_at timestamp without time zone,
+            uuid uuid DEFAULT gen_random_uuid()
+        );
+      - |
+        CREATE SEQUENCE public.receivables_id_seq
+            START WITH 1
+            INCREMENT BY 1
+            NO MINVALUE
+            NO MAXVALUE
+            CACHE 1;
+      - |
+        ALTER SEQUENCE public.receivables_id_seq OWNED BY public.receivables.id;
+      - |
+        CREATE TABLE public.receivables_income (
+            id bigint NOT NULL,
+            company_id bigint NOT NULL,
+            date date NOT NULL,
+            customer_id bigint NOT NULL,
+            amount numeric(16,2) NOT NULL,
+            created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+            updated_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+            deleted_at timestamp without time zone,
+            uuid uuid DEFAULT gen_random_uuid(),
+            notes text,
+            payment jsonb,
+            status public.payment_status DEFAULT 'pending'::public.payment_status NOT NULL,
+            code character varying(20) NOT NULL
+        );
+      - |
+        CREATE SEQUENCE public.receivables_income_id_seq
+            START WITH 1
+            INCREMENT BY 1
+            NO MINVALUE
+            NO MAXVALUE
+            CACHE 1;
+      - |
+        ALTER SEQUENCE public.receivables_income_id_seq OWNED BY public.receivables_income.id;
+      - |
+        CREATE TABLE public.receivables_income_items (
+            id bigint NOT NULL,
+            company_id bigint NOT NULL,
+            date date NOT NULL,
+            receivable_income_id bigint NOT NULL,
+            invoice_id bigint NOT NULL,
+            amount_due numeric(16,2) NOT NULL,
+            payment_amount numeric(16,2) NOT NULL,
+            created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+            updated_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+            deleted_at timestamp without time zone
+        );
+      - |
+        CREATE SEQUENCE public.receivables_income_items_id_seq
+            START WITH 1
+            INCREMENT BY 1
+            NO MINVALUE
+            NO MAXVALUE
+            CACHE 1;
+      - |
+        ALTER SEQUENCE public.receivables_income_items_id_seq OWNED BY public.receivables_income_items.id;
+      - |
+        CREATE TABLE public.resource_prerequisites (
+            id bigint NOT NULL,
+            resource text NOT NULL,
+            dependency_key text NOT NULL,
+            dependency_type text NOT NULL,
+            target text NOT NULL,
+            error_message text NOT NULL,
+            enabled boolean DEFAULT true NOT NULL,
+            CONSTRAINT resource_prerequisites_dependency_type_check CHECK ((dependency_type = ANY (ARRAY['table_exists'::text, 'sequence_exists'::text, 'setting_exists'::text, 'custom_check'::text, 'jsonb_key_exists'::text, 'jsonb_object_has_keys'::text])))
+        );
+      - |
+        CREATE SEQUENCE public.resource_prerequisites_id_seq
+            START WITH 1
+            INCREMENT BY 1
+            NO MINVALUE
+            NO MAXVALUE
+            CACHE 1;
+      - |
+        ALTER SEQUENCE public.resource_prerequisites_id_seq OWNED BY public.resource_prerequisites.id;
+      - |
+        CREATE TABLE public.sessions (
+            id character varying(100) NOT NULL,
+            user_id bigint,
+            ip_address character varying(45),
+            user_agent character varying(255),
+            payload text,
+            last_activity bigint,
+            created_at bigint
+        );
+      - |
+        CREATE TABLE public.shared_tax_receipts (
+            id bigint,
+            name character varying(255),
+            serie character varying(4),
+            type public.tax_receipts_type,
+            created_at timestamp without time zone,
+            updated_at timestamp without time zone
+        );
+      - |
+        CREATE TABLE public.shared_units (
+            id bigint,
+            name character varying(255),
+            created_at timestamp without time zone,
+            updated_at timestamp without time zone,
+            base_qty integer
+        );
+      - |
+        CREATE TABLE public.tax_receipts (
+            id bigint NOT NULL,
+            company_id bigint NOT NULL,
+            name character varying(255) NOT NULL,
+            serie character varying(4) NOT NULL,
+            type public.tax_receipts_type NOT NULL,
+            sequence_start bigint NOT NULL,
+            sequence_end bigint NOT NULL,
+            current bigint NOT NULL,
+            created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+            updated_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+            deleted_at timestamp without time zone,
+            shared_tax_receipt_id integer
+        );
+      - |
+        CREATE SEQUENCE public.tax_receipts_id_seq
+            START WITH 1
+            INCREMENT BY 1
+            NO MINVALUE
+            NO MAXVALUE
+            CACHE 1;
+      - |
+        ALTER SEQUENCE public.tax_receipts_id_seq OWNED BY public.tax_receipts.id;
+      - |
+        CREATE TABLE public.taxes (
+            id bigint NOT NULL,
+            company_id bigint NOT NULL,
+            name character varying(255) NOT NULL,
+            rate numeric(16,2) DEFAULT 0 NOT NULL,
+            created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+            updated_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+            deleted_at timestamp without time zone,
+            uuid uuid DEFAULT gen_random_uuid()
+        );
+      - |
+        CREATE SEQUENCE public.taxes_id_seq
+            START WITH 1
+            INCREMENT BY 1
+            NO MINVALUE
+            NO MAXVALUE
+            CACHE 1;
+      - |
+        ALTER SEQUENCE public.taxes_id_seq OWNED BY public.taxes.id;
+      - |
+        CREATE TABLE public.units (
+            id bigint NOT NULL,
+            company_id bigint NOT NULL,
+            name character varying(255) NOT NULL,
+            created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+            updated_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+            deleted_at timestamp without time zone,
+            base_qty integer NOT NULL
+        );
+      - |
+        CREATE SEQUENCE public.units_id_seq
+            START WITH 1
+            INCREMENT BY 1
+            NO MINVALUE
+            NO MAXVALUE
+            CACHE 1;
+      - |
+        ALTER SEQUENCE public.units_id_seq OWNED BY public.units.id;
+      - |
+        CREATE TABLE public.upload_sessions (
+            id character varying(36) NOT NULL,
+            user_id bigint NOT NULL,
+            filename text NOT NULL,
+            file_size bigint NOT NULL,
+            status character varying(20) NOT NULL,
+            total_chunks integer,
+            uploaded_chunks integer DEFAULT 0,
+            error_message text,
+            created_at timestamp without time zone DEFAULT now() NOT NULL,
+            updated_at timestamp without time zone DEFAULT now() NOT NULL,
+            delimiter character(1),
+            encoding character varying(20) DEFAULT 'UTF-8'::character varying NOT NULL,
+            CONSTRAINT upload_sessions_delimiter_check CHECK ((delimiter = ANY (ARRAY[','::bpchar, ';'::bpchar, '	'::bpchar, '|'::bpchar])))
+        );
+      - |
+        CREATE TABLE public.users (
+            id bigint NOT NULL,
+            name character varying(255) NOT NULL,
+            email character varying(255) NOT NULL,
+            password character varying(255) NOT NULL,
+            email_verified_at timestamp without time zone,
+            last_password_reset timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+            created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+            updated_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+            deleted_at timestamp without time zone,
+            uuid uuid DEFAULT gen_random_uuid() NOT NULL,
+            status public.user_status DEFAULT 'enabled'::public.user_status,
+            must_change_password boolean DEFAULT true NOT NULL,
+            pending_email character varying(255)
+        );
+      - |
+        CREATE SEQUENCE public.users_id_seq
+            START WITH 1
+            INCREMENT BY 1
+            NO MINVALUE
+            NO MAXVALUE
+            CACHE 1;
+      - |
+        ALTER SEQUENCE public.users_id_seq OWNED BY public.users.id;
+      - |
+        CREATE TABLE public.users_verification_token (
+            id bigint NOT NULL,
+            user_id bigint NOT NULL,
+            token character varying(255) NOT NULL,
+            created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+            expired_at timestamp without time zone NOT NULL
+        );
+      - |
+        CREATE SEQUENCE public.users_verification_token_id_seq
+            START WITH 1
+            INCREMENT BY 1
+            NO MINVALUE
+            NO MAXVALUE
+            CACHE 1;
+      - |
+        ALTER SEQUENCE public.users_verification_token_id_seq OWNED BY public.users_verification_token.id;
+      - |
+        CREATE TABLE public.vendors (
+            id bigint NOT NULL,
+            company_id bigint NOT NULL,
+            name character varying(255) NOT NULL,
+            status public.entity_status DEFAULT 'enabled'::public.entity_status NOT NULL,
+            created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
+            updated_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
+            deleted_at timestamp without time zone,
+            payment_terms public.payment_terms DEFAULT 'pia'::public.payment_terms NOT NULL,
+            currency public.currency DEFAULT 'DOP'::public.currency NOT NULL,
+            purchase_note text DEFAULT ''::text NOT NULL,
+            lead_time_days integer DEFAULT 0 NOT NULL,
+            vendor_type public.vendor_types DEFAULT 'individual'::public.vendor_types NOT NULL,
+            uuid uuid DEFAULT gen_random_uuid(),
+            contact_name character varying(255) DEFAULT ''::character varying,
+            phone character varying(20) DEFAULT ''::character varying,
+            email character varying(255) DEFAULT ''::character varying,
+            amount_payable numeric(16,2) DEFAULT 0,
+            payment_method public.payment_methods DEFAULT 'cash'::public.payment_methods,
+            code character varying(20) DEFAULT ''::character varying
+        );
+      - |
+        CREATE SEQUENCE public.vendors_id_seq
+            START WITH 1
+            INCREMENT BY 1
+            NO MINVALUE
+            NO MAXVALUE
+            CACHE 1;
+      - |
+        ALTER SEQUENCE public.vendors_id_seq OWNED BY public.vendors.id;
+      - |
+        CREATE TABLE public.warehouses (
+            id bigint NOT NULL,
+            company_id bigint NOT NULL,
+            uuid uuid DEFAULT gen_random_uuid() NOT NULL,
+            name character varying(150) NOT NULL,
+            location text,
+            status public.entity_status DEFAULT 'enabled'::public.entity_status NOT NULL,
+            created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+            updated_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+            deleted_at timestamp without time zone
+        );
+      - |
+        CREATE SEQUENCE public.warehouses_id_seq
+            START WITH 1
+            INCREMENT BY 1
+            NO MINVALUE
+            NO MAXVALUE
+            CACHE 1;
+      - |
+        ALTER SEQUENCE public.warehouses_id_seq OWNED BY public.warehouses.id;
+      - |
+        ALTER TABLE ONLY public.accounts ALTER COLUMN id SET DEFAULT nextval('public.accounts_id_seq'::regclass);
+      - |
+        ALTER TABLE ONLY public.accounts_payable ALTER COLUMN id SET DEFAULT nextval('public.accounts_payable_id_seq'::regclass);
+      - |
+        ALTER TABLE ONLY public.accounts_users ALTER COLUMN id SET DEFAULT nextval('public.accounts_users_id_seq'::regclass);
+      - |
+        ALTER TABLE ONLY public.companies ALTER COLUMN id SET DEFAULT nextval('public.companies_id_seq'::regclass);
+      - |
+        ALTER TABLE ONLY public.companies_settings ALTER COLUMN id SET DEFAULT nextval('public.companies_settings_id_seq'::regclass);
+      - |
+        ALTER TABLE ONLY public.companies_users ALTER COLUMN id SET DEFAULT nextval('public.companies_users_id_seq'::regclass);
+      - |
+        ALTER TABLE ONLY public.customers ALTER COLUMN id SET DEFAULT nextval('public.customers_id_seq'::regclass);
+      - |
+        ALTER TABLE ONLY public.expenses ALTER COLUMN id SET DEFAULT nextval('public.expenses_id_seq'::regclass);
+      - |
+        ALTER TABLE ONLY public.expenses_categories ALTER COLUMN id SET DEFAULT nextval('public.expense_categories_id_seq'::regclass);
+      - |
+        ALTER TABLE ONLY public.import_row_issues ALTER COLUMN id SET DEFAULT nextval('public.import_row_issues_id_seq'::regclass);
+      - |
+        ALTER TABLE ONLY public.inventory_movements ALTER COLUMN id SET DEFAULT nextval('public.inventory_movements_id_seq'::regclass);
+      - |
+        ALTER TABLE ONLY public.invoices ALTER COLUMN id SET DEFAULT nextval('public.invoices_id_seq'::regclass);
+      - |
+        ALTER TABLE ONLY public.invoices_items ALTER COLUMN id SET DEFAULT nextval('public.invoices_items_id_seq'::regclass);
+      - |
+        ALTER TABLE ONLY public.items ALTER COLUMN id SET DEFAULT nextval('public.items_id_seq'::regclass);
+      - |
+        ALTER TABLE ONLY public.items_units ALTER COLUMN id SET DEFAULT nextval('public.items_units_id_seq'::regclass);
+      - |
+        ALTER TABLE ONLY public.items_variants ALTER COLUMN id SET DEFAULT nextval('public.items_variants_id_seq'::regclass);
+      - |
+        ALTER TABLE ONLY public.notes ALTER COLUMN id SET DEFAULT nextval('public.notes_id_seq'::regclass);
+      - |
+        ALTER TABLE ONLY public.oauth_access_tokens ALTER COLUMN id SET DEFAULT nextval('public.oauth_access_tokens_id_seq'::regclass);
+      - |
+        ALTER TABLE ONLY public.oauth_refresh_tokens ALTER COLUMN id SET DEFAULT nextval('public.oauth_refresh_tokens_id_seq'::regclass);
+      - |
+        ALTER TABLE ONLY public.payables ALTER COLUMN id SET DEFAULT nextval('public.payables_id_seq'::regclass);
+      - |
+        ALTER TABLE ONLY public.purchase_items ALTER COLUMN id SET DEFAULT nextval('public.purchase_items_id_seq'::regclass);
+      - |
+        ALTER TABLE ONLY public.purchases ALTER COLUMN id SET DEFAULT nextval('public.purchases_id_seq'::regclass);
+      - |
+        ALTER TABLE ONLY public.receivables ALTER COLUMN id SET DEFAULT nextval('public.receivables_id_seq'::regclass);
+      - |
+        ALTER TABLE ONLY public.receivables_income ALTER COLUMN id SET DEFAULT nextval('public.receivables_income_id_seq'::regclass);
+      - |
+        ALTER TABLE ONLY public.receivables_income_items ALTER COLUMN id SET DEFAULT nextval('public.receivables_income_items_id_seq'::regclass);
+      - |
+        ALTER TABLE ONLY public.resource_prerequisites ALTER COLUMN id SET DEFAULT nextval('public.resource_prerequisites_id_seq'::regclass);
+      - |
+        ALTER TABLE ONLY public.tax_receipts ALTER COLUMN id SET DEFAULT nextval('public.tax_receipts_id_seq'::regclass);
+      - |
+        ALTER TABLE ONLY public.taxes ALTER COLUMN id SET DEFAULT nextval('public.taxes_id_seq'::regclass);
+      - |
+        ALTER TABLE ONLY public.units ALTER COLUMN id SET DEFAULT nextval('public.units_id_seq'::regclass);
+      - |
+        ALTER TABLE ONLY public.users ALTER COLUMN id SET DEFAULT nextval('public.users_id_seq'::regclass);
+      - |
+        ALTER TABLE ONLY public.users_verification_token ALTER COLUMN id SET DEFAULT nextval('public.users_verification_token_id_seq'::regclass);
+      - |
+        ALTER TABLE ONLY public.vendors ALTER COLUMN id SET DEFAULT nextval('public.vendors_id_seq'::regclass);
+      - |
+        ALTER TABLE ONLY public.warehouses ALTER COLUMN id SET DEFAULT nextval('public.warehouses_id_seq'::regclass);
+      - |
+        ALTER TABLE ONLY public.accounts
+            ADD CONSTRAINT accounts_pkey PRIMARY KEY (id);
+      - |
+        ALTER TABLE ONLY public.accounts_users
+            ADD CONSTRAINT accounts_users_pkey PRIMARY KEY (id);
+      - |
+        ALTER TABLE ONLY public.companies
+            ADD CONSTRAINT companies_pkey PRIMARY KEY (id);
+      - |
+        ALTER TABLE ONLY public.companies_settings
+            ADD CONSTRAINT companies_settings_pkey PRIMARY KEY (id);
+      - |
+        ALTER TABLE ONLY public.companies_users
+            ADD CONSTRAINT companies_users_company_id_user_id_key UNIQUE (company_id, user_id);
+      - |
+        ALTER TABLE ONLY public.companies_users
+            ADD CONSTRAINT companies_users_pkey PRIMARY KEY (id);
+      - |
+        ALTER TABLE ONLY public.customers
+            ADD CONSTRAINT customers_companies_code_unique UNIQUE (company_id, code);
+      - |
+        ALTER TABLE ONLY public.customers
+            ADD CONSTRAINT customers_pkey PRIMARY KEY (id);
+      - |
+        ALTER TABLE ONLY public.expenses_categories
+            ADD CONSTRAINT expense_categories_pkey PRIMARY KEY (id);
+      - |
+        ALTER TABLE ONLY public.expenses
+            ADD CONSTRAINT expenses_pkey PRIMARY KEY (id);
+      - |
+        ALTER TABLE ONLY public.import_row_issues
+            ADD CONSTRAINT import_row_issues_pkey PRIMARY KEY (id);
+      - |
+        ALTER TABLE ONLY public.imports
+            ADD CONSTRAINT imports_pkey PRIMARY KEY (id);
+      - |
+        ALTER TABLE ONLY public.inventory_balances
+            ADD CONSTRAINT inventory_balances_pkey PRIMARY KEY (company_id, variant_id, warehouse_id);
+      - |
+        ALTER TABLE ONLY public.inventory_movements
+            ADD CONSTRAINT inventory_movements_pkey PRIMARY KEY (id);
+      - |
+        ALTER TABLE ONLY public.invoices
+            ADD CONSTRAINT invoices_companies_code_unique UNIQUE (company_id, code);
+      - |
+        ALTER TABLE ONLY public.invoices_items
+            ADD CONSTRAINT invoices_items_pkey PRIMARY KEY (id);
+      - |
+        ALTER TABLE ONLY public.invoices
+            ADD CONSTRAINT invoices_pkey PRIMARY KEY (id);
+      - |
+        ALTER TABLE ONLY public.items
+            ADD CONSTRAINT items_pkey PRIMARY KEY (id);
+      - |
+        ALTER TABLE ONLY public.items_units
+            ADD CONSTRAINT items_units_pkey PRIMARY KEY (id);
+      - |
+        ALTER TABLE ONLY public.items_variants
+            ADD CONSTRAINT items_variants_pkey PRIMARY KEY (id);
+      - |
+        ALTER TABLE ONLY public.items_variants
+            ADD CONSTRAINT items_variants_uuid_key UNIQUE (uuid);
+      - |
+        ALTER TABLE ONLY public.notes
+            ADD CONSTRAINT notes_name_unique UNIQUE (company_id, name);
+      - |
+        ALTER TABLE ONLY public.notes
+            ADD CONSTRAINT notes_pkey PRIMARY KEY (id);
+      - |
+        ALTER TABLE ONLY public.oauth_access_tokens
+            ADD CONSTRAINT oauth_access_tokens_pkey PRIMARY KEY (id);
+      - |
+        ALTER TABLE ONLY public.oauth_refresh_tokens
+            ADD CONSTRAINT oauth_refresh_tokens_pkey PRIMARY KEY (id);
+      - |
+        ALTER TABLE ONLY public.accounts_payable
+            ADD CONSTRAINT pk_accounts_payable PRIMARY KEY (id);
+      - |
+        ALTER TABLE ONLY public.payables
+            ADD CONSTRAINT pk_payables PRIMARY KEY (id);
+      - |
+        ALTER TABLE ONLY public.preview_cache
+            ADD CONSTRAINT preview_cache_pkey PRIMARY KEY (key);
+      - |
+        ALTER TABLE ONLY public.purchase_items
+            ADD CONSTRAINT purchase_items_pkey PRIMARY KEY (id);
+      - |
+        ALTER TABLE ONLY public.purchases
+            ADD CONSTRAINT purchases_code_company_unique UNIQUE (company_id, code);
+      - |
+        ALTER TABLE ONLY public.purchases
+            ADD CONSTRAINT purchases_pkey PRIMARY KEY (id);
+      - |
+        ALTER TABLE ONLY public.receivables_income
+            ADD CONSTRAINT receivables_income_companies_code_unique UNIQUE (company_id, code);
+      - |
+        ALTER TABLE ONLY public.receivables_income_items
+            ADD CONSTRAINT receivables_income_items_pkey PRIMARY KEY (id);
+      - |
+        ALTER TABLE ONLY public.receivables_income
+            ADD CONSTRAINT receivables_income_pkey PRIMARY KEY (id);
+      - |
+        ALTER TABLE ONLY public.receivables
+            ADD CONSTRAINT receivables_invoice_id_customer_id_key UNIQUE (invoice_id, customer_id);
+      - |
+        ALTER TABLE ONLY public.receivables
+            ADD CONSTRAINT receivables_pkey PRIMARY KEY (id);
+      - |
+        ALTER TABLE ONLY public.resource_prerequisites
+            ADD CONSTRAINT resource_prerequisites_pkey PRIMARY KEY (id);
+      - |
+        ALTER TABLE ONLY public.sessions
+            ADD CONSTRAINT sessions_pkey PRIMARY KEY (id);
+      - |
+        ALTER TABLE ONLY public.tax_receipts
+            ADD CONSTRAINT tax_receipts_company_unique UNIQUE (company_id, id);
+      - |
+        ALTER TABLE ONLY public.tax_receipts
+            ADD CONSTRAINT tax_receipts_pkey PRIMARY KEY (id);
+      - |
+        ALTER TABLE ONLY public.taxes
+            ADD CONSTRAINT taxes_pkey PRIMARY KEY (id);
+      - |
+        ALTER TABLE ONLY public.companies_settings
+            ADD CONSTRAINT unique_companies UNIQUE (company_id);
+      - |
+        ALTER TABLE ONLY public.units
+            ADD CONSTRAINT units_pkey PRIMARY KEY (id);
+      - |
+        ALTER TABLE ONLY public.upload_sessions
+            ADD CONSTRAINT upload_sessions_pkey PRIMARY KEY (id);
+      - |
+        ALTER TABLE ONLY public.accounts_payable
+            ADD CONSTRAINT uq_ap_company_invoice UNIQUE (company_id, invoice_number);
+      - |
+        ALTER TABLE ONLY public.accounts_payable
+            ADD CONSTRAINT uq_ap_invoice_number_per_company UNIQUE (company_id, invoice_number);
+      - |
+        ALTER TABLE ONLY public.accounts_payable
+            ADD CONSTRAINT uq_ap_uuid UNIQUE (uuid);
+      - |
+        ALTER TABLE ONLY public.payables
+            ADD CONSTRAINT uq_payables_ap UNIQUE (accounts_payable_id);
+      - |
+        ALTER TABLE ONLY public.payables
+            ADD CONSTRAINT uq_payables_uuid UNIQUE (uuid);
+      - |
+        ALTER TABLE ONLY public.users
+            ADD CONSTRAINT users_email_key UNIQUE (email);
+      - |
+        ALTER TABLE ONLY public.users
+            ADD CONSTRAINT users_pkey PRIMARY KEY (id);
+      - |
+        ALTER TABLE ONLY public.users_verification_token
+            ADD CONSTRAINT users_verification_token_pkey PRIMARY KEY (id);
+      - |
+        ALTER TABLE ONLY public.users_verification_token
+            ADD CONSTRAINT users_verification_token_token_key UNIQUE (token);
+      - |
+        ALTER TABLE ONLY public.vendors
+            ADD CONSTRAINT vendors_pkey PRIMARY KEY (id);
+      - |
+        ALTER TABLE ONLY public.warehouses
+            ADD CONSTRAINT warehouses_pkey PRIMARY KEY (id);
+      - |
+        ALTER TABLE ONLY public.warehouses
+            ADD CONSTRAINT warehouses_uuid_key UNIQUE (uuid);
+      - |
+        CREATE UNIQUE INDEX expense_categories_companies_unique ON public.expenses_categories USING btree (company_id, name);
+      - |
+        CREATE INDEX idx_ap_company_id ON public.accounts_payable USING btree (company_id);
+      - |
+        CREATE INDEX idx_ap_company_status_due ON public.accounts_payable USING btree (company_id, status, due_date);
+      - |
+        CREATE INDEX idx_ap_company_vendor ON public.accounts_payable USING btree (company_id, vendor_id);
+      - |
+        CREATE INDEX idx_ap_purchase_id ON public.accounts_payable USING btree (purchase_id) WHERE (purchase_id IS NOT NULL);
+      - |
+        CREATE INDEX idx_companies_account_id ON public.companies USING btree (account_id);
+      - |
+        CREATE INDEX idx_companies_users_abilities ON public.companies_users USING gin (abilities);
+      - |
+        CREATE INDEX idx_companies_users_company_id ON public.companies_users USING btree (company_id);
+      - |
+        CREATE INDEX idx_companies_users_user_company ON public.companies_users USING btree (user_id, company_id);
+      - |
+        CREATE INDEX idx_companies_users_user_id ON public.companies_users USING btree (user_id);
+      - |
+        CREATE INDEX idx_customers_companies_code ON public.customers USING btree (company_id, code);
+      - |
+        CREATE INDEX idx_import_row_issues_import_id ON public.import_row_issues USING btree (import_id);
+      - |
+        CREATE INDEX idx_import_row_issues_level ON public.import_row_issues USING btree (level);
+      - |
+        CREATE INDEX idx_inventory_movements_lookup ON public.inventory_movements USING btree (company_id, variant_id, warehouse_id, created_at DESC);
+      - |
+        CREATE INDEX idx_invoices_companies_code ON public.invoices USING btree (company_id, code);
+      - |
+        CREATE INDEX idx_invoices_recurrence_next_run_at ON public.invoices USING btree (recurrence_next_run_at) WHERE (recurrence_next_run_at IS NOT NULL);
+      - |
+        CREATE INDEX idx_items_identifiers ON public.items USING gin (identifiers);
+      - |
+        CREATE INDEX idx_items_variants_company_item ON public.items_variants USING btree (company_id, item_id);
+      - |
+        CREATE INDEX idx_items_variants_item_id ON public.items_variants USING btree (item_id);
+      - |
+        CREATE INDEX idx_payables_company_id ON public.payables USING btree (company_id);
+      - |
+        CREATE INDEX idx_payables_vendor_id ON public.payables USING btree (company_id, vendor_id);
+      - |
+        CREATE INDEX idx_purchase_items_purchase_id ON public.purchase_items USING btree (purchase_id);
+      - |
+        CREATE INDEX idx_purchase_items_variant_id ON public.purchase_items USING btree (variant_id);
+      - |
+        CREATE INDEX idx_purchases_company_id ON public.purchases USING btree (company_id);
+      - |
+        CREATE INDEX idx_purchases_vendor_id ON public.purchases USING btree (vendor_id);
+      - |
+        CREATE INDEX idx_purchases_warehouse_id ON public.purchases USING btree (warehouse_id);
+      - |
+        CREATE INDEX idx_receivables_income_companies_code ON public.receivables_income USING btree (company_id, code);
+      - |
+        CREATE INDEX idx_resource_prerequisites_resource ON public.resource_prerequisites USING btree (resource) WHERE enabled;
+      - |
+        CREATE INDEX idx_upload_sessions_status ON public.upload_sessions USING btree (status);
+      - |
+        CREATE INDEX idx_upload_sessions_user_id ON public.upload_sessions USING btree (user_id);
+      - |
+        CREATE UNIQUE INDEX idx_users_uuid ON public.users USING btree (uuid);
+      - |
+        CREATE INDEX idx_warehouses_company_id ON public.warehouses USING btree (company_id);
+      - |
+        CREATE UNIQUE INDEX invoices_companies_code_kind_unique ON public.invoices USING btree (company_id, code, transaction_kind);
+      - |
+        CREATE UNIQUE INDEX invoices_expr_idx ON public.invoices USING btree (((source ->> 'id'::text))) WHERE ((source ->> 'type'::text) = 'estimate'::text);
+      - |
+        CREATE UNIQUE INDEX invoices_expr_idx1 ON public.invoices USING btree (((source ->> 'id'::text))) WHERE ((source ->> 'type'::text) = 'order'::text);
+      - |
+        CREATE INDEX invoices_expr_idx2 ON public.invoices USING btree (((source ->> 'id'::text))) WHERE ((source ->> 'type'::text) = 'template'::text);
+      - |
+        CREATE INDEX oauth_access_tokens_user_id_index ON public.oauth_access_tokens USING btree (user_id);
+      - |
+        CREATE INDEX oauth_refresh_tokens_user_id_index ON public.oauth_refresh_tokens USING btree (user_id);
+      - |
+        CREATE INDEX refresh_token_index ON public.oauth_refresh_tokens USING btree (refresh_token);
+      - |
+        CREATE INDEX revoked_index ON public.oauth_access_tokens USING btree (revoked);
+      - |
+        CREATE INDEX token_index ON public.oauth_access_tokens USING btree (token);
+      - |
+        CREATE UNIQUE INDEX unique_email_pending ON public.users USING btree (pending_email) WHERE (pending_email IS NOT NULL);
+      - |
+        CREATE UNIQUE INDEX uq_items_variants_default_per_item ON public.items_variants USING btree (item_id) WHERE (is_default = true);
+      - |
+        CREATE TRIGGER prevent_ap_overpayment BEFORE UPDATE ON public.accounts_payable FOR EACH ROW EXECUTE FUNCTION public.trg_prevent_ap_overpayment();
+      - |
+        CREATE TRIGGER prevent_locked_po_delete BEFORE DELETE ON public.purchases FOR EACH ROW EXECUTE FUNCTION public.trg_prevent_locked_po_delete();
+      - |
+        CREATE TRIGGER prevent_po_header_change BEFORE UPDATE ON public.purchases FOR EACH ROW EXECUTE FUNCTION public.trg_prevent_po_header_change();
+      - |
+        CREATE TRIGGER trg_ap_updated_at BEFORE UPDATE ON public.accounts_payable FOR EACH ROW EXECUTE FUNCTION public.trg_set_updated_at();
+      - |
+        CREATE TRIGGER trg_payables_updated_at BEFORE UPDATE ON public.payables FOR EACH ROW EXECUTE FUNCTION public.trg_set_updated_at();
+      - |
+        CREATE TRIGGER trg_sync_recurrence_next_run_at BEFORE INSERT OR UPDATE OF recurrence ON public.invoices FOR EACH ROW EXECUTE FUNCTION public.sync_recurrence_next_run_at();
+      - |
+        ALTER TABLE ONLY public.customers
+            ADD CONSTRAINT customer_company_fk FOREIGN KEY (company_id) REFERENCES public.companies(id) ON DELETE CASCADE;
+      - |
+        ALTER TABLE ONLY public.customers
+            ADD CONSTRAINT customers_tax_receipt_fk FOREIGN KEY (tax_receipt_id) REFERENCES public.tax_receipts(id);
+      - |
+        ALTER TABLE ONLY public.expenses_categories
+            ADD CONSTRAINT expense_company_fk FOREIGN KEY (company_id) REFERENCES public.companies(id) ON DELETE CASCADE;
+      - |
+        ALTER TABLE ONLY public.companies
+            ADD CONSTRAINT fk_account_company FOREIGN KEY (account_id) REFERENCES public.accounts(id);
+      - |
+        ALTER TABLE ONLY public.accounts_users
+            ADD CONSTRAINT fk_accounts_users_accounts FOREIGN KEY (account_id) REFERENCES public.accounts(id);
+      - |
+        ALTER TABLE ONLY public.accounts_users
+            ADD CONSTRAINT fk_accounts_users_users FOREIGN KEY (user_id) REFERENCES public.users(id);
+      - |
+        ALTER TABLE ONLY public.accounts_payable
+            ADD CONSTRAINT fk_ap_approved_by FOREIGN KEY (approved_by) REFERENCES public.users(id) ON UPDATE CASCADE ON DELETE SET NULL;
+      - |
+        ALTER TABLE ONLY public.accounts_payable
+            ADD CONSTRAINT fk_ap_company FOREIGN KEY (company_id) REFERENCES public.companies(id) ON UPDATE CASCADE ON DELETE RESTRICT;
+      - |
+        ALTER TABLE ONLY public.accounts_payable
+            ADD CONSTRAINT fk_ap_created_by FOREIGN KEY (created_by) REFERENCES public.users(id) ON UPDATE CASCADE ON DELETE RESTRICT;
+      - |
+        ALTER TABLE ONLY public.accounts_payable
+            ADD CONSTRAINT fk_ap_purchases_order FOREIGN KEY (purchase_id) REFERENCES public.purchases(id) ON UPDATE CASCADE ON DELETE SET NULL;
+      - |
+        ALTER TABLE ONLY public.accounts_payable
+            ADD CONSTRAINT fk_ap_vendor FOREIGN KEY (vendor_id) REFERENCES public.vendors(id) ON UPDATE CASCADE ON DELETE RESTRICT;
+      - |
+        ALTER TABLE ONLY public.companies_settings
+            ADD CONSTRAINT fk_companies_settings_companies FOREIGN KEY (company_id) REFERENCES public.companies(id);
+      - |
+        ALTER TABLE ONLY public.companies_users
+            ADD CONSTRAINT fk_companies_users_companies FOREIGN KEY (company_id) REFERENCES public.companies(id);
+      - |
+        ALTER TABLE ONLY public.companies_users
+            ADD CONSTRAINT fk_companies_users_users FOREIGN KEY (user_id) REFERENCES public.users(id);
+      - |
+        ALTER TABLE ONLY public.expenses
+            ADD CONSTRAINT fk_expenses_category FOREIGN KEY (category_id) REFERENCES public.expenses_categories(id) ON DELETE CASCADE;
+      - |
+        ALTER TABLE ONLY public.expenses
+            ADD CONSTRAINT fk_expenses_companies FOREIGN KEY (company_id) REFERENCES public.companies(id) ON DELETE CASCADE;
+      - |
+        ALTER TABLE ONLY public.payables
+            ADD CONSTRAINT fk_payables_accounts_payable FOREIGN KEY (accounts_payable_id) REFERENCES public.accounts_payable(id) ON UPDATE CASCADE ON DELETE RESTRICT;
+      - |
+        ALTER TABLE ONLY public.payables
+            ADD CONSTRAINT fk_payables_company FOREIGN KEY (company_id) REFERENCES public.companies(id) ON UPDATE CASCADE ON DELETE RESTRICT;
+      - |
+        ALTER TABLE ONLY public.payables
+            ADD CONSTRAINT fk_payables_vendor FOREIGN KEY (vendor_id) REFERENCES public.vendors(id) ON UPDATE CASCADE ON DELETE RESTRICT;
+      - |
+        ALTER TABLE ONLY public.accounts
+            ADD CONSTRAINT fk_users FOREIGN KEY (owner_id) REFERENCES public.users(id);
+      - |
+        ALTER TABLE ONLY public.import_row_issues
+            ADD CONSTRAINT import_row_issues_import_id_fkey FOREIGN KEY (import_id) REFERENCES public.imports(id) ON DELETE CASCADE;
+      - |
+        ALTER TABLE ONLY public.inventory_balances
+            ADD CONSTRAINT inventory_balances_company_id_fkey FOREIGN KEY (company_id) REFERENCES public.companies(id) ON DELETE CASCADE;
+      - |
+        ALTER TABLE ONLY public.inventory_balances
+            ADD CONSTRAINT inventory_balances_variant_id_fkey FOREIGN KEY (variant_id) REFERENCES public.items_variants(id) ON DELETE CASCADE;
+      - |
+        ALTER TABLE ONLY public.inventory_balances
+            ADD CONSTRAINT inventory_balances_warehouse_id_fkey FOREIGN KEY (warehouse_id) REFERENCES public.warehouses(id) ON DELETE CASCADE;
+      - |
+        ALTER TABLE ONLY public.inventory_movements
+            ADD CONSTRAINT inventory_movements_company_id_fkey FOREIGN KEY (company_id) REFERENCES public.companies(id) ON DELETE CASCADE;
+      - |
+        ALTER TABLE ONLY public.inventory_movements
+            ADD CONSTRAINT inventory_movements_variant_id_fkey FOREIGN KEY (variant_id) REFERENCES public.items_variants(id) ON DELETE RESTRICT;
+      - |
+        ALTER TABLE ONLY public.inventory_movements
+            ADD CONSTRAINT inventory_movements_warehouse_id_fkey FOREIGN KEY (warehouse_id) REFERENCES public.warehouses(id) ON DELETE RESTRICT;
+      - |
+        ALTER TABLE ONLY public.invoices
+            ADD CONSTRAINT invoice_company_fk FOREIGN KEY (company_id) REFERENCES public.companies(id) ON DELETE CASCADE;
+      - |
+        ALTER TABLE ONLY public.invoices
+            ADD CONSTRAINT invoice_customer_fk FOREIGN KEY (customer_id) REFERENCES public.customers(id) ON DELETE CASCADE;
+      - |
+        ALTER TABLE ONLY public.receivables_income
+            ADD CONSTRAINT invoice_income_company_fk FOREIGN KEY (company_id) REFERENCES public.companies(id) ON DELETE CASCADE;
+      - |
+        ALTER TABLE ONLY public.invoices_items
+            ADD CONSTRAINT invoice_item_invoice_fk FOREIGN KEY (invoice_id) REFERENCES public.invoices(id) ON DELETE CASCADE;
+      - |
+        ALTER TABLE ONLY public.invoices_items
+            ADD CONSTRAINT invoice_item_item_fk FOREIGN KEY (item_id) REFERENCES public.items(id) ON DELETE CASCADE;
+      - |
+        ALTER TABLE ONLY public.invoices_items
+            ADD CONSTRAINT invoice_item_unit_fk FOREIGN KEY (unit_id) REFERENCES public.units(id) ON DELETE CASCADE;
+      - |
+        ALTER TABLE ONLY public.invoices_items
+            ADD CONSTRAINT invoice_items_company_fk FOREIGN KEY (company_id) REFERENCES public.companies(id) ON DELETE CASCADE;
+      - |
+        ALTER TABLE ONLY public.invoices
+            ADD CONSTRAINT invoice_tax_receipts_fk FOREIGN KEY (tax_receipt_id) REFERENCES public.tax_receipts(id) ON DELETE CASCADE;
+      - |
+        ALTER TABLE ONLY public.invoices_items
+            ADD CONSTRAINT invoices_items_warehouse_id_fkey FOREIGN KEY (warehouse_id) REFERENCES public.warehouses(id);
+      - |
+        ALTER TABLE ONLY public.items
+            ADD CONSTRAINT item_tax_fk FOREIGN KEY (tax_id) REFERENCES public.taxes(id) ON DELETE CASCADE;
+      - |
+        ALTER TABLE ONLY public.items
+            ADD CONSTRAINT items_company_fk FOREIGN KEY (company_id) REFERENCES public.companies(id) ON DELETE CASCADE;
+      - |
+        ALTER TABLE ONLY public.items_units
+            ADD CONSTRAINT items_unit_company_fk FOREIGN KEY (company_id) REFERENCES public.companies(id) ON DELETE CASCADE;
+      - |
+        ALTER TABLE ONLY public.items_units
+            ADD CONSTRAINT items_units_item_fk FOREIGN KEY (item_id) REFERENCES public.items(id) ON DELETE CASCADE;
+      - |
+        ALTER TABLE ONLY public.items_units
+            ADD CONSTRAINT items_units_unit_fk FOREIGN KEY (unit_id) REFERENCES public.units(id) ON DELETE CASCADE;
+      - |
+        ALTER TABLE ONLY public.items_variants
+            ADD CONSTRAINT items_variants_company_id_fkey FOREIGN KEY (company_id) REFERENCES public.companies(id) ON DELETE CASCADE;
+      - |
+        ALTER TABLE ONLY public.items_variants
+            ADD CONSTRAINT items_variants_item_id_fkey FOREIGN KEY (item_id) REFERENCES public.items(id) ON DELETE CASCADE;
+      - |
+        ALTER TABLE ONLY public.notes
+            ADD CONSTRAINT notes_company_fk FOREIGN KEY (company_id) REFERENCES public.companies(id) ON DELETE CASCADE;
+      - |
+        ALTER TABLE ONLY public.purchase_items
+            ADD CONSTRAINT purchase_items_company_id_fkey FOREIGN KEY (company_id) REFERENCES public.companies(id) ON DELETE CASCADE;
+      - |
+        ALTER TABLE ONLY public.purchase_items
+            ADD CONSTRAINT purchase_items_purchase_id_fkey FOREIGN KEY (purchase_id) REFERENCES public.purchases(id) ON DELETE CASCADE;
+      - |
+        ALTER TABLE ONLY public.purchase_items
+            ADD CONSTRAINT purchase_items_tax_id_fkey FOREIGN KEY (tax_id) REFERENCES public.taxes(id);
+      - |
+        ALTER TABLE ONLY public.purchase_items
+            ADD CONSTRAINT purchase_items_unit_id_fkey FOREIGN KEY (unit_id) REFERENCES public.units(id);
+      - |
+        ALTER TABLE ONLY public.purchase_items
+            ADD CONSTRAINT purchase_items_variant_id_fkey FOREIGN KEY (variant_id) REFERENCES public.items_variants(id) ON DELETE RESTRICT;
+      - |
+        ALTER TABLE ONLY public.purchases
+            ADD CONSTRAINT purchases_approved_by_fkey FOREIGN KEY (approved_by) REFERENCES public.users(id);
+      - |
+        ALTER TABLE ONLY public.purchases
+            ADD CONSTRAINT purchases_company_id_fkey FOREIGN KEY (company_id) REFERENCES public.companies(id) ON DELETE CASCADE;
+      - |
+        ALTER TABLE ONLY public.purchases
+            ADD CONSTRAINT purchases_vendor_id_fkey FOREIGN KEY (vendor_id) REFERENCES public.vendors(id) ON DELETE RESTRICT;
+      - |
+        ALTER TABLE ONLY public.purchases
+            ADD CONSTRAINT purchases_warehouse_id_fkey FOREIGN KEY (warehouse_id) REFERENCES public.warehouses(id) ON DELETE RESTRICT;
+      - |
+        ALTER TABLE ONLY public.receivables
+            ADD CONSTRAINT receivables_company_fk FOREIGN KEY (company_id) REFERENCES public.companies(id) ON DELETE CASCADE;
+      - |
+        ALTER TABLE ONLY public.receivables
+            ADD CONSTRAINT receivables_customer_fk FOREIGN KEY (customer_id) REFERENCES public.customers(id) ON DELETE CASCADE;
+      - |
+        ALTER TABLE ONLY public.receivables_income
+            ADD CONSTRAINT receivables_income_customer_fk FOREIGN KEY (customer_id) REFERENCES public.customers(id) ON DELETE CASCADE;
+      - |
+        ALTER TABLE ONLY public.receivables_income_items
+            ADD CONSTRAINT receivables_income_items_company_fk FOREIGN KEY (company_id) REFERENCES public.companies(id) ON DELETE CASCADE;
+      - |
+        ALTER TABLE ONLY public.receivables_income_items
+            ADD CONSTRAINT receivables_income_items_invoice_fk FOREIGN KEY (invoice_id) REFERENCES public.invoices(id) ON DELETE CASCADE;
+      - |
+        ALTER TABLE ONLY public.receivables_income_items
+            ADD CONSTRAINT receivables_income_items_receivable_fk FOREIGN KEY (receivable_income_id) REFERENCES public.receivables_income(id) ON DELETE CASCADE;
+      - |
+        ALTER TABLE ONLY public.receivables
+            ADD CONSTRAINT receivables_invoice_fk FOREIGN KEY (invoice_id) REFERENCES public.invoices(id) ON DELETE CASCADE;
+      - |
+        ALTER TABLE ONLY public.taxes
+            ADD CONSTRAINT taxes_company_fk FOREIGN KEY (company_id) REFERENCES public.companies(id) ON DELETE CASCADE;
+      - |
+        ALTER TABLE ONLY public.tax_receipts
+            ADD CONSTRAINT taxes_receipts_company_fk FOREIGN KEY (company_id) REFERENCES public.companies(id) ON DELETE CASCADE;
+      - |
+        ALTER TABLE ONLY public.units
+            ADD CONSTRAINT unit_company_fk FOREIGN KEY (company_id) REFERENCES public.companies(id) ON DELETE CASCADE;
+      - |
+        ALTER TABLE ONLY public.users_verification_token
+            ADD CONSTRAINT users_verification_token_user_fk FOREIGN KEY (user_id) REFERENCES public.users(id) ON DELETE CASCADE;
+      - |
+        ALTER TABLE ONLY public.vendors
+            ADD CONSTRAINT vendors_company_id_fkey FOREIGN KEY (company_id) REFERENCES public.companies(id) ON DELETE CASCADE;
+      - |
+        ALTER TABLE ONLY public.warehouses
+            ADD CONSTRAINT warehouses_company_id_fkey FOREIGN KEY (company_id) REFERENCES public.companies(id) ON DELETE CASCADE;
+down:
+  schema:
+    action: raw
+    statements:
+      - |
+        DROP SCHEMA public CASCADE;
+      - |
+        CREATE SCHEMA public;
