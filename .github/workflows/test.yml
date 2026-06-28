@@ -5,11 +5,20 @@ on:
     branches: [main]
   pull_request:
 
+# forge and camel are private github.com/martin3zra modules; GOPRIVATE skips the
+# public proxy/checksum DB and the git config below provides credentials to
+# clone them. Add a repo secret GO_MODULES_PAT (a token with read access to the
+# martin3zra/forge and martin3zra/camel repositories).
+env:
+  GOPRIVATE: github.com/martin3zra/*
+
 jobs:
   unit:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - name: Authenticate private Go modules
+        run: git config --global url."https://x-access-token:${{ secrets.GO_MODULES_PAT }}@github.com/".insteadOf "https://github.com/"
       - uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
@@ -41,6 +50,8 @@ jobs:
       DB_SSLMODE: disable
     steps:
       - uses: actions/checkout@v4
+      - name: Authenticate private Go modules
+        run: git config --global url."https://x-access-token:${{ secrets.GO_MODULES_PAT }}@github.com/".insteadOf "https://github.com/"
       - uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
