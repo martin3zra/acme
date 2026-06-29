@@ -5,20 +5,25 @@ on:
     branches: [main]
   pull_request:
 
-# forge and camel are private github.com/martin3zra modules; GOPRIVATE skips the
-# public proxy/checksum DB and the git config below provides credentials to
-# clone them. Add a repo secret GO_MODULES_PAT (a token with read access to the
-# martin3zra/forge and martin3zra/camel repositories).
-env:
-  GOPRIVATE: github.com/martin3zra/*
+permissions:
+  contents: read
 
 jobs:
   unit:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Authenticate private Go modules
-        run: git config --global url."https://x-access-token:${{ secrets.GO_MODULES_PAT }}@github.com/".insteadOf "https://github.com/"
+      # forge/camel are public, but the Go proxy may not have re-indexed them
+      # yet and falls back to direct git, which 401s anonymously on the runner.
+      # Authenticate git with the built-in GITHUB_TOKEN (no setup, reads public
+      # repos) so the direct fetch always works.
+      - name: Configure git auth for go modules
+        run: git config --global url."https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/".insteadOf "https://github.com/"
+      # main.go embeds public/build (a Vite build artifact, gitignored). The Go
+      # build/test only needs the directory to exist with a file; a stub
+      # manifest satisfies the //go:embed at compile time.
+      - name: Stub embedded frontend assets
+        run: mkdir -p public/build && echo '{}' > public/build/manifest.json
       - uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
@@ -50,8 +55,8 @@ jobs:
       DB_SSLMODE: disable
     steps:
       - uses: actions/checkout@v4
-      - name: Authenticate private Go modules
-        run: git config --global url."https://x-access-token:${{ secrets.GO_MODULES_PAT }}@github.com/".insteadOf "https://github.com/"
+      - name: Configure git auth for go modules
+        run: git config --global url."https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/".insteadOf "https://github.com/"
       - uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
