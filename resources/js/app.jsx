@@ -20,6 +20,11 @@ let onSuccessEvent = (e) => {
         toast.success(message);
       }, 200);
     }
+    if (props.flash.error) {
+      setTimeout(() => {
+        toast.error(props.flash.error);
+      }, 200);
+    }
     if (props.flash.redirectTo) {
       props.redirectTo = props.flash.redirectTo
     }

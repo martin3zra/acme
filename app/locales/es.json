@@ -325,7 +325,8 @@
       "expenses": "Gastos",
       "reports": "Reportes",
       "payables": "Cuentas por pagar",
-      "receivables": "Cuentas por cobrar"
+      "receivables": "Cuentas por cobrar",
+      "movements": "Movimientos"
     },
     "navSecondary": {
       "settings": "Ajustes",
@@ -356,7 +357,8 @@
     "openMenu": "Abrir menú",
     "paid": "Pagado",
     "invoiceNumber": "Número de factura",
-    "convertToVendorBill": "Convertir a factura de proveedor"
+    "convertToVendorBill": "Convertir a factura de proveedor",
+    "transfer": "La transferencia"
   },
   "dashboard": {
     "due_invoices": "Facturas vencidas",
@@ -1247,7 +1249,8 @@
     "save": "Guardar transferencia",
     "errors": {
       "sameWarehouse": "El almacén de origen y destino deben ser diferentes.",
-      "insufficientStock": "Stock insuficiente en el almacén de origen."
+      "insufficientStock": "Stock insuficiente en el almacén de origen.",
+      "invalidTransition": "Esta transferencia no puede cambiar a ese estado."
     }
   },
   "items": {
@@ -1571,5 +1574,72 @@
       "void": "Nula"
     },
     "applyBulkPayment": "Aplicar pago masivo a proveedor"
+  },
+  "transfers": {
+    "title": "Transferencias",
+    "description": "Solicitudes de traslado de mercancía entre almacenes.",
+    "newTransfer": "Nueva transferencia",
+    "empty": "No hay transferencias todavía.",
+    "columns": {
+      "date": "Fecha",
+      "item": "Producto / Variante",
+      "route": "Origen → Destino",
+      "qty": "Cantidad",
+      "status": "Estado",
+      "requestedBy": "Solicitado por",
+      "actions": "Acciones"
+    },
+    "status": {
+      "requested": "Solicitada",
+      "in_transit": "En tránsito",
+      "received": "Recibida",
+      "cancelled": "Cancelada"
+    },
+    "actions": {
+      "dispatch": "Despachar",
+      "receive": "Recibir",
+      "cancel": "Cancelar"
+    },
+    "confirm": {
+      "dispatchTitle": "¿Despachar transferencia?",
+      "dispatchBody": "Se descontará el stock del almacén de origen.",
+      "receiveTitle": "¿Recibir transferencia?",
+      "receiveBody": "Se sumará el stock al almacén de destino.",
+      "cancelTitle": "¿Cancelar transferencia?",
+      "cancelBody": "La solicitud se marcará como cancelada.",
+      "confirm": "Confirmar",
+      "dismiss": "Cerrar"
+    },
+    "create": {
+      "title": "Nueva transferencia"
+    },
+    "show": {
+      "title": "Detalle de transferencia"
+    },
+    "fields": {
+      "fromWarehouse": "Almacén de origen",
+      "toWarehouse": "Almacén de destino"
+    },
+    "line": {
+      "reference": "Producto / Referencia",
+      "referencePlaceholder": "Referencia o presione ⌘K",
+      "search": "Buscar productos…",
+      "code": "Código",
+      "item": "Producto",
+      "description": "Descripción",
+      "unit": "Unidad",
+      "qty": "Cantidad",
+      "cost": "Costo",
+      "total": "Total",
+      "add": "Agregar",
+      "empty": "Sin productos. Busca y agrega al menos uno."
+    },
+    "footer": {
+      "items": "Productos",
+      "totalCost": "Costo total"
+    },
+    "errors": {
+      "noLines": "Agrega al menos un producto a la transferencia."
+    }
   }
 }
