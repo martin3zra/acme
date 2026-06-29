@@ -1582,9 +1582,6 @@ up:
             ADD CONSTRAINT uq_ap_company_invoice UNIQUE (company_id, invoice_number);
       - |
         ALTER TABLE ONLY public.accounts_payable
-            ADD CONSTRAINT uq_ap_invoice_number_per_company UNIQUE (company_id, invoice_number);
-      - |
-        ALTER TABLE ONLY public.accounts_payable
             ADD CONSTRAINT uq_ap_uuid UNIQUE (uuid);
       - |
         ALTER TABLE ONLY public.payables
