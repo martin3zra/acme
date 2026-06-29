@@ -515,12 +515,12 @@ const (
 )
 
 var PurchaseStatuses = struct {
-	Draft              PurchaseStatus
-	PartiallyReceived  PurchaseStatus
-	Received           PurchaseStatus
-	PartiallyPaid      PurchaseStatus
-	Closed             PurchaseStatus
-	Posted             PurchaseStatus
+	Draft             PurchaseStatus
+	PartiallyReceived PurchaseStatus
+	Received          PurchaseStatus
+	PartiallyPaid     PurchaseStatus
+	Closed            PurchaseStatus
+	Posted            PurchaseStatus
 }{
 	Draft:             _PURCHASE_STATUS_DRAFT,
 	PartiallyReceived: _PURCHASE_STATUS_PARTIALLY_RECEIVED,
@@ -653,11 +653,11 @@ func (d *Recurrence) Scan(value any) error {
 type PayableStatus string
 
 const (
-	_PAYABLE_DRAFT     PayableStatus = "draft"
-	_PAYABLE_PENDING   PayableStatus = "pending"
-	_PAYABLE_APPROVED  PayableStatus = "approved"
-	_PAYABLE_REJECTED  PayableStatus = "rejected"
-	_PAYABLE_VOID      PayableStatus = "void"
+	_PAYABLE_DRAFT    PayableStatus = "draft"
+	_PAYABLE_PENDING  PayableStatus = "pending"
+	_PAYABLE_APPROVED PayableStatus = "approved"
+	_PAYABLE_REJECTED PayableStatus = "rejected"
+	_PAYABLE_VOID     PayableStatus = "void"
 )
 
 var PayableStatuses = struct {
@@ -1041,19 +1041,19 @@ func (form UpdateInvoiceForm) Authorize() bool {
 
 func (form UpdateInvoiceForm) Rules() map[string]any {
 	return map[string]any{
-		"customer_id":    "bail|required|exists:customers,id",
-		"date":           "bail|required|date",
-		"terms":          "bail|sometimes|required_if:kind,invoice,order|min:1",
-		"tax_receipt":    "bail|sometimes|required_if:kind,invoice|exists:tax_receipts,id",
-		"lines":          "required|min:1",
-		"lines.*.id":     "required|exists:items,id",
-		"lines.*.unit":   "required|exists:units,id",
-		"lines.*.qty":    "required|min:1", // ADD when rule here, only validate when is the action is added or updated
-		"lines.*.price":  "required",
-		"lines.*.rate":   "required",
-		"lines.*.action": "required|in:added,updated,deleted,unchanged",
+		"customer_id":          "bail|required|exists:customers,id",
+		"date":                 "bail|required|date",
+		"terms":                "bail|sometimes|required_if:kind,invoice,order|min:1",
+		"tax_receipt":          "bail|sometimes|required_if:kind,invoice|exists:tax_receipts,id",
+		"lines":                "required|min:1",
+		"lines.*.id":           "required|exists:items,id",
+		"lines.*.unit":         "required|exists:units,id",
+		"lines.*.qty":          "required|min:1", // ADD when rule here, only validate when is the action is added or updated
+		"lines.*.price":        "required",
+		"lines.*.rate":         "required",
+		"lines.*.action":       "required|in:added,updated,deleted,unchanged",
 		"lines.*.warehouse_id": "required_unless:lines.*.action,deleted,unchanged|exists:warehouses,id",
-		"discount":       "required",
+		"discount":             "required",
 		"discount.value": []any{
 			"sometimes",
 			validator.Rule{}.When(form.Discount.Type == "percentage", "between:0,100", "min:0"),
@@ -1064,12 +1064,12 @@ func (form UpdateInvoiceForm) Rules() map[string]any {
 
 type StorePurchaseForm struct {
 	support.FormRequest
-	VendorID int                     `json:"vendor_id"`
-	Date     time.Time               `json:"date"`
-	Terms    string                  `json:"terms"`
-	Discount Discount                `json:"discount"`
-	Notes    string                  `json:"notes"`
-	Lines    []*Line                 `json:"lines"`
+	VendorID      int                     `json:"vendor_id"`
+	Date          time.Time               `json:"date"`
+	Terms         string                  `json:"terms"`
+	Discount      Discount                `json:"discount"`
+	Notes         string                  `json:"notes"`
+	Lines         []*Line                 `json:"lines"`
 	Kind          PurchaseTransactionKind `json:"kind"`
 	Source        *PurchaseSource         `json:"source"`
 	InvoiceNumber string                  `json:"invoice_number"`
@@ -2055,6 +2055,49 @@ var InventoryMovementKinds = struct {
 	Transfer:        _INV_MOVEMENT_TRANSFER,
 }
 
+// TransferStatus maps to the transfer_status enum on inventory_transfers.
+// Lifecycle: requested -> in_transit -> received, with cancelled reachable
+// only from requested (once goods are in transit they must be received).
+type TransferStatus string
+
+const (
+	_TRANSFER_REQUESTED  TransferStatus = "requested"
+	_TRANSFER_IN_TRANSIT TransferStatus = "in_transit"
+	_TRANSFER_RECEIVED   TransferStatus = "received"
+	_TRANSFER_CANCELLED  TransferStatus = "cancelled"
+)
+
+var TransferStatuses = struct {
+	Requested TransferStatus
+	InTransit TransferStatus
+	Received  TransferStatus
+	Cancelled TransferStatus
+}{
+	Requested: _TRANSFER_REQUESTED,
+	InTransit: _TRANSFER_IN_TRANSIT,
+	Received:  _TRANSFER_RECEIVED,
+	Cancelled: _TRANSFER_CANCELLED,
+}
+
+// transferTransitions lists the statuses each status may move to.
+var transferTransitions = map[TransferStatus][]TransferStatus{
+	_TRANSFER_REQUESTED:  {_TRANSFER_IN_TRANSIT, _TRANSFER_CANCELLED},
+	_TRANSFER_IN_TRANSIT: {_TRANSFER_RECEIVED},
+	_TRANSFER_RECEIVED:   {},
+	_TRANSFER_CANCELLED:  {},
+}
+
+// CanTransitionTo reports whether the transfer may move from its current
+// status to the target status.
+func (s TransferStatus) CanTransitionTo(target TransferStatus) bool {
+	for _, allowed := range transferTransitions[s] {
+		if allowed == target {
+			return true
+		}
+	}
+	return false
+}
+
 type StoreAdjustmentForm struct {
 	support.FormRequest
 	VariantID   int     `json:"variant_id"`
@@ -2078,13 +2121,23 @@ func (form StoreAdjustmentForm) Rules() map[string]any {
 	}
 }
 
+// TransferLineInput is a single product line on a transfer document. ID is the
+// item id (resolved to its default variant on store, like purchases/invoices).
+type TransferLineInput struct {
+	ID          int     `json:"id"`
+	Qty         float64 `json:"qty"`
+	Unit        int     `json:"unit"`
+	Cost        float64 `json:"cost"`
+	Description string  `json:"description"`
+}
+
 type StoreTransferForm struct {
 	support.FormRequest
-	VariantID       int     `json:"variant_id"`
-	FromWarehouseID int     `json:"from_warehouse_id"`
-	ToWarehouseID   int     `json:"to_warehouse_id"`
-	Qty             float64 `json:"qty"`
-	Notes           string  `json:"notes"`
+	FromWarehouseID int                 `json:"from_warehouse_id"`
+	ToWarehouseID   int                 `json:"to_warehouse_id"`
+	Date            time.Time           `json:"date"`
+	Notes           string              `json:"notes"`
+	Lines           []TransferLineInput `json:"lines"`
 }
 
 func (form StoreTransferForm) Authorize() bool {
@@ -2093,10 +2146,9 @@ func (form StoreTransferForm) Authorize() bool {
 
 func (form StoreTransferForm) Rules() map[string]any {
 	return map[string]any{
-		"variant_id":        "bail|required|exists:items_variants,id",
 		"from_warehouse_id": "bail|required|exists:warehouses,id",
 		"to_warehouse_id":   "bail|required|exists:warehouses,id",
-		"qty":               "bail|required|gt:0",
 		"notes":             "sometimes|max:1000",
+		"lines":             "bail|required",
 	}
 }

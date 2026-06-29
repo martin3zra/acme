@@ -1,11 +1,13 @@
 package app
 
 import (
+	"context"
 	"errors"
 	"log"
-	"net/http"
 
+	"github.com/martin3zra/forge/i18n"
 	"github.com/martin3zra/forge/routing"
+	inertia "github.com/romsar/gonertia/v2"
 )
 
 func (s *Server) stocksHandler(ctx *routing.Context) {
@@ -26,9 +28,87 @@ func (s *Server) stocksHandler(ctx *routing.Context) {
 
 func (s *Server) transfersHandler(ctx *routing.Context) {
 	companyID := CurrentCompany(ctx.Request.Context()).ID
-	movements, err := s.findMovements(ctx.Request.Context(), companyID)
+	transfers, err := s.findTransfers(ctx.Request.Context(), companyID)
 	if err != nil {
 		log.Printf("transfersHandler: %v", err)
+		ctx.Error(err)
+		return
+	}
+	if transfers == nil {
+		transfers = []*transferRow{}
+	}
+
+	ctx.Render("Inventories/Transfers/Index", map[string]any{
+		"translations": trans("global", "movements", "transfers"),
+		"transfers":    transfers,
+	})
+}
+
+// createTransferHandler renders the transfer document form. Warehouses are loaded
+// up front; products are searched on demand (partial reloads) like purchases.
+func (s *Server) createTransferHandler(ctx *routing.Context) {
+	companyID := CurrentCompany(ctx.Request.Context()).ID
+	term := ctx.Query("search")
+
+	warehouses, err := s.findWarehouses(ctx.Request.Context())
+	if err != nil {
+		log.Printf("createTransferHandler: warehouses: %v", err)
+		ctx.Error(err)
+		return
+	}
+
+	ctx.Render("Inventories/Transfers/Create", map[string]any{
+		"translations": trans("global", "movements", "transfers"),
+		"warehouses":   warehouses,
+		"item": inertia.Optional(func() (any, error) {
+			return s.findTransferItem(ctx.Request.Context(), companyID, term)
+		}),
+		"items": inertia.Optional(func() (any, error) {
+			return s.findTransferItems(ctx.Request.Context(), companyID, term)
+		}),
+	})
+}
+
+// showTransferHandler renders the transfer detail (header + lines + actions).
+func (s *Server) showTransferHandler(ctx *routing.Context) {
+	companyID := CurrentCompany(ctx.Request.Context()).ID
+	uuid := ctx.Param("id")
+
+	header, err := s.findTransferByUUID(ctx.Request.Context(), companyID, uuid)
+	if err != nil {
+		if errors.Is(err, ErrTransferNotFound) {
+			ctx.Redirect("/inventories/transfers")
+			return
+		}
+		log.Printf("showTransferHandler: %v", err)
+		ctx.Error(err)
+		return
+	}
+
+	lines, err := s.findTransferLines(ctx.Request.Context(), companyID, header.ID)
+	if err != nil {
+		log.Printf("showTransferHandler: lines: %v", err)
+		ctx.Error(err)
+		return
+	}
+	if lines == nil {
+		lines = []*transferLineRow{}
+	}
+
+	ctx.Render("Inventories/Transfers/Show", map[string]any{
+		"translations": trans("global", "movements", "transfers"),
+		"transfer":     header,
+		"lines":        lines,
+	})
+}
+
+// movementsHandler renders the full inventory movement ledger (every stock in/out
+// across sales, purchases, adjustments and transfers).
+func (s *Server) movementsHandler(ctx *routing.Context) {
+	companyID := CurrentCompany(ctx.Request.Context()).ID
+	movements, err := s.findMovements(ctx.Request.Context(), companyID)
+	if err != nil {
+		log.Printf("movementsHandler: %v", err)
 		ctx.Error(err)
 		return
 	}
@@ -36,26 +116,40 @@ func (s *Server) transfersHandler(ctx *routing.Context) {
 		movements = []*inventoryMovementRow{}
 	}
 
-	variants, err := s.findTrackableVariants(ctx.Request.Context(), companyID)
-	if err != nil {
-		log.Printf("transfersHandler: variants: %v", err)
-		ctx.Error(err)
-		return
-	}
-
-	warehouses, err := s.findWarehouses(ctx.Request.Context())
-	if err != nil {
-		log.Printf("transfersHandler: warehouses: %v", err)
-		ctx.Error(err)
-		return
-	}
-
-	ctx.Render("Inventories/Transfers/Index", map[string]any{
+	ctx.Render("Inventories/Movements/Index", map[string]any{
 		"translations": trans("global", "movements"),
 		"movements":    movements,
-		"variants":     variants,
-		"warehouses":   warehouses,
 	})
+}
+
+// transferTransitionHandler returns a handler that drives a single transfer
+// status transition (dispatch / receive / cancel) by uuid.
+func (s *Server) transferTransitionHandler(action func(context.Context, string) error) routing.HandlerFunc {
+	return func(ctx *routing.Context) {
+		uuid := ctx.Param("id")
+		if uuid == "" {
+			ctx.BackWith("status", s.trans("movements.errors.invalidTransition", nil))
+			return
+		}
+
+		if err := action(ctx.Request.Context(), uuid); err != nil {
+			switch {
+			case errors.Is(err, ErrTransferNotFound), errors.Is(err, ErrInvalidTransition):
+				ctx.Flash("error", s.trans("movements.errors.invalidTransition", nil))
+				ctx.Back()
+			case errors.Is(err, ErrInsufficientStock):
+				ctx.Flash("error", s.trans("movements.errors.insufficientStock", nil))
+				ctx.Back()
+			default:
+				log.Printf("transferTransitionHandler: %v", err)
+				ctx.BackWithError(err)
+			}
+			return
+		}
+
+		ctx.Flash("success", s.trans("global.wasUpdated", i18n.Replacements{"subject": "@global.transfer"}))
+		ctx.Redirect("/inventories/transfers")
+	}
 }
 
 func (s *Server) adjustmentsHandler(ctx *routing.Context) {
@@ -99,7 +193,7 @@ func (s *Server) storeAdjustmentHandler() routing.HandlerFunc {
 			return
 		}
 		ctx.Flash("success", s.trans("global.wasCreated", nil))
-		ctx.JSON(http.StatusCreated, map[string]any{"message": "Adjustment recorded"})
+		ctx.Redirect("/inventories/adjustments")
 	})
 }
 
@@ -111,6 +205,9 @@ func (s *Server) storeTransferHandler() routing.HandlerFunc {
 			case errors.Is(err, ErrSameWarehouse):
 				ctx.Errors("to_warehouse_id", s.trans("movements.errors.sameWarehouse", nil))
 				ctx.Back()
+			case errors.Is(err, ErrNoTransferLines):
+				ctx.Errors("lines", s.trans("transfers.errors.noLines", nil))
+				ctx.Back()
 			case errors.Is(err, ErrInsufficientStock):
 				ctx.Errors("qty", s.trans("movements.errors.insufficientStock", nil))
 				ctx.Back()
@@ -120,7 +217,7 @@ func (s *Server) storeTransferHandler() routing.HandlerFunc {
 			}
 			return
 		}
-		ctx.Flash("success", s.trans("global.wasCreated", nil))
-		ctx.JSON(http.StatusCreated, map[string]any{"message": "Transfer recorded"})
+		ctx.Flash("success", s.trans("global.wasCreated", i18n.Replacements{"subject": "@global.transfer"}))
+		ctx.Redirect("/inventories/transfers")
 	})
 }

@@ -12,6 +12,9 @@ import (
 var (
 	ErrSameWarehouse     = errors.New("source and destination warehouse must be different")
 	ErrInsufficientStock = errors.New("insufficient stock at the source warehouse")
+	ErrTransferNotFound  = errors.New("transfer not found")
+	ErrInvalidTransition = errors.New("transfer cannot move to the requested status")
+	ErrNoTransferLines   = errors.New("a transfer needs at least one product line")
 )
 
 // ── Internal structs ─────────────────────────────────────────────────────────
@@ -56,6 +59,51 @@ type adjustmentRow struct {
 	Reason      string  `json:"reason"`
 	Notes       string  `json:"notes"`
 	CreatedAt   string  `json:"created_at"`
+}
+
+type transferRow struct {
+	ID            int64   `json:"id"`
+	UUID          string  `json:"uuid"`
+	FromWarehouse string  `json:"from_warehouse"`
+	ToWarehouse   string  `json:"to_warehouse"`
+	Status        string  `json:"status"`
+	Notes         string  `json:"notes"`
+	RequestedBy   string  `json:"requested_by"`
+	LineCount     int     `json:"line_count"`
+	TotalQty      float64 `json:"total_qty"`
+	TotalCost     float64 `json:"total_cost"`
+	CreatedAt     string  `json:"created_at"`
+	DispatchedAt  string  `json:"dispatched_at"`
+	ReceivedAt    string  `json:"received_at"`
+}
+
+type transferLineRow struct {
+	ID          int64   `json:"id"`
+	VariantID   int64   `json:"variant_id"`
+	VariantName string  `json:"variant_name"`
+	SKU         string  `json:"sku"`
+	Reference   string  `json:"reference"`
+	ItemName    string  `json:"item_name"`
+	Description string  `json:"description"`
+	Unit        string  `json:"unit"`
+	Qty         float64 `json:"qty"`
+	UnitCost    float64 `json:"unit_cost"`
+	LineTotal   float64 `json:"line_total"`
+}
+
+// transferItemOption is a product hit for the transfer line search. ID is the
+// item id; Cost defaults to the item's default-variant cost_price.
+type transferItemOption struct {
+	ID          int64   `json:"id"`
+	Name        string  `json:"name"`
+	Description string  `json:"description"`
+	Reference   string  `json:"reference"`
+	SKU         string  `json:"sku"`
+	Cost        float64 `json:"cost"`
+	Unit        struct {
+		ID   *int64  `json:"id"`
+		Name *string `json:"name"`
+	} `json:"unit"`
 }
 
 // ── Core movement helpers ────────────────────────────────────────────────────
@@ -144,7 +192,10 @@ func (s *Server) reverseMovements(tx *sql.Tx, companyID int, referenceType strin
 	}
 	defer rows.Close()
 
-	type mvt struct{ variantID, warehouseID int; qty, unitCost float64 }
+	type mvt struct {
+		variantID, warehouseID int
+		qty, unitCost          float64
+	}
 	var movements []mvt
 	for rows.Next() {
 		var m mvt
@@ -352,11 +403,293 @@ func (s *Server) storeAdjustment(ctx context.Context, form *StoreAdjustmentForm)
 	return tx.Commit()
 }
 
+// findTransfers returns the manual transfer requests for a company, newest first,
+// with aggregate line count, total qty and total cost per transfer.
+func (s *Server) findTransfers(ctx context.Context, companyID int) ([]*transferRow, error) {
+	rows, err := s.db.QueryContext(ctx, `
+		SELECT t.id,
+		       t.uuid::text,
+		       wf.name                AS from_warehouse,
+		       wt.name                AS to_warehouse,
+		       t.status::text         AS status,
+		       COALESCE(t.notes, '')  AS notes,
+		       COALESCE(u.name, '')   AS requested_by,
+		       COALESCE(l.cnt, 0)        AS line_count,
+		       COALESCE(l.total_qty, 0)  AS total_qty,
+		       COALESCE(l.total_cost, 0) AS total_cost,
+		       TO_CHAR(t.created_at, 'YYYY-MM-DD HH24:MI') AS created_at,
+		       COALESCE(TO_CHAR(t.dispatched_at, 'YYYY-MM-DD HH24:MI'), '') AS dispatched_at,
+		       COALESCE(TO_CHAR(t.received_at,   'YYYY-MM-DD HH24:MI'), '') AS received_at
+		  FROM inventory_transfers t
+		  JOIN warehouses     wf ON wf.id = t.from_warehouse_id  AND wf.company_id = t.company_id
+		  JOIN warehouses     wt ON wt.id = t.to_warehouse_id    AND wt.company_id = t.company_id
+		  LEFT JOIN users     u  ON u.id  = t.requested_by
+		  LEFT JOIN (
+		        SELECT transfer_id,
+		               COUNT(*)               AS cnt,
+		               SUM(qty)               AS total_qty,
+		               SUM(qty * unit_cost)   AS total_cost
+		          FROM inventory_transfer_lines
+		         WHERE company_id = $1
+		         GROUP BY transfer_id
+		  ) l ON l.transfer_id = t.id
+		 WHERE t.company_id = $1
+		 ORDER BY t.created_at DESC`,
+		companyID,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var result []*transferRow
+	for rows.Next() {
+		var r transferRow
+		if err := rows.Scan(
+			&r.ID, &r.UUID, &r.FromWarehouse, &r.ToWarehouse,
+			&r.Status, &r.Notes, &r.RequestedBy,
+			&r.LineCount, &r.TotalQty, &r.TotalCost,
+			&r.CreatedAt, &r.DispatchedAt, &r.ReceivedAt,
+		); err != nil {
+			return nil, err
+		}
+		result = append(result, &r)
+	}
+	return result, rows.Err()
+}
+
+// findTransferByUUID returns a single transfer header (with aggregates) for the
+// detail view.
+func (s *Server) findTransferByUUID(ctx context.Context, companyID int, uuid string) (*transferRow, error) {
+	var r transferRow
+	err := s.db.QueryRowContext(ctx, `
+		SELECT t.id,
+		       t.uuid::text,
+		       wf.name, wt.name,
+		       t.status::text,
+		       COALESCE(t.notes, ''),
+		       COALESCE(u.name, ''),
+		       COALESCE(l.cnt, 0), COALESCE(l.total_qty, 0), COALESCE(l.total_cost, 0),
+		       TO_CHAR(t.created_at, 'YYYY-MM-DD HH24:MI'),
+		       COALESCE(TO_CHAR(t.dispatched_at, 'YYYY-MM-DD HH24:MI'), ''),
+		       COALESCE(TO_CHAR(t.received_at,   'YYYY-MM-DD HH24:MI'), '')
+		  FROM inventory_transfers t
+		  JOIN warehouses wf ON wf.id = t.from_warehouse_id AND wf.company_id = t.company_id
+		  JOIN warehouses wt ON wt.id = t.to_warehouse_id   AND wt.company_id = t.company_id
+		  LEFT JOIN users u ON u.id = t.requested_by
+		  LEFT JOIN (
+		        SELECT transfer_id, COUNT(*) AS cnt, SUM(qty) AS total_qty, SUM(qty * unit_cost) AS total_cost
+		          FROM inventory_transfer_lines WHERE company_id = $1 GROUP BY transfer_id
+		  ) l ON l.transfer_id = t.id
+		 WHERE t.company_id = $1 AND t.uuid = $2`,
+		companyID, uuid,
+	).Scan(
+		&r.ID, &r.UUID, &r.FromWarehouse, &r.ToWarehouse,
+		&r.Status, &r.Notes, &r.RequestedBy,
+		&r.LineCount, &r.TotalQty, &r.TotalCost,
+		&r.CreatedAt, &r.DispatchedAt, &r.ReceivedAt,
+	)
+	if err == sql.ErrNoRows {
+		return nil, ErrTransferNotFound
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &r, nil
+}
+
+// findTransferLines returns the product detail lines for a transfer.
+func (s *Server) findTransferLines(ctx context.Context, companyID int, transferID int64) ([]*transferLineRow, error) {
+	rows, err := s.db.QueryContext(ctx, `
+		SELECT tl.id,
+		       tl.variant_id,
+		       iv.name                                  AS variant_name,
+		       COALESCE(iv.sku, '')                     AS sku,
+		       COALESCE(i.identifiers->>'reference', '') AS reference,
+		       i.name                                   AS item_name,
+		       COALESCE(tl.description, '')             AS description,
+		       COALESCE(un.name, '')                    AS unit,
+		       tl.qty,
+		       tl.unit_cost,
+		       (tl.qty * tl.unit_cost)                  AS line_total
+		  FROM inventory_transfer_lines tl
+		  JOIN items_variants iv ON iv.id = tl.variant_id AND iv.company_id = tl.company_id
+		  JOIN items          i  ON i.id  = iv.item_id    AND i.company_id  = tl.company_id
+		  LEFT JOIN units     un ON un.id = tl.unit_id
+		 WHERE tl.company_id = $1 AND tl.transfer_id = $2
+		 ORDER BY tl.id`,
+		companyID, transferID,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var result []*transferLineRow
+	for rows.Next() {
+		var r transferLineRow
+		if err := rows.Scan(
+			&r.ID, &r.VariantID, &r.VariantName, &r.SKU, &r.Reference, &r.ItemName,
+			&r.Description, &r.Unit, &r.Qty, &r.UnitCost, &r.LineTotal,
+		); err != nil {
+			return nil, err
+		}
+		result = append(result, &r)
+	}
+	return result, rows.Err()
+}
+
+// storeTransfer records a new manual transfer request with its product lines.
+// No stock moves yet — stock leaves the source on dispatch and arrives at the
+// destination on receive. Item ids on the lines are resolved to default variants.
 func (s *Server) storeTransfer(ctx context.Context, form *StoreTransferForm) error {
 	if form.FromWarehouseID == form.ToWarehouseID {
 		return ErrSameWarehouse
 	}
+	if len(form.Lines) == 0 {
+		return ErrNoTransferLines
+	}
 
+	companyID := CurrentCompany(ctx).ID
+
+	var requestedBy any
+	if u := AuthUserFromContext(ctx); u != nil && !u.IsEmpty() {
+		requestedBy = u.GetAuthIdentifier()
+	}
+
+	createdAt := form.Date
+	if createdAt.IsZero() {
+		createdAt = time.Now().UTC()
+	}
+
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	var transferID int
+	if err := tx.QueryRow(
+		`INSERT INTO inventory_transfers
+		    (company_id, from_warehouse_id, to_warehouse_id, notes, status, requested_by, created_at)
+		 VALUES ($1, $2, $3, NULLIF($4, ''), 'requested', $5, $6)
+		 RETURNING id`,
+		companyID, form.FromWarehouseID, form.ToWarehouseID, form.Notes, requestedBy, createdAt,
+	).Scan(&transferID); err != nil {
+		return err
+	}
+
+	itemIDs := make([]int, 0, len(form.Lines))
+	for _, l := range form.Lines {
+		itemIDs = append(itemIDs, l.ID)
+	}
+	variantIDs, err := resolveItemVariantIDs(tx, companyID, itemIDs)
+	if err != nil {
+		return err
+	}
+
+	for _, l := range form.Lines {
+		variantID, ok := variantIDs[l.ID]
+		if !ok {
+			return fmt.Errorf("missing item variant for item_id=%d", l.ID)
+		}
+		var unitID any
+		if l.Unit > 0 {
+			unitID = l.Unit
+		}
+		if _, err := tx.Exec(
+			`INSERT INTO inventory_transfer_lines
+			    (company_id, transfer_id, variant_id, qty, unit_id, unit_cost, description)
+			 VALUES ($1, $2, $3, $4, $5, $6, NULLIF($7, ''))`,
+			companyID, transferID, variantID, l.Qty, unitID, l.Cost, l.Description,
+		); err != nil {
+			return err
+		}
+	}
+
+	return tx.Commit()
+}
+
+// transferHeader is the minimal header row needed to drive a status transition.
+type transferHeader struct {
+	ID     int
+	FromWh int
+	ToWh   int
+	Status TransferStatus
+}
+
+// transferLineMovement is a line reduced to what stock movement needs.
+type transferLineMovement struct {
+	VariantID int
+	UnitID    int
+	Qty       float64
+	UnitCost  float64
+}
+
+// loadTransferForUpdate locks a transfer row by uuid for the current company.
+func loadTransferForUpdate(tx *sql.Tx, companyID int, uuid string) (*transferHeader, error) {
+	var h transferHeader
+	var status string
+	err := tx.QueryRow(
+		`SELECT id, from_warehouse_id, to_warehouse_id, status::text
+		   FROM inventory_transfers
+		  WHERE company_id = $1 AND uuid = $2
+		  FOR UPDATE`,
+		companyID, uuid,
+	).Scan(&h.ID, &h.FromWh, &h.ToWh, &status)
+	if err == sql.ErrNoRows {
+		return nil, ErrTransferNotFound
+	}
+	if err != nil {
+		return nil, err
+	}
+	h.Status = TransferStatus(status)
+	return &h, nil
+}
+
+// loadTransferLineMovements reads the lines of a transfer for stock movement.
+func loadTransferLineMovements(tx *sql.Tx, companyID, transferID int) ([]transferLineMovement, error) {
+	rows, err := tx.Query(
+		`SELECT variant_id, COALESCE(unit_id, 0), qty, unit_cost
+		   FROM inventory_transfer_lines
+		  WHERE company_id = $1 AND transfer_id = $2`,
+		companyID, transferID,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var lines []transferLineMovement
+	for rows.Next() {
+		var l transferLineMovement
+		if err := rows.Scan(&l.VariantID, &l.UnitID, &l.Qty, &l.UnitCost); err != nil {
+			return nil, err
+		}
+		lines = append(lines, l)
+	}
+	return lines, rows.Err()
+}
+
+// unitBaseQty returns a unit's base_qty multiplier (1 when no/unknown unit).
+func unitBaseQty(tx *sql.Tx, companyID, unitID int) (float64, error) {
+	if unitID <= 0 {
+		return 1, nil
+	}
+	var base float64 = 1
+	err := tx.QueryRow(
+		"SELECT COALESCE(base_qty, 1) FROM units WHERE id = $1 AND company_id = $2",
+		unitID, companyID,
+	).Scan(&base)
+	if err == sql.ErrNoRows {
+		return 1, nil
+	}
+	return base, err
+}
+
+// dispatchTransfer moves a transfer requested -> in_transit, taking stock OUT of
+// the source warehouse for every line. Fails if any line lacks enough on hand.
+func (s *Server) dispatchTransfer(ctx context.Context, uuid string) error {
 	companyID := CurrentCompany(ctx).ID
 
 	tx, err := s.db.BeginTx(ctx, nil)
@@ -365,40 +698,58 @@ func (s *Server) storeTransfer(ctx context.Context, form *StoreTransferForm) err
 	}
 	defer tx.Rollback()
 
-	// Lock the source balance row and ensure there is enough on hand before
-	// moving stock. A missing row means zero quantity available.
-	var available float64
-	err = tx.QueryRow(
-		`SELECT quantity FROM inventory_balances
-		  WHERE company_id = $1 AND variant_id = $2 AND warehouse_id = $3
-		  FOR UPDATE`,
-		companyID, form.VariantID, form.FromWarehouseID,
-	).Scan(&available)
-	if err != nil && err != sql.ErrNoRows {
+	h, err := loadTransferForUpdate(tx, companyID, uuid)
+	if err != nil {
 		return err
 	}
-	if available < form.Qty {
-		return ErrInsufficientStock
+	if !h.Status.CanTransitionTo(TransferStatuses.InTransit) {
+		return ErrInvalidTransition
 	}
 
-	// OUT from source (negative), IN to destination (positive).
-	// unitID=0 → base units, no conversion (same as adjustments).
-	if err := s.recordMovement(
-		tx, companyID,
-		form.VariantID, form.FromWarehouseID, 0,
-		-form.Qty, 0,
-		InventoryMovementKinds.Transfer,
-		form.Notes, 0,
-	); err != nil {
+	lines, err := loadTransferLineMovements(tx, companyID, h.ID)
+	if err != nil {
 		return err
 	}
 
-	if err := s.recordMovement(
-		tx, companyID,
-		form.VariantID, form.ToWarehouseID, 0,
-		form.Qty, 0,
-		InventoryMovementKinds.Transfer,
-		form.Notes, 0,
+	for _, l := range lines {
+		base, err := unitBaseQty(tx, companyID, l.UnitID)
+		if err != nil {
+			return err
+		}
+		needed := l.Qty * base
+
+		// Lock the source balance and ensure enough on hand. Missing row = zero.
+		var available float64
+		err = tx.QueryRow(
+			`SELECT quantity FROM inventory_balances
+			  WHERE company_id = $1 AND variant_id = $2 AND warehouse_id = $3
+			  FOR UPDATE`,
+			companyID, l.VariantID, h.FromWh,
+		).Scan(&available)
+		if err != nil && err != sql.ErrNoRows {
+			return err
+		}
+		if available < needed {
+			return ErrInsufficientStock
+		}
+
+		// OUT from source (negative). recordMovement applies unit conversion.
+		if err := s.recordMovement(
+			tx, companyID,
+			l.VariantID, h.FromWh, l.UnitID,
+			-l.Qty, l.UnitCost,
+			InventoryMovementKinds.Transfer,
+			string(InventoryMovementKinds.Transfer), h.ID,
+		); err != nil {
+			return err
+		}
+	}
+
+	if _, err := tx.Exec(
+		`UPDATE inventory_transfers
+		    SET status = 'in_transit', dispatched_at = NOW(), updated_at = NOW()
+		  WHERE id = $1`,
+		h.ID,
 	); err != nil {
 		return err
 	}
@@ -406,16 +757,173 @@ func (s *Server) storeTransfer(ctx context.Context, form *StoreTransferForm) err
 	return tx.Commit()
 }
 
+// receiveTransfer moves a transfer in_transit -> received, taking stock IN to the
+// destination warehouse for every line.
+func (s *Server) receiveTransfer(ctx context.Context, uuid string) error {
+	companyID := CurrentCompany(ctx).ID
+
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	h, err := loadTransferForUpdate(tx, companyID, uuid)
+	if err != nil {
+		return err
+	}
+	if !h.Status.CanTransitionTo(TransferStatuses.Received) {
+		return ErrInvalidTransition
+	}
+
+	lines, err := loadTransferLineMovements(tx, companyID, h.ID)
+	if err != nil {
+		return err
+	}
+
+	for _, l := range lines {
+		// IN to destination (positive).
+		if err := s.recordMovement(
+			tx, companyID,
+			l.VariantID, h.ToWh, l.UnitID,
+			l.Qty, l.UnitCost,
+			InventoryMovementKinds.Transfer,
+			string(InventoryMovementKinds.Transfer), h.ID,
+		); err != nil {
+			return err
+		}
+	}
+
+	if _, err := tx.Exec(
+		`UPDATE inventory_transfers
+		    SET status = 'received', received_at = NOW(), updated_at = NOW()
+		  WHERE id = $1`,
+		h.ID,
+	); err != nil {
+		return err
+	}
+
+	return tx.Commit()
+}
+
+// cancelTransfer moves a transfer requested -> cancelled. Only allowed before
+// dispatch; no stock has moved yet so there is nothing to reverse.
+func (s *Server) cancelTransfer(ctx context.Context, uuid string) error {
+	companyID := CurrentCompany(ctx).ID
+
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	h, err := loadTransferForUpdate(tx, companyID, uuid)
+	if err != nil {
+		return err
+	}
+	if !h.Status.CanTransitionTo(TransferStatuses.Cancelled) {
+		return ErrInvalidTransition
+	}
+
+	if _, err := tx.Exec(
+		`UPDATE inventory_transfers
+		    SET status = 'cancelled', updated_at = NOW()
+		  WHERE id = $1`,
+		h.ID,
+	); err != nil {
+		return err
+	}
+
+	return tx.Commit()
+}
+
+// findTransferItems searches trackable products for the transfer line picker.
+// Each hit is an item with its default variant's sku and cost_price.
+func (s *Server) findTransferItems(ctx context.Context, companyID int, search string) ([]*transferItemOption, error) {
+	rows, err := s.db.QueryContext(ctx, transferItemQuery+" ORDER BY i.name LIMIT 25", companyID, "%"+search+"%")
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var result []*transferItemOption
+	for rows.Next() {
+		opt, err := scanTransferItem(rows)
+		if err != nil {
+			return nil, err
+		}
+		result = append(result, opt)
+	}
+	return result, rows.Err()
+}
+
+// findTransferItem returns the first trackable product matching the search term,
+// used by the reference-enter quick add on the transfer form.
+func (s *Server) findTransferItem(ctx context.Context, companyID int, search string) (*transferItemOption, error) {
+	rows, err := s.db.QueryContext(ctx, transferItemQuery+" ORDER BY i.name LIMIT 1", companyID, "%"+search+"%")
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	if !rows.Next() {
+		return nil, rows.Err()
+	}
+	return scanTransferItem(rows)
+}
+
+const transferItemQuery = `
+	SELECT i.id,
+	       i.name,
+	       COALESCE(i.description, '')               AS description,
+	       COALESCE(i.identifiers->>'reference', '') AS reference,
+	       COALESCE(iv.sku, '')                      AS sku,
+	       COALESCE(iv.cost_price, 0)                AS cost,
+	       iu.unit_id,
+	       iu.unit_name
+	  FROM items i
+	  JOIN LATERAL (
+	        SELECT id, sku, cost_price
+	          FROM items_variants
+	         WHERE item_id = i.id AND company_id = i.company_id
+	           AND track_inventory = TRUE AND deleted_at IS NULL
+	         ORDER BY id LIMIT 1
+	  ) iv ON TRUE
+	  LEFT JOIN LATERAL (
+	        SELECT iu.unit_id, u.name AS unit_name
+	          FROM items_units iu JOIN units u ON u.id = iu.unit_id
+	         WHERE iu.item_id = i.id LIMIT 1
+	  ) iu ON TRUE
+	 WHERE i.company_id = $1 AND i.deleted_at IS NULL
+	   AND (i.name ILIKE $2 OR i.identifiers->>'reference' ILIKE $2 OR iv.sku ILIKE $2)`
+
+func scanTransferItem(rows *sql.Rows) (*transferItemOption, error) {
+	var o transferItemOption
+	var unitID sql.NullInt64
+	var unitName sql.NullString
+	if err := rows.Scan(&o.ID, &o.Name, &o.Description, &o.Reference, &o.SKU, &o.Cost, &unitID, &unitName); err != nil {
+		return nil, err
+	}
+	if unitID.Valid {
+		id := unitID.Int64
+		o.Unit.ID = &id
+	}
+	if unitName.Valid {
+		name := unitName.String
+		o.Unit.Name = &name
+	}
+	return &o, nil
+}
+
 type variantOption struct {
-ID       int64  `json:"id"`
-Name     string `json:"name"`
-ItemName string `json:"item_name"`
-SKU      string `json:"sku"`
+	ID       int64  `json:"id"`
+	Name     string `json:"name"`
+	ItemName string `json:"item_name"`
+	SKU      string `json:"sku"`
 }
 
 // findTrackableVariants returns all enabled variants with track_inventory=true.
 func (s *Server) findTrackableVariants(ctx context.Context, companyID int) ([]*variantOption, error) {
-rows, err := s.db.QueryContext(ctx, `
+	rows, err := s.db.QueryContext(ctx, `
 SELECT iv.id,
        iv.name,
        i.name  AS item_name,
@@ -428,20 +936,20 @@ SELECT iv.id,
    AND i.deleted_at  IS NULL
    AND iv.status = 'enabled'
  ORDER BY i.name, iv.name`,
-companyID,
-)
-if err != nil {
-return nil, err
-}
-defer rows.Close()
+		companyID,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
 
-var result []*variantOption
-for rows.Next() {
-var v variantOption
-if err := rows.Scan(&v.ID, &v.Name, &v.ItemName, &v.SKU); err != nil {
-return nil, err
-}
-result = append(result, &v)
-}
-return result, rows.Err()
+	var result []*variantOption
+	for rows.Next() {
+		var v variantOption
+		if err := rows.Scan(&v.ID, &v.Name, &v.ItemName, &v.SKU); err != nil {
+			return nil, err
+		}
+		result = append(result, &v)
+	}
+	return result, rows.Err()
 }

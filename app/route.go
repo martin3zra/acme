@@ -109,8 +109,14 @@ func (s *Server) bootRoutes() {
 					route.DELETE("/inventories/warehouses/:id", s.deleteWarehouseHandler())
 
 					route.GET("/inventories/stocks", s.stocksHandler).Can("viewAny:inventory")
+					route.GET("/inventories/movements", s.movementsHandler).Can("viewAny:inventory")
 					route.GET("/inventories/transfers", s.transfersHandler).Can("viewAny:inventory")
+					route.GET("/inventories/transfers/create", s.createTransferHandler).Can("create:transfer")
 					route.POST("/inventories/transfers", s.storeTransferHandler()).Can("create:transfer")
+					route.PUT("/inventories/transfers/:id/dispatch", s.transferTransitionHandler(s.dispatchTransfer)).Can("create:transfer")
+					route.PUT("/inventories/transfers/:id/receive", s.transferTransitionHandler(s.receiveTransfer)).Can("create:transfer")
+					route.PUT("/inventories/transfers/:id/cancel", s.transferTransitionHandler(s.cancelTransfer)).Can("create:transfer")
+					route.GET("/inventories/transfers/:id", s.showTransferHandler).Can("viewAny:inventory")
 					route.GET("/inventories/adjustments", s.adjustmentsHandler).Can("viewAny:inventory")
 					route.POST("/inventories/adjustments", s.storeAdjustmentHandler()).Can("create:adjustment")
 
@@ -122,11 +128,11 @@ func (s *Server) bootRoutes() {
 					route.GET("/payments/:id/print/:hash", s.printPaymentHandler).Middleware(Signed)
 					route.PUT("/payments/:id", s.updatePaymentHandler())
 
-				route.GET("/payables", s.payablesHandler).Can("viewAny:payable")
-				route.GET("/payables/create", s.createVendorPaymentHandler).Can("create:payable")
-				route.POST("/payables", s.storeVendorPaymentHandler())
-				route.PUT("/payables/:id/void", s.voidVendorPaymentHandler())
-				route.GET("/payables/:id", s.showVendorPaymentHandler)
+					route.GET("/payables", s.payablesHandler).Can("viewAny:payable")
+					route.GET("/payables/create", s.createVendorPaymentHandler).Can("create:payable")
+					route.POST("/payables", s.storeVendorPaymentHandler())
+					route.PUT("/payables/:id/void", s.voidVendorPaymentHandler())
+					route.GET("/payables/:id", s.showVendorPaymentHandler)
 
 					route.GET("/expenses", s.expensesHandler).Can("viewAny:expense")
 					route.POST("/expenses", s.storeExpenseHandler())
