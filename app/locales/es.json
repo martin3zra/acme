@@ -358,7 +358,8 @@
     "paid": "Pagado",
     "invoiceNumber": "Número de factura",
     "convertToVendorBill": "Convertir a factura de proveedor",
-    "transfer": "La transferencia"
+    "transfer": "La transferencia",
+    "adjustment": "El ajuste"
   },
   "dashboard": {
     "due_invoices": "Facturas vencidas",
