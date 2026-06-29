@@ -19,6 +19,11 @@ jobs:
       - uses: actions/checkout@v4
       - name: Authenticate private Go modules
         run: git config --global url."https://x-access-token:${{ secrets.GO_MODULES_PAT }}@github.com/".insteadOf "https://github.com/"
+      # main.go embeds public/build (a Vite build artifact, gitignored). The Go
+      # build/test only needs the directory to exist with a file; a stub
+      # manifest satisfies the //go:embed at compile time.
+      - name: Stub embedded frontend assets
+        run: mkdir -p public/build && echo '{}' > public/build/manifest.json
       - uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
