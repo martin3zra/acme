@@ -1,0 +1,20 @@
+# "Remember me" persistent login. Stores a SHA-256 hash (64 hex chars) of the
+# token; the raw token lives only in the user's cookie.
+up:
+  user:
+    action: alter
+    table: users
+    add_columns:
+      remember_token: string:64 nullable
+    add_indexes:
+      - name: idx_users_remember_token
+        columns: [remember_token]
+
+down:
+  user:
+    action: alter
+    table: users
+    drop_indexes:
+      - idx_users_remember_token
+    drop_columns:
+      - remember_token

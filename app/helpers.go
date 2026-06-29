@@ -1,9 +1,14 @@
 package app
 
 import (
+	"crypto/rand"
+	"crypto/sha256"
 	_ "embed"
+	"encoding/base64"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"io"
 	"math"
 	"regexp"
 	"strconv"
@@ -13,6 +18,23 @@ import (
 	"codeberg.org/go-pdf/fpdf"
 	"github.com/martin3zra/forge/i18n"
 )
+
+// generateRememberToken returns a URL-safe random token (the raw value handed to
+// the client cookie; only its hash is ever stored).
+func generateRememberToken() string {
+	b := make([]byte, 32)
+	if _, err := io.ReadFull(rand.Reader, b); err != nil {
+		panic("failed to generate remember token")
+	}
+	return base64.RawURLEncoding.EncodeToString(b)
+}
+
+// hashRememberToken returns the SHA-256 hex digest of a raw token. Storing the
+// hash means a leaked DB row can't be replayed as a login cookie.
+func hashRememberToken(raw string) string {
+	sum := sha256.Sum256([]byte(raw))
+	return hex.EncodeToString(sum[:])
+}
 
 func filter[T any](s []T, predicate func(T) bool) []T {
 	result := make([]T, 0, len(s)) // Pre-allocate for efficiency

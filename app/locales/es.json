@@ -561,7 +561,8 @@
         "logout": "Cerrar sesión"
       },
       "title": "Inicia sesión en tu cuenta",
-      "description": "Ingrese su correo electrónico y contraseña a continuación para iniciar sesión."
+      "description": "Ingrese su correo electrónico y contraseña a continuación para iniciar sesión.",
+      "rememberMe": "Recordarme"
     }
   },
   "reports": {
