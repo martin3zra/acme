@@ -5,11 +5,20 @@ on:
     branches: [main]
   pull_request:
 
+permissions:
+  contents: read
+
 jobs:
   unit:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      # forge/camel are public, but the Go proxy may not have re-indexed them
+      # yet and falls back to direct git, which 401s anonymously on the runner.
+      # Authenticate git with the built-in GITHUB_TOKEN (no setup, reads public
+      # repos) so the direct fetch always works.
+      - name: Configure git auth for go modules
+        run: git config --global url."https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/".insteadOf "https://github.com/"
       # main.go embeds public/build (a Vite build artifact, gitignored). The Go
       # build/test only needs the directory to exist with a file; a stub
       # manifest satisfies the //go:embed at compile time.
@@ -46,6 +55,8 @@ jobs:
       DB_SSLMODE: disable
     steps:
       - uses: actions/checkout@v4
+      - name: Configure git auth for go modules
+        run: git config --global url."https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/".insteadOf "https://github.com/"
       - uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
