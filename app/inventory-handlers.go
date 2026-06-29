@@ -192,7 +192,7 @@ func (s *Server) storeAdjustmentHandler() routing.HandlerFunc {
 			ctx.BackWithError(err)
 			return
 		}
-		ctx.Flash("success", s.trans("global.wasCreated", nil))
+		ctx.Flash("success", s.trans("global.wasCreated", i18n.Replacements{"subject": "@global.adjustment"}))
 		ctx.Redirect("/inventories/adjustments")
 	})
 }
