@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"log"
 	"net/http"
 	"strings"
 
@@ -131,6 +132,57 @@ func EnforceVerifiedUserAccess(next routing.HandlerFunc) routing.HandlerFunc {
 			return
 		}
 
+		next(ctx)
+	}
+}
+
+// RememberMe restores a session from the persistent-login cookie before the
+// auth check runs. On a valid cookie it rebuilds the session (so the downstream
+// AuthenticatedMiddleware sees user_id) and rotates the token. No-ops when the
+// user already has a session or the cookie is missing/invalid.
+func (s *Server) RememberMe(next routing.HandlerFunc) routing.HandlerFunc {
+	return func(ctx *routing.Context) {
+		sess := session.GetSession(ctx.Request)
+		if uid, ok := sess.Get("user_id").(float64); ok && uid > 0 {
+			next(ctx)
+			return
+		}
+
+		cookie, err := ctx.Request.Cookie(rememberCookieName)
+		if err != nil || cookie.Value == "" {
+			next(ctx)
+			return
+		}
+
+		userID, err := s.findUserIDByRememberToken(hashRememberToken(cookie.Value))
+		if err != nil {
+			log.Printf("RememberMe: lookup: %v", err)
+			next(ctx)
+			return
+		}
+		if userID == 0 {
+			s.expireRememberCookie(ctx) // stale/invalid cookie
+			next(ctx)
+			return
+		}
+
+		user, err := auth.NewAuth(ctx.Request.Context()).LoginUsingId(userID)
+		if err != nil {
+			log.Printf("RememberMe: load user: %v", err)
+			next(ctx)
+			return
+		}
+
+		attrs := s.sessionAttrsForUser(user)
+		if err := s.sessionManager.ReGenerate(ctx.Request, user, attrs); err != nil {
+			log.Printf("RememberMe: regenerate: %v", err)
+			next(ctx)
+			return
+		}
+
+		// Token is intentionally NOT rotated here: concurrent requests restoring
+		// at once would otherwise invalidate each other's cookie. It stays valid
+		// (hashed at rest, HttpOnly) until logout or expiry.
 		next(ctx)
 	}
 }

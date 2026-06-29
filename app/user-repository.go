@@ -234,3 +234,28 @@ func (s *Server) updateUser(ctx context.Context, form *StoreUserForm) error {
 
 	return err
 }
+
+// storeRememberToken persists the hash of a user's remember token.
+func (s *Server) storeRememberToken(id int, hashed string) error {
+	_, err := s.db.Exec("UPDATE users SET remember_token = $2 WHERE id = $1", id, hashed)
+	return err
+}
+
+// clearRememberToken removes a user's remember token (logout / rotation cleanup).
+func (s *Server) clearRememberToken(id int) error {
+	_, err := s.db.Exec("UPDATE users SET remember_token = NULL WHERE id = $1", id)
+	return err
+}
+
+// findUserIDByRememberToken returns the user id whose stored hash matches, or 0.
+func (s *Server) findUserIDByRememberToken(hashed string) (int, error) {
+	var id int
+	err := s.db.QueryRow(
+		"SELECT id FROM users WHERE remember_token = $1 AND status = 'enabled' LIMIT 1",
+		hashed,
+	).Scan(&id)
+	if err == sql.ErrNoRows {
+		return 0, nil
+	}
+	return id, err
+}

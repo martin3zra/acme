@@ -80,7 +80,12 @@ func AuthUserFromContext(ctx context.Context) *AuthUser {
 func init() {
 	auth.SetCredentialResolver(func(db *sql.DB, column string, value any) (foundation.Authenticatable, error) {
 		user := new(AuthUser)
-		err := db.QueryRow(fmt.Sprintf("SELECT * FROM users WHERE %s = $1", column), value).
+		// Explicit columns (not SELECT *) so new table columns can't shift the
+		// scan order and break authentication.
+		err := db.QueryRow(fmt.Sprintf(
+			"SELECT id, name, email, password, email_verified_at, last_password_reset, "+
+				"created_at, updated_at, deleted_at, uuid, status, must_change_password, pending_email "+
+				"FROM users WHERE %s = $1", column), value).
 			Scan(&user.Id, &user.Name, &user.Email,
 				&user.Password, &user.EmailVerifiedAt, &user.LastPasswordReset, &user.CreatedAt,
 				&user.UpdatedAt, &user.DeletedAt, &user.UUID, &user.Status, &user.MustChangePassword, &user.PendingEmail)

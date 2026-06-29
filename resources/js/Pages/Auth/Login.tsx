@@ -1,5 +1,6 @@
 import InputError from '@/components/input-error';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useTranslation } from '@/hooks/use-translation';
@@ -66,7 +67,14 @@ export default function Login() {
             <InputError message={errors.password} />
           </div>
 
-          <Button type="submit" className="w-full" tabIndex={3} disabled={processing}>
+          <div className="flex items-center gap-2">
+            <Checkbox id="remember" checked={data.remember} onCheckedChange={(checked) => setData('remember', checked === true)} tabIndex={3} />
+            <Label htmlFor="remember" className="font-normal">
+              {t('auth.login.rememberMe')}
+            </Label>
+          </div>
+
+          <Button type="submit" className="w-full" tabIndex={4} disabled={processing}>
             {processing ? <div>{t('global.processing')}</div> : <span>{t('auth.login.action.login')}</span>}
           </Button>
         </div>

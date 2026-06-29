@@ -9,7 +9,7 @@ import (
 
 func (s *Server) bootRoutes() {
 
-	s.route.WithMiddleware(s.SharedProps)
+	s.route.WithMiddleware(s.RememberMe, s.SharedProps)
 
 	s.route.
 		WithMiddleware(RedirectIfAuthenticated).

@@ -30,12 +30,14 @@ type LoginFormRequest struct {
 	support.FormRequest
 	Email    string `json:"email"`
 	Password string `json:"password"`
+	Remember bool   `json:"remember"`
 }
 
 func (f LoginFormRequest) Rules() map[string]any {
 	return map[string]any{
 		"email":    "required|email|max:100|lowercase",
 		"password": "required",
+		"remember": "sometimes|boolean",
 	}
 }
 
