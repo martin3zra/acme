@@ -1,19 +1,37 @@
 package app
 
 import (
+	"bytes"
 	"context"
 	"database/sql"
+	"encoding/json"
 	"fmt"
 	"math"
+	"net/http/httptest"
 	"reflect"
 	"strings"
 	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/martin3zra/forge/auth"
 	"github.com/martin3zra/forge/database"
+	"github.com/martin3zra/forge/i18n"
+	"github.com/martin3zra/forge/routing"
+	"github.com/martin3zra/forge/session"
 	"github.com/martin3zra/forge/store"
+	gonertia "github.com/romsar/gonertia/v2"
 )
+
+// testInertia is a minimal Inertia instance for handler tests — enough for
+// Back()/Redirect() (which flash + redirect); page rendering is not exercised.
+var testInertia = func() *gonertia.Inertia {
+	i, err := gonertia.New("<!doctype html><html><head></head><body>{{ .inertiaHead }}{{ .inertia }}</body></html>")
+	if err != nil {
+		panic(err)
+	}
+	return i
+}()
 
 var txCounter int64
 
@@ -34,6 +52,55 @@ func newTestServer(t *testing.T) *Server {
 		t.Fatalf("query store: %v", err)
 	}
 	return &Server{db: db, qs: qs}
+}
+
+// newHandlerServer is a test server with the extra wiring HTTP handlers need:
+// a translator (flash messages) and a session manager (BackWith/Flash/Errors).
+func newHandlerServer(t *testing.T) *Server {
+	s := newTestServer(t)
+	s.translator = i18n.NewTranslator(localesFS, defaultLang, fallbackLang, trans("global", "invoices", "companies", "profile"))
+	s.sessionManager = session.NewSessionManager(
+		session.NewDatabaseStore(s.db),
+		30*time.Minute, 120*time.Minute, 12*time.Hour,
+		"acme_session", "", false, true,
+	)
+	return s
+}
+
+// handlerCtx assembles a routing.Context for a handler call: a JSON request body,
+// the tenant/auth/db values the repos and validator read, and a fresh session so
+// BackWith/Flash/Errors work. Returns the context, the session (to assert flashes
+// and errors), and the response recorder.
+func handlerCtx(t *testing.T, s *Server, f *fixture, method, path string, body any) (*routing.Context, *session.Session, *httptest.ResponseRecorder) {
+	t.Helper()
+	b, err := json.Marshal(body)
+	if err != nil {
+		t.Fatalf("marshal body: %v", err)
+	}
+	req := httptest.NewRequest(method, path, bytes.NewReader(b))
+	req.Header.Set("Content-Type", "application/json")
+
+	ctx := req.Context()
+	ctx = context.WithValue(ctx, database.ConnectionKey{}, s.db)
+	ctx = context.WithValue(ctx, CompanyKey{}, f.company)
+	ctx = context.WithValue(ctx, AccountKey{}, map[string]any{"id": f.accountID, "uuid": ""})
+	ctx = context.WithValue(ctx, auth.ContextUserID{}, map[string]any{
+		"id": f.user.Id, "uuid": f.user.UUID, "email": f.user.Email, "role": f.user.Role,
+	})
+	req = req.WithContext(ctx)
+
+	sess, req := s.sessionManager.Start(req)
+	rec := httptest.NewRecorder()
+	return &routing.Context{Response: rec, Request: req, Inertia: testInertia}, sess, rec
+}
+
+// sessionErrors returns the validation/guard errors stashed on the session by
+// BackWith/Errors (map of field -> messages).
+func sessionErrors(sess *session.Session) map[string][]string {
+	if e, ok := sess.Get("errors").(map[string][]string); ok {
+		return e
+	}
+	return nil
 }
 
 // authCtx builds a request-equivalent context: tenant company, account and the
