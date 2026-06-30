@@ -3,8 +3,6 @@
 # Prereqs for tests:
 #   - Postgres reachable per .env.test (cp .env.test.sample .env.test)
 #   - `camel` on PATH (or ~/go/bin/camel) to build the test schema
-#   - GOPRIVATE set for the private forge module
-export GOPRIVATE := github.com/martin3zra/*
 
 .PHONY: test test-db test-unit lint
 
