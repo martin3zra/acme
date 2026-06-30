@@ -12,3 +12,4 @@ bootstrap/*
 /public/hot
 acme.log
 uploads
+.env.test
