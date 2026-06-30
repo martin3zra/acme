@@ -1,0 +1,88 @@
+# vendor_payments + vendor_payment_items: settle accounts_payable (pay vendors).
+# These tables are referenced by app/payable-repository.go (storeVendorPayment,
+# voidVendorPayment, findVendorPayment*) but were missing from the schema, so the
+# entire "pay a vendor" flow failed at runtime with "relation does not exist".
+# Columns mirror exactly what the code reads/writes.
+#
+# action: raw to match the baseline style (native uuid default + sequences).
+up:
+  vendor_payments:
+    action: raw
+    statements:
+      - |
+        CREATE TABLE public.vendor_payments (
+            id bigint NOT NULL,
+            uuid uuid DEFAULT gen_random_uuid() NOT NULL,
+            company_id bigint NOT NULL,
+            vendor_id bigint NOT NULL,
+            date timestamp without time zone NOT NULL,
+            amount numeric(15,2) DEFAULT 0 NOT NULL,
+            notes text,
+            payment jsonb,
+            status character varying(20) DEFAULT 'completed'::character varying NOT NULL,
+            code character varying(20) NOT NULL,
+            created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+            updated_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL
+        );
+      - |
+        CREATE SEQUENCE public.vendor_payments_id_seq
+            START WITH 1 INCREMENT BY 1 NO MINVALUE NO MAXVALUE CACHE 1;
+      - |
+        ALTER SEQUENCE public.vendor_payments_id_seq OWNED BY public.vendor_payments.id;
+      - |
+        ALTER TABLE ONLY public.vendor_payments ALTER COLUMN id SET DEFAULT nextval('public.vendor_payments_id_seq'::regclass);
+      - |
+        ALTER TABLE ONLY public.vendor_payments
+            ADD CONSTRAINT vendor_payments_pkey PRIMARY KEY (id);
+      - |
+        ALTER TABLE ONLY public.vendor_payments
+            ADD CONSTRAINT vendor_payments_uuid_key UNIQUE (uuid);
+      - |
+        ALTER TABLE ONLY public.vendor_payments
+            ADD CONSTRAINT vendor_payments_company_id_fkey FOREIGN KEY (company_id) REFERENCES public.companies(id) ON DELETE CASCADE;
+      - |
+        ALTER TABLE ONLY public.vendor_payments
+            ADD CONSTRAINT vendor_payments_vendor_id_fkey FOREIGN KEY (vendor_id) REFERENCES public.vendors(id) ON DELETE RESTRICT;
+      - |
+        CREATE INDEX idx_vendor_payments_company_vendor ON public.vendor_payments USING btree (company_id, vendor_id);
+
+      - |
+        CREATE TABLE public.vendor_payment_items (
+            id bigint NOT NULL,
+            company_id bigint NOT NULL,
+            vendor_payment_id bigint NOT NULL,
+            accounts_payable_id bigint NOT NULL,
+            date timestamp without time zone NOT NULL,
+            amount_due numeric(15,2) NOT NULL,
+            payment_amount numeric(15,2) NOT NULL,
+            created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+            updated_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL
+        );
+      - |
+        CREATE SEQUENCE public.vendor_payment_items_id_seq
+            START WITH 1 INCREMENT BY 1 NO MINVALUE NO MAXVALUE CACHE 1;
+      - |
+        ALTER SEQUENCE public.vendor_payment_items_id_seq OWNED BY public.vendor_payment_items.id;
+      - |
+        ALTER TABLE ONLY public.vendor_payment_items ALTER COLUMN id SET DEFAULT nextval('public.vendor_payment_items_id_seq'::regclass);
+      - |
+        ALTER TABLE ONLY public.vendor_payment_items
+            ADD CONSTRAINT vendor_payment_items_pkey PRIMARY KEY (id);
+      - |
+        ALTER TABLE ONLY public.vendor_payment_items
+            ADD CONSTRAINT vendor_payment_items_company_id_fkey FOREIGN KEY (company_id) REFERENCES public.companies(id) ON DELETE CASCADE;
+      - |
+        ALTER TABLE ONLY public.vendor_payment_items
+            ADD CONSTRAINT vendor_payment_items_payment_fkey FOREIGN KEY (vendor_payment_id) REFERENCES public.vendor_payments(id) ON DELETE CASCADE;
+      - |
+        ALTER TABLE ONLY public.vendor_payment_items
+            ADD CONSTRAINT vendor_payment_items_ap_fkey FOREIGN KEY (accounts_payable_id) REFERENCES public.accounts_payable(id) ON DELETE RESTRICT;
+      - |
+        CREATE INDEX idx_vendor_payment_items_payment ON public.vendor_payment_items USING btree (company_id, vendor_payment_id);
+
+down:
+  vendor_payments:
+    action: raw
+    statements:
+      - "DROP TABLE IF EXISTS public.vendor_payment_items;"
+      - "DROP TABLE IF EXISTS public.vendor_payments;"

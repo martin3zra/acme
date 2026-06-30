@@ -184,6 +184,48 @@ func mkItem(t *testing.T, f *fixture, price, cost float64) (itemID, variantID in
 	return itemID, variantID
 }
 
+// mkVendor creates a vendor via the real storeVendor path. Returns id + uuid.
+func mkVendor(t *testing.T, f *fixture, terms string) (id int, uuid string) {
+	t.Helper()
+	email := uniq("vend") + "@test.local"
+	form := &StoreVendorForm{
+		Name: uniq("Vendor"), Email: email, PaymentMethod: "cash",
+		PaymentTerms: terms, VendorType: "business", TaxReceipt: f.taxReceiptID,
+	}
+	if err := f.s.storeVendor(f.ctx, form); err != nil {
+		t.Fatalf("storeVendor: %v", err)
+	}
+	if err := f.s.db.QueryRow(
+		`SELECT id, uuid FROM vendors WHERE company_id = $1 AND email = $2`, f.company.ID, email,
+	).Scan(&id, &uuid); err != nil {
+		t.Fatalf("load vendor: %v", err)
+	}
+	return id, uuid
+}
+
+// mkPurchase creates a purchase document (purchase_order/purchase_receipt/
+// vendor_bill) through the real storePurchase path. Returns the new uuid.
+func mkPurchase(t *testing.T, f *fixture, vendorID int, kind PurchaseTransactionKind, terms, invoiceNumber string, src *PurchaseSource, lines ...*Line) string {
+	t.Helper()
+	form := &StorePurchaseForm{
+		VendorID:      vendorID,
+		Date:          time.Now(),
+		Terms:         terms,
+		Discount:      Discount{Type: "percentage"},
+		Lines:         lines,
+		Kind:          kind,
+		Source:        src,
+		InvoiceNumber: invoiceNumber,
+	}
+	form.SetContext(f.ctx) // so form.User() resolves (AP created_by)
+	form.Compute()
+	uuid, err := f.s.storePurchase(f.ctx, form)
+	if err != nil {
+		t.Fatalf("storePurchase(%s): %v", kind, err)
+	}
+	return uuid
+}
+
 // mkCustomer creates a customer via the real storeCustomer path. terms e.g.
 // "pia" (cash) or "net30" (credit). Returns id + uuid.
 func mkCustomer(t *testing.T, f *fixture, terms string) (id int, uuid string) {

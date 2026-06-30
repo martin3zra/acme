@@ -12,16 +12,16 @@ import (
 )
 
 type vendorPayment struct {
-	ID        int      `json:"id"`
-	UUID      string   `json:"uuid"`
-	CompanyID int      `json:"company_id"`
-	Vendor    vendor   `json:"vendor"`
+	ID        int       `json:"id"`
+	UUID      string    `json:"uuid"`
+	CompanyID int       `json:"company_id"`
+	Vendor    vendor    `json:"vendor"`
 	Date      time.Time `json:"date"`
-	Amount    float64  `json:"amount"`
-	Notes     string   `json:"notes"`
-	Payment   *Payment `json:"payment"`
-	Status    string   `json:"status"`
-	Code      string   `json:"code"`
+	Amount    float64   `json:"amount"`
+	Notes     string    `json:"notes"`
+	Payment   *Payment  `json:"payment"`
+	Status    string    `json:"status"`
+	Code      string    `json:"code"`
 	foundation.Timestamps
 }
 
@@ -187,16 +187,21 @@ func (s *Server) updateAPBalance(tx *sql.Tx, companyID int, apID int64, paymentA
 	// was created from a vendor bill that is linked to a PO via source).
 	var poUUID string
 	lookupErr := tx.QueryRow(
-		`SELECT p_po.uuid
+		`SELECT p_po.uuid::text
 		   FROM accounts_payable ap
 		   JOIN purchases p_bill ON ap.purchase_id = p_bill.id
 		   JOIN purchases p_po   ON p_po.company_id = p_bill.company_id
-		                        AND p_po.uuid = p_bill.source->>'id'
+		                        AND p_po.uuid = (p_bill.source->>'id')::uuid
 		                        AND p_po.transaction_kind = 'purchase_order'
 		  WHERE ap.company_id = $1 AND ap.id = $2`,
 		companyID, apID,
 	).Scan(&poUUID)
-	if lookupErr == nil && poUUID != "" {
+	// No linked PO is fine; any other error must not be swallowed (it would
+	// otherwise abort the surrounding transaction silently).
+	if lookupErr != nil && lookupErr != sql.ErrNoRows {
+		return lookupErr
+	}
+	if poUUID != "" {
 		if err = updatePOPaymentStatus(tx, companyID, poUUID); err != nil {
 			return err
 		}

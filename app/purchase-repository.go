@@ -21,27 +21,27 @@ type linkedPurchaseReceipt struct {
 }
 
 type purchase struct {
-	CompanyID      int                       `json:"company_id"`
-	ID             int                       `json:"id"`
-	UUID           string                    `json:"uuid"`
-	Number         string                    `json:"number"` // purchases.code
-	Vendor         vendor                    `json:"vendor"`
-	WarehouseID    int                       `json:"warehouse_id"`
-	Date           time.Time                 `json:"date"`
-	DueOn          *time.Time                `json:"due_on"` // purchases.due_date
-	Terms          string                    `json:"terms"`  // computed from date/due_on
-	Amount         float64                   `json:"amount"` // purchases.subtotal
-	Discount       Discount                  `json:"discount"`
-	Tax            float64                   `json:"tax"` // purchases.tax_amount
-	Total          float64                   `json:"total"`
-	AmountDue      float64                   `json:"amount_due"`    // computed
-	InvoiceNumber  string                    `json:"invoice_number,omitempty"` // vendor-supplied reference
-	Status         string                    `json:"status"`        // purchases.purchase_status
-	PaymentStatus  PaidStatus                `json:"payment_status"`
-	Notes          string                    `json:"notes"` // purchases.notes
-	Kind           PurchaseTransactionKind   `json:"transaction_kind"`
-	Source         *PurchaseSource           `json:"source,omitempty"`
-	LinkedReceipts []*linkedPurchaseReceipt  `json:"linked_receipts,omitempty"`
+	CompanyID      int                      `json:"company_id"`
+	ID             int                      `json:"id"`
+	UUID           string                   `json:"uuid"`
+	Number         string                   `json:"number"` // purchases.code
+	Vendor         vendor                   `json:"vendor"`
+	WarehouseID    int                      `json:"warehouse_id"`
+	Date           time.Time                `json:"date"`
+	DueOn          *time.Time               `json:"due_on"` // purchases.due_date
+	Terms          string                   `json:"terms"`  // computed from date/due_on
+	Amount         float64                  `json:"amount"` // purchases.subtotal
+	Discount       Discount                 `json:"discount"`
+	Tax            float64                  `json:"tax"` // purchases.tax_amount
+	Total          float64                  `json:"total"`
+	AmountDue      float64                  `json:"amount_due"`               // computed
+	InvoiceNumber  string                   `json:"invoice_number,omitempty"` // vendor-supplied reference
+	Status         string                   `json:"status"`                   // purchases.purchase_status
+	PaymentStatus  PaidStatus               `json:"payment_status"`
+	Notes          string                   `json:"notes"` // purchases.notes
+	Kind           PurchaseTransactionKind  `json:"transaction_kind"`
+	Source         *PurchaseSource          `json:"source,omitempty"`
+	LinkedReceipts []*linkedPurchaseReceipt `json:"linked_receipts,omitempty"`
 
 	EntityStatus foundation.Status `json:"-"` // purchases.status
 }
@@ -543,8 +543,8 @@ func (s *Server) createAPForVendorBill(tx *sql.Tx, companyID, purchaseID, vendor
 		form.InvoiceNumber,
 		form.Date,
 		form.dueOn,
-		form.total,
-		form.tax,
+		form.amount, // amount_total is the pre-tax subtotal; amount_payable is
+		form.tax,    // generated as (amount_total + tax_amount - discount_amount)
 		0,
 		0,
 		"DOP",
