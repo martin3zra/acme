@@ -225,14 +225,21 @@ func (s *Server) storeCustomerInternal(tx *sql.Tx, companyID int, code string, f
 		return nil
 	}
 
-	stmt, err = tx.Prepare("INSERT INTO invoices (company_id, date, type, due_on, customer_id, amount, amount_due, total, note, status, paid_status) " +
-		"VALUES($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING id")
+	// The opening-balance invoice needs a code like any other invoice
+	// (invoices.code is NOT NULL); use the credit-invoice sequence.
+	openingSeq, err := GetNextSequence(tx, companyID, "invoice.credit")
+	if err != nil {
+		return err
+	}
+
+	stmt, err = tx.Prepare("INSERT INTO invoices (company_id, date, type, due_on, customer_id, amount, amount_due, total, note, status, paid_status, code) " +
+		"VALUES($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12) RETURNING id")
 	if err != nil {
 		return err
 	}
 
 	var invoiceID int
-	err = stmt.QueryRow(companyID, form.OpenBalanceAsOf, InvoiceTermType.Opening, form.OpenBalanceAsOf, customerID, form.OpenBalance, form.OpenBalance, form.OpenBalance, "Saldo inicial", InvoiceStatuses.Sent, PaidStatuses.UnPaid).
+	err = stmt.QueryRow(companyID, form.OpenBalanceAsOf, InvoiceTermType.Opening, form.OpenBalanceAsOf, customerID, form.OpenBalance, form.OpenBalance, form.OpenBalance, "Saldo inicial", InvoiceStatuses.Sent, PaidStatuses.UnPaid, openingSeq.Code).
 		Scan(&invoiceID)
 	if err != nil {
 		return err

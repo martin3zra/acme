@@ -17,3 +17,5 @@ require (
 	codeberg.org/go-pdf/fpdf v0.11.1
 	golang.org/x/text v0.26.0
 )
+
+require github.com/DATA-DOG/go-txdb v0.2.1
