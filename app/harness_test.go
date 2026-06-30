@@ -221,6 +221,15 @@ func scalarFloat(t *testing.T, db *sql.DB, query string, args ...any) float64 {
 	return v
 }
 
+func scalarInt(t *testing.T, db *sql.DB, query string, args ...any) int {
+	t.Helper()
+	var v int
+	if err := db.QueryRow(query, args...).Scan(&v); err != nil {
+		t.Fatalf("scalarInt: %v", err)
+	}
+	return v
+}
+
 func scalarString(t *testing.T, db *sql.DB, query string, args ...any) string {
 	t.Helper()
 	var v string

@@ -563,6 +563,13 @@ func (s *Server) storeInvoiceInternal(tx *sql.Tx, companyID int, form *StoreInvo
 		taxNumber = &taxReceiptSequence.Number
 	}
 
+	// A recurring template stores which tax receipt to stamp on each generated
+	// invoice. No sequence is consumed here — that happens when an invoice is
+	// actually generated from the template (kind invoice grabs the sequence).
+	if form.Kind == TransactionKinds.Template && form.TaxReceipt > 0 {
+		taxID = &form.TaxReceipt
+	}
+
 	var source *[]byte
 	if form.Source != nil && form.Source.ID != "" {
 		j := foundation.AsJSON(form.Source)
