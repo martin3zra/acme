@@ -39,6 +39,7 @@ type invoice struct {
 type line struct {
 	ID           int64           `json:"id"`
 	VariantID    int64           `json:"-"`
+	WarehouseID  int64           `json:"warehouse_id"`
 	Qty          int64           `json:"qty"`
 	RemainingQty *int64          `json:"remaining_qty,omitempty"`
 	Price        float64         `json:"price"`
@@ -407,7 +408,7 @@ func (s *Server) findInvoiceLines(ctx context.Context, companyID, invoiceID int)
 	rows, err := s.db.Query(`
     SELECT ii.item_id, ii.qty, ii.price, items_units.unit_id, it.name, it.description, items_units.name,
     ii.created_at, ii.updated_at, ii.deleted_at, 'unchanged' as action, ii.amount, ii.total,
-    taxes.id as tax_id, taxes.name as tax_name, ii.rate, ii.tax, it.identifiers
+    taxes.id as tax_id, taxes.name as tax_name, ii.rate, ii.tax, it.identifiers, ii.warehouse_id
     FROM invoices_items AS ii
     INNER JOIN companies AS com ON (ii.company_id = com.id)
     INNER JOIN invoices AS i ON (ii.invoice_id = i.id AND ii.company_id = i.company_id)
@@ -447,6 +448,7 @@ func (s *Server) findInvoiceLines(ctx context.Context, companyID, invoiceID int)
 			&i.Tax.Rate,
 			&i.Tax.Amount,
 			&i.Identifier,
+			&i.WarehouseID,
 		); err != nil {
 			return nil, err
 		}
