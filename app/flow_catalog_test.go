@@ -21,6 +21,28 @@ func TestFlowItemCreatesVariant(t *testing.T) {
 	})
 }
 
+// TestFlowStoreItemCreatesDefaultVariant: storeItem (not the factory) creates a
+// default, inventory-tracked variant carrying the item's price + a generated SKU.
+func TestFlowStoreItemCreatesDefaultVariant(t *testing.T) {
+	s := newTestServer(t)
+	is := newIs(t)
+	f := mkAccountCompany(t, s)
+
+	name := uniq("Direct")
+	is.NoErr(f.s.storeItem(f.ctx, &StoreItemForm{
+		Name: name, Price: 42, Description: "x", TaxID: f.taxID, UnitID: f.unitID, ItemType: "product",
+	}))
+
+	var itemID int
+	is.NoErr(s.db.QueryRow(`SELECT id FROM items WHERE company_id = $1 AND name = $2`, f.company.ID, name).Scan(&itemID))
+	assertRow(t, s.db, "items_variants", map[string]any{
+		"item_id": itemID, "is_default": true, "track_inventory": true, "combination_signature": "default",
+	})
+	is.EqualFloat(scalarFloat(t, s.db, `SELECT price FROM items_variants WHERE item_id = $1 AND is_default = true`, itemID), 42)
+	sku := scalarString(t, s.db, `SELECT sku FROM items_variants WHERE item_id = $1 AND is_default = true`, itemID)
+	is.True(strings.HasPrefix(sku, "SKU-"), "default variant should get a generated SKU, got "+sku)
+}
+
 // TestFlowCustomerHasCode: a customer gets a sequence code and zero balance.
 func TestFlowCustomerHasCode(t *testing.T) {
 	s := newTestServer(t)

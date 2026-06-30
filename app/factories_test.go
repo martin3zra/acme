@@ -174,12 +174,15 @@ func mkItem(t *testing.T, f *fixture, price, cost float64) (itemID, variantID in
 	).Scan(&itemID); err != nil {
 		t.Fatalf("load item: %v", err)
 	}
+	// storeItem now creates the default variant; load it and set the test cost.
 	if err := f.s.db.QueryRow(
-		`INSERT INTO items_variants (company_id, item_id, name, combination_signature, price, cost_price, is_default, track_inventory)
-		 VALUES ($1, $2, 'default', 'default', $3, $4, true, true) RETURNING id`,
-		f.company.ID, itemID, price, cost,
+		`SELECT id FROM items_variants WHERE company_id = $1 AND item_id = $2 AND is_default = true`,
+		f.company.ID, itemID,
 	).Scan(&variantID); err != nil {
-		t.Fatalf("insert variant: %v", err)
+		t.Fatalf("load default variant: %v", err)
+	}
+	if _, err := f.s.db.Exec(`UPDATE items_variants SET cost_price = $2 WHERE id = $1`, variantID, cost); err != nil {
+		t.Fatalf("set variant cost: %v", err)
 	}
 	return itemID, variantID
 }

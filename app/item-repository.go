@@ -223,7 +223,21 @@ func (s *Server) storeItemInternal(tx *sql.Tx, companyID int, form *StoreItemFor
 		return err
 	}
 
-	return nil
+	// Every item gets a default, inventory-tracked variant. Without it, the
+	// item has nothing to stock against and inventory recording silently no-ops.
+	return s.storeDefaultVariant(tx, companyID, itemID, form.Name, form.Price)
+}
+
+// storeDefaultVariant creates the single default variant for an item (no
+// attributes). combination_signature 'default' + is_default=true.
+func (s *Server) storeDefaultVariant(tx *sql.Tx, companyID, itemID int, name string, price float64) error {
+	_, err := tx.Exec(
+		`INSERT INTO items_variants
+		    (company_id, item_id, name, sku, combination_signature, is_default, price, cost_price, track_inventory)
+		 VALUES ($1, $2, $3, 'SKU-' || substr(gen_random_uuid()::text, 1, 8), 'default', true, $4, 0, true)`,
+		companyID, itemID, name, price,
+	)
+	return err
 }
 
 func (s *Server) attachItemUnit(tx *sql.Tx, companyID, itemID, unitID int) error {
