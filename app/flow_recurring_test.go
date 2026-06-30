@@ -29,23 +29,32 @@ func TestFlowRecurringGeneratesInvoice(t *testing.T) {
 
 	itemID, _ := mkItem(t, f, 100, 60)
 	custID, _ := mkCustomer(t, f, "net30")
-	tmplUUID := mkInvoice(t, f, custID, TransactionKinds.Template, "net30", nil,
-		mkLine(itemID, f.unitID, f.warehouseID, 1, 100, 18))
 
-	var tmplID int
-	is.NoErr(s.db.QueryRow(`SELECT id FROM invoices WHERE uuid = $1`, tmplUUID).Scan(&tmplID))
-
+	// Create the recurring template through the real storeInvoice path: it now
+	// persists both the recurrence object and the tax_receipt_id, so no manual
+	// patching is needed for generation to work.
 	now := time.Now()
 	r := &Recurrence{
 		Enabled: true, Name: "Monthly", Type: "schedule",
 		Frequency: "monthly", Interval: 1, Timezone: "America/Santo_Domingo",
-		DayOfMonth: now.Day(), StartDate: &now, NextRunAt: &now,
+		DayOfMonth: now.Day(), StartDate: &now,
 	}
-
-	// A recurring template stores its full recurrence object and the tax receipt
-	// to stamp on each generated invoice.
-	_, err := s.db.Exec(`UPDATE invoices SET recurrence = $2, tax_receipt_id = $3 WHERE id = $1`, tmplID, r, f.taxReceiptID)
+	tmplForm := &StoreInvoiceForm{
+		CustomerID: custID, Date: now, Terms: "net30", TaxReceipt: f.taxReceiptID,
+		Discount: Discount{Type: "percentage"}, Kind: TransactionKinds.Template,
+		Recurrence: r, Lines: []*Line{mkLine(itemID, f.unitID, f.warehouseID, 1, 100, 18)},
+	}
+	tmplForm.Compute()
+	tmplUUID, err := f.s.storeInvoice(f.ctx, tmplForm)
 	is.NoErr(err)
+
+	var tmplID int
+	is.NoErr(s.db.QueryRow(`SELECT id FROM invoices WHERE uuid = $1`, tmplUUID).Scan(&tmplID))
+
+	// Sanity: the template carries its tax receipt (the fix under test).
+	is.Equal(scalarInt(t, s.db, `SELECT COALESCE(tax_receipt_id,0) FROM invoices WHERE id = $1`, tmplID), f.taxReceiptID)
+
+	// storeInvoice set r.NextRunAt = StartDate; that is the run we process now.
 
 	var gen uuid.UUID
 	is.NoErr(database.WithTransaction(s.db, func(tx *sql.Tx) error {
