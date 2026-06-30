@@ -6,6 +6,7 @@ func mapInvoiceToStoreForm(invoice *invoice, lines []*line) *StoreInvoiceForm {
 		var l Line
 		l.ID = int(line.ID)
 		l.Unit = int(line.Unit.ID)
+		l.WarehouseID = int(line.WarehouseID)
 		l.Qty = int(line.Qty)
 		l.Price = line.Price
 		l.Rate = line.Tax.Rate
@@ -17,11 +18,16 @@ func mapInvoiceToStoreForm(invoice *invoice, lines []*line) *StoreInvoiceForm {
 		formLines = append(formLines, &l)
 	}
 
+	taxReceipt := 0
+	if invoice.TaxReceiptID != nil {
+		taxReceipt = *invoice.TaxReceiptID
+	}
+
 	return &StoreInvoiceForm{
 		Kind:       TransactionKinds.Template,
 		termType:   TermType(invoice.Terms),
 		Date:       invoice.Date,
-		TaxReceipt: *invoice.TaxReceiptID,
+		TaxReceipt: taxReceipt,
 		CustomerID: invoice.Customer.ID,
 		amount:     invoice.Amount,
 		amountDue:  0,
