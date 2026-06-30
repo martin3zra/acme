@@ -175,7 +175,9 @@ func (s *Server) findInvoicesByID(companyID, invoiceId int) (*invoice, error) {
 		"FROM invoices "+
 		"INNER JOIN companies ON (invoices.company_id = companies.id) "+
 		"INNER JOIN customers ON (invoices.company_id = customers.company_id AND invoices.customer_id = customers.id) "+
-		"INNER JOIN tax_receipts ON (invoices.company_id = tax_receipts.company_id AND invoices.tax_receipt_id = tax_receipts.id) "+
+		// LEFT JOIN: templates/estimates/orders have no tax receipt, but must
+		// still be findable (this is hit by the recurrence generator).
+		"LEFT JOIN tax_receipts ON (invoices.company_id = tax_receipts.company_id AND invoices.tax_receipt_id = tax_receipts.id) "+
 		"WHERE invoices.company_id = $1 AND invoices.id = $2", companyID, invoiceId).
 		Scan(
 			&i.CompanyID,
