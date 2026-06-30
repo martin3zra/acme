@@ -180,6 +180,15 @@ func (s *Server) RememberMe(next routing.HandlerFunc) routing.HandlerFunc {
 			return
 		}
 
+		// ReGenerate stores native Go types (user_id as int, user as a struct).
+		// On every other request these come back from the session store already
+		// JSON-decoded (float64, map[string]any) and the rest of the app asserts
+		// those forms. Normalize here so the SAME request doesn't panic.
+		sess.Put("user_id", float64(userID))
+		if userMap := toJSONMap(user); userMap != nil {
+			sess.Put("user", userMap)
+		}
+
 		// Token is intentionally NOT rotated here: concurrent requests restoring
 		// at once would otherwise invalidate each other's cookie. It stays valid
 		// (hashed at rest, HttpOnly) until logout or expiry.
@@ -293,17 +302,23 @@ func getCurrentCompany(attrs map[string]any) (*Company, error) {
 		return nil, nil
 	}
 
-	companyMap, ok := raw.(map[string]any)
-	if !ok {
+	// After a session round-trip the value is a map[string]any; on the same
+	// request that restored the session (remember-me) it is still the original
+	// *Company. Accept both.
+	switch v := raw.(type) {
+	case *Company:
+		return v, nil
+	case Company:
+		return &v, nil
+	case map[string]any:
+		companyStruct, err := mapTo[Company](v)
+		if err != nil {
+			return nil, err
+		}
+		return &companyStruct, nil
+	default:
 		return nil, fmt.Errorf("current_company is not a valid map")
 	}
-
-	companyStruct, err := mapTo[Company](companyMap)
-	if err != nil {
-		return nil, err
-	}
-
-	return &companyStruct, nil
 }
 
 func getAccount(attrs map[string]any) map[string]any {

@@ -54,6 +54,20 @@ func trans(namespaces ...string) map[string]string {
 	return translations
 }
 
+// toJSONMap marshals a value and decodes it back into a map[string]any, matching
+// what the session store yields for the value on subsequent requests.
+func toJSONMap(v any) map[string]any {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return nil
+	}
+	var m map[string]any
+	if err := json.Unmarshal(b, &m); err != nil {
+		return nil
+	}
+	return m
+}
+
 func mapTo[T any](m map[string]any) (T, error) {
 	var result T
 	data, err := json.Marshal(m)

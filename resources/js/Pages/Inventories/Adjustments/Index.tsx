@@ -26,6 +26,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { useHeader } from '@/composables/use-headers';
 import { useForm, usePage } from '@inertiajs/react';
 import { useState } from 'react';
 import { Plus } from 'lucide-react';
@@ -66,8 +67,9 @@ type AdjustmentForm = {
 };
 
 function NewAdjustmentDialog({ variants, warehouses }: { variants: ItemVariant[]; warehouses: Warehouse[] }) {
+  const { headers } = useHeader();
   const [open, setOpen] = useState(false);
-  const { data, setData, post, reset, errors, processing } = useForm<AdjustmentForm>({
+  const { data, setData, post, transform, reset, errors, processing } = useForm<AdjustmentForm>({
     variant_id: '',
     warehouse_id: '',
     qty: '',
@@ -77,7 +79,17 @@ function NewAdjustmentDialog({ variants, warehouses }: { variants: ItemVariant[]
 
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
+    // Backend expects numeric ids/qty; the form holds them as strings (Select/
+    // Input values), so coerce before the JSON body is sent.
+    transform((d) => ({
+      variant_id: Number(d.variant_id),
+      warehouse_id: Number(d.warehouse_id),
+      qty: Number(d.qty),
+      reason: d.reason,
+      notes: d.notes,
+    }));
     post('/inventories/adjustments', {
+      ...headers,
       onSuccess: () => {
         reset();
         setOpen(false);

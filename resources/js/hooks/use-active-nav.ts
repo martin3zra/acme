@@ -10,8 +10,10 @@ export function useActiveNav(navItems: NavItem[]) {
     const isActive =
       // Match by URL path
       url.startsWith(item.url) ||
-      // Or match by kind if using shared component
-      (kind && item.url.includes(kind)) ||
+      // Or match by kind for the shared sales component (estimate/order/invoice).
+      // Must be the exact sales path so kind "order" doesn't also light up
+      // "/purchases/orders".
+      (kind && item.url === `/${kind}s`) ||
       // prefix match (if defined)
       (item.match && item.match.some((prefix: string) => url.startsWith(prefix)));
 
