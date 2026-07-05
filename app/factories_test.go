@@ -187,25 +187,6 @@ func mkItem(t *testing.T, f *fixture, price, cost float64) (itemID, variantID in
 	return itemID, variantID
 }
 
-// mkCreditCustomer creates a credit-limited customer (net30) with the given
-// limit. Returns the customer id.
-func mkCreditCustomer(t *testing.T, f *fixture, limit float64) int {
-	t.Helper()
-	email := uniq("cl") + "@test.local"
-	form := &StoreCustomerForm{
-		Name: uniq("Credit"), Email: email, PaymentMethod: "cash", PaymentTerms: "net30",
-		CreditLimited: true, CreditLimit: limit, CustomerType: "business", TaxReceipt: f.taxReceiptID,
-	}
-	if err := f.s.storeCustomer(f.ctx, form); err != nil {
-		t.Fatalf("storeCustomer: %v", err)
-	}
-	var id int
-	if err := f.s.db.QueryRow(`SELECT id FROM customers WHERE company_id = $1 AND email = $2`, f.company.ID, email).Scan(&id); err != nil {
-		t.Fatalf("load customer: %v", err)
-	}
-	return id
-}
-
 // mkVendor creates a vendor via the real storeVendor path. Returns id + uuid.
 func mkVendor(t *testing.T, f *fixture, terms string) (id int, uuid string) {
 	t.Helper()

@@ -52,12 +52,13 @@ func TestFlowCreditInvoice(t *testing.T) {
 	s := newTestServer(t)
 	is := newIs(t)
 	f := mkAccountCompany(t, s)
+	g := newFaker(t)
 
 	itemID, variantID := mkItem(t, f, 100, 60)
-	custID, _ := mkCustomer(t, f, "net30")
+	custID, _ := newCustomer(t, f, g).Credit("net30").Build()
 
-	uuid := mkInvoice(t, f, custID, TransactionKinds.Invoice, "net30", nil,
-		mkLine(itemID, f.unitID, f.warehouseID, 1, 100, 18))
+	uuid := newInvoice(t, f, g).ForCustomer(custID).Credit("net30").
+		WithLine(itemID, 1, 100, 18).Build()
 
 	var status, paid, termType string
 	var total, amountDue float64

@@ -11,16 +11,17 @@ func TestFlowEstimateToInvoice(t *testing.T) {
 	s := newTestServer(t)
 	is := newIs(t)
 	f := mkAccountCompany(t, s)
+	g := newFaker(t)
 
 	itemID, _ := mkItem(t, f, 100, 60)
-	custID, _ := mkCustomer(t, f, "pia")
+	custID, _ := newCustomer(t, f, g).Build()
 
-	estUUID := mkInvoice(t, f, custID, TransactionKinds.Estimate, "", nil,
-		mkLine(itemID, f.unitID, f.warehouseID, 1, 100, 18))
+	estUUID := newInvoice(t, f, g).ForCustomer(custID).Kind(TransactionKinds.Estimate).
+		WithLine(itemID, 1, 100, 18).Build()
 
-	invUUID := mkInvoice(t, f, custID, TransactionKinds.Invoice, "pia",
-		&TransactionSource{Type: TransactionKinds.Estimate, ID: estUUID},
-		mkLine(itemID, f.unitID, f.warehouseID, 1, 100, 18))
+	invUUID := newInvoice(t, f, g).ForCustomer(custID).Cash().
+		FromSource(&TransactionSource{Type: TransactionKinds.Estimate, ID: estUUID}).
+		WithLine(itemID, 1, 100, 18).Build()
 
 	// Source estimate is closed and points forward to the new invoice.
 	is.Equal(scalarString(t, s.db, `SELECT status FROM invoices WHERE uuid = $1`, estUUID), "closed")
@@ -37,15 +38,16 @@ func TestFlowOrderToInvoice(t *testing.T) {
 	s := newTestServer(t)
 	is := newIs(t)
 	f := mkAccountCompany(t, s)
+	g := newFaker(t)
 
 	itemID, _ := mkItem(t, f, 50, 30)
-	custID, _ := mkCustomer(t, f, "pia")
+	custID, _ := newCustomer(t, f, g).Build()
 
-	ordUUID := mkInvoice(t, f, custID, TransactionKinds.Order, "pia", nil,
-		mkLine(itemID, f.unitID, f.warehouseID, 1, 50, 18))
-	invUUID := mkInvoice(t, f, custID, TransactionKinds.Invoice, "pia",
-		&TransactionSource{Type: TransactionKinds.Order, ID: ordUUID},
-		mkLine(itemID, f.unitID, f.warehouseID, 1, 50, 18))
+	ordUUID := newInvoice(t, f, g).ForCustomer(custID).Kind(TransactionKinds.Order).Cash().
+		WithLine(itemID, 1, 50, 18).Build()
+	invUUID := newInvoice(t, f, g).ForCustomer(custID).Cash().
+		FromSource(&TransactionSource{Type: TransactionKinds.Order, ID: ordUUID}).
+		WithLine(itemID, 1, 50, 18).Build()
 
 	is.Equal(scalarString(t, s.db, `SELECT status FROM invoices WHERE uuid = $1`, ordUUID), "closed")
 	ordSrc := scalarString(t, s.db, `SELECT COALESCE(source::text, '') FROM invoices WHERE uuid = $1`, ordUUID)
