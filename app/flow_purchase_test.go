@@ -21,11 +21,12 @@ func TestFlowVendorBillCreatesPayable(t *testing.T) {
 	is := newIs(t)
 	f := mkAccountCompany(t, s)
 
-	vendorID, _ := mkVendor(t, f, "net30")
+	g := newFaker(t)
+	vendorID, _ := newVendor(t, f, g).Build()
 	itemID, variantID := mkItem(t, f, 100, 60)
 
-	uuid := mkPurchase(t, f, vendorID, PurchaseTransactionKinds.VendorBill, "net30", uniq("BILL"), nil,
-		mkLine(itemID, f.unitID, f.warehouseID, 1, 100, 18))
+	uuid := newPurchase(t, f).ForVendor(vendorID).Kind(PurchaseTransactionKinds.VendorBill).
+		WithLine(itemID, 1, 100, 18).Build()
 
 	var kind, status string
 	var total float64
@@ -50,10 +51,11 @@ func TestFlowConfirmVendorBillMovesStock(t *testing.T) {
 	is := newIs(t)
 	f := mkAccountCompany(t, s)
 
-	vendorID, _ := mkVendor(t, f, "net30")
+	g := newFaker(t)
+	vendorID, _ := newVendor(t, f, g).Build()
 	itemID, variantID := mkItem(t, f, 100, 60)
-	uuid := mkPurchase(t, f, vendorID, PurchaseTransactionKinds.VendorBill, "net30", uniq("BILL"), nil,
-		mkLine(itemID, f.unitID, f.warehouseID, 5, 100, 18))
+	uuid := newPurchase(t, f).ForVendor(vendorID).Kind(PurchaseTransactionKinds.VendorBill).
+		WithLine(itemID, 5, 100, 18).Build()
 
 	is.NoErr(f.s.confirmPurchase(f.ctx, uuid))
 
@@ -73,10 +75,11 @@ func TestFlowPayVendorBill(t *testing.T) {
 	is := newIs(t)
 	f := mkAccountCompany(t, s)
 
-	vendorID, vendorUUID := mkVendor(t, f, "net30")
+	g := newFaker(t)
+	vendorID, vendorUUID := newVendor(t, f, g).Build()
 	itemID, _ := mkItem(t, f, 100, 60)
-	mkPurchase(t, f, vendorID, PurchaseTransactionKinds.VendorBill, "net30", uniq("BILL"), nil,
-		mkLine(itemID, f.unitID, f.warehouseID, 1, 100, 18))
+	newPurchase(t, f).ForVendor(vendorID).Kind(PurchaseTransactionKinds.VendorBill).
+		WithLine(itemID, 1, 100, 18).Build()
 
 	ap := apUUID(t, f, vendorID)
 	form := &StoreVendorPaymentForm{
@@ -99,10 +102,11 @@ func TestFlowVendorOverpaymentBlocked(t *testing.T) {
 	is := newIs(t)
 	f := mkAccountCompany(t, s)
 
-	vendorID, vendorUUID := mkVendor(t, f, "net30")
+	g := newFaker(t)
+	vendorID, vendorUUID := newVendor(t, f, g).Build()
 	itemID, _ := mkItem(t, f, 100, 60)
-	mkPurchase(t, f, vendorID, PurchaseTransactionKinds.VendorBill, "net30", uniq("BILL"), nil,
-		mkLine(itemID, f.unitID, f.warehouseID, 1, 100, 18))
+	newPurchase(t, f).ForVendor(vendorID).Kind(PurchaseTransactionKinds.VendorBill).
+		WithLine(itemID, 1, 100, 18).Build()
 	ap := apUUID(t, f, vendorID)
 
 	pay := func() error {
@@ -123,14 +127,15 @@ func TestFlowPurchaseOrderToReceipt(t *testing.T) {
 	is := newIs(t)
 	f := mkAccountCompany(t, s)
 
-	vendorID, _ := mkVendor(t, f, "net30")
+	g := newFaker(t)
+	vendorID, _ := newVendor(t, f, g).Build()
 	itemID, variantID := mkItem(t, f, 100, 60)
 
-	poUUID := mkPurchase(t, f, vendorID, PurchaseTransactionKinds.PurchaseOrder, "net30", "", nil,
-		mkLine(itemID, f.unitID, f.warehouseID, 2, 100, 18))
-	rcUUID := mkPurchase(t, f, vendorID, PurchaseTransactionKinds.PurchaseReceipt, "net30", uniq("PR"),
-		&PurchaseSource{Type: PurchaseTransactionKinds.PurchaseOrder, ID: poUUID},
-		mkLine(itemID, f.unitID, f.warehouseID, 2, 100, 18))
+	poUUID := newPurchase(t, f).ForVendor(vendorID).Kind(PurchaseTransactionKinds.PurchaseOrder).
+		WithLine(itemID, 2, 100, 18).Build()
+	rcUUID := newPurchase(t, f).ForVendor(vendorID).Kind(PurchaseTransactionKinds.PurchaseReceipt).
+		FromSource(&PurchaseSource{Type: PurchaseTransactionKinds.PurchaseOrder, ID: poUUID}).
+		WithLine(itemID, 2, 100, 18).Build()
 
 	rcSrc := scalarString(t, s.db, `SELECT COALESCE(source::text, '') FROM purchases WHERE uuid = $1`, rcUUID)
 	is.True(strings.Contains(rcSrc, poUUID), "receipt.source should reference the purchase order")

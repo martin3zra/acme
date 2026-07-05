@@ -41,10 +41,11 @@ func TestFlowVoidVendorPaymentRestoresPayable(t *testing.T) {
 	is := newIs(t)
 	f := mkAccountCompany(t, s)
 
-	vendorID, vendorUUID := mkVendor(t, f, "net30")
+	g := newFaker(t)
+	vendorID, vendorUUID := newVendor(t, f, g).Build()
 	itemID, _ := mkItem(t, f, 100, 60)
-	mkPurchase(t, f, vendorID, PurchaseTransactionKinds.VendorBill, "net30", uniq("BILL"), nil,
-		mkLine(itemID, f.unitID, f.warehouseID, 1, 100, 18))
+	newPurchase(t, f).ForVendor(vendorID).Kind(PurchaseTransactionKinds.VendorBill).
+		WithLine(itemID, 1, 100, 18).Build()
 	ap := apUUID(t, f, vendorID)
 
 	is.NoErr(f.s.storeVendorPayment(f.ctx, &StoreVendorPaymentForm{
