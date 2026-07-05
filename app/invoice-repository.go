@@ -391,23 +391,48 @@ func (s *Server) attachInvoiceLines(tx *sql.Tx, companyId, invoiceId int, form *
 }
 
 func (s *Server) processInvoiceLines(tx *sql.Tx, companyId, invoiceId int, form *UpdateInvoiceForm) error {
+	ptx, err := playTx(tx)
+	if err != nil {
+		return err
+	}
 
 	lines := s.filterInvoiceLines(form.Lines, ADDED, UPDATED, DELETED)
 	for _, line := range lines {
 		switch line.Action {
 		case ADDED:
-			stmt := "INSERT INTO invoices_items (company_id, invoice_id, item_id, unit_id, qty, price, tax, warehouse_id) VALUES($1,$2,$3,$4,$5,$6,$7,$8) "
-			if _, err := tx.Exec(stmt, companyId, invoiceId, line.ID, line.Unit, line.Qty, line.Price, line.Rate, line.WarehouseID); err != nil {
+			// Preserves the original column set exactly: only these eight columns,
+			// with the tax column carrying the line rate (rate/amount/total are left
+			// to their defaults on this path, unlike the create-time bulk insert).
+			if _, err := ptx.Model(&InvoiceItem{}).InsertMany(context.Background(), []map[string]any{{
+				"company_id":   companyId,
+				"invoice_id":   invoiceId,
+				"item_id":      line.ID,
+				"unit_id":      line.Unit,
+				"qty":          line.Qty,
+				"price":        line.Price,
+				"tax":          line.Rate,
+				"warehouse_id": line.WarehouseID,
+			}}); err != nil {
 				return err
 			}
 		case UPDATED:
-			stmt := "UPDATE invoices_items SET qty = $4, unit_id = $5, warehouse_id = $6 WHERE company_id = $1 AND invoice_id = $2 AND item_id = $3 "
-			if _, err := tx.Exec(stmt, companyId, invoiceId, line.ID, line.Qty, line.Unit, line.WarehouseID); err != nil {
+			if _, err := ptx.Model(&InvoiceItem{}).
+				WhereEq("company_id", companyId).
+				WhereEq("invoice_id", invoiceId).
+				WhereEq("item_id", line.ID).
+				Update(context.Background(), map[string]any{
+					"qty":          line.Qty,
+					"unit_id":      line.Unit,
+					"warehouse_id": line.WarehouseID,
+				}); err != nil {
 				return err
 			}
 		case DELETED:
-			stmt := "DELETE FROM invoices_items WHERE company_id = $1 AND invoice_id = $2 AND item_id = $3"
-			if _, err := tx.Exec(stmt, companyId, invoiceId, line.ID); err != nil {
+			if _, err := ptx.Model(&InvoiceItem{}).
+				WhereEq("company_id", companyId).
+				WhereEq("invoice_id", invoiceId).
+				WhereEq("item_id", line.ID).
+				Delete(context.Background()); err != nil {
 				return err
 			}
 		default:
