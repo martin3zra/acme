@@ -26,9 +26,10 @@ func TestFlowRecurringGeneratesInvoice(t *testing.T) {
 	s := newTestServer(t)
 	is := newIs(t)
 	f := mkAccountCompany(t, s)
+	g := newFaker(t)
 
 	itemID, _ := mkItem(t, f, 100, 60)
-	custID, _ := mkCustomer(t, f, "net30")
+	custID, _ := newCustomer(t, f, g).Credit("net30").Build()
 
 	// Create the recurring template through the real storeInvoice path: it now
 	// persists both the recurrence object and the tax_receipt_id, so no manual

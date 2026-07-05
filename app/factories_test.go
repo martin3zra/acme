@@ -16,31 +16,6 @@ func mkLine(itemID, unitID, warehouseID, qty int, price, rate float64) *Line {
 	}
 }
 
-// mkInvoice creates a document (invoice/estimate/order) through the real
-// storeInvoice path. terms "pia" = cash, "net30" = credit. Returns the new uuid.
-func mkInvoice(t *testing.T, f *fixture, customerID int, kind TransactionKind, terms string, src *TransactionSource, lines ...*Line) string {
-	t.Helper()
-	form := &StoreInvoiceForm{
-		CustomerID: customerID,
-		Date:       time.Now(),
-		Terms:      terms,
-		TaxReceipt: f.taxReceiptID,
-		Discount:   Discount{Type: "percentage"},
-		Lines:      lines,
-		Kind:       kind,
-		Source:     src,
-	}
-	form.Compute() // populate protected fields (HTTP layer normally does this)
-	if kind == TransactionKinds.Invoice && terms == "pia" {
-		form.Payment.Cash.Amount = form.total
-	}
-	uuid, err := f.s.storeInvoice(f.ctx, form)
-	if err != nil {
-		t.Fatalf("storeInvoice(%s,%s): %v", kind, terms, err)
-	}
-	return uuid
-}
-
 var seqN int64
 
 func uniq(prefix string) string {
@@ -227,25 +202,4 @@ func mkPurchase(t *testing.T, f *fixture, vendorID int, kind PurchaseTransaction
 		t.Fatalf("storePurchase(%s): %v", kind, err)
 	}
 	return uuid
-}
-
-// mkCustomer creates a customer via the real storeCustomer path. terms e.g.
-// "pia" (cash) or "net30" (credit). Returns id + uuid.
-func mkCustomer(t *testing.T, f *fixture, terms string) (id int, uuid string) {
-	t.Helper()
-	email := uniq("cust") + "@test.local"
-	form := &StoreCustomerForm{
-		Name: uniq("Customer"), Email: email, PaymentMethod: "cash",
-		PaymentTerms: terms, CreditLimited: false, CreditLimit: 0,
-		CustomerType: "business", TaxReceipt: f.taxReceiptID,
-	}
-	if err := f.s.storeCustomer(f.ctx, form); err != nil {
-		t.Fatalf("storeCustomer: %v", err)
-	}
-	if err := f.s.db.QueryRow(
-		`SELECT id, uuid FROM customers WHERE company_id = $1 AND email = $2`, f.company.ID, email,
-	).Scan(&id, &uuid); err != nil {
-		t.Fatalf("load customer: %v", err)
-	}
-	return id, uuid
 }
