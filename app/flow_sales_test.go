@@ -8,12 +8,15 @@ func TestFlowCashInvoice(t *testing.T) {
 	s := newTestServer(t)
 	is := newIs(t)
 	f := mkAccountCompany(t, s)
+	g := newFaker(t)
 
 	itemID, variantID := mkItem(t, f, 100, 60)
-	custID, _ := mkCustomer(t, f, "pia")
+	custID, _ := newCustomer(t, f, g).Build() // cash (pia) by default
 
-	uuid := mkInvoice(t, f, custID, TransactionKinds.Invoice, "pia", nil,
-		mkLine(itemID, f.unitID, f.warehouseID, 2, 100, 18))
+	// Line price is explicit: the totals below are asserted exactly, so it must
+	// not come from faker. The builder still handles customer + document wiring.
+	uuid := newInvoice(t, f, g).ForCustomer(custID).Cash().
+		WithLine(itemID, 2, 100, 18).Build()
 
 	var status, paid, termType string
 	var total, amountDue float64

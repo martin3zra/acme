@@ -1,6 +1,6 @@
 module github.com/martin3zra/acme
 
-go 1.23.6
+go 1.24.1
 
 require github.com/romsar/gonertia/v2 v2.0.3
 
@@ -18,4 +18,9 @@ require (
 	golang.org/x/text v0.26.0
 )
 
-require github.com/DATA-DOG/go-txdb v0.2.1
+require (
+	github.com/DATA-DOG/go-txdb v0.2.1
+	github.com/martin3zra/faker v0.0.0-20260704190143-1f95848a2bff
+)
+
+require gopkg.in/yaml.v3 v3.0.1 // indirect
