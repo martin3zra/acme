@@ -459,11 +459,15 @@ func (s *Server) findInvoiceLines(ctx context.Context, companyID, invoiceID int)
 }
 
 func (s *Server) registerReceivable(tx *sql.Tx, companyId, invoiceId, customerId int) error {
-	_, err := tx.Exec("INSERT INTO receivables (company_id, invoice_id, customer_id) VALUES($1, $2, $3)",
-		companyId, invoiceId, customerId,
-	)
-
-	return err
+	ptx, err := playTx(tx)
+	if err != nil {
+		return err
+	}
+	return ptx.Insert(context.Background(), &Receivable{
+		CompanyID:  companyId,
+		InvoiceID:  invoiceId,
+		CustomerID: customerId,
+	})
 }
 
 func (s *Server) deleteInvoiceFromReceivables(tx *sql.Tx, companyId, invoiceId, customerId int) error {
