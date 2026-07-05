@@ -471,13 +471,28 @@ func (s *Server) registerReceivable(tx *sql.Tx, companyId, invoiceId, customerId
 }
 
 func (s *Server) deleteInvoiceFromReceivables(tx *sql.Tx, companyId, invoiceId, customerId int) error {
-	_, err := tx.Exec("DELETE FROM receivables WHERE company_id = $1 AND invoice_id = $2 AND customer_id = $3", companyId, invoiceId, customerId)
+	ptx, err := playTx(tx)
+	if err != nil {
+		return err
+	}
+	_, err = ptx.Model(&Receivable{}).
+		WhereEq("company_id", companyId).
+		WhereEq("invoice_id", invoiceId).
+		WhereEq("customer_id", customerId).
+		Delete(context.Background())
 	return err
 }
 
 func (s *Server) changeCustomerFromReceivables(tx *sql.Tx, companyId, invoiceId, customerId, newCustomerId int) error {
-	_, err := tx.Exec("UPDATE receivables SET customer_id = $4 WHERE company_id = $1 AND invoice_id = $2 AND customer_id = $3", companyId, invoiceId, customerId, newCustomerId)
-
+	ptx, err := playTx(tx)
+	if err != nil {
+		return err
+	}
+	_, err = ptx.Model(&Receivable{}).
+		WhereEq("company_id", companyId).
+		WhereEq("invoice_id", invoiceId).
+		WhereEq("customer_id", customerId).
+		Update(context.Background(), map[string]any{"customer_id": newCustomerId})
 	return err
 }
 
