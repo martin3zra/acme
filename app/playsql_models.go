@@ -30,3 +30,23 @@ type Receivable struct {
 }
 
 func (Receivable) TableName() string { return "receivables" }
+
+// InvoiceItem is the write model for invoice line rows (invoices_items). It backs
+// the bulk line insert; the pk is DB-assigned, and timestamp columns are left to
+// their database defaults (not mapped here).
+type InvoiceItem struct {
+	ID          int64   `db:"id" play:"pk,incrementing"`
+	CompanyID   int     `db:"company_id"`
+	InvoiceID   int     `db:"invoice_id"`
+	ItemID      int     `db:"item_id"`
+	UnitID      int     `db:"unit_id"`
+	Qty         int     `db:"qty"`
+	Price       float64 `db:"price"`
+	Rate        float64 `db:"rate"`
+	Amount      float64 `db:"amount"`
+	Tax         float64 `db:"tax"`
+	Total       float64 `db:"total"`
+	WarehouseID int     `db:"warehouse_id"`
+}
+
+func (InvoiceItem) TableName() string { return "invoices_items" }

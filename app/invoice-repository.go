@@ -364,16 +364,29 @@ func (s *Server) voidInvoice(ctx context.Context, kind TransactionKind, uuid str
 }
 
 func (s *Server) attachInvoiceLines(tx *sql.Tx, companyId, invoiceId int, form *StoreInvoiceForm) error {
-	vals := []any{}
-	for _, line := range form.Lines {
-		vals = append(vals, companyId, invoiceId, line.ID, line.Unit, line.Qty, line.Price, line.Rate, line.amount, line.tax, line.total, line.WarehouseID)
+	ptx, err := playTx(tx)
+	if err != nil {
+		return err
 	}
-
-	stmt := "INSERT INTO invoices_items (company_id, invoice_id, item_id, unit_id, qty, price, rate, amount, tax, total, warehouse_id) VALUES "
-	stmt += database.PrepareBulkInsert(11, len(form.Lines))
-
-	_, err := tx.Exec(stmt, vals...)
-
+	rows := make([]map[string]any, 0, len(form.Lines))
+	for _, line := range form.Lines {
+		rows = append(rows, map[string]any{
+			"company_id":   companyId,
+			"invoice_id":   invoiceId,
+			"item_id":      line.ID,
+			"unit_id":      line.Unit,
+			"qty":          line.Qty,
+			"price":        line.Price,
+			"rate":         line.Rate,
+			"amount":       line.amount,
+			"tax":          line.tax,
+			"total":        line.total,
+			"warehouse_id": line.WarehouseID,
+		})
+	}
+	// InsertMany compiles a single multi-row INSERT, preserving the original
+	// bulk-insert behaviour.
+	_, err = ptx.Model(&InvoiceItem{}).InsertMany(context.Background(), rows)
 	return err
 }
 
