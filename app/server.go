@@ -10,8 +10,10 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"sync"
 	"time"
 
+	"github.com/martin3zra/acme/app/events"
 	"github.com/martin3zra/acme/app/mail"
 	"github.com/martin3zra/forge/i18n"
 	"github.com/martin3zra/forge/inertia"
@@ -37,6 +39,9 @@ type Server struct {
 	translator *i18n.Translator
 	route      *routing.Router
 	httpServer *http.Server
+	// Domain-event dispatcher, lazily built on first use (see dispatcher()).
+	events     *events.Dispatcher
+	eventsOnce sync.Once
 }
 
 func NewServer(assets, resources embed.FS) *Server {

@@ -766,16 +766,16 @@ func (s *Server) storeInvoiceInternal(tx *sql.Tx, companyID int, form *StoreInvo
 		}
 	}
 
-	if form.Kind == TransactionKinds.Invoice {
-		// trigger an event for this? Use pipe!!!
-		if form.Terms != "pia" {
-			if err = s.registerReceivable(tx, companyID, invoiceID, form.CustomerID); err != nil {
-				return invoiceUUID, err
-			}
-
-			if err = s.updateCustomerAmountDue(tx, companyID, form.CustomerID, form.amountDue); err != nil {
-				return invoiceUUID, err
-			}
+	// A credit invoice raises InvoiceCreated; the receivable + customer-balance
+	// side effects react in receivableListener, within this same transaction.
+	if form.Kind == TransactionKinds.Invoice && form.Terms != "pia" {
+		if err = s.dispatcher().Dispatch(context.Background(), tx, InvoiceCreated{
+			CompanyID:  companyID,
+			InvoiceID:  invoiceID,
+			CustomerID: form.CustomerID,
+			AmountDue:  form.amountDue,
+		}); err != nil {
+			return invoiceUUID, err
 		}
 	}
 
