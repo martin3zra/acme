@@ -307,12 +307,15 @@ func (s *Server) storeVendorOpenBalance(tx *sql.Tx, companyID int, vendorID int,
 }
 
 func (s *Server) registerPayable(tx *sql.Tx, companyID int, apID, vendorID int) error {
-	_, err := tx.Exec(
-		"INSERT INTO payables (company_id, accounts_payable_id, vendor_id) VALUES ($1, $2, $3)",
-		companyID, apID, vendorID,
-	)
-
-	return err
+	ptx, err := playTx(tx)
+	if err != nil {
+		return err
+	}
+	return ptx.Insert(context.Background(), &payableRegister{
+		CompanyID:         companyID,
+		AccountsPayableID: apID,
+		VendorID:          vendorID,
+	})
 }
 
 func (s *Server) updateVendor(ctx context.Context, vendorID int, form *UpdateVendorForm) error {

@@ -220,3 +220,36 @@ type vendorPaymentItem struct {
 }
 
 func (vendorPaymentItem) TableName() string { return "vendor_payment_items" }
+
+// accountsPayableInsert is the write model for an AP entry (accounts_payable).
+// amount_payable is a generated column and is intentionally not mapped.
+type accountsPayableInsert struct {
+	ID             int64         `db:"id" play:"pk,incrementing"`
+	CompanyID      int           `db:"company_id"`
+	VendorID       int           `db:"vendor_id"`
+	PurchaseID     int           `db:"purchase_id"`
+	InvoiceNumber  string        `db:"invoice_number"`
+	InvoiceDate    time.Time     `db:"invoice_date"`
+	DueDate        *time.Time    `db:"due_date"`
+	AmountTotal    float64       `db:"amount_total"`
+	TaxAmount      float64       `db:"tax_amount"`
+	DiscountAmount float64       `db:"discount_amount"`
+	AmountPaid     float64       `db:"amount_paid"`
+	Currency       string        `db:"currency"`
+	PaymentTerms   string        `db:"payment_terms"`
+	Status         PayableStatus `db:"status"`
+	PaidStatus     PaidStatus    `db:"paid_status"`
+	CreatedBy      int           `db:"created_by"`
+}
+
+func (accountsPayableInsert) TableName() string { return "accounts_payable" }
+
+// payableRegister is the write model for the payables cross-reference row.
+type payableRegister struct {
+	ID                int64 `db:"id" play:"pk,incrementing"`
+	CompanyID         int   `db:"company_id"`
+	AccountsPayableID int   `db:"accounts_payable_id"`
+	VendorID          int   `db:"vendor_id"`
+}
+
+func (payableRegister) TableName() string { return "payables" }

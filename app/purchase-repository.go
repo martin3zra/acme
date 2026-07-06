@@ -530,32 +530,33 @@ func (s *Server) storePurchaseInternal(tx *sql.Tx, companyID int, form *StorePur
 }
 
 func (s *Server) createAPForVendorBill(tx *sql.Tx, companyID, purchaseID, vendorID int, form *StorePurchaseForm) error {
-	var apID int
-	err := tx.QueryRow(
-		"INSERT INTO accounts_payable "+
-			"(company_id, vendor_id, purchase_id, invoice_number, invoice_date, due_date, "+
-			"amount_total, tax_amount, discount_amount, amount_paid, "+
-			"currency, payment_terms, status, paid_status, created_by) "+
-			"VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15) RETURNING id",
-		companyID,
-		vendorID,
-		purchaseID,
-		form.InvoiceNumber,
-		form.Date,
-		form.dueOn,
-		form.amount, // amount_total is the pre-tax subtotal; amount_payable is
-		form.tax,    // generated as (amount_total + tax_amount - discount_amount)
-		0,
-		0,
-		"DOP",
-		form.Terms,
-		PayableStatuses.Pending,
-		PaidStatuses.UnPaid,
-		form.User().GetAuthIdentifier(),
-	).Scan(&apID)
+	ptx, err := playTx(tx)
 	if err != nil {
 		return err
 	}
+	// amount_total is the pre-tax subtotal; amount_payable is a generated column
+	// (amount_total + tax_amount - discount_amount) and is not written here.
+	ap := &accountsPayableInsert{
+		CompanyID:      companyID,
+		VendorID:       vendorID,
+		PurchaseID:     purchaseID,
+		InvoiceNumber:  form.InvoiceNumber,
+		InvoiceDate:    form.Date,
+		DueDate:        form.dueOn,
+		AmountTotal:    form.amount,
+		TaxAmount:      form.tax,
+		DiscountAmount: 0,
+		AmountPaid:     0,
+		Currency:       "DOP",
+		PaymentTerms:   form.Terms,
+		Status:         PayableStatuses.Pending,
+		PaidStatus:     PaidStatuses.UnPaid,
+		CreatedBy:      form.User().GetAuthIdentifier(),
+	}
+	if err = ptx.Insert(context.Background(), ap); err != nil {
+		return err
+	}
+	apID := int(ap.ID)
 
 	if err := s.registerPayable(tx, companyID, apID, vendorID); err != nil {
 		return err
