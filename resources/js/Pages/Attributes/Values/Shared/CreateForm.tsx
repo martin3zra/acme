@@ -1,0 +1,130 @@
+import FormSection from '@/components/form-section';
+import InputError from '@/components/input-error';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { useHeader } from '@/composables/use-headers';
+import { useTranslation } from '@/hooks/use-translation';
+import { PageProps, Verb } from '@/types';
+import { useForm, usePage } from '@inertiajs/react';
+import { useMemo, useState } from 'react';
+import { AttributeValue, AttributeValueForm } from '../../types';
+
+export type CreateFormParams = {
+  attributeId: string;
+  value: AttributeValue | undefined;
+  action: Verb;
+};
+
+type CreateFormProps = {
+  params: CreateFormParams;
+  onFinish: () => void;
+};
+
+export default function CreateForm({ params, onFinish }: CreateFormProps) {
+  const t = useTranslation().trans;
+  const { headers } = useHeader();
+  const { errors: propsErrors, values = [] } = usePage<PageProps<{ values?: AttributeValue[] }>>().props;
+  const [valueError, setValueError] = useState('');
+
+  const { data, setData, post, put, errors, processing, reset } = useForm<AttributeValueForm>({
+    value: params.value?.value || '',
+    display_name: params.value?.display_name || '',
+    sort_order: params.value?.sort_order || 0,
+  });
+
+  const options = {
+    ...headers,
+    preserveScroll: true,
+    onSuccess: () => {
+      reset();
+      onFinish();
+    },
+  };
+
+  const normalizedValue = useMemo(() => data.value.trim().toLowerCase(), [data.value]);
+
+  const hasDuplicateValue = useMemo(() => {
+    if (!normalizedValue) {
+      return false;
+    }
+
+    return values.some((existing) => existing.uuid !== params.value?.uuid && existing.value.trim().toLowerCase() === normalizedValue);
+  }, [normalizedValue, params.value?.uuid, values]);
+
+  const submit = () => {
+    if (hasDuplicateValue) {
+      setValueError('Attribute value already exists. Please use a different value.');
+      return;
+    }
+
+    setValueError('');
+
+    if (params.value) {
+      put(`/attribute-values/${params.value.uuid}`, options);
+      return;
+    }
+
+    post(`/attributes/${params.attributeId}/values`, options);
+  };
+
+  return (
+    <FormSection onSubmit={submit}>
+      <FormSection.Form>
+        {propsErrors.status && <div className="col-span-6 mb-4 text-center text-sm font-medium text-red-600">{propsErrors.status}</div>}
+
+        <div className="col-span-6 gap-2">
+          <Label htmlFor="value">{t('global.code')}</Label>
+          <Input
+            id="value"
+            className="mt-1 block w-full"
+            value={data.value}
+            onChange={(e) => {
+              if (valueError) {
+                setValueError('');
+              }
+
+              setData('value', e.target.value);
+            }}
+            placeholder={t('attributes.values.form.valuePlaceholder')}
+            required
+          />
+          <InputError className="mt-2" message={errors.value || valueError} />
+        </div>
+
+        <div className="col-span-6 gap-2">
+          <Label htmlFor="display_name">{t('global.displayName')}</Label>
+          <Input
+            id="display_name"
+            className="mt-1 block w-full"
+            value={data.display_name}
+            onChange={(e) => setData('display_name', e.target.value)}
+            placeholder={t('attributes.values.form.displayNamePlaceholder')}
+            required
+          />
+          <InputError className="mt-2" message={errors.display_name} />
+        </div>
+
+        <div className="col-span-6 gap-2">
+          <Label htmlFor="sort_order">{t('attributes.values.sortOrder')}</Label>
+          <Input
+            id="sort_order"
+            type="number"
+            className="mt-1 block w-full"
+            value={data.sort_order}
+            onChange={(e) => setData('sort_order', parseInt(e.target.value) || 0)}
+            placeholder={t('attributes.values.form.sortOrderPlaceholder')}
+          />
+          <InputError className="mt-2" message={errors.sort_order} />
+          <p className="mt-1 text-sm text-gray-500">{t('attributes.values.sortOrderHelp')}</p>
+        </div>
+      </FormSection.Form>
+
+      <FormSection.Actions>
+        <Button type="submit" disabled={processing} className="uppercase">
+          {t('global.save')}
+        </Button>
+      </FormSection.Actions>
+    </FormSection>
+  );
+}
