@@ -149,14 +149,21 @@ func (s *Server) recordMovement(
 	finalQty := qty * float64(baseQty)
 
 	// Insert movement record.
-	_, err := tx.Exec(
-		`INSERT INTO inventory_movements
-		    (company_id, variant_id, warehouse_id, transaction_kind, qty, unit_cost, reference_type, reference_id, created_at)
-		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
-		companyID, variantID, warehouseID, kind, finalQty, unitCost,
-		referenceType, referenceID, time.Now().UTC(),
-	)
+	ptx, err := playTx(tx)
 	if err != nil {
+		return err
+	}
+	if err := ptx.Insert(context.Background(), &InventoryMovement{
+		CompanyID:       companyID,
+		VariantID:       variantID,
+		WarehouseID:     warehouseID,
+		TransactionKind: kind,
+		Qty:             finalQty,
+		UnitCost:        unitCost,
+		ReferenceType:   referenceType,
+		ReferenceID:     referenceID,
+		CreatedAt:       time.Now().UTC(),
+	}); err != nil {
 		return fmt.Errorf("recordMovement: insert movement: %w", err)
 	}
 

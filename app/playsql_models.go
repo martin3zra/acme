@@ -84,3 +84,22 @@ type invoiceInsert struct {
 }
 
 func (invoiceInsert) TableName() string { return "invoices" }
+
+// InventoryMovement is the write model for a stock movement row. created_at is
+// set explicitly by the caller (no DB default is relied on). The balance upsert
+// that follows a movement stays raw SQL: it increments (quantity +=
+// EXCLUDED.quantity), which playsql's replace-style Upsert cannot express.
+type InventoryMovement struct {
+	ID              int64                 `db:"id" play:"pk,incrementing"`
+	CompanyID       int                   `db:"company_id"`
+	VariantID       int                   `db:"variant_id"`
+	WarehouseID     int                   `db:"warehouse_id"`
+	TransactionKind InventoryMovementKind `db:"transaction_kind"`
+	Qty             float64               `db:"qty"`
+	UnitCost        float64               `db:"unit_cost"`
+	ReferenceType   string                `db:"reference_type"`
+	ReferenceID     int                   `db:"reference_id"`
+	CreatedAt       time.Time             `db:"created_at"`
+}
+
+func (InventoryMovement) TableName() string { return "inventory_movements" }
