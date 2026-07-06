@@ -12,11 +12,12 @@ func TestFlowCollectCreditInvoice(t *testing.T) {
 	is := newIs(t)
 	f := mkAccountCompany(t, s)
 
+	g := newFaker(t)
 	itemID, _ := mkItem(t, f, 100, 60)
-	custID, custUUID := mkCustomer(t, f, "net30")
+	custID, custUUID := newCustomer(t, f, g).Credit("net30").Build()
 
-	invUUID := mkInvoice(t, f, custID, TransactionKinds.Invoice, "net30", nil,
-		mkLine(itemID, f.unitID, f.warehouseID, 1, 100, 18))
+	invUUID := newInvoice(t, f, g).ForCustomer(custID).Credit("net30").
+		WithLine(itemID, 1, 100, 18).Build()
 	const total = 118.0
 
 	is.EqualFloat(scalarFloat(t, s.db, `SELECT amount_due FROM customers WHERE id = $1`, custID), total)
@@ -51,10 +52,11 @@ func TestFlowPartialPayment(t *testing.T) {
 	is := newIs(t)
 	f := mkAccountCompany(t, s)
 
+	g := newFaker(t)
 	itemID, _ := mkItem(t, f, 100, 60)
-	custID, custUUID := mkCustomer(t, f, "net30")
-	invUUID := mkInvoice(t, f, custID, TransactionKinds.Invoice, "net30", nil,
-		mkLine(itemID, f.unitID, f.warehouseID, 1, 100, 18))
+	custID, custUUID := newCustomer(t, f, g).Credit("net30").Build()
+	invUUID := newInvoice(t, f, g).ForCustomer(custID).Credit("net30").
+		WithLine(itemID, 1, 100, 18).Build()
 
 	form := &StorePaymentForm{
 		CustomerID: custUUID, Date: time.Now(), Amount: 50,

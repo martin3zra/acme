@@ -9,19 +9,20 @@ func TestFlowPartialReceipt(t *testing.T) {
 	is := newIs(t)
 	f := mkAccountCompany(t, s)
 
-	vendorID, _ := mkVendor(t, f, "net30")
+	g := newFaker(t)
+	vendorID, _ := newVendor(t, f, g).Build()
 	itemID, variantID := mkItem(t, f, 100, 60)
 
-	poUUID := mkPurchase(t, f, vendorID, PurchaseTransactionKinds.PurchaseOrder, "net30", "", nil,
-		mkLine(itemID, f.unitID, f.warehouseID, 10, 100, 18))
+	poUUID := newPurchase(t, f).ForVendor(vendorID).Kind(PurchaseTransactionKinds.PurchaseOrder).
+		WithLine(itemID, 10, 100, 18).Build()
 
 	var poID int
 	is.NoErr(s.db.QueryRow(`SELECT id FROM purchases WHERE uuid = $1`, poUUID).Scan(&poID))
 
 	// First receipt: 4 of 10.
-	rc1 := mkPurchase(t, f, vendorID, PurchaseTransactionKinds.PurchaseReceipt, "net30", uniq("PR"),
-		&PurchaseSource{Type: PurchaseTransactionKinds.PurchaseOrder, ID: poUUID},
-		mkLine(itemID, f.unitID, f.warehouseID, 4, 100, 18))
+	rc1 := newPurchase(t, f).ForVendor(vendorID).Kind(PurchaseTransactionKinds.PurchaseReceipt).
+		FromSource(&PurchaseSource{Type: PurchaseTransactionKinds.PurchaseOrder, ID: poUUID}).
+		WithLine(itemID, 4, 100, 18).Build()
 	is.NoErr(f.s.confirmPurchase(f.ctx, rc1))
 
 	remaining := func() int64 {
@@ -43,9 +44,9 @@ func TestFlowPartialReceipt(t *testing.T) {
 	is.Equal(len(links), 1)
 
 	// Second receipt: remaining 6 -> fully received.
-	rc2 := mkPurchase(t, f, vendorID, PurchaseTransactionKinds.PurchaseReceipt, "net30", uniq("PR"),
-		&PurchaseSource{Type: PurchaseTransactionKinds.PurchaseOrder, ID: poUUID},
-		mkLine(itemID, f.unitID, f.warehouseID, 6, 100, 18))
+	rc2 := newPurchase(t, f).ForVendor(vendorID).Kind(PurchaseTransactionKinds.PurchaseReceipt).
+		FromSource(&PurchaseSource{Type: PurchaseTransactionKinds.PurchaseOrder, ID: poUUID}).
+		WithLine(itemID, 6, 100, 18).Build()
 	is.NoErr(f.s.confirmPurchase(f.ctx, rc2))
 
 	is.Equal(remaining(), int64(0))

@@ -28,9 +28,10 @@ func TestFlowCreditLimitBlocksInvoice(t *testing.T) {
 	srv := newHandlerServer(t)
 	is := newIs(t)
 	f := mkAccountCompany(t, srv)
+	g := newFaker(t)
 
 	itemID, _ := mkItem(t, f, 100, 60)
-	custID := mkCreditCustomer(t, f, 50) // limit 50, invoice total 118
+	custID, _ := newCustomer(t, f, g).Credit("net30").CreditLimit(50).Build() // limit 50, invoice total 118
 
 	ctx, sess, _ := handlerCtx(t, srv, f, "POST", "/invoices",
 		invoiceBody(f, custID, itemID))
@@ -46,9 +47,10 @@ func TestFlowCreditLimitAllowsWithinLimit(t *testing.T) {
 	srv := newHandlerServer(t)
 	is := newIs(t)
 	f := mkAccountCompany(t, srv)
+	g := newFaker(t)
 
 	itemID, _ := mkItem(t, f, 100, 60)
-	custID := mkCreditCustomer(t, f, 1000) // limit 1000, invoice total 118
+	custID, _ := newCustomer(t, f, g).Credit("net30").CreditLimit(1000).Build() // limit 1000, invoice total 118
 
 	ctx, sess, _ := handlerCtx(t, srv, f, "POST", "/invoices",
 		invoiceBody(f, custID, itemID))

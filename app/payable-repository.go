@@ -100,38 +100,45 @@ func (s *Server) storeVendorPayment(ctx context.Context, form *StoreVendorPaymen
 			return err
 		}
 
-		var paymentID int
-		err = tx.QueryRow(
-			"INSERT INTO vendor_payments (company_id, vendor_id, date, amount, notes, payment, status, code) "+
-				"VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING id",
-			companyID,
-			v.ID,
-			form.Date,
-			form.Amount,
-			form.Notes,
-			foundation.ToJSON(form.Payment),
-			"completed",
-			seqInfo.Code,
-		).Scan(&paymentID)
+		ptx, err := playTx(tx)
 		if err != nil {
 			return err
 		}
+		payment := &vendorPaymentInsert{
+			CompanyID: companyID,
+			VendorID:  int(v.ID),
+			Date:      form.Date,
+			Amount:    form.Amount,
+			Notes:     form.Notes,
+			Payment:   foundation.ToJSON(form.Payment),
+			Status:    "completed",
+			Code:      seqInfo.Code,
+		}
+		if err = ptx.Insert(context.Background(), payment); err != nil {
+			return err
+		}
+		paymentID := int(payment.ID)
 
+		rows := make([]map[string]any, 0, len(form.Lines))
 		for _, line := range form.Lines {
 			ap, err := s.findAPByUUID(tx, companyID, line.UUID)
 			if err != nil {
 				return err
 			}
-			if _, err = tx.Exec(
-				"INSERT INTO vendor_payment_items (company_id, vendor_payment_id, accounts_payable_id, date, amount_due, payment_amount) "+
-					"VALUES ($1,$2,$3,$4,$5,$6)",
-				companyID, paymentID, ap.ID, form.Date, line.AmountDue, line.Payment,
-			); err != nil {
-				return err
-			}
+			rows = append(rows, map[string]any{
+				"company_id":          companyID,
+				"vendor_payment_id":   paymentID,
+				"accounts_payable_id": ap.ID,
+				"date":                form.Date,
+				"amount_due":          line.AmountDue,
+				"payment_amount":      line.Payment,
+			})
 			if err = s.updateAPBalance(tx, companyID, ap.ID, line.Payment); err != nil {
 				return err
 			}
+		}
+		if _, err = ptx.Model(&vendorPaymentItem{}).InsertMany(context.Background(), rows); err != nil {
+			return err
 		}
 
 		return s.updateVendorAmountPayable(tx, companyID, v.ID, -form.Amount)

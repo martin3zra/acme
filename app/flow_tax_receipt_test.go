@@ -11,13 +11,14 @@ func TestFlowTaxReceiptConsumed(t *testing.T) {
 	s := newTestServer(t)
 	is := newIs(t)
 	f := mkAccountCompany(t, s)
+	g := newFaker(t)
 
 	before := scalarFloat(t, s.db, `SELECT current FROM tax_receipts WHERE id = $1`, f.taxReceiptID)
 
 	itemID, _ := mkItem(t, f, 100, 60)
-	custID, _ := mkCustomer(t, f, "pia")
-	uuid := mkInvoice(t, f, custID, TransactionKinds.Invoice, "pia", nil,
-		mkLine(itemID, f.unitID, f.warehouseID, 1, 100, 18))
+	custID, _ := newCustomer(t, f, g).Build()
+	uuid := newInvoice(t, f, g).ForCustomer(custID).Cash().
+		WithLine(itemID, 1, 100, 18).Build()
 
 	after := scalarFloat(t, s.db, `SELECT current FROM tax_receipts WHERE id = $1`, f.taxReceiptID)
 	is.EqualFloat(after, before+1)
@@ -35,6 +36,7 @@ func TestFlowTaxReceiptExhausted(t *testing.T) {
 	is := newIs(t)
 	srv := newTestServer(t)
 	f := mkAccountCompany(t, srv)
+	g := newFaker(t)
 
 	// A tax receipt already at its end.
 	var exhaustedID int
@@ -44,7 +46,7 @@ func TestFlowTaxReceiptExhausted(t *testing.T) {
 	).Scan(&exhaustedID))
 
 	itemID, _ := mkItem(t, f, 100, 60)
-	custID, _ := mkCustomer(t, f, "pia")
+	custID, _ := newCustomer(t, f, g).Build()
 
 	form := &StoreInvoiceForm{
 		CustomerID: custID, Date: time.Now(), Terms: "pia", TaxReceipt: exhaustedID,

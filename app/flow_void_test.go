@@ -11,11 +11,12 @@ func TestFlowVoidPaymentRestoresBalance(t *testing.T) {
 	s := newTestServer(t)
 	is := newIs(t)
 	f := mkAccountCompany(t, s)
+	g := newFaker(t)
 
 	itemID, _ := mkItem(t, f, 100, 60)
-	custID, custUUID := mkCustomer(t, f, "net30")
-	invUUID := mkInvoice(t, f, custID, TransactionKinds.Invoice, "net30", nil,
-		mkLine(itemID, f.unitID, f.warehouseID, 1, 100, 18))
+	custID, custUUID := newCustomer(t, f, g).Credit("net30").Build()
+	invUUID := newInvoice(t, f, g).ForCustomer(custID).Credit("net30").
+		WithLine(itemID, 1, 100, 18).Build()
 
 	is.NoErr(f.s.storePayment(f.ctx, &StorePaymentForm{
 		CustomerID: custUUID, Date: time.Now(), Amount: 118,
@@ -40,10 +41,11 @@ func TestFlowVoidVendorPaymentRestoresPayable(t *testing.T) {
 	is := newIs(t)
 	f := mkAccountCompany(t, s)
 
-	vendorID, vendorUUID := mkVendor(t, f, "net30")
+	g := newFaker(t)
+	vendorID, vendorUUID := newVendor(t, f, g).Build()
 	itemID, _ := mkItem(t, f, 100, 60)
-	mkPurchase(t, f, vendorID, PurchaseTransactionKinds.VendorBill, "net30", uniq("BILL"), nil,
-		mkLine(itemID, f.unitID, f.warehouseID, 1, 100, 18))
+	newPurchase(t, f).ForVendor(vendorID).Kind(PurchaseTransactionKinds.VendorBill).
+		WithLine(itemID, 1, 100, 18).Build()
 	ap := apUUID(t, f, vendorID)
 
 	is.NoErr(f.s.storeVendorPayment(f.ctx, &StoreVendorPaymentForm{

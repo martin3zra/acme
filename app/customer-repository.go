@@ -209,17 +209,29 @@ func (s *Server) storeCustomer(ctx context.Context, form *StoreCustomerForm) err
 }
 
 func (s *Server) storeCustomerInternal(tx *sql.Tx, companyID int, code string, form *StoreCustomerForm) error {
-	stmt, err := tx.Prepare("INSERT INTO customers (company_id, name, contact_name, email, phone, payment_method, payment_terms, credit_limited, credit_limit, amount_due, customer_type, tax_receipt_id, code) " +
-		"VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13) RETURNING id")
+	ptx, err := playTx(tx)
 	if err != nil {
 		return err
 	}
-
-	var customerID int
-	err = stmt.QueryRow(companyID, form.Name, form.Contact, form.Email, form.Phone, form.PaymentMethod, form.PaymentTerms, form.CreditLimited, form.CreditLimit, form.OpenBalance, form.CustomerType, form.TaxReceipt, code).Scan(&customerID)
-	if err != nil {
+	cust := &customerInsert{
+		CompanyID:     companyID,
+		Name:          form.Name,
+		ContactName:   form.Contact,
+		Email:         form.Email,
+		Phone:         form.Phone,
+		PaymentMethod: form.PaymentMethod,
+		PaymentTerms:  form.PaymentTerms,
+		CreditLimited: form.CreditLimited,
+		CreditLimit:   form.CreditLimit,
+		AmountDue:     form.OpenBalance,
+		CustomerType:  form.CustomerType,
+		TaxReceiptID:  form.TaxReceipt,
+		Code:          code,
+	}
+	if err = ptx.Insert(context.Background(), cust); err != nil {
 		return err
 	}
+	customerID := int(cust.ID)
 
 	if form.OpenBalance == 0 || form.OpenBalanceAsOf.IsZero() {
 		return nil
@@ -232,18 +244,24 @@ func (s *Server) storeCustomerInternal(tx *sql.Tx, companyID int, code string, f
 		return err
 	}
 
-	stmt, err = tx.Prepare("INSERT INTO invoices (company_id, date, type, due_on, customer_id, amount, amount_due, total, note, status, paid_status, code) " +
-		"VALUES($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12) RETURNING id")
-	if err != nil {
+	opening := &openingInvoiceInsert{
+		CompanyID:  companyID,
+		Date:       form.OpenBalanceAsOf,
+		Type:       InvoiceTermType.Opening,
+		DueOn:      form.OpenBalanceAsOf,
+		CustomerID: customerID,
+		Amount:     form.OpenBalance,
+		AmountDue:  form.OpenBalance,
+		Total:      form.OpenBalance,
+		Note:       "Saldo inicial",
+		Status:     InvoiceStatuses.Sent,
+		PaidStatus: PaidStatuses.UnPaid,
+		Code:       openingSeq.Code,
+	}
+	if err := ptx.Insert(context.Background(), opening); err != nil {
 		return err
 	}
-
-	var invoiceID int
-	err = stmt.QueryRow(companyID, form.OpenBalanceAsOf, InvoiceTermType.Opening, form.OpenBalanceAsOf, customerID, form.OpenBalance, form.OpenBalance, form.OpenBalance, "Saldo inicial", InvoiceStatuses.Sent, PaidStatuses.UnPaid, openingSeq.Code).
-		Scan(&invoiceID)
-	if err != nil {
-		return err
-	}
+	invoiceID := int(opening.ID)
 
 	return s.registerReceivable(tx, companyID, invoiceID, customerID)
 }

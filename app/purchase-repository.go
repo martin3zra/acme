@@ -530,32 +530,33 @@ func (s *Server) storePurchaseInternal(tx *sql.Tx, companyID int, form *StorePur
 }
 
 func (s *Server) createAPForVendorBill(tx *sql.Tx, companyID, purchaseID, vendorID int, form *StorePurchaseForm) error {
-	var apID int
-	err := tx.QueryRow(
-		"INSERT INTO accounts_payable "+
-			"(company_id, vendor_id, purchase_id, invoice_number, invoice_date, due_date, "+
-			"amount_total, tax_amount, discount_amount, amount_paid, "+
-			"currency, payment_terms, status, paid_status, created_by) "+
-			"VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15) RETURNING id",
-		companyID,
-		vendorID,
-		purchaseID,
-		form.InvoiceNumber,
-		form.Date,
-		form.dueOn,
-		form.amount, // amount_total is the pre-tax subtotal; amount_payable is
-		form.tax,    // generated as (amount_total + tax_amount - discount_amount)
-		0,
-		0,
-		"DOP",
-		form.Terms,
-		PayableStatuses.Pending,
-		PaidStatuses.UnPaid,
-		form.User().GetAuthIdentifier(),
-	).Scan(&apID)
+	ptx, err := playTx(tx)
 	if err != nil {
 		return err
 	}
+	// amount_total is the pre-tax subtotal; amount_payable is a generated column
+	// (amount_total + tax_amount - discount_amount) and is not written here.
+	ap := &accountsPayableInsert{
+		CompanyID:      companyID,
+		VendorID:       vendorID,
+		PurchaseID:     purchaseID,
+		InvoiceNumber:  form.InvoiceNumber,
+		InvoiceDate:    form.Date,
+		DueDate:        form.dueOn,
+		AmountTotal:    form.amount,
+		TaxAmount:      form.tax,
+		DiscountAmount: 0,
+		AmountPaid:     0,
+		Currency:       "DOP",
+		PaymentTerms:   form.Terms,
+		Status:         PayableStatuses.Pending,
+		PaidStatus:     PaidStatuses.UnPaid,
+		CreatedBy:      form.User().GetAuthIdentifier(),
+	}
+	if err = ptx.Insert(context.Background(), ap); err != nil {
+		return err
+	}
+	apID := int(ap.ID)
 
 	if err := s.registerPayable(tx, companyID, apID, vendorID); err != nil {
 		return err
@@ -579,29 +580,31 @@ func (s *Server) attachPurchaseLines(tx *sql.Tx, companyID, purchaseID int, form
 		return err
 	}
 
-	vals := []any{}
+	rows := make([]map[string]any, 0, len(form.Lines))
 	for _, l := range form.Lines {
 		variantID, ok := variantIDs[l.ID]
 		if !ok {
 			return fmt.Errorf("missing item variant for item_id=%d", l.ID)
 		}
-		vals = append(vals,
-			companyID,
-			purchaseID,
-			variantID,
-			l.Qty,
-			l.Price,
-			l.total,
-			l.Unit,
-			l.discount,
-			taxIDs[l.ID],
-			l.tax,
-		)
+		rows = append(rows, map[string]any{
+			"company_id":  companyID,
+			"purchase_id": purchaseID,
+			"variant_id":  variantID,
+			"qty":         l.Qty,
+			"unit_price":  l.Price,
+			"line_total":  l.total,
+			"unit_id":     l.Unit,
+			"discount":    l.discount,
+			"tax_id":      taxIDs[l.ID],
+			"tax_amount":  l.tax,
+		})
 	}
 
-	stmt := "INSERT INTO purchase_items (company_id, purchase_id, variant_id, qty, unit_price, line_total, unit_id, discount, tax_id, tax_amount) VALUES "
-	stmt += database.PrepareBulkInsert(10, len(form.Lines))
-	_, err = tx.Exec(stmt, vals...)
+	ptx, err := playTx(tx)
+	if err != nil {
+		return err
+	}
+	_, err = ptx.Model(&PurchaseItem{}).InsertMany(context.Background(), rows)
 	return err
 }
 

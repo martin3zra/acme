@@ -10,6 +10,7 @@ import (
 	"github.com/martin3zra/forge/cache"
 	"github.com/martin3zra/forge/database"
 	"github.com/martin3zra/forge/foundation"
+	"github.com/martin3zra/playsql"
 )
 
 type invoice struct {
@@ -246,17 +247,27 @@ func (s *Server) updateInvoice(ctx context.Context, uuid string, form *UpdateInv
 		if form.Kind == TransactionKinds.Invoice || form.Kind == TransactionKinds.Order {
 			termType = (*string)(&form.termType)
 		}
-		_, err = tx.Exec(`
-    UPDATE invoices
-    SET customer_id = $3, date = $4, due_on = $5, amount = $6, discount = $7, tax = $8, total = $9,
-    amount_due = $10, note = $11, payment = $12, type = $13, paid_status = $14
-    WHERE company_id = $1 AND id = $2
-    `,
-			companyID, invoice.ID, form.CustomerID, form.Date, form.dueOn, form.amount,
-			foundation.ToJSON(form.Discount), form.tax, form.total, form.amountDue,
-			form.Notes, foundation.ToJSON(form.Payment), termType, form.paidStatus,
-		)
+		ptx, err := playTx(tx)
 		if err != nil {
+			return err
+		}
+		if _, err = ptx.Model(&invoiceInsert{}).
+			WhereEq("company_id", companyID).
+			WhereEq("id", invoice.ID).
+			Update(context.Background(), map[string]any{
+				"customer_id": form.CustomerID,
+				"date":        form.Date,
+				"due_on":      form.dueOn,
+				"amount":      form.amount,
+				"discount":    foundation.ToJSON(form.Discount),
+				"tax":         form.tax,
+				"total":       form.total,
+				"amount_due":  form.amountDue,
+				"note":        form.Notes,
+				"payment":     foundation.ToJSON(form.Payment),
+				"type":        termType,
+				"paid_status": form.paidStatus,
+			}); err != nil {
 			return err
 		}
 
@@ -320,26 +331,37 @@ func (s *Server) voidInvoice(ctx context.Context, kind TransactionKind, uuid str
 	}
 
 	return database.WithTransaction(s.db, func(tx *sql.Tx) error {
-		_, err = tx.Exec(`
-    UPDATE invoices
-    SET amount = 0, discount = NULL, tax = 0, total = 0,
-    amount_due = 0, payment = NULL, status = $4, paid_status = $5
-    WHERE company_id = $1 AND id = $2 AND transaction_kind = $3
-  `,
-			companyID, invoice.ID, kind, InvoiceStatuses.Void, PaidStatuses.Refunded,
-		)
+		ptx, err := playTx(tx)
 		if err != nil {
 			return err
 		}
+		if _, err = ptx.Model(&invoiceInsert{}).
+			WhereEq("company_id", companyID).
+			WhereEq("id", invoice.ID).
+			WhereEq("transaction_kind", kind).
+			Update(context.Background(), map[string]any{
+				"amount":      0,
+				"discount":    nil,
+				"tax":         0,
+				"total":       0,
+				"amount_due":  0,
+				"payment":     nil,
+				"status":      InvoiceStatuses.Void,
+				"paid_status": PaidStatuses.Refunded,
+			}); err != nil {
+			return err
+		}
 
-		_, err = tx.Exec(`
-    UPDATE invoices_items
-    SET amount = 0, qty = 0, price = 0, tax = 0, total = 0
-    WHERE company_id = $1 AND invoice_id = $2
-  `,
-			companyID, invoice.ID,
-		)
-		if err != nil {
+		if _, err = ptx.Model(&InvoiceItem{}).
+			WhereEq("company_id", companyID).
+			WhereEq("invoice_id", invoice.ID).
+			Update(context.Background(), map[string]any{
+				"amount": 0,
+				"qty":    0,
+				"price":  0,
+				"tax":    0,
+				"total":  0,
+			}); err != nil {
 			return err
 		}
 
@@ -364,37 +386,75 @@ func (s *Server) voidInvoice(ctx context.Context, kind TransactionKind, uuid str
 }
 
 func (s *Server) attachInvoiceLines(tx *sql.Tx, companyId, invoiceId int, form *StoreInvoiceForm) error {
-	vals := []any{}
-	for _, line := range form.Lines {
-		vals = append(vals, companyId, invoiceId, line.ID, line.Unit, line.Qty, line.Price, line.Rate, line.amount, line.tax, line.total, line.WarehouseID)
+	ptx, err := playTx(tx)
+	if err != nil {
+		return err
 	}
-
-	stmt := "INSERT INTO invoices_items (company_id, invoice_id, item_id, unit_id, qty, price, rate, amount, tax, total, warehouse_id) VALUES "
-	stmt += database.PrepareBulkInsert(11, len(form.Lines))
-
-	_, err := tx.Exec(stmt, vals...)
-
+	rows := make([]map[string]any, 0, len(form.Lines))
+	for _, line := range form.Lines {
+		rows = append(rows, map[string]any{
+			"company_id":   companyId,
+			"invoice_id":   invoiceId,
+			"item_id":      line.ID,
+			"unit_id":      line.Unit,
+			"qty":          line.Qty,
+			"price":        line.Price,
+			"rate":         line.Rate,
+			"amount":       line.amount,
+			"tax":          line.tax,
+			"total":        line.total,
+			"warehouse_id": line.WarehouseID,
+		})
+	}
+	// InsertMany compiles a single multi-row INSERT, preserving the original
+	// bulk-insert behaviour.
+	_, err = ptx.Model(&InvoiceItem{}).InsertMany(context.Background(), rows)
 	return err
 }
 
 func (s *Server) processInvoiceLines(tx *sql.Tx, companyId, invoiceId int, form *UpdateInvoiceForm) error {
+	ptx, err := playTx(tx)
+	if err != nil {
+		return err
+	}
 
 	lines := s.filterInvoiceLines(form.Lines, ADDED, UPDATED, DELETED)
 	for _, line := range lines {
 		switch line.Action {
 		case ADDED:
-			stmt := "INSERT INTO invoices_items (company_id, invoice_id, item_id, unit_id, qty, price, tax, warehouse_id) VALUES($1,$2,$3,$4,$5,$6,$7,$8) "
-			if _, err := tx.Exec(stmt, companyId, invoiceId, line.ID, line.Unit, line.Qty, line.Price, line.Rate, line.WarehouseID); err != nil {
+			// Preserves the original column set exactly: only these eight columns,
+			// with the tax column carrying the line rate (rate/amount/total are left
+			// to their defaults on this path, unlike the create-time bulk insert).
+			if _, err := ptx.Model(&InvoiceItem{}).InsertMany(context.Background(), []map[string]any{{
+				"company_id":   companyId,
+				"invoice_id":   invoiceId,
+				"item_id":      line.ID,
+				"unit_id":      line.Unit,
+				"qty":          line.Qty,
+				"price":        line.Price,
+				"tax":          line.Rate,
+				"warehouse_id": line.WarehouseID,
+			}}); err != nil {
 				return err
 			}
 		case UPDATED:
-			stmt := "UPDATE invoices_items SET qty = $4, unit_id = $5, warehouse_id = $6 WHERE company_id = $1 AND invoice_id = $2 AND item_id = $3 "
-			if _, err := tx.Exec(stmt, companyId, invoiceId, line.ID, line.Qty, line.Unit, line.WarehouseID); err != nil {
+			if _, err := ptx.Model(&InvoiceItem{}).
+				WhereEq("company_id", companyId).
+				WhereEq("invoice_id", invoiceId).
+				WhereEq("item_id", line.ID).
+				Update(context.Background(), map[string]any{
+					"qty":          line.Qty,
+					"unit_id":      line.Unit,
+					"warehouse_id": line.WarehouseID,
+				}); err != nil {
 				return err
 			}
 		case DELETED:
-			stmt := "DELETE FROM invoices_items WHERE company_id = $1 AND invoice_id = $2 AND item_id = $3"
-			if _, err := tx.Exec(stmt, companyId, invoiceId, line.ID); err != nil {
+			if _, err := ptx.Model(&InvoiceItem{}).
+				WhereEq("company_id", companyId).
+				WhereEq("invoice_id", invoiceId).
+				WhereEq("item_id", line.ID).
+				Delete(context.Background()); err != nil {
 				return err
 			}
 		default:
@@ -459,21 +519,40 @@ func (s *Server) findInvoiceLines(ctx context.Context, companyID, invoiceID int)
 }
 
 func (s *Server) registerReceivable(tx *sql.Tx, companyId, invoiceId, customerId int) error {
-	_, err := tx.Exec("INSERT INTO receivables (company_id, invoice_id, customer_id) VALUES($1, $2, $3)",
-		companyId, invoiceId, customerId,
-	)
-
-	return err
+	ptx, err := playTx(tx)
+	if err != nil {
+		return err
+	}
+	return ptx.Insert(context.Background(), &Receivable{
+		CompanyID:  companyId,
+		InvoiceID:  invoiceId,
+		CustomerID: customerId,
+	})
 }
 
 func (s *Server) deleteInvoiceFromReceivables(tx *sql.Tx, companyId, invoiceId, customerId int) error {
-	_, err := tx.Exec("DELETE FROM receivables WHERE company_id = $1 AND invoice_id = $2 AND customer_id = $3", companyId, invoiceId, customerId)
+	ptx, err := playTx(tx)
+	if err != nil {
+		return err
+	}
+	_, err = ptx.Model(&Receivable{}).
+		WhereEq("company_id", companyId).
+		WhereEq("invoice_id", invoiceId).
+		WhereEq("customer_id", customerId).
+		Delete(context.Background())
 	return err
 }
 
 func (s *Server) changeCustomerFromReceivables(tx *sql.Tx, companyId, invoiceId, customerId, newCustomerId int) error {
-	_, err := tx.Exec("UPDATE receivables SET customer_id = $4 WHERE company_id = $1 AND invoice_id = $2 AND customer_id = $3", companyId, invoiceId, customerId, newCustomerId)
-
+	ptx, err := playTx(tx)
+	if err != nil {
+		return err
+	}
+	_, err = ptx.Model(&Receivable{}).
+		WhereEq("company_id", companyId).
+		WhereEq("invoice_id", invoiceId).
+		WhereEq("customer_id", customerId).
+		Update(context.Background(), map[string]any{"customer_id": newCustomerId})
 	return err
 }
 
@@ -539,12 +618,6 @@ func (s *Server) storeInvoiceInternal(tx *sql.Tx, companyID int, form *StoreInvo
 		}
 	}
 
-	stmt, err := tx.Prepare("INSERT INTO invoices (company_id, tax_receipt_id, tax_receipt_sequence, tax_number, date, type, due_on, customer_id, amount, discount, tax, amount_due, total, note, status, paid_status, payment, code, transaction_kind, source, recurrence) " +
-		"VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21) RETURNING id, uuid")
-	if err != nil {
-		return invoiceUUID, err
-	}
-
 	seqSource := string(form.Kind)
 	if form.Kind == TransactionKinds.Invoice {
 		seqSource = fmt.Sprintf("invoice.%v", form.termType)
@@ -584,31 +657,41 @@ func (s *Server) storeInvoiceInternal(tx *sql.Tx, companyID int, form *StoreInvo
 		recurrence = &_recurrence
 	}
 
-	var invoiceID int
-	err = stmt.QueryRow(
-		companyID,
-		taxID,
-		taxSeq,
-		taxNumber,
-		form.Date,
-		termType,
-		&form.dueOn,
-		form.CustomerID,
-		form.amount,
-		foundation.ToJSON(form.Discount),
-		form.tax,
-		form.amountDue,
-		form.total,
-		form.Notes,
-		form.status,
-		form.paidStatus,
-		foundation.ToJSON(form.Payment),
-		seqInfo.Code,
-		form.Kind,
-		source,
-		recurrence,
-	).Scan(&invoiceID, &invoiceUUID)
+	ptx, err := playTx(tx)
+	if err != nil {
+		return invoiceUUID, err
+	}
+	row := &invoiceInsert{
+		CompanyID:          companyID,
+		TaxReceiptID:       taxID,
+		TaxReceiptSequence: taxSeq,
+		TaxNumber:          taxNumber,
+		Date:               form.Date,
+		Type:               termType,
+		DueOn:              form.dueOn,
+		CustomerID:         form.CustomerID,
+		Amount:             form.amount,
+		Discount:           foundation.ToJSON(form.Discount),
+		Tax:                form.tax,
+		AmountDue:          form.amountDue,
+		Total:              form.total,
+		Note:               form.Notes,
+		Status:             form.status,
+		PaidStatus:         form.paidStatus,
+		Payment:            foundation.ToJSON(form.Payment),
+		Code:               seqInfo.Code,
+		TransactionKind:    form.Kind,
+		Source:             source,
+		Recurrence:         recurrence,
+	}
+	if err = ptx.Insert(context.Background(), row); err != nil {
+		return invoiceUUID, err
+	}
+	invoiceID := int(row.ID)
 
+	// uuid is generated by the database default; read it back by the new id.
+	invoiceUUID, err = playsql.RawScalar[string](ptx, context.Background(),
+		"SELECT uuid FROM invoices WHERE company_id = $1 AND id = $2", companyID, row.ID)
 	if err != nil {
 		return invoiceUUID, err
 	}
@@ -630,10 +713,10 @@ func (s *Server) storeInvoiceInternal(tx *sql.Tx, companyID int, form *StoreInvo
 			if err = s.recordInvoiceMovements(tx, companyID, invoiceID, form.Lines); err != nil {
 				return invoiceUUID, err
 			}
-			if _, err = tx.Exec(
-				"UPDATE invoices SET movement_recorded = TRUE WHERE company_id = $1 AND id = $2",
-				companyID, invoiceID,
-			); err != nil {
+			if _, err = ptx.Model(&invoiceInsert{}).
+				WhereEq("company_id", companyID).
+				WhereEq("id", invoiceID).
+				Update(context.Background(), map[string]any{"movement_recorded": true}); err != nil {
 				return invoiceUUID, err
 			}
 		}
@@ -644,31 +727,34 @@ func (s *Server) storeInvoiceInternal(tx *sql.Tx, companyID int, form *StoreInvo
 		// a relationshipt bewteen both invoice using the
 		// source column to keep track of them.
 		if form.Source.Type == TransactionKinds.Invoice {
-			_, err := tx.Exec(
-				"UPDATE invoices SET source = $4 "+
-					"WHERE company_id = $1 "+
-					"AND uuid = $2 AND transaction_kind = $3",
-				companyID, form.Source.ID, form.Source.Type, foundation.AsJSON(map[string]any{
-					"type": form.Kind,
-					"id":   invoiceUUID,
-					"code": seqInfo.Code,
-				}))
-			if err != nil {
+			if _, err := ptx.Model(&invoiceInsert{}).
+				WhereEq("company_id", companyID).
+				WhereEq("uuid", form.Source.ID).
+				WhereEq("transaction_kind", form.Source.Type).
+				Update(context.Background(), map[string]any{
+					"source": foundation.AsJSON(map[string]any{
+						"type": form.Kind,
+						"id":   invoiceUUID,
+						"code": seqInfo.Code,
+					}),
+				}); err != nil {
 				return invoiceUUID, err
 			}
 		}
 
 		if form.Source.Type == TransactionKinds.Estimate || form.Source.Type == TransactionKinds.Order {
-			_, err := tx.Exec(
-				"UPDATE invoices SET status = 'closed', source = $4 "+
-					"WHERE company_id = $1 "+
-					"AND uuid = $2 AND transaction_kind = $3",
-				companyID, form.Source.ID, form.Source.Type, foundation.ToJSON(map[string]any{
-					"type": form.Kind,
-					"id":   invoiceUUID,
-					"code": seqInfo.Code,
-				}))
-			if err != nil {
+			if _, err := ptx.Model(&invoiceInsert{}).
+				WhereEq("company_id", companyID).
+				WhereEq("uuid", form.Source.ID).
+				WhereEq("transaction_kind", form.Source.Type).
+				Update(context.Background(), map[string]any{
+					"status": "closed",
+					"source": foundation.ToJSON(map[string]any{
+						"type": form.Kind,
+						"id":   invoiceUUID,
+						"code": seqInfo.Code,
+					}),
+				}); err != nil {
 				return invoiceUUID, err
 			}
 		}

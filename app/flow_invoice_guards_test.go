@@ -30,8 +30,9 @@ func TestFlowCashPaymentMismatchBlocked(t *testing.T) {
 	is := newIs(t)
 	f := mkAccountCompany(t, srv)
 
+	g := newFaker(t)
 	itemID, _ := mkItem(t, f, 100, 60)
-	custID, _ := mkCustomer(t, f, "pia")
+	custID, _ := newCustomer(t, f, g).Build()
 
 	// total is 118, but only 50 tendered.
 	ctx, sess, _ := handlerCtx(t, srv, f, "POST", "/invoices", cashInvoiceBody(f, custID, itemID, 50))
@@ -47,8 +48,9 @@ func TestFlowCashPaymentMatchesCreates(t *testing.T) {
 	is := newIs(t)
 	f := mkAccountCompany(t, srv)
 
+	g := newFaker(t)
 	itemID, _ := mkItem(t, f, 100, 60)
-	custID, _ := mkCustomer(t, f, "pia")
+	custID, _ := newCustomer(t, f, g).Build()
 
 	ctx, sess, _ := handlerCtx(t, srv, f, "POST", "/invoices", cashInvoiceBody(f, custID, itemID, 118))
 	srv.storeInvoiceHandler()(ctx)

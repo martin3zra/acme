@@ -48,7 +48,8 @@ func TestFlowCustomerHasCode(t *testing.T) {
 	s := newTestServer(t)
 	is := newIs(t)
 	f := mkAccountCompany(t, s)
-	id, _ := mkCustomer(t, f, "net30")
+	g := newFaker(t)
+	id, _ := newCustomer(t, f, g).Credit("net30").Build()
 
 	code := scalarString(t, s.db, `SELECT code FROM customers WHERE id = $1`, id)
 	is.True(strings.HasPrefix(code, "CUST"), "customer code should start with CUST, got "+code)
