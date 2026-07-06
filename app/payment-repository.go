@@ -198,12 +198,6 @@ func (s *Server) storePayment(ctx context.Context, form *StorePaymentForm) error
 	}
 
 	return database.WithTransaction(s.db, func(tx *sql.Tx) error {
-		stmt, err := tx.Prepare("INSERT INTO receivables_income (company_id, customer_id, date, amount, notes, payment, status, code) " +
-			"VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id")
-		if err != nil {
-			return err
-		}
-
 		companyID := CurrentCompany(ctx).ID
 
 		seqInfo, err := GetNextSequence(tx, companyID, "payment")
@@ -211,21 +205,24 @@ func (s *Server) storePayment(ctx context.Context, form *StorePaymentForm) error
 			return err
 		}
 
-		var paymentID int
-		err = stmt.QueryRow(
-			companyID,
-			customer.ID,
-			form.Date,
-			form.Amount,
-			form.Notes,
-			foundation.ToJSON(form.Payment),
-			PaymentStatuses.Completed,
-			seqInfo.Code,
-		).Scan(&paymentID)
-
+		ptx, err := playTx(tx)
 		if err != nil {
 			return err
 		}
+		payment := &paymentInsert{
+			CompanyID:  companyID,
+			CustomerID: int(customer.ID),
+			Date:       form.Date,
+			Amount:     form.Amount,
+			Notes:      form.Notes,
+			Payment:    foundation.ToJSON(form.Payment),
+			Status:     PaymentStatuses.Completed,
+			Code:       seqInfo.Code,
+		}
+		if err = ptx.Insert(context.Background(), payment); err != nil {
+			return err
+		}
+		paymentID := int(payment.ID)
 
 		if err = s.attachPaymentLines(tx, ctx, paymentID, form); err != nil {
 			return err
@@ -241,13 +238,20 @@ func (s *Server) storePayment(ctx context.Context, form *StorePaymentForm) error
 
 func (s *Server) attachPaymentLines(tx *sql.Tx, ctx context.Context, paymentId int, form *StorePaymentForm) error {
 	companyId := CurrentCompany(ctx).ID
-	vals := []any{}
+	rows := make([]map[string]any, 0, len(form.Lines))
 	for _, line := range form.Lines {
 		invoice, err := s.findInvoicesByUUID(ctx, TransactionKinds.Invoice, companyId, line.Uuid)
 		if err != nil {
 			return err
 		}
-		vals = append(vals, companyId, paymentId, form.Date, invoice.ID, line.AmountDue, line.Payment)
+		rows = append(rows, map[string]any{
+			"company_id":           companyId,
+			"receivable_income_id": paymentId,
+			"date":                 form.Date,
+			"invoice_id":           invoice.ID,
+			"amount_due":           line.AmountDue,
+			"payment_amount":       line.Payment,
+		})
 
 		// Update invoice balance and payment status.
 		if err = s.updateInvoiceBalance(tx, companyId, invoice.ID, -line.Payment); err != nil {
@@ -255,11 +259,11 @@ func (s *Server) attachPaymentLines(tx *sql.Tx, ctx context.Context, paymentId i
 		}
 	}
 
-	stmt := "INSERT INTO receivables_income_items (company_id, receivable_income_id, date, invoice_id, amount_due, payment_amount) VALUES "
-	stmt += database.PrepareBulkInsert(6, len(form.Lines))
-
-	_, err := tx.Exec(stmt, vals...)
-
+	ptx, err := playTx(tx)
+	if err != nil {
+		return err
+	}
+	_, err = ptx.Model(&paymentItem{}).InsertMany(context.Background(), rows)
 	return err
 }
 

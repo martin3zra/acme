@@ -162,3 +162,61 @@ type PurchaseItem struct {
 }
 
 func (PurchaseItem) TableName() string { return "purchase_items" }
+
+// paymentInsert is the write model for a customer payment (receivables_income).
+type paymentInsert struct {
+	ID         int64         `db:"id" play:"pk,incrementing"`
+	CompanyID  int           `db:"company_id"`
+	CustomerID int           `db:"customer_id"`
+	Date       time.Time     `db:"date"`
+	Amount     float64       `db:"amount"`
+	Notes      string        `db:"notes"`
+	Payment    string        `db:"payment"`
+	Status     PaymentStatus `db:"status"`
+	Code       string        `db:"code"`
+}
+
+func (paymentInsert) TableName() string { return "receivables_income" }
+
+// vendorPaymentInsert is the write model for a vendor payment (vendor_payments).
+type vendorPaymentInsert struct {
+	ID        int64     `db:"id" play:"pk,incrementing"`
+	CompanyID int       `db:"company_id"`
+	VendorID  int       `db:"vendor_id"`
+	Date      time.Time `db:"date"`
+	Amount    float64   `db:"amount"`
+	Notes     string    `db:"notes"`
+	Payment   string    `db:"payment"`
+	Status    string    `db:"status"`
+	Code      string    `db:"code"`
+}
+
+func (vendorPaymentInsert) TableName() string { return "vendor_payments" }
+
+// paymentItem is the write model for customer payment allocation rows
+// (receivables_income_items). Backs the bulk allocation insert.
+type paymentItem struct {
+	ID                 int64     `db:"id" play:"pk,incrementing"`
+	CompanyID          int       `db:"company_id"`
+	ReceivableIncomeID int       `db:"receivable_income_id"`
+	Date               time.Time `db:"date"`
+	InvoiceID          int       `db:"invoice_id"`
+	AmountDue          float64   `db:"amount_due"`
+	PaymentAmount      float64   `db:"payment_amount"`
+}
+
+func (paymentItem) TableName() string { return "receivables_income_items" }
+
+// vendorPaymentItem is the write model for vendor payment allocation rows
+// (vendor_payment_items). Backs the bulk allocation insert.
+type vendorPaymentItem struct {
+	ID                int64     `db:"id" play:"pk,incrementing"`
+	CompanyID         int       `db:"company_id"`
+	VendorPaymentID   int       `db:"vendor_payment_id"`
+	AccountsPayableID int64     `db:"accounts_payable_id"`
+	Date              time.Time `db:"date"`
+	AmountDue         float64   `db:"amount_due"`
+	PaymentAmount     float64   `db:"payment_amount"`
+}
+
+func (vendorPaymentItem) TableName() string { return "vendor_payment_items" }
