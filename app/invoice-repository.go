@@ -365,23 +365,20 @@ func (s *Server) voidInvoice(ctx context.Context, kind TransactionKind, uuid str
 			return err
 		}
 
-		if err = s.deleteInvoiceFromReceivables(tx, companyID, invoice.ID, invoice.Customer.ID); err != nil {
-			return err
-		}
-
-		// Reverse any inventory movements that were recorded for this invoice.
+		// The reverse side effects (receivable removal, and stock reversal when the
+		// invoice moved stock) react to InvoiceVoided within this same transaction.
 		var movementRecorded bool
 		_ = s.db.QueryRowContext(ctx,
 			"SELECT movement_recorded FROM invoices WHERE company_id = $1 AND id = $2",
 			companyID, invoice.ID,
 		).Scan(&movementRecorded)
-		if movementRecorded {
-			if err = s.reverseMovements(tx, companyID, "invoice", invoice.ID, InventoryMovementKinds.SaleReturn); err != nil {
-				return err
-			}
-		}
 
-		return nil
+		return s.dispatcher().Dispatch(context.Background(), tx, InvoiceVoided{
+			CompanyID:        companyID,
+			InvoiceID:        invoice.ID,
+			CustomerID:       invoice.Customer.ID,
+			MovementRecorded: movementRecorded,
+		})
 	})
 }
 

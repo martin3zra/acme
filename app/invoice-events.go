@@ -31,6 +31,39 @@ func (l receivableListener) Handle(ctx context.Context, tx *sql.Tx, e events.Eve
 	return l.s.updateCustomerAmountDue(tx, ev.CompanyID, ev.CustomerID, ev.AmountDue)
 }
 
+// InvoiceVoided is raised when an invoice has been voided (amounts and lines
+// zeroed). Reverse listeners undo its side effects within the same transaction.
+type InvoiceVoided struct {
+	CompanyID  int
+	InvoiceID  int
+	CustomerID int
+	// MovementRecorded reports whether the invoice had posted stock movements, so
+	// the inventory listener only reverses stock that was actually taken.
+	MovementRecorded bool
+}
+
+func (InvoiceVoided) Name() string { return "invoice.voided" }
+
+// reverseReceivableListener removes the invoice's receivable when it is voided.
+type reverseReceivableListener struct{ s *Server }
+
+func (l reverseReceivableListener) Handle(ctx context.Context, tx *sql.Tx, e events.Event) error {
+	ev := e.(InvoiceVoided)
+	return l.s.deleteInvoiceFromReceivables(tx, ev.CompanyID, ev.InvoiceID, ev.CustomerID)
+}
+
+// reverseInventoryListener returns the invoice's stock (a sale_return) when the
+// voided invoice had recorded inventory movements.
+type reverseInventoryListener struct{ s *Server }
+
+func (l reverseInventoryListener) Handle(ctx context.Context, tx *sql.Tx, e events.Event) error {
+	ev := e.(InvoiceVoided)
+	if !ev.MovementRecorded {
+		return nil
+	}
+	return l.s.reverseMovements(tx, ev.CompanyID, "invoice", ev.InvoiceID, InventoryMovementKinds.SaleReturn)
+}
+
 // dispatcher lazily builds the event dispatcher and registers listeners on first
 // use, so every way a *Server is constructed (production, test harness) gets the
 // same wiring without touching constructors.
@@ -38,6 +71,7 @@ func (s *Server) dispatcher() *events.Dispatcher {
 	s.eventsOnce.Do(func() {
 		d := events.NewDispatcher()
 		d.On(InvoiceCreated{}, receivableListener{s})
+		d.On(InvoiceVoided{}, reverseReceivableListener{s}, reverseInventoryListener{s})
 		s.events = d
 	})
 	return s.events
