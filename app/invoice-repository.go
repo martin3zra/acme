@@ -247,17 +247,27 @@ func (s *Server) updateInvoice(ctx context.Context, uuid string, form *UpdateInv
 		if form.Kind == TransactionKinds.Invoice || form.Kind == TransactionKinds.Order {
 			termType = (*string)(&form.termType)
 		}
-		_, err = tx.Exec(`
-    UPDATE invoices
-    SET customer_id = $3, date = $4, due_on = $5, amount = $6, discount = $7, tax = $8, total = $9,
-    amount_due = $10, note = $11, payment = $12, type = $13, paid_status = $14
-    WHERE company_id = $1 AND id = $2
-    `,
-			companyID, invoice.ID, form.CustomerID, form.Date, form.dueOn, form.amount,
-			foundation.ToJSON(form.Discount), form.tax, form.total, form.amountDue,
-			form.Notes, foundation.ToJSON(form.Payment), termType, form.paidStatus,
-		)
+		ptx, err := playTx(tx)
 		if err != nil {
+			return err
+		}
+		if _, err = ptx.Model(&invoiceInsert{}).
+			WhereEq("company_id", companyID).
+			WhereEq("id", invoice.ID).
+			Update(context.Background(), map[string]any{
+				"customer_id": form.CustomerID,
+				"date":        form.Date,
+				"due_on":      form.dueOn,
+				"amount":      form.amount,
+				"discount":    foundation.ToJSON(form.Discount),
+				"tax":         form.tax,
+				"total":       form.total,
+				"amount_due":  form.amountDue,
+				"note":        form.Notes,
+				"payment":     foundation.ToJSON(form.Payment),
+				"type":        termType,
+				"paid_status": form.paidStatus,
+			}); err != nil {
 			return err
 		}
 
@@ -321,26 +331,37 @@ func (s *Server) voidInvoice(ctx context.Context, kind TransactionKind, uuid str
 	}
 
 	return database.WithTransaction(s.db, func(tx *sql.Tx) error {
-		_, err = tx.Exec(`
-    UPDATE invoices
-    SET amount = 0, discount = NULL, tax = 0, total = 0,
-    amount_due = 0, payment = NULL, status = $4, paid_status = $5
-    WHERE company_id = $1 AND id = $2 AND transaction_kind = $3
-  `,
-			companyID, invoice.ID, kind, InvoiceStatuses.Void, PaidStatuses.Refunded,
-		)
+		ptx, err := playTx(tx)
 		if err != nil {
 			return err
 		}
+		if _, err = ptx.Model(&invoiceInsert{}).
+			WhereEq("company_id", companyID).
+			WhereEq("id", invoice.ID).
+			WhereEq("transaction_kind", kind).
+			Update(context.Background(), map[string]any{
+				"amount":      0,
+				"discount":    nil,
+				"tax":         0,
+				"total":       0,
+				"amount_due":  0,
+				"payment":     nil,
+				"status":      InvoiceStatuses.Void,
+				"paid_status": PaidStatuses.Refunded,
+			}); err != nil {
+			return err
+		}
 
-		_, err = tx.Exec(`
-    UPDATE invoices_items
-    SET amount = 0, qty = 0, price = 0, tax = 0, total = 0
-    WHERE company_id = $1 AND invoice_id = $2
-  `,
-			companyID, invoice.ID,
-		)
-		if err != nil {
+		if _, err = ptx.Model(&InvoiceItem{}).
+			WhereEq("company_id", companyID).
+			WhereEq("invoice_id", invoice.ID).
+			Update(context.Background(), map[string]any{
+				"amount": 0,
+				"qty":    0,
+				"price":  0,
+				"tax":    0,
+				"total":  0,
+			}); err != nil {
 			return err
 		}
 

@@ -53,4 +53,7 @@ func TestFlowUpdateInvoiceLineActions(t *testing.T) {
 	assertRow(t, s.db, "invoices_items", map[string]any{"invoice_id": invID, "item_id": item1, "qty": 5})
 	assertRow(t, s.db, "invoices_items", map[string]any{"invoice_id": invID, "item_id": item3, "qty": 3})
 	assertNoRow(t, s.db, "invoices_items", map[string]any{"invoice_id": invID, "item_id": item2})
+
+	// The invoice-level UPDATE wrote the recomputed total: (5*100 + 3*30)*1.18.
+	is.EqualFloat(scalarFloat(t, s.db, `SELECT total FROM invoices WHERE id = $1`, invID), 696.2)
 }

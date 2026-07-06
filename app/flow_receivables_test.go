@@ -32,6 +32,12 @@ func TestFlowVoidCreditInvoiceRemovesReceivable(t *testing.T) {
 	is.EqualFloat(scalarFloat(t, s.db,
 		`SELECT quantity FROM inventory_balances WHERE company_id = $1 AND variant_id = $2 AND warehouse_id = $3`,
 		f.company.ID, variantID, f.warehouseID), 0)
+
+	// Void zeroes the invoice amounts and its line rows (both playsql UPDATEs).
+	var invID int
+	is.NoErr(s.db.QueryRow(`SELECT id FROM invoices WHERE uuid = $1`, uuid).Scan(&invID))
+	is.EqualFloat(scalarFloat(t, s.db, `SELECT total FROM invoices WHERE id = $1`, invID), 0)
+	is.EqualFloat(scalarFloat(t, s.db, `SELECT COALESCE(sum(qty),0) FROM invoices_items WHERE invoice_id = $1`, invID), 0)
 }
 
 // TestChangeCustomerFromReceivables: moving a receivable to a new customer
