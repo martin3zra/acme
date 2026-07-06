@@ -711,7 +711,9 @@ func (s *Server) storeVendorFromRecord(companyID int, importID string, row []str
 	}
 	// 🔥 ONE ROW = ONE TRANSACTION — honor the CSV `code` column.
 	if err := database.WithTransaction(s.db, func(tx *sql.Tx) error {
-		return s.storeVendorInternal(tx, companyID, *code, form)
+		// createdBy 0: the CSV import never maps an opening balance, so the
+		// storeVendorOpenBalance path (the only user of createdBy) is not reached.
+		return s.storeVendorInternal(tx, companyID, *code, 0, form)
 	}); err != nil {
 		log.Println("storing record", err)
 		if saveErr := database.WithTransaction(s.db, func(tx *sql.Tx) error {

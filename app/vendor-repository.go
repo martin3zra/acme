@@ -226,11 +226,12 @@ func (s *Server) storeVendor(ctx context.Context, form *StoreVendorForm) error {
 			return err
 		}
 
-		return s.storeVendorInternal(tx, companyID, seqInfo.Code, form)
+		createdBy := AuthUserFromContext(ctx).GetAuthIdentifier()
+		return s.storeVendorInternal(tx, companyID, seqInfo.Code, createdBy, form)
 	})
 }
 
-func (s *Server) storeVendorInternal(tx *sql.Tx, companyID int, code string, form *StoreVendorForm) error {
+func (s *Server) storeVendorInternal(tx *sql.Tx, companyID int, code string, createdBy int, form *StoreVendorForm) error {
 	ptx, err := playTx(tx)
 	if err != nil {
 		return err
@@ -258,50 +259,45 @@ func (s *Server) storeVendorInternal(tx *sql.Tx, companyID int, code string, for
 		return nil
 	}
 
-	return s.storeVendorOpenBalance(tx, companyID, vendorID, 0, form)
+	return s.storeVendorOpenBalance(tx, companyID, vendorID, createdBy, form)
 }
 
 // storeVendorOpenBalance inserts an opening balance entry into accounts_payable.
 // This represents a pre-existing liability the company owes the vendor
 // before they started using the system.
 func (s *Server) storeVendorOpenBalance(tx *sql.Tx, companyID int, vendorID int, createdBy int, form *StoreVendorForm) error {
-	stmt, err := tx.Prepare(
-		"INSERT INTO accounts_payable " +
-			"(company_id, vendor_id, invoice_number, invoice_date, due_date, " +
-			"amount_total, tax_amount, discount_amount, amount_paid, " +
-			"currency, payment_terms, payment_method, status, paid_status, notes, created_by) " +
-			"VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16) " +
-			"RETURNING id")
-	if err != nil {
-		return err
-	}
-
 	// Opening balance invoice number: OB-{vendorID}-{YYYYMMDD}
 	// Guaranteed unique per vendor since a vendor can only have one opening balance.
 	invoiceNumber := fmt.Sprintf("OB-%d-%s", vendorID, form.OpenBalanceAsOf.Format("20060102"))
 
-	var apID int
-	err = stmt.QueryRow(
-		companyID,
-		vendorID,
-		invoiceNumber,
-		form.OpenBalanceAsOf, // invoice_date
-		form.OpenBalanceAsOf, // due_date — already overdue by definition
-		form.OpenBalance,     // amount_total
-		0,                    // tax_amount
-		0,                    // discount_amount
-		0,                    // amount_paid
-		"USD",                // currency_code — adjust to your default
-		form.PaymentTerms,
-		form.PaymentMethod,
-		PayableStatuses.Pending, // status: lifecycle
-		PaidStatuses.UnPaid,     // paid_status: payment state
-		"Saldo inicial",
-		createdBy,
-	).Scan(&apID)
+	ptx, err := playTx(tx)
 	if err != nil {
 		return err
 	}
+	// due_date == invoice_date: an opening balance is overdue by definition.
+	// amount_payable is a generated column and is not written here.
+	ap := &openingPayableInsert{
+		CompanyID:      companyID,
+		VendorID:       vendorID,
+		InvoiceNumber:  invoiceNumber,
+		InvoiceDate:    form.OpenBalanceAsOf,
+		DueDate:        form.OpenBalanceAsOf,
+		AmountTotal:    form.OpenBalance,
+		TaxAmount:      0,
+		DiscountAmount: 0,
+		AmountPaid:     0,
+		Currency:       "USD",
+		PaymentTerms:   form.PaymentTerms,
+		PaymentMethod:  form.PaymentMethod,
+		Status:         PayableStatuses.Pending,
+		PaidStatus:     PaidStatuses.UnPaid,
+		Notes:          "Saldo inicial",
+		CreatedBy:      createdBy,
+	}
+	if err = ptx.Insert(context.Background(), ap); err != nil {
+		return err
+	}
+	apID := int(ap.ID)
 
 	return s.registerPayable(tx, companyID, apID, vendorID)
 }

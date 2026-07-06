@@ -253,3 +253,49 @@ type payableRegister struct {
 }
 
 func (payableRegister) TableName() string { return "payables" }
+
+// openingInvoiceInsert is the write model for a customer's opening-balance invoice
+// — a partial-column insert (the rest of invoices' columns take DB defaults), so
+// it is a dedicated model rather than the full invoiceInsert.
+type openingInvoiceInsert struct {
+	ID         int64         `db:"id" play:"pk,incrementing"`
+	CompanyID  int           `db:"company_id"`
+	Date       time.Time     `db:"date"`
+	Type       TermType      `db:"type"`
+	DueOn      time.Time     `db:"due_on"`
+	CustomerID int           `db:"customer_id"`
+	Amount     float64       `db:"amount"`
+	AmountDue  float64       `db:"amount_due"`
+	Total      float64       `db:"total"`
+	Note       string        `db:"note"`
+	Status     InvoiceStatus `db:"status"`
+	PaidStatus PaidStatus    `db:"paid_status"`
+	Code       string        `db:"code"`
+}
+
+func (openingInvoiceInsert) TableName() string { return "invoices" }
+
+// openingPayableInsert is the write model for a vendor's opening-balance AP entry.
+// Its column set differs from accountsPayableInsert (no purchase_id; carries
+// payment_method + notes), so it is its own model. amount_payable is generated.
+type openingPayableInsert struct {
+	ID             int64         `db:"id" play:"pk,incrementing"`
+	CompanyID      int           `db:"company_id"`
+	VendorID       int           `db:"vendor_id"`
+	InvoiceNumber  string        `db:"invoice_number"`
+	InvoiceDate    time.Time     `db:"invoice_date"`
+	DueDate        time.Time     `db:"due_date"`
+	AmountTotal    float64       `db:"amount_total"`
+	TaxAmount      float64       `db:"tax_amount"`
+	DiscountAmount float64       `db:"discount_amount"`
+	AmountPaid     float64       `db:"amount_paid"`
+	Currency       string        `db:"currency"`
+	PaymentTerms   string        `db:"payment_terms"`
+	PaymentMethod  string        `db:"payment_method"`
+	Status         PayableStatus `db:"status"`
+	PaidStatus     PaidStatus    `db:"paid_status"`
+	Notes          string        `db:"notes"`
+	CreatedBy      int           `db:"created_by"`
+}
+
+func (openingPayableInsert) TableName() string { return "accounts_payable" }
