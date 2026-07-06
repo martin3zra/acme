@@ -713,10 +713,10 @@ func (s *Server) storeInvoiceInternal(tx *sql.Tx, companyID int, form *StoreInvo
 			if err = s.recordInvoiceMovements(tx, companyID, invoiceID, form.Lines); err != nil {
 				return invoiceUUID, err
 			}
-			if _, err = tx.Exec(
-				"UPDATE invoices SET movement_recorded = TRUE WHERE company_id = $1 AND id = $2",
-				companyID, invoiceID,
-			); err != nil {
+			if _, err = ptx.Model(&invoiceInsert{}).
+				WhereEq("company_id", companyID).
+				WhereEq("id", invoiceID).
+				Update(context.Background(), map[string]any{"movement_recorded": true}); err != nil {
 				return invoiceUUID, err
 			}
 		}
@@ -727,31 +727,34 @@ func (s *Server) storeInvoiceInternal(tx *sql.Tx, companyID int, form *StoreInvo
 		// a relationshipt bewteen both invoice using the
 		// source column to keep track of them.
 		if form.Source.Type == TransactionKinds.Invoice {
-			_, err := tx.Exec(
-				"UPDATE invoices SET source = $4 "+
-					"WHERE company_id = $1 "+
-					"AND uuid = $2 AND transaction_kind = $3",
-				companyID, form.Source.ID, form.Source.Type, foundation.AsJSON(map[string]any{
-					"type": form.Kind,
-					"id":   invoiceUUID,
-					"code": seqInfo.Code,
-				}))
-			if err != nil {
+			if _, err := ptx.Model(&invoiceInsert{}).
+				WhereEq("company_id", companyID).
+				WhereEq("uuid", form.Source.ID).
+				WhereEq("transaction_kind", form.Source.Type).
+				Update(context.Background(), map[string]any{
+					"source": foundation.AsJSON(map[string]any{
+						"type": form.Kind,
+						"id":   invoiceUUID,
+						"code": seqInfo.Code,
+					}),
+				}); err != nil {
 				return invoiceUUID, err
 			}
 		}
 
 		if form.Source.Type == TransactionKinds.Estimate || form.Source.Type == TransactionKinds.Order {
-			_, err := tx.Exec(
-				"UPDATE invoices SET status = 'closed', source = $4 "+
-					"WHERE company_id = $1 "+
-					"AND uuid = $2 AND transaction_kind = $3",
-				companyID, form.Source.ID, form.Source.Type, foundation.ToJSON(map[string]any{
-					"type": form.Kind,
-					"id":   invoiceUUID,
-					"code": seqInfo.Code,
-				}))
-			if err != nil {
+			if _, err := ptx.Model(&invoiceInsert{}).
+				WhereEq("company_id", companyID).
+				WhereEq("uuid", form.Source.ID).
+				WhereEq("transaction_kind", form.Source.Type).
+				Update(context.Background(), map[string]any{
+					"status": "closed",
+					"source": foundation.ToJSON(map[string]any{
+						"type": form.Kind,
+						"id":   invoiceUUID,
+						"code": seqInfo.Code,
+					}),
+				}); err != nil {
 				return invoiceUUID, err
 			}
 		}
