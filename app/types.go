@@ -2154,3 +2154,69 @@ func (form StoreTransferForm) Rules() map[string]any {
 		"lines":             "bail|required",
 	}
 }
+
+// attribute is a product characteristic (Color, Size, ...) with a set of values.
+type attribute struct {
+	ID          int               `json:"id"`
+	UUID        string            `json:"uuid"`
+	Name        string            `json:"name"`
+	Type        string            `json:"type"` // "select", "text", "numeric"
+	DisplayName string            `json:"display_name"`
+	Description *string           `json:"description,omitempty"`
+	Values      []*attributeValue `json:"values,omitempty"`
+	foundation.Timestamps
+}
+
+// attributeValue is a specific value for an attribute (Red, Blue, S, M, L, ...).
+type attributeValue struct {
+	ID          int    `json:"id"`
+	UUID        string `json:"uuid"`
+	AttributeID int    `json:"attribute_id"`
+	Value       string `json:"value"`
+	DisplayName string `json:"display_name"`
+	SortOrder   int    `json:"sort_order"`
+	foundation.Timestamps
+}
+
+// StoreAttributeForm handles attribute creation and update.
+type StoreAttributeForm struct {
+	support.FormRequest
+	Name        string `json:"name"`
+	Type        string `json:"type"`
+	DisplayName string `json:"display_name"`
+	Description string `json:"description,omitempty"`
+}
+
+func (StoreAttributeForm) Rules() map[string]any {
+	return map[string]any{
+		"name":         []any{"required", "min:2", "max:120"},
+		"type":         "required|in:select,text,numeric",
+		"display_name": []any{"required", "min:2", "max:255"},
+		"description":  "sometimes|max:1000",
+	}
+}
+
+func (form StoreAttributeForm) Authorize() bool {
+	return Can(form.User(), "create:attribute")
+}
+
+// StoreAttributeValueForm handles attribute-value creation and update.
+type StoreAttributeValueForm struct {
+	support.FormRequest
+	AttributeID int    `json:"-"`
+	Value       string `json:"value"`
+	DisplayName string `json:"display_name"`
+	SortOrder   int    `json:"sort_order,omitempty"`
+}
+
+func (StoreAttributeValueForm) Rules() map[string]any {
+	return map[string]any{
+		"value":        []any{"required", "min:1", "max:120"},
+		"display_name": []any{"required", "min:1", "max:255"},
+		"sort_order":   "sometimes|integer|min:0",
+	}
+}
+
+func (form StoreAttributeValueForm) Authorize() bool {
+	return Can(form.User(), "create:attribute")
+}
