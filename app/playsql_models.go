@@ -2,6 +2,7 @@ package app
 
 import (
 	"database/sql"
+	"time"
 
 	"github.com/martin3zra/playsql"
 )
@@ -50,3 +51,36 @@ type InvoiceItem struct {
 }
 
 func (InvoiceItem) TableName() string { return "invoices_items" }
+
+// invoiceInsert is the write model for creating an invoice row. uuid is
+// deliberately NOT mapped: it is DB-generated, and mapping it would make playsql
+// insert an empty string over the default. After Insert sets ID, the caller reads
+// the generated uuid back. JSON columns hold pre-encoded values (foundation
+// ToJSON/AsJSON) exactly as the prior raw INSERT passed them, so encoding is
+// unchanged. Timestamp columns are left to their database defaults.
+type invoiceInsert struct {
+	ID                 int64           `db:"id" play:"pk,incrementing"`
+	CompanyID          int             `db:"company_id"`
+	TaxReceiptID       *int            `db:"tax_receipt_id"`
+	TaxReceiptSequence *int64          `db:"tax_receipt_sequence"`
+	TaxNumber          *string         `db:"tax_number"`
+	Date               time.Time       `db:"date"`
+	Type               *string         `db:"type"`
+	DueOn              *time.Time       `db:"due_on"`
+	CustomerID         int             `db:"customer_id"`
+	Amount             float64         `db:"amount"`
+	Discount           string          `db:"discount"`
+	Tax                float64         `db:"tax"`
+	AmountDue          float64         `db:"amount_due"`
+	Total              float64         `db:"total"`
+	Note               string          `db:"note"`
+	Status             InvoiceStatus   `db:"status"`
+	PaidStatus         PaidStatus      `db:"paid_status"`
+	Payment            string          `db:"payment"`
+	Code               string          `db:"code"`
+	TransactionKind    TransactionKind `db:"transaction_kind"`
+	Source             *[]byte         `db:"source"`
+	Recurrence         *[]byte         `db:"recurrence"`
+}
+
+func (invoiceInsert) TableName() string { return "invoices" }
