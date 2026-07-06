@@ -103,3 +103,44 @@ type InventoryMovement struct {
 }
 
 func (InventoryMovement) TableName() string { return "inventory_movements" }
+
+// customerInsert is the write model for creating a customer row. amount_due seeds
+// from the opening balance; the pk is DB-assigned.
+type customerInsert struct {
+	ID            int64   `db:"id" play:"pk,incrementing"`
+	CompanyID     int     `db:"company_id"`
+	Name          string  `db:"name"`
+	ContactName   string  `db:"contact_name"`
+	Email         string  `db:"email"`
+	Phone         string  `db:"phone"`
+	PaymentMethod string  `db:"payment_method"`
+	PaymentTerms  string  `db:"payment_terms"`
+	CreditLimited bool    `db:"credit_limited"`
+	CreditLimit   float64 `db:"credit_limit"`
+	AmountDue     float64 `db:"amount_due"`
+	CustomerType  string  `db:"customer_type"`
+	TaxReceiptID  int     `db:"tax_receipt_id"`
+	Code          string  `db:"code"`
+}
+
+func (customerInsert) TableName() string { return "customers" }
+
+// vendorInsert is the write model for creating a vendor row. amount_payable seeds
+// from the opening balance; the pk is DB-assigned.
+type vendorInsert struct {
+	ID            int64   `db:"id" play:"pk,incrementing"`
+	CompanyID     int     `db:"company_id"`
+	Name          string  `db:"name"`
+	ContactName   string  `db:"contact_name"`
+	Email         string  `db:"email"`
+	Phone         string  `db:"phone"`
+	PaymentMethod string  `db:"payment_method"`
+	PaymentTerms  string  `db:"payment_terms"`
+	PurchaseNote  string  `db:"purchase_note"`
+	LeadTimeDays  int     `db:"lead_time_days"`
+	AmountPayable float64 `db:"amount_payable"`
+	VendorType    string  `db:"vendor_type"`
+	Code          string  `db:"code"`
+}
+
+func (vendorInsert) TableName() string { return "vendors" }

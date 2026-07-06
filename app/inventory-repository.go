@@ -216,17 +216,24 @@ func (s *Server) reverseMovements(tx *sql.Tx, companyID int, referenceType strin
 	}
 
 	now := time.Now().UTC()
+	ptx, err := playTx(tx)
+	if err != nil {
+		return err
+	}
 	for _, m := range movements {
 		reversal := -m.qty
 
-		_, err := tx.Exec(
-			`INSERT INTO inventory_movements
-			    (company_id, variant_id, warehouse_id, transaction_kind, qty, unit_cost, reference_type, reference_id, created_at)
-			 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
-			companyID, m.variantID, m.warehouseID, reversalKind,
-			reversal, m.unitCost, referenceType, referenceID, now,
-		)
-		if err != nil {
+		if err := ptx.Insert(context.Background(), &InventoryMovement{
+			CompanyID:       companyID,
+			VariantID:       m.variantID,
+			WarehouseID:     m.warehouseID,
+			TransactionKind: reversalKind,
+			Qty:             reversal,
+			UnitCost:        m.unitCost,
+			ReferenceType:   referenceType,
+			ReferenceID:     referenceID,
+			CreatedAt:       now,
+		}); err != nil {
 			return fmt.Errorf("reverseMovements: insert reversal: %w", err)
 		}
 

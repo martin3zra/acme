@@ -231,17 +231,28 @@ func (s *Server) storeVendor(ctx context.Context, form *StoreVendorForm) error {
 }
 
 func (s *Server) storeVendorInternal(tx *sql.Tx, companyID int, code string, form *StoreVendorForm) error {
-	stmt, err := tx.Prepare("INSERT INTO vendors (company_id, name, contact_name, email, phone, payment_method, payment_terms, purchase_note, lead_time_days, amount_payable, vendor_type, code) " +
-		"VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12) RETURNING id")
+	ptx, err := playTx(tx)
 	if err != nil {
 		return err
 	}
-
-	var vendorID int
-	err = stmt.QueryRow(companyID, form.Name, form.Contact, form.Email, form.Phone, form.PaymentMethod, form.PaymentTerms, form.PurchaseNote, form.LeadTimeDays, form.OpenBalance, form.VendorType, code).Scan(&vendorID)
-	if err != nil {
+	vend := &vendorInsert{
+		CompanyID:     companyID,
+		Name:          form.Name,
+		ContactName:   form.Contact,
+		Email:         form.Email,
+		Phone:         form.Phone,
+		PaymentMethod: form.PaymentMethod,
+		PaymentTerms:  form.PaymentTerms,
+		PurchaseNote:  form.PurchaseNote,
+		LeadTimeDays:  form.LeadTimeDays,
+		AmountPayable: form.OpenBalance,
+		VendorType:    form.VendorType,
+		Code:          code,
+	}
+	if err = ptx.Insert(context.Background(), vend); err != nil {
 		return err
 	}
+	vendorID := int(vend.ID)
 
 	if form.OpenBalance == 0 || form.OpenBalanceAsOf.IsZero() {
 		return nil
