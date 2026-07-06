@@ -144,3 +144,21 @@ type vendorInsert struct {
 }
 
 func (vendorInsert) TableName() string { return "vendors" }
+
+// PurchaseItem is the write model for purchase line rows (purchase_items). Backs
+// the bulk line insert; the pk is DB-assigned.
+type PurchaseItem struct {
+	ID         int64   `db:"id" play:"pk,incrementing"`
+	CompanyID  int     `db:"company_id"`
+	PurchaseID int     `db:"purchase_id"`
+	VariantID  int     `db:"variant_id"`
+	Qty        int     `db:"qty"`
+	UnitPrice  float64 `db:"unit_price"`
+	LineTotal  float64 `db:"line_total"`
+	UnitID     int     `db:"unit_id"`
+	Discount   float64 `db:"discount"`
+	TaxID      int     `db:"tax_id"`
+	TaxAmount  float64 `db:"tax_amount"`
+}
+
+func (PurchaseItem) TableName() string { return "purchase_items" }

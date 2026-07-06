@@ -579,29 +579,31 @@ func (s *Server) attachPurchaseLines(tx *sql.Tx, companyID, purchaseID int, form
 		return err
 	}
 
-	vals := []any{}
+	rows := make([]map[string]any, 0, len(form.Lines))
 	for _, l := range form.Lines {
 		variantID, ok := variantIDs[l.ID]
 		if !ok {
 			return fmt.Errorf("missing item variant for item_id=%d", l.ID)
 		}
-		vals = append(vals,
-			companyID,
-			purchaseID,
-			variantID,
-			l.Qty,
-			l.Price,
-			l.total,
-			l.Unit,
-			l.discount,
-			taxIDs[l.ID],
-			l.tax,
-		)
+		rows = append(rows, map[string]any{
+			"company_id":  companyID,
+			"purchase_id": purchaseID,
+			"variant_id":  variantID,
+			"qty":         l.Qty,
+			"unit_price":  l.Price,
+			"line_total":  l.total,
+			"unit_id":     l.Unit,
+			"discount":    l.discount,
+			"tax_id":      taxIDs[l.ID],
+			"tax_amount":  l.tax,
+		})
 	}
 
-	stmt := "INSERT INTO purchase_items (company_id, purchase_id, variant_id, qty, unit_price, line_total, unit_id, discount, tax_id, tax_amount) VALUES "
-	stmt += database.PrepareBulkInsert(10, len(form.Lines))
-	_, err = tx.Exec(stmt, vals...)
+	ptx, err := playTx(tx)
+	if err != nil {
+		return err
+	}
+	_, err = ptx.Model(&PurchaseItem{}).InsertMany(context.Background(), rows)
 	return err
 }
 
