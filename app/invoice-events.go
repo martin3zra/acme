@@ -4,7 +4,7 @@ import (
 	"context"
 	"database/sql"
 
-	"github.com/martin3zra/acme/app/events"
+	"github.com/martin3zra/forge/events"
 )
 
 // InvoiceCreated is raised when an invoice row has been persisted. Listeners run

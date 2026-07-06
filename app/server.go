@@ -13,8 +13,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/martin3zra/acme/app/events"
 	"github.com/martin3zra/acme/app/mail"
+	"github.com/martin3zra/forge/events"
 	"github.com/martin3zra/forge/i18n"
 	"github.com/martin3zra/forge/inertia"
 	"github.com/martin3zra/forge/mailer"
