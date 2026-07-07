@@ -2154,3 +2154,128 @@ func (form StoreTransferForm) Rules() map[string]any {
 		"lines":             "bail|required",
 	}
 }
+
+// attribute is a product characteristic (Color, Size, ...) with a set of values.
+type attribute struct {
+	ID          int               `json:"id"`
+	UUID        string            `json:"uuid"`
+	Name        string            `json:"name"`
+	Type        string            `json:"type"` // "select", "text", "numeric"
+	DisplayName string            `json:"display_name"`
+	Description *string           `json:"description,omitempty"`
+	Values      []*attributeValue `json:"values,omitempty"`
+	foundation.Timestamps
+}
+
+// attributeValue is a specific value for an attribute (Red, Blue, S, M, L, ...).
+type attributeValue struct {
+	ID          int    `json:"id"`
+	UUID        string `json:"uuid"`
+	AttributeID int    `json:"attribute_id"`
+	Value       string `json:"value"`
+	DisplayName string `json:"display_name"`
+	SortOrder   int    `json:"sort_order"`
+	foundation.Timestamps
+}
+
+// StoreAttributeForm handles attribute creation and update.
+type StoreAttributeForm struct {
+	support.FormRequest
+	Name        string `json:"name"`
+	Type        string `json:"type"`
+	DisplayName string `json:"display_name"`
+	Description string `json:"description,omitempty"`
+}
+
+func (StoreAttributeForm) Rules() map[string]any {
+	return map[string]any{
+		"name":         []any{"required", "min:2", "max:120"},
+		"type":         "required|in:select,text,numeric",
+		"display_name": []any{"required", "min:2", "max:255"},
+		"description":  "sometimes|max:1000",
+	}
+}
+
+func (form StoreAttributeForm) Authorize() bool {
+	return Can(form.User(), "create:attribute")
+}
+
+// StoreAttributeValueForm handles attribute-value creation and update.
+type StoreAttributeValueForm struct {
+	support.FormRequest
+	AttributeID int    `json:"-"`
+	Value       string `json:"value"`
+	DisplayName string `json:"display_name"`
+	SortOrder   int    `json:"sort_order,omitempty"`
+}
+
+func (StoreAttributeValueForm) Rules() map[string]any {
+	return map[string]any{
+		"value":        []any{"required", "min:1", "max:120"},
+		"display_name": []any{"required", "min:1", "max:255"},
+		"sort_order":   "sometimes|integer|min:0",
+	}
+}
+
+func (form StoreAttributeValueForm) Authorize() bool {
+	return Can(form.User(), "create:attribute")
+}
+
+// itemVariant is a concrete sellable variant of an item (a point in the
+// attribute-value matrix, or the lone default variant of a simple item).
+type itemVariant struct {
+	ID                   int         `json:"id"`
+	UUID                 string      `json:"uuid"`
+	ItemID               int         `json:"item_id"`
+	SKU                  string      `json:"sku"`
+	Name                 string      `json:"name"`
+	Barcode              *string     `json:"barcode,omitempty"`
+	Reference            *string     `json:"reference,omitempty"`
+	VendorReference      *string     `json:"vendor_reference,omitempty"`
+	CombinationSignature string      `json:"combination_signature"`
+	IsDefault            bool        `json:"is_default"`
+	Price                *float64    `json:"price,omitempty"`
+	CostPrice            *float64    `json:"cost_price,omitempty"`
+	TrackInventory       bool        `json:"track_inventory"`
+	StockByWarehouse     map[int]int `json:"stock_by_warehouse,omitempty"`
+	Active               bool        `json:"active"`
+	foundation.Timestamps
+}
+
+// VariantCombo is one requested variant: a map of attribute_id -> attribute_value_id
+// plus its per-variant pricing/identifiers.
+type VariantCombo struct {
+	VariantID         int         `json:"variant_id,omitempty"`
+	AttributeValueIDs map[int]int `json:"attribute_value_ids"`
+	Price             *float64    `json:"price,omitempty"`
+	CostPrice         *float64    `json:"cost_price,omitempty"`
+	TrackInventory    *bool       `json:"track_inventory,omitempty"`
+	StockByWarehouse  map[int]int `json:"stock_by_warehouse,omitempty"`
+	SKU               string      `json:"sku,omitempty"`
+	Barcode           string      `json:"barcode,omitempty"`
+	Reference         string      `json:"reference,omitempty"`
+	VendorReference   string      `json:"vendor_reference,omitempty"`
+	Active            *bool       `json:"active,omitempty"`
+}
+
+// StoreItemWithAttributesForm handles item creation with attributes and variants.
+type StoreItemWithAttributesForm struct {
+	support.FormRequest
+	Name          string         `json:"name"`
+	Description   string         `json:"description,omitempty"`
+	AttributeIDs  []int          `json:"attribute_ids,omitempty"`
+	VariantCombos []VariantCombo `json:"variant_combos,omitempty"`
+}
+
+func (StoreItemWithAttributesForm) Rules() map[string]any {
+	return map[string]any{
+		"name":             []any{"required", "min:3", "max:120"},
+		"description":      "sometimes|max:1000",
+		"attribute_ids.*":  "sometimes|exists:attributes,id",
+		"variant_combos.*": "sometimes|array",
+	}
+}
+
+func (form StoreItemWithAttributesForm) Authorize() bool {
+	return Can(form.User(), "create:item")
+}

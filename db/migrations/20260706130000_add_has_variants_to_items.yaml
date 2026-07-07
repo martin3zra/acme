@@ -1,0 +1,15 @@
+# Flag marking an item as variant-bearing (set by the variant-matrix service when
+# an item is created from attribute combinations). Ported from the raw-SQL branch.
+up:
+  item:
+    action: alter
+    table: items
+    add_columns:
+      has_variants: boolean default:false
+
+down:
+  item:
+    action: alter
+    table: items
+    drop_columns:
+      - has_variants
