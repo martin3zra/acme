@@ -65,7 +65,7 @@ export default function CreateForm({ onFinish, params }: CreateFormProps) {
   const t = useTranslation().trans;
   const [dialogOpen, setDialogOpen] = useState(false);
   const { headers } = useHeader();
-  const { errors: propsErrors } = usePage<PageProps>().props;
+  const { errors: propsErrors, variantsEnabled } = usePage<PageProps & { variantsEnabled?: boolean }>().props;
   const { data, setData, post, put, transform, errors, reset, processing } = useForm<Required<ItemForm>>({
     id: params.item?.id,
     name: params.item?.name || '',
@@ -92,7 +92,7 @@ export default function CreateForm({ onFinish, params }: CreateFormProps) {
   // Per-combo overrides, keyed by a stable combo signature.
   const [overrides, setOverrides] = useState<Record<string, ComboOverride>>({});
 
-  const canUseVariants = params.action === 'create' && data.item_type === 'product' && attributes.length > 0;
+  const canUseVariants = variantsEnabled === true && params.action === 'create' && data.item_type === 'product' && attributes.length > 0;
 
   const selectedAttributeIds = useMemo(
     () => Object.keys(valuesByAttribute).map(Number).filter((id) => (valuesByAttribute[id] || []).length > 0),

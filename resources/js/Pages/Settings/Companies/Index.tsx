@@ -62,7 +62,7 @@ export default function Index({ companies, company }: PageProps<{ companies: Com
         {hasCompanies && <CompanyList data={companies} onSelectCompany={onSelectCompany} />}
 
         <Sheet open={open} onOpenChange={onOpenChange}>
-          <SheetContent side="right" className="m-4 flex h-[calc(~'(100%-var(--spacing)*4)/3')] w-full flex-col rounded-md sm:max-w-[1380px]">
+          <SheetContent side="right" className="m-4 flex h-[calc(~'(100%-var(--spacing)*4)/3')] w-full flex-col rounded-md sm:max-w-[1600px]">
             <SheetHeader>
               <SheetTitle>
                 {t(`global.actions.${verbName}`)} {t(`global.company`).toLocaleLowerCase()}

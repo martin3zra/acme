@@ -8,6 +8,7 @@ import { Link, usePage } from '@inertiajs/react';
 import {
   ArrowLeftRight,
   Boxes,
+  Tags,
   ChartArea,
   ClipboardCheck,
   ClipboardEdit,
@@ -129,6 +130,12 @@ const navMain: NavItem[] = [
     url: '/items',
     icon: Boxes,
     requiredAbility: 'viewAny:item',
+  },
+  {
+    title: 'global.navMain.attributes',
+    url: '/attributes',
+    icon: Tags,
+    requiredAbility: 'viewAny:attribute',
   },
 
   // FINANCE

@@ -223,6 +223,7 @@ const groupMap: Record<string, string> = {
   'global.navMain.customers': 'global.navGroups.customersCatalog',
   'global.navMain.vendors': 'global.navGroups.customersCatalog',
   'global.navMain.items': 'global.navGroups.customersCatalog',
+  'global.navMain.attributes': 'global.navGroups.customersCatalog',
 
   // Finance
   'global.navMain.receivables': 'global.navGroups.finance',

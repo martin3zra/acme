@@ -1688,6 +1688,18 @@ func (RedirectPreferencesForm) Rules() map[string]any {
 	}
 }
 
+// HandlesVariantsForm toggles the company-level product-variants feature flag.
+type HandlesVariantsForm struct {
+	support.FormRequest
+	Enabled bool `json:"enabled"`
+}
+
+func (HandlesVariantsForm) Rules() map[string]any {
+	return map[string]any{
+		"enabled": "boolean",
+	}
+}
+
 type TaxReceiptSequenceForm struct {
 	ID    int `json:"id"`
 	Start int `json:"start"`

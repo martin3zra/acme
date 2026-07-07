@@ -1,0 +1,15 @@
+# Company-level feature flag: whether this company manages product variants. Gates
+# the variant UI in the item editor.
+up:
+  companies_setting:
+    action: alter
+    table: companies_settings
+    add_columns:
+      handles_variants: boolean default:false
+
+down:
+  companies_setting:
+    action: alter
+    table: companies_settings
+    drop_columns:
+      - handles_variants
