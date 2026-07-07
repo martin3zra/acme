@@ -55,6 +55,7 @@ func (s *Server) bootRoutes() {
 
 					route.GET("/items", s.itemsHandler).Can("viewAny:item")
 					route.POST("/items", s.storeItemHandler())
+					route.POST("/items/variants", s.storeItemWithVariantsHandler()).Can("create:item")
 					route.PUT("/items/:id", s.updateItemHandler())
 					route.PUT("/items/:id/change-status", s.changeStatusItemHandler())
 					route.DELETE("/items/:id", s.deleteItemHandler())

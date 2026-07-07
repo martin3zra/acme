@@ -23,65 +23,71 @@ func NewCreateProductWithVariantsService(db *sql.DB) *CreateProductWithVariantsS
 	return &CreateProductWithVariantsService{db: db}
 }
 
-// Execute creates the variants for an already-persisted item: either the matrix
-// of requested attribute combinations, or a single default variant.
+// Execute creates the variants for an already-persisted item in its own
+// transaction. Callers that also create the item row should use run so item and
+// variants commit together.
 func (s *CreateProductWithVariantsService) Execute(ctx context.Context, form *StoreItemWithAttributesForm, itemID int) error {
 	if AuthUserFromContext(ctx).GetAuthIdentifier() == 0 {
 		return errors.New("user context required")
 	}
 
 	companyID := CurrentCompany(ctx).ID
+	return database.WithTransaction(s.db, func(tx *sql.Tx) error {
+		return s.run(ctx, tx, companyID, form, itemID)
+	})
+}
 
+// run creates the variants within an existing transaction: either the matrix of
+// requested attribute combinations, or a single default variant.
+func (s *CreateProductWithVariantsService) run(ctx context.Context, tx *sql.Tx, companyID int, form *StoreItemWithAttributesForm, itemID int) error {
 	// Attributes without concrete combinations are meaningless.
 	if len(form.AttributeIDs) > 0 && len(form.VariantCombos) == 0 {
 		return errors.New("variants required when attributes are specified")
 	}
 
-	return database.WithTransaction(s.db, func(tx *sql.Tx) error {
-		if len(form.VariantCombos) == 0 {
-			// Simple product: a single default variant.
-			return s.createDefaultVariant(ctx, tx, companyID, itemID, form.Name)
-		}
+	if len(form.VariantCombos) == 0 {
+		// Simple product: a single default variant.
+		return s.createDefaultVariant(ctx, tx, companyID, itemID, form.Name)
+	}
 
-		if _, err := tx.ExecContext(
-			ctx,
-			`UPDATE items SET has_variants = true, updated_at = NOW() WHERE id = $1`,
-			itemID,
-		); err != nil {
+	if _, err := tx.ExecContext(
+		ctx,
+		`UPDATE items SET has_variants = true, updated_at = NOW() WHERE id = $1`,
+		itemID,
+	); err != nil {
+		return err
+	}
+
+	for i, attrID := range form.AttributeIDs {
+		if err := s.attachProductAttribute(tx, companyID, itemID, attrID, i); err != nil {
 			return err
 		}
+	}
 
-		for i, attrID := range form.AttributeIDs {
-			if err := s.attachProductAttribute(tx, companyID, itemID, attrID, i); err != nil {
-				return err
-			}
+	for _, combo := range form.VariantCombos {
+		variant := &itemVariant{
+			ItemID:    itemID,
+			SKU:       combo.SKU,
+			Price:     combo.Price,
+			CostPrice: combo.CostPrice,
+			IsDefault: false,
+		}
+		if combo.SKU == "" {
+			variant.SKU = fmt.Sprintf("SKU-%s-%d", generateHashCode(form.Name, 6), itemID)
 		}
 
-		for _, combo := range form.VariantCombos {
-			variant := &itemVariant{
-				ItemID:    itemID,
-				SKU:       combo.SKU,
-				Price:     combo.Price,
-				CostPrice: combo.CostPrice,
-				IsDefault: false,
-			}
-			if combo.SKU == "" {
-				variant.SKU = fmt.Sprintf("SKU-%s-%d", generateHashCode(form.Name, 6), itemID)
-			}
-
-			variantName, err := s.generateVariantName(ctx, tx, companyID, combo.AttributeValueIDs)
-			if err != nil {
-				return err
-			}
-			variant.Name = variantName
-
-			if err := s.storeVariantWithAttributeMapping(ctx, tx, companyID, variant, combo.AttributeValueIDs); err != nil {
-				return err
-			}
+		variantName, err := s.generateVariantName(ctx, tx, companyID, combo.AttributeValueIDs)
+		if err != nil {
+			return err
 		}
+		variant.Name = variantName
 
-		return nil
-	})
+		if err := s.storeVariantWithAttributeMapping(ctx, tx, companyID, variant, combo.AttributeValueIDs); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 // attachProductAttribute links an attribute to a product.
