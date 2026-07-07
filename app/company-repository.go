@@ -33,6 +33,7 @@ type Company struct {
 	TaxReceipts         []*taxReceipt       `json:"tax_receipts"`
 	ExpenseCategories   []*expenseCategory  `json:"expense_categories"`
 	Units               []*unit             `json:"units"`
+	HandlesVariants     bool                `json:"handles_variants"`
 	UserRole            string              `json:"_"`
 	foundation.Timestamps
 }
@@ -311,6 +312,40 @@ func (s *Server) updateRedirectPreferences(ctx context.Context, uuid string, for
     UPDATE companies_settings
     SET redirect_preferences = $3, updated_at = now()
     WHERE company_id = (SELECT id FROM companies WHERE account_id = $1 AND uuid = $2)`, CurrentAccount(ctx), uuid, foundation.ToJSON(form))
+	return err
+}
+
+// companyHandlesVariants reports whether the current company manages product
+// variants (the feature flag that gates the variant UI in the item editor).
+func (s *Server) companyHandlesVariants(ctx context.Context) (bool, error) {
+	var enabled bool
+	err := s.db.QueryRowContext(ctx,
+		`SELECT COALESCE(handles_variants, false) FROM companies_settings WHERE company_id = $1`,
+		CurrentCompany(ctx).ID,
+	).Scan(&enabled)
+	if errors.Is(err, sql.ErrNoRows) {
+		return false, nil
+	}
+	return enabled, err
+}
+
+// findHandlesVariants reads the flag for a company (by account + uuid) for the
+// settings screen.
+func (s *Server) findHandlesVariants(ctx context.Context, uuid string) (bool, error) {
+	var enabled bool
+	err := s.db.QueryRow(`
+    SELECT COALESCE(handles_variants, false)
+    FROM companies_settings
+    WHERE company_id = (SELECT id FROM companies WHERE account_id = $1 AND uuid = $2)`, CurrentAccount(ctx), uuid).Scan(&enabled)
+	return enabled, err
+}
+
+// updateHandlesVariants toggles the flag for a company (by account + uuid).
+func (s *Server) updateHandlesVariants(ctx context.Context, uuid string, enabled bool) error {
+	_, err := s.db.Exec(`
+    UPDATE companies_settings
+    SET handles_variants = $3, updated_at = now()
+    WHERE company_id = (SELECT id FROM companies WHERE account_id = $1 AND uuid = $2)`, CurrentAccount(ctx), uuid, enabled)
 	return err
 }
 

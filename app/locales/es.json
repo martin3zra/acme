@@ -326,7 +326,8 @@
       "reports": "Reportes",
       "payables": "Cuentas por pagar",
       "receivables": "Cuentas por cobrar",
-      "movements": "Movimientos"
+      "movements": "Movimientos",
+      "attributes": "Atributos"
     },
     "navSecondary": {
       "settings": "Ajustes",
@@ -359,7 +360,13 @@
     "invoiceNumber": "Número de factura",
     "convertToVendorBill": "Convertir a factura de proveedor",
     "transfer": "La transferencia",
-    "adjustment": "El ajuste"
+    "adjustment": "El ajuste",
+    "attribute": "Atributo",
+    "attributeValue": "Valor de atributo",
+    "setting": "Configuración",
+    "attributes": "Atributos",
+    "displayName": "Nombre para mostrar",
+    "update": "Actualizar"
   },
   "dashboard": {
     "due_invoices": "Facturas vencidas",
@@ -1279,7 +1286,10 @@
       "type": "Tipo",
       "service": "Servicio",
       "product": "Producto",
-      "vendor_reference": "Referencia del proveedor"
+      "vendor_reference": "Referencia del proveedor",
+      "hasVariants": "Este producto tiene variantes",
+      "variant": "Variante",
+      "cost": "Costo"
     },
     "viewItem": {
       "title": "Ver producto",
@@ -1509,6 +1519,11 @@
           "redirectToList": "Redirigir a la lista de :resource",
           "redirectToDetail": "Redirigir al detalle de :resource",
           "stayOnForm": "Permanecer en el formulario"
+        },
+        "variants": {
+          "title": "Variantes",
+          "description": "Habilita la gestión de variantes de producto (atributos y combinaciones) para esta empresa.",
+          "enable": "Gestionar variantes de producto"
         }
       },
       "newCompany": {
@@ -1642,6 +1657,43 @@
     },
     "errors": {
       "noLines": "Agrega al menos un producto a la transferencia."
+    }
+  },
+  "attributes": {
+    "emptyState": {
+      "title": "No hay atributos",
+      "description": "Crea atributos (como color o talla) para generar variantes de producto."
+    },
+    "newAttribute": {
+      "title": "Nuevo atributo"
+    },
+    "values": {
+      "title": "Valores",
+      "description": "Gestiona los valores de este atributo.",
+      "sortOrder": "Orden",
+      "sortOrderHelp": "Define el orden en que se muestran los valores.",
+      "emptyState": {
+        "title": "No hay valores",
+        "description": "Agrega valores a este atributo."
+      },
+      "newValue": {
+        "title": "Nuevo valor",
+        "description": "Agrega un valor a este atributo."
+      },
+      "editValue": {
+        "title": "Editar valor",
+        "description": "Actualiza este valor de atributo."
+      },
+      "confirmsPassword": {
+        "title": "Eliminar valor",
+        "description": "Ingresa tu contraseña para eliminar este valor.",
+        "confirm": "Eliminar"
+      },
+      "form": {
+        "valuePlaceholder": "Ej. Rojo",
+        "displayNamePlaceholder": "Ej. Rojo",
+        "sortOrderPlaceholder": "0"
+      }
     }
   }
 }

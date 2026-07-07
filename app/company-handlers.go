@@ -96,6 +96,20 @@ func (s *Server) companyUpdateRedirectPreferences() routing.HandlerFunc {
 	})
 }
 
+func (s *Server) companyUpdateHandlesVariants() routing.HandlerFunc {
+	return routing.WithRequest(func(ctx *routing.Context, form *HandlesVariantsForm) {
+
+		if err := s.updateHandlesVariants(ctx.Request.Context(), ctx.Param("id"), form.Enabled); err != nil {
+			ctx.Error(err)
+			return
+		}
+
+		ctx.Flash("success", s.trans("global.wasUpdated", i18n.Replacements{"subject": "@global.setting"}))
+
+		ctx.Redirect(fmt.Sprintf("/settings/%s/profile?company_id=%s", ctx.Param("account"), ctx.Param("id")))
+	})
+}
+
 func (s *Server) companyUpdateTaxReceipts() routing.HandlerFunc {
 	return routing.WithRequest(func(ctx *routing.Context, form *TaxReceiptsForm) {
 

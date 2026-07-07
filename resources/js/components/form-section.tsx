@@ -43,12 +43,14 @@ class FormSection extends React.Component<Props> {
     const actions = array.find((child): child is React.ReactElement => React.isValidElement(child) && child.type === Actions);
 
     return (
-      <div className="md:grid md:grid-cols-3 md:gap-6">
-        <SectionTitle>
-          <SectionTitle.Title>{title}</SectionTitle.Title>
-          <SectionTitle.Description>{description}</SectionTitle.Description>
-        </SectionTitle>
-        <div className="mt-5 md:col-span-2 md:mt-0">
+      <div data-form-section className="md:grid md:grid-cols-3 md:gap-6">
+        <div data-form-aside>
+          <SectionTitle>
+            <SectionTitle.Title>{title}</SectionTitle.Title>
+            <SectionTitle.Description>{description}</SectionTitle.Description>
+          </SectionTitle>
+        </div>
+        <div data-form-content className="mt-5 md:col-span-2 md:mt-0">
           <form onSubmit={this.onSubmit}>
             <div className={`bg-white px-4 py-5 shadow sm:p-6 dark:bg-gray-800 ${actions ? 'sm:rounded-tl-md sm:rounded-tr-md' : 'sm:rounded-md'}`}>
               <div data-form className="grid grid-cols-6 gap-6">

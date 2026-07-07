@@ -36,12 +36,18 @@ func (s *Server) itemsHandler(ctx *routing.Context) {
 		ctx.Error(err)
 		return
 	}
+	variantsEnabled, err := s.companyHandlesVariants(ctx.Request.Context())
+	if err != nil {
+		ctx.Error(err)
+		return
+	}
 	mode := ctx.Query("mode")
 	props := inertia.Props{
 		"openState":             mode == "creating",
 		"translations":          trans("items"),
 		"items":                 items,
 		"currentItemTypeFilter": itemType,
+		"variantsEnabled":       variantsEnabled,
 	}
 	// only add units defer if not creating
 	if mode != "creating" {

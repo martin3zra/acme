@@ -183,6 +183,7 @@ func (s *Server) bootRoutes() {
 						route.GET("/companies", s.companyHandler).Can("viewAny:company")
 						route.PUT("/companies/:id/sequences", s.companyUpdateSequences())
 						route.PUT("/companies/:id/redirect-preferences", s.companyUpdateRedirectPreferences())
+						route.PUT("/companies/:id/handles-variants", s.companyUpdateHandlesVariants())
 						route.PUT("/companies/:id/tax-receipts", s.companyUpdateTaxReceipts())
 						route.POST("/users", s.storeUserHandler())
 						route.PUT("/users/:id", s.updateUserHandler())

@@ -341,6 +341,13 @@ func (s *Server) accountProfileHandler(ctx *routing.Context) {
 			return
 		}
 
+		handlesVariants, err := s.findHandlesVariants(ctx.Request.Context(), CurrentCompany(ctx.Request.Context()).UUID)
+		if err != nil {
+			log.Printf("Error fetching handles_variants: %v", err)
+			ctx.Back()
+			return
+		}
+
 		company.Sequences = &sequences.Sequence
 		company.SeqLastUpdatedAt = &sequences.UpdatedAt
 		company.Taxes = taxes
@@ -348,6 +355,7 @@ func (s *Server) accountProfileHandler(ctx *routing.Context) {
 		company.TaxReceipts = taxReceipts
 		company.ExpenseCategories = categories
 		company.Units = units
+		company.HandlesVariants = handlesVariants
 		props["company"] = company
 
 		props["initialState"] = true

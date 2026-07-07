@@ -72,6 +72,7 @@ export interface Company {
   tax_receipts: TaxReceiptForSetup[];
   expense_categories: ExpenseCategory[];
   units: Unit[];
+  handles_variants: boolean;
   created_at: string;
   updated_at: string;
 }
