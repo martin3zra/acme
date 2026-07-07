@@ -12,16 +12,24 @@ import { FileUp, Plus } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { breadcrumbs } from './constants';
 import { List } from './List/Index';
-import CreateForm, { CreateFormParams } from './Shared/CreateForm';
+import CreateForm, { CreateFormParams, ItemAttributeOption } from './Shared/CreateForm';
 
 export default function Index({
   auth,
   items,
   taxes,
   units,
+  attributes = [],
   currentItemTypeFilter,
   openState,
-}: PageProps<{ openState: boolean; items: Item[]; taxes: Tax[]; units: Unit[]; currentItemTypeFilter: ItemTypeFilter }>) {
+}: PageProps<{
+  openState: boolean;
+  items: Item[];
+  taxes: Tax[];
+  units: Unit[];
+  attributes?: ItemAttributeOption[];
+  currentItemTypeFilter: ItemTypeFilter;
+}>) {
   const t = useTranslation().trans;
   const page = usePage<PageProps>();
   const [loadingItem, setLoadingItem] = useState<boolean>(false);
@@ -32,6 +40,7 @@ export default function Index({
     item: undefined,
     taxes,
     units,
+    attributes,
     action: 'create',
   });
 
@@ -39,17 +48,17 @@ export default function Index({
   const hasItems = items.length > 0;
 
   const onCreateNewItem = () => {
-    setSelectedItem({ item: undefined, taxes, units, action: 'create' });
+    setSelectedItem({ item: undefined, taxes, units, attributes, action: 'create' });
     setOpen(!open);
   };
 
   const onSelectItem = (item: Item, action: Verb): void => {
-    setSelectedItem({ item, taxes, units, action });
+    setSelectedItem({ item, taxes, units, attributes, action });
   };
 
   const onOpenChange = (open: boolean) => {
     setOpen(open);
-    if (!open) setSelectedItem({ item: undefined, taxes, units, action: 'create' });
+    if (!open) setSelectedItem({ item: undefined, taxes, units, attributes, action: 'create' });
   };
 
   useEffect(() => {
@@ -85,7 +94,7 @@ export default function Index({
             title={t('items.title')}
             description={t('items.description')}
             rightPanel={
-              <Deferred data={open ? [] : ['taxes', 'units']} fallback={<div>Loading...</div>}>
+              <Deferred data={open ? [] : ['taxes', 'units', 'attributes']} fallback={<div>Loading...</div>}>
                 <div className="flex space-x-2">
                   <Button onClick={onCreateNewItem}>
                     <Plus /> {t('items.newItem.title')}
@@ -104,7 +113,7 @@ export default function Index({
             <div className="absolute top-1/2 left-1/2 flex h-61 min-w-3xl -translate-x-1/2 -translate-y-1/2 flex-col items-center gap-4 rounded-3xl bg-white p-10 shadow-[0px_8px_12px_-4px_rgba(16,12,12,0.08),0px_0px_2px_rgba(16,12,12,0.1),0px_1px_2px_rgba(16,12,12,0.1)]">
               <h4 className="text-2xl">{t(`items.emptyState.${currentItemTypeFilter}.title`)}</h4>
               <p className="text-sm text-gray-400">{t(`items.emptyState.${currentItemTypeFilter}.description`)}</p>
-              <Deferred data={open ? [] : ['taxes', 'units']} fallback={<div>Loading...</div>}>
+              <Deferred data={open ? [] : ['taxes', 'units', 'attributes']} fallback={<div>Loading...</div>}>
                 <div className="flex space-x-3">
                   {currentItemTypeFilter !== 'all' && (
                     <Button variant={'outline'} onClick={() => onItemFilterTypeChange('all')}>
