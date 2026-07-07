@@ -246,6 +246,41 @@ func (s *Server) attachItemUnit(tx *sql.Tx, companyID, itemID, unitID int) error
 	return err
 }
 
+// insertVariantItem inserts the item row + unit for a variant-bearing item,
+// deliberately WITHOUT a default variant (the variant matrix supplies the
+// variants). It mirrors storeItemInternal's insert on purpose so the plain-item
+// path stays untouched.
+func (s *Server) insertVariantItem(tx *sql.Tx, companyID int, form *StoreItemWithAttributesForm) (int, error) {
+	var itemID int
+	err := tx.QueryRow(
+		"INSERT INTO items (name, price, description, tax_id, item_type, identifiers, company_id) "+
+			"VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id",
+		form.Name, form.Price, form.Description, form.TaxID, form.ItemType, foundation.ToJSON(form.Identifiers), companyID,
+	).Scan(&itemID)
+	if err != nil {
+		return 0, err
+	}
+	if err := s.attachItemUnit(tx, companyID, itemID, form.UnitID); err != nil {
+		return 0, err
+	}
+	return itemID, nil
+}
+
+// storeItemWithVariants creates an item together with its attribute/variant
+// matrix in one transaction. Unlike storeItem it does not create a default
+// variant when combinations are supplied — the matrix owns the variants.
+func (s *Server) storeItemWithVariants(ctx context.Context, form *StoreItemWithAttributesForm) error {
+	companyID := CurrentCompany(ctx).ID
+	svc := NewCreateProductWithVariantsService(s.db)
+	return database.WithTransaction(s.db, func(tx *sql.Tx) error {
+		itemID, err := s.insertVariantItem(tx, companyID, form)
+		if err != nil {
+			return err
+		}
+		return svc.run(ctx, tx, companyID, form, itemID)
+	})
+}
+
 func (s *Server) updateItem(ctx context.Context, itemID int, form *UpdateItemForm) error {
 	companyID := CurrentCompany(ctx).ID
 	return database.WithTransaction(s.db, func(tx *sql.Tx) error {

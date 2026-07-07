@@ -2259,18 +2259,29 @@ type VariantCombo struct {
 }
 
 // StoreItemWithAttributesForm handles item creation with attributes and variants.
+// It carries the same base item fields as StoreItemForm so the item row can be
+// created, plus the attribute/variant matrix.
 type StoreItemWithAttributesForm struct {
 	support.FormRequest
-	Name          string         `json:"name"`
-	Description   string         `json:"description,omitempty"`
-	AttributeIDs  []int          `json:"attribute_ids,omitempty"`
-	VariantCombos []VariantCombo `json:"variant_combos,omitempty"`
+	Name          string          `json:"name"`
+	Price         float64         `json:"price"`
+	Description   string          `json:"description,omitempty"`
+	TaxID         int             `json:"tax_id"`
+	UnitID        int             `json:"unit_id"`
+	ItemType      string          `json:"item_type"`
+	Identifiers   ItemIdentifiers `json:"identifiers,omitempty"`
+	AttributeIDs  []int           `json:"attribute_ids,omitempty"`
+	VariantCombos []VariantCombo  `json:"variant_combos,omitempty"`
 }
 
 func (StoreItemWithAttributesForm) Rules() map[string]any {
 	return map[string]any{
 		"name":             []any{"required", "min:3", "max:120"},
+		"price":            "required|numeric|min:0",
 		"description":      "sometimes|max:1000",
+		"tax_id":           "required|exists:taxes,id",
+		"unit_id":          "required|exists:units,id",
+		"item_type":        "required",
 		"attribute_ids.*":  "sometimes|exists:attributes,id",
 		"variant_combos.*": "sometimes|array",
 	}

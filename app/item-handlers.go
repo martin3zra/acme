@@ -85,6 +85,21 @@ func (s *Server) storeItemHandler() routing.HandlerFunc {
 	})
 }
 
+// storeItemWithVariantsHandler creates an item together with its attribute/variant
+// matrix (no default variant when combinations are supplied).
+func (s *Server) storeItemWithVariantsHandler() routing.HandlerFunc {
+	return routing.WithRequest(func(ctx *routing.Context, form *StoreItemWithAttributesForm) {
+		if err := s.storeItemWithVariants(ctx.Request.Context(), form); err != nil {
+			log.Printf("Error creating item with variants: %v", err)
+			ctx.BackWith("status", s.trans("global.wasNotCreated", i18n.Replacements{"subject": "@global.item"}))
+			return
+		}
+
+		ctx.Flash("success", s.trans("global.wasCreated", i18n.Replacements{"subject": "@global.item"}))
+		ctx.Redirect("/items")
+	})
+}
+
 func (s *Server) updateItemHandler() routing.HandlerFunc {
 	return routing.WithRequest(func(ctx *routing.Context, form *UpdateItemForm) {
 
