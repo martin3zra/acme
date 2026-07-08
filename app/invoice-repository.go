@@ -419,14 +419,12 @@ func (s *Server) processInvoiceLines(tx *sql.Tx, companyId, invoiceId int, form 
 	}
 
 	lines := s.filterInvoiceLines(form.Lines, ADDED, UPDATED, DELETED)
+	if err := resolveVariantsForLines(tx, companyId, lines); err != nil {
+		return err
+	}
 	for _, line := range lines {
 		switch line.Action {
 		case ADDED:
-			variantID, err := resolveVariantForLine(tx, companyId, line.ID, line.VariantID)
-			if err != nil {
-				return err
-			}
-			line.VariantID = variantID
 			// Preserves the original column set exactly: only these eight columns,
 			// with the tax column carrying the line rate (rate/amount/total are left
 			// to their defaults on this path, unlike the create-time bulk insert).
@@ -444,11 +442,6 @@ func (s *Server) processInvoiceLines(tx *sql.Tx, companyId, invoiceId int, form 
 				return err
 			}
 		case UPDATED:
-			variantID, err := resolveVariantForLine(tx, companyId, line.ID, line.VariantID)
-			if err != nil {
-				return err
-			}
-			line.VariantID = variantID
 			// Match on variant_id too: one item may appear on several lines as
 			// different variants, so item_id alone no longer identifies a row.
 			if _, err := ptx.Model(&InvoiceItem{}).
@@ -464,11 +457,6 @@ func (s *Server) processInvoiceLines(tx *sql.Tx, companyId, invoiceId int, form 
 				return err
 			}
 		case DELETED:
-			variantID, err := resolveVariantForLine(tx, companyId, line.ID, line.VariantID)
-			if err != nil {
-				return err
-			}
-			line.VariantID = variantID
 			if _, err := ptx.Model(&InvoiceItem{}).
 				WhereEq("company_id", companyId).
 				WhereEq("invoice_id", invoiceId).
@@ -731,12 +719,8 @@ func (s *Server) storeInvoiceInternal(tx *sql.Tx, companyID int, form *StoreInvo
 	}
 	// Resolve each line's variant (explicit, or the item's default) before the
 	// line is persisted, so invoices_items.variant_id is populated correctly.
-	for _, line := range form.Lines {
-		variantID, err := resolveVariantForLine(tx, companyID, line.ID, line.VariantID)
-		if err != nil {
-			return invoiceUUID, err
-		}
-		line.VariantID = variantID
+	if err := resolveVariantsForLines(tx, companyID, form.Lines); err != nil {
+		return invoiceUUID, err
 	}
 	if err = s.attachInvoiceLines(tx, companyID, invoiceID, form); err != nil {
 		return invoiceUUID, err

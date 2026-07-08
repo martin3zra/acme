@@ -12,6 +12,7 @@ import { useEffect, useState } from 'react';
 
 export type TransferItem = {
   id: number;
+  variant_id: number;
   name: string;
   description: string;
   reference: string;
@@ -189,7 +190,7 @@ export const Lines = ({
                 <CommandItem
                   asChild
                   value={`${item.name} ${item.reference} ${item.sku}`}
-                  key={item.id}
+                  key={`${item.id}-${item.variant_id}`}
                   onSelect={() => {
                     handleOnSelected(item);
                     setOpen(false);

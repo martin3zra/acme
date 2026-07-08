@@ -91,10 +91,13 @@ type transferLineRow struct {
 	LineTotal   float64 `json:"line_total"`
 }
 
-// transferItemOption is a product hit for the transfer line search. ID is the
-// item id; Cost defaults to the item's default-variant cost_price.
+// transferItemOption is a sellable-variant hit for the transfer line search. ID
+// is the item id and VariantID the specific variant this row transacts; the
+// search expands one row per trackable variant, so a variant product surfaces
+// each of its variants ("Item — Variant"). Cost is that variant's cost_price.
 type transferItemOption struct {
 	ID          int64   `json:"id"`
+	VariantID   int64   `json:"variant_id"`
 	Name        string  `json:"name"`
 	Description string  `json:"description"`
 	Reference   string  `json:"reference"`
@@ -555,7 +558,8 @@ func (s *Server) findTransferLines(ctx context.Context, companyID int, transferI
 
 // storeTransfer records a new manual transfer request with its product lines.
 // No stock moves yet — stock leaves the source on dispatch and arrives at the
-// destination on receive. Item ids on the lines are resolved to default variants.
+// destination on receive. Each line resolves to a concrete variant (explicit, or
+// the item's default) so a variant product moves the intended variant's stock.
 func (s *Server) storeTransfer(ctx context.Context, form *StoreTransferForm) error {
 	if form.FromWarehouseID == form.ToWarehouseID {
 		return ErrSameWarehouse
@@ -593,20 +597,21 @@ func (s *Server) storeTransfer(ctx context.Context, form *StoreTransferForm) err
 		return err
 	}
 
-	itemIDs := make([]int, 0, len(form.Lines))
-	for _, l := range form.Lines {
-		itemIDs = append(itemIDs, l.ID)
+	// Resolve each line to a concrete variant with the same rules as sales and
+	// purchases: an explicit variant is validated against its item, a plain item
+	// falls to its default, and a has_variants item without a variant is rejected
+	// rather than silently defaulting. Stubs carry (item, variant) for the shared
+	// resolver, which writes the resolved id back onto each stub.
+	stubs := make([]*Line, len(form.Lines))
+	for i, l := range form.Lines {
+		stubs[i] = &Line{ID: l.ID, VariantID: l.VariantID}
 	}
-	variantIDs, err := resolveDefaultVariantIDs(tx, companyID, itemIDs)
-	if err != nil {
+	if err := resolveVariantsForLines(tx, companyID, stubs); err != nil {
 		return err
 	}
 
-	for _, l := range form.Lines {
-		variantID, ok := variantIDs[l.ID]
-		if !ok {
-			return fmt.Errorf("missing item variant for item_id=%d", l.ID)
-		}
+	for i, l := range form.Lines {
+		variantID := stubs[i].VariantID
 		var unitID any
 		if l.Unit > 0 {
 			unitID = l.Unit
@@ -854,7 +859,7 @@ func (s *Server) cancelTransfer(ctx context.Context, uuid string) error {
 // findTransferItems searches trackable products for the transfer line picker.
 // Each hit is an item with its default variant's sku and cost_price.
 func (s *Server) findTransferItems(ctx context.Context, companyID int, search string) ([]*transferItemOption, error) {
-	rows, err := s.db.QueryContext(ctx, transferItemQuery+" ORDER BY i.name LIMIT 25", companyID, "%"+search+"%")
+	rows, err := s.db.QueryContext(ctx, transferItemQuery+" ORDER BY i.name, iv.is_default DESC, iv.name LIMIT 25", companyID, "%"+search+"%")
 	if err != nil {
 		return nil, err
 	}
@@ -874,7 +879,7 @@ func (s *Server) findTransferItems(ctx context.Context, companyID int, search st
 // findTransferItem returns the first trackable product matching the search term,
 // used by the reference-enter quick add on the transfer form.
 func (s *Server) findTransferItem(ctx context.Context, companyID int, search string) (*transferItemOption, error) {
-	rows, err := s.db.QueryContext(ctx, transferItemQuery+" ORDER BY i.name LIMIT 1", companyID, "%"+search+"%")
+	rows, err := s.db.QueryContext(ctx, transferItemQuery+" ORDER BY i.name, iv.is_default DESC, iv.name LIMIT 1", companyID, "%"+search+"%")
 	if err != nil {
 		return nil, err
 	}
@@ -887,7 +892,9 @@ func (s *Server) findTransferItem(ctx context.Context, companyID int, search str
 
 const transferItemQuery = `
 	SELECT i.id,
-	       i.name,
+	       iv.id                                     AS variant_id,
+	       CASE WHEN iv.is_default THEN i.name
+	            ELSE i.name || ' — ' || iv.name END  AS name,
 	       COALESCE(i.description, '')               AS description,
 	       COALESCE(i.identifiers->>'reference', '') AS reference,
 	       COALESCE(iv.sku, '')                      AS sku,
@@ -895,26 +902,24 @@ const transferItemQuery = `
 	       iu.unit_id,
 	       iu.unit_name
 	  FROM items i
-	  JOIN LATERAL (
-	        SELECT id, sku, cost_price
-	          FROM items_variants
-	         WHERE item_id = i.id AND company_id = i.company_id
-	           AND track_inventory = TRUE AND deleted_at IS NULL
-	         ORDER BY id LIMIT 1
-	  ) iv ON TRUE
+	  JOIN items_variants iv
+	    ON iv.item_id = i.id AND iv.company_id = i.company_id
+	   AND iv.track_inventory = TRUE AND iv.deleted_at IS NULL
 	  LEFT JOIN LATERAL (
 	        SELECT iu.unit_id, u.name AS unit_name
 	          FROM items_units iu JOIN units u ON u.id = iu.unit_id
 	         WHERE iu.item_id = i.id LIMIT 1
 	  ) iu ON TRUE
 	 WHERE i.company_id = $1 AND i.deleted_at IS NULL
-	   AND (i.name ILIKE $2 OR i.identifiers->>'reference' ILIKE $2 OR iv.sku ILIKE $2)`
+	   AND (i.name ILIKE $2 OR i.identifiers->>'reference' ILIKE $2
+	        OR iv.sku ILIKE $2 OR iv.name ILIKE $2
+	        OR iv.reference ILIKE $2 OR iv.barcode ILIKE $2)`
 
 func scanTransferItem(rows *sql.Rows) (*transferItemOption, error) {
 	var o transferItemOption
 	var unitID sql.NullInt64
 	var unitName sql.NullString
-	if err := rows.Scan(&o.ID, &o.Name, &o.Description, &o.Reference, &o.SKU, &o.Cost, &unitID, &unitName); err != nil {
+	if err := rows.Scan(&o.ID, &o.VariantID, &o.Name, &o.Description, &o.Reference, &o.SKU, &o.Cost, &unitID, &unitName); err != nil {
 		return nil, err
 	}
 	if unitID.Valid {
