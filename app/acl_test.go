@@ -1,6 +1,9 @@
 package app
 
-import "testing"
+import (
+	"sync"
+	"testing"
+)
 
 func TestCan(t *testing.T) {
 	tests := []struct {
@@ -28,4 +31,20 @@ func TestCan(t *testing.T) {
 			}
 		})
 	}
+}
+
+// TestCanConcurrent exercises Can() from many goroutines at once — including an
+// unknown role, which previously triggered a cache write. Run under `-race` it
+// fails if the permission cache is mutated concurrently.
+func TestCanConcurrent(t *testing.T) {
+	roles := []string{"owner", "admin", "supervisor", "standard", "ghost"}
+	var wg sync.WaitGroup
+	for i := range 100 {
+		wg.Add(1)
+		go func(role string) {
+			defer wg.Done()
+			_ = Can(&AuthUser{Role: role}, "view:invoice")
+		}(roles[i%len(roles)])
+	}
+	wg.Wait()
 }
