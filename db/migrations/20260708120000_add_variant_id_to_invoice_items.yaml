@@ -2,11 +2,36 @@
 # (purchase_items already has it). Backfill existing rows to each item's default
 # (or lowest-id) variant, then lock NOT NULL + FK. Raw DDL: multi-step add →
 # backfill → constrain can't be expressed as a single alter.
+#
+# The backfill assumes every referenced item has at least one variant row. If any
+# item lacks one the plain UPDATE would leave NULLs and SET NOT NULL would fail
+# with a cryptic "column contains null values" mid-migration. The guard below
+# fails first, naming the offending item ids so the operator can create the
+# missing default variants before retrying.
 up:
   add_variant_id_to_invoice_items:
     action: raw
     statements:
       - ALTER TABLE invoices_items ADD COLUMN variant_id bigint;
+      - |
+        DO $$
+        DECLARE
+            orphans text;
+        BEGIN
+            SELECT string_agg(DISTINCT ii.item_id::text, ', ' ORDER BY ii.item_id::text)
+              INTO orphans
+              FROM invoices_items ii
+             WHERE NOT EXISTS (
+                       SELECT 1 FROM items_variants iv
+                        WHERE iv.company_id = ii.company_id
+                          AND iv.item_id = ii.item_id
+                   );
+            IF orphans IS NOT NULL THEN
+                RAISE EXCEPTION
+                    'cannot backfill invoices_items.variant_id: item_id(s) [%] have no variant row; create their default variants first',
+                    orphans;
+            END IF;
+        END $$;
       - |
         UPDATE invoices_items ii SET variant_id = (
             SELECT iv.id FROM items_variants iv
