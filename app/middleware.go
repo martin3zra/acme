@@ -53,6 +53,18 @@ func (s *Server) SharedProps(next routing.HandlerFunc) routing.HandlerFunc {
 			ownedBy = getAccount(attrs)
 		}
 
+		// The session company predates the variants flag (stored in
+		// companies_settings), so refresh it here to keep auth.company.handles_variants
+		// correct on every page — the sidebar gates the Attributes nav on it.
+		if currentCompany != nil {
+			enabled, err := s.handlesVariantsByCompanyID(ctx.Request.Context(), currentCompany.ID)
+			if err != nil {
+				log.Printf("Error fetching handles_variants for shared props: %v", err)
+			} else {
+				currentCompany.HandlesVariants = enabled
+			}
+		}
+
 		props := map[string]any{
 			"auth": map[string]any{
 				"user":    sessionUser,
