@@ -60,14 +60,18 @@ func (s *Server) bootRoutes() {
 					route.PUT("/items/:id/change-status", s.changeStatusItemHandler())
 					route.DELETE("/items/:id", s.deleteItemHandler())
 
-					route.GET("/attributes", s.attributesHandler).Can("viewAny:attribute")
-					route.POST("/attributes", s.storeAttributeHandler()).Can("create:attribute")
-					route.PUT("/attributes/:id", s.updateAttributeHandler()).Can("update:attribute")
-					route.DELETE("/attributes/:id", s.deleteAttributeHandler()).Can("delete:attribute")
-					route.GET("/attributes/:id/values", s.attributeValuesHandler).Can("viewAny:attribute")
-					route.POST("/attributes/:id/values", s.storeAttributeValueHandler()).Can("create:attribute")
-					route.PUT("/attribute-values/:uuid", s.updateAttributeValueHandler()).Can("update:attribute")
-					route.DELETE("/attribute-values/:uuid", s.deleteAttributeValueHandler()).Can("delete:attribute")
+					route.
+						WithMiddleware(s.RequiresVariants).
+						Group(func(route *routing.Router) {
+							route.GET("/attributes", s.attributesHandler).Can("viewAny:attribute")
+							route.POST("/attributes", s.storeAttributeHandler()).Can("create:attribute")
+							route.PUT("/attributes/:id", s.updateAttributeHandler()).Can("update:attribute")
+							route.DELETE("/attributes/:id", s.deleteAttributeHandler()).Can("delete:attribute")
+							route.GET("/attributes/:id/values", s.attributeValuesHandler).Can("viewAny:attribute")
+							route.POST("/attributes/:id/values", s.storeAttributeValueHandler()).Can("create:attribute")
+							route.PUT("/attribute-values/:uuid", s.updateAttributeValueHandler()).Can("update:attribute")
+							route.DELETE("/attribute-values/:uuid", s.deleteAttributeValueHandler()).Can("delete:attribute")
+						})
 
 					route.GET("/invoices", s.invoicesHandler).Can("viewAny:invoice")
 					route.POST("/invoices", s.storeInvoiceHandler())

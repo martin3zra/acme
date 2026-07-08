@@ -84,6 +84,24 @@ func (s *Server) SharedProps(next routing.HandlerFunc) routing.HandlerFunc {
 	}
 }
 
+// RequiresVariants gates a route on the company's variants feature flag. When
+// off the route responds 404 so the attribute endpoints are fully hidden,
+// matching the sidebar/editor gating.
+func (s *Server) RequiresVariants(next routing.HandlerFunc) routing.HandlerFunc {
+	return func(ctx *routing.Context) {
+		enabled, err := s.companyHandlesVariants(ctx.Request.Context())
+		if err != nil {
+			ctx.Error(err)
+			return
+		}
+		if !enabled {
+			ctx.Error(foundation.HTTPError{StatusCode: http.StatusNotFound, Message: "Not Found"})
+			return
+		}
+		next(ctx)
+	}
+}
+
 func Signed(next routing.HandlerFunc) routing.HandlerFunc {
 	return func(ctx *routing.Context) {
 		config := ctx.Request.Context().Value(ConfigKey{}).(*Config)
