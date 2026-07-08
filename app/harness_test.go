@@ -19,7 +19,6 @@ import (
 	"github.com/martin3zra/forge/i18n"
 	"github.com/martin3zra/forge/routing"
 	"github.com/martin3zra/forge/session"
-	"github.com/martin3zra/forge/store"
 	gonertia "github.com/romsar/gonertia/v2"
 )
 
@@ -47,11 +46,7 @@ func newTestServer(t *testing.T) *Server {
 	}
 	t.Cleanup(func() { _ = db.Close() })
 
-	qs, err := store.NewQueryStore(sqlQueriesFS, "sql/")
-	if err != nil {
-		t.Fatalf("query store: %v", err)
-	}
-	return &Server{db: db, qs: qs}
+	return &Server{db: db}
 }
 
 // newHandlerServer is a test server with the extra wiring HTTP handlers need:

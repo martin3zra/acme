@@ -20,14 +20,9 @@ import (
 	"github.com/martin3zra/forge/mailer"
 	"github.com/martin3zra/forge/routing"
 	"github.com/martin3zra/forge/session"
-	"github.com/martin3zra/forge/store"
 )
 
-//go:embed sql/*.sql
-var sqlQueriesFS embed.FS
-
 type Server struct {
-	qs             store.Query
 	db             *sql.DB
 	config         *Config
 	sessionManager *session.SessionManager
@@ -46,14 +41,9 @@ type Server struct {
 
 func NewServer(assets, resources embed.FS) *Server {
 
-	qs, err := store.NewQueryStore(sqlQueriesFS, "sql/")
-	if err != nil {
-		panic(err)
-	}
 	translator := i18n.NewTranslator(localesFS, defaultLang, fallbackLang, trans("global", "companies", "profile", "movements", "transfers"))
 
 	server := &Server{
-		qs:         qs,
 		config:     LoadConfig(),
 		translator: translator,
 		assets:     assets,
