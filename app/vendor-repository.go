@@ -81,19 +81,18 @@ type Payable struct {
 func (s *Server) findVendorByID(ctx context.Context, vendorID int) (*vendor, error) {
 
 	var v vendor
-	err := s.db.QueryRow("SELECT v.id, v.uuid, v.code, v.name, v.contact_name, v.phone, v.email, v.status, v.amount_payable, v.purchase_note, v.lead_time_days, "+
+	err := s.db.QueryRow("SELECT v.id, v.uuid, v.code, v.name, v.contact_name, v.phone, v.email, v.status, v.amount_payable, v.purchase_note, v.lead_time_days, v.address, "+
 		"v.created_at, v.updated_at, v.deleted_at "+
 		"FROM vendors v "+
 		"INNER JOIN companies ON (v.company_id = companies.id) "+
 		"WHERE v.company_id = $1 "+
 		"AND v.id = $2 "+
 		"AND v.deleted_at IS NULL", CurrentCompany(ctx).ID, vendorID).
-		Scan(&v.ID, &v.UUID, &v.Code, &v.Name, &v.ContactName, &v.Phone, &v.Email, &v.Status, &v.AmountPayable, &v.PurchaseNote, &v.LeadTimeDays, &v.CreatedAt, &v.UpdatedAt, &v.DeletedAt)
+		Scan(&v.ID, &v.UUID, &v.Code, &v.Name, &v.ContactName, &v.Phone, &v.Email, &v.Status, &v.AmountPayable, &v.PurchaseNote, &v.LeadTimeDays, &v.Address, &v.CreatedAt, &v.UpdatedAt, &v.DeletedAt)
 	if err != nil {
 		return nil, err
 	}
 
-	v.Address = "LOUISVILLE, Selby 3864 Johnson Street, United States of America"
 	return &v, nil
 }
 
@@ -103,7 +102,7 @@ func (s *Server) findVendorByUUID(ctx context.Context, vendorID string) (*vendor
 	var ob OpenBalance
 	err := s.db.QueryRow(
 		"SELECT v.id, v.uuid, v.code, v.name, v.contact_name, v.phone, v.email, v.status, v.amount_payable, v.purchase_note, v.lead_time_days, "+
-			"ap.id as invoice_id, ap.invoice_date, ap.amount_total, v.vendor_type, v.payment_method, v.payment_terms, "+
+			"ap.id as invoice_id, ap.invoice_date, ap.amount_total, v.vendor_type, v.payment_method, v.payment_terms, v.address, "+
 			"v.created_at, v.updated_at, v.deleted_at "+
 			"FROM vendors v "+
 			"INNER JOIN companies ON (v.company_id = companies.id) "+
@@ -116,7 +115,7 @@ func (s *Server) findVendorByUUID(ctx context.Context, vendorID string) (*vendor
 			&v.ID, &v.UUID, &v.Code, &v.Name, &v.ContactName, &v.Phone, &v.Email,
 			&v.Status, &v.AmountPayable, &v.PurchaseNote, &v.LeadTimeDays,
 			&ob.InvoiceID, &ob.Date, &ob.Amount,
-			&v.VendorType, &v.PaymentMethod, &v.PaymentTerms,
+			&v.VendorType, &v.PaymentMethod, &v.PaymentTerms, &v.Address,
 			&v.CreatedAt, &v.UpdatedAt, &v.DeletedAt,
 		)
 	if err != nil {
@@ -125,14 +124,13 @@ func (s *Server) findVendorByUUID(ctx context.Context, vendorID string) (*vendor
 
 	v.OpenBalance = &ob
 
-	v.Address = "LOUISVILLE, Selby 3864 Johnson Street, United States of America"
 	return &v, nil
 }
 
 func (s *Server) findVendors(ctx context.Context, vendorType VendorType) ([]*vendor, error) {
 
 	rows, err := s.db.Query("SELECT v.id, v.uuid, v.code, v.name, v.contact_name, v.phone, v.email, v.status, v.amount_payable, v.purchase_note, v.lead_time_days, "+
-		"v.vendor_type, v.payment_method, v.payment_terms, v.created_at, v.updated_at, v.deleted_at "+
+		"v.vendor_type, v.payment_method, v.payment_terms, v.address, v.created_at, v.updated_at, v.deleted_at "+
 		"FROM vendors v "+
 		"INNER JOIN companies ON (v.company_id = companies.id) "+
 		"WHERE v.company_id = $1 "+
@@ -158,13 +156,13 @@ func (s *Server) findVendors(ctx context.Context, vendorType VendorType) ([]*ven
 			&row.VendorType,
 			&row.PaymentMethod,
 			&row.PaymentTerms,
+			&row.Address,
 			&row.CreatedAt,
 			&row.UpdatedAt,
 			&row.DeletedAt,
 		); err != nil {
 			return data, err
 		}
-		row.Address = "LOUISVILLE, Selby 3864 Johnson Street, United States of America"
 
 		data = append(data, row)
 	}
@@ -177,7 +175,7 @@ func (s *Server) findVendorsBySearchCriteria(ctx context.Context, term string) (
 		return nil, errors.New("need to specifiy the vendor you're looking for")
 	}
 	rows, err := s.db.Query("SELECT v.id, v.uuid, v.code, v.name, v.contact_name, v.phone, v.email, v.amount_payable, v.purchase_note, v.lead_time_days, "+
-		"v.vendor_type, v.payment_method, v.payment_terms, v.created_at, v.updated_at, v.deleted_at "+
+		"v.vendor_type, v.payment_method, v.payment_terms, v.address, v.created_at, v.updated_at, v.deleted_at "+
 		"FROM vendors v "+
 		"INNER JOIN companies ON (v.company_id = companies.id) "+
 		"WHERE v.company_id = $1 "+
@@ -203,6 +201,7 @@ func (s *Server) findVendorsBySearchCriteria(ctx context.Context, term string) (
 			&row.VendorType,
 			&row.PaymentMethod,
 			&row.PaymentTerms,
+			&row.Address,
 			&row.CreatedAt,
 			&row.UpdatedAt,
 			&row.DeletedAt,
@@ -210,7 +209,6 @@ func (s *Server) findVendorsBySearchCriteria(ctx context.Context, term string) (
 			return data, err
 		}
 
-		row.Address = "LOUISVILLE, Selby 3864 Johnson Street, United States of America"
 		data = append(data, row)
 	}
 
@@ -249,6 +247,7 @@ func (s *Server) storeVendorInternal(tx *sql.Tx, companyID int, code string, cre
 		AmountPayable: form.OpenBalance,
 		VendorType:    form.VendorType,
 		Code:          code,
+		Address:       form.Address,
 	}
 	if err = ptx.Insert(context.Background(), vend); err != nil {
 		return err
@@ -317,8 +316,8 @@ func (s *Server) registerPayable(tx *sql.Tx, companyID int, apID, vendorID int) 
 func (s *Server) updateVendor(ctx context.Context, vendorID int, form *UpdateVendorForm) error {
 
 	_, err := s.db.Exec(
-		"UPDATE vendors SET name = $1, contact_name = $2, email = $3, phone = $4, payment_method = $5, payment_terms = $6, vendor_type = $7, purchase_note = $8, lead_time_days = $9 WHERE company_id = $10 AND id = $11",
-		form.Name, form.Contact, form.Email, form.Phone, form.PaymentMethod, form.PaymentTerms, form.VendorType, form.PurchaseNote, form.LeadTimeDays, CurrentCompany(ctx).ID, vendorID,
+		"UPDATE vendors SET name = $1, contact_name = $2, email = $3, phone = $4, payment_method = $5, payment_terms = $6, vendor_type = $7, purchase_note = $8, lead_time_days = $9, address = $10 WHERE company_id = $11 AND id = $12",
+		form.Name, form.Contact, form.Email, form.Phone, form.PaymentMethod, form.PaymentTerms, form.VendorType, form.PurchaseNote, form.LeadTimeDays, form.Address, CurrentCompany(ctx).ID, vendorID,
 	)
 
 	return err

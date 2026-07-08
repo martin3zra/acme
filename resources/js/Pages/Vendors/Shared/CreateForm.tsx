@@ -34,6 +34,7 @@ type VendorForm = {
   contact: string;
   email: string;
   phone: string;
+  address: string;
   purchase_note: string;
   lead_time_days: number;
   payment_method?: string;
@@ -56,6 +57,7 @@ export default function CreateForm({ onFinish, params }: CreateFormProps) {
     contact: params.vendor?.contact_name || '',
     email: params.vendor?.email || '',
     phone: params.vendor?.phone || '',
+    address: params.vendor?.address || '',
     purchase_note: params.vendor?.purchase_note || '',
     lead_time_days: params.vendor?.lead_time_days ?? 0,
     payment_method: params.vendor?.payment_method || '',
@@ -164,6 +166,18 @@ export default function CreateForm({ onFinish, params }: CreateFormProps) {
               readOnly={viewMode}
             />
             <InputError className="mt-2" message={errors.phone} />
+          </div>
+          <div className="col-span-6 gap-2">
+            <Label htmlFor="address">{t('global.address')}</Label>
+            <Input
+              id="address"
+              className="mt-1 block w-full"
+              value={data.address}
+              onChange={(e) => setData('address', e.target.value)}
+              placeholder={t('global.address')}
+              readOnly={viewMode}
+            />
+            <InputError className="mt-2" message={errors.address} />
           </div>
           <Separator className="col-span-6" />
           <div className="col-span-6">

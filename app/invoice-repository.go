@@ -68,7 +68,7 @@ type line struct {
 func (s *Server) findInvoices(ctx context.Context, kind TransactionKind, invoiceType InvoiceType) ([]*invoice, error) {
 	rows, err := s.db.Query("SELECT invoices.id, invoices.uuid, invoices.code, invoices.date, invoices.due_on, invoices.amount, invoices.discount, invoices.tax, "+
 		"invoices.total, invoices.amount_due, invoices.status, invoices.paid_status, invoices.payment, invoices.note, invoices.tax_receipt_id, invoices.transaction_kind, "+
-		"invoices.source, invoices.tax_number, customers.id, customers.uuid, customers.name, customers.email, customers.phone "+
+		"invoices.source, invoices.tax_number, customers.id, customers.uuid, customers.name, customers.email, customers.phone, customers.address "+
 		"FROM invoices "+
 		"INNER JOIN companies ON (invoices.company_id = companies.id) "+
 		"INNER JOIN customers ON (invoices.company_id = customers.company_id AND invoices.customer_id = customers.id) "+
@@ -107,11 +107,10 @@ func (s *Server) findInvoices(ctx context.Context, kind TransactionKind, invoice
 			&i.Customer.Name,
 			&i.Customer.Email,
 			&i.Customer.Phone,
+			&i.Customer.Address,
 		); err != nil {
 			return nil, err
 		}
-
-		i.Customer.Address = "LOUISVILLE, Selby 3864 Johnson Street, United States of America"
 
 		data = append(data, i)
 	}
@@ -122,7 +121,7 @@ func (s *Server) findInvoicesByUUID(ctx context.Context, kind TransactionKind, c
 	i := new(invoice)
 	err := s.db.QueryRow("SELECT invoices.company_id, invoices.id, invoices.uuid, invoices.code, invoices.date, invoices.due_on, invoices.amount, invoices.amount_due, invoices.discount, invoices.tax, "+
 		"invoices.total, invoices.status, invoices.paid_status, invoices.payment, invoices.note, invoices.tax_receipt_id, invoices.transaction_kind, "+
-		"invoices.source, invoices.tax_number, invoices.note, customers.id, customers.uuid, customers.name, customers.email, customers.phone "+
+		"invoices.source, invoices.tax_number, invoices.note, customers.id, customers.uuid, customers.name, customers.email, customers.phone, customers.address "+
 		"FROM invoices "+
 		"INNER JOIN companies ON (invoices.company_id = companies.id) "+
 		"INNER JOIN customers ON (invoices.company_id = customers.company_id AND invoices.customer_id = customers.id) "+
@@ -155,7 +154,8 @@ func (s *Server) findInvoicesByUUID(ctx context.Context, kind TransactionKind, c
 			&i.Customer.UUID,
 			&i.Customer.Name,
 			&i.Customer.Email,
-			&i.Customer.Phone)
+			&i.Customer.Phone,
+			&i.Customer.Address)
 	if err != nil {
 		return nil, err
 	}
@@ -166,8 +166,6 @@ func (s *Server) findInvoicesByUUID(ctx context.Context, kind TransactionKind, c
 		i.Terms = fmt.Sprintf("net%d", int(difference.Hours())/24)
 	}
 
-	i.Customer.Address = "LOUISVILLE, Selby 3864 Johnson Street, United States of America"
-
 	return i, nil
 }
 
@@ -175,7 +173,7 @@ func (s *Server) findInvoicesByID(companyID, invoiceId int) (*invoice, error) {
 	i := new(invoice)
 	err := s.db.QueryRow("SELECT invoices.company_id,invoices.id, invoices.uuid, invoices.code, invoices.date, invoices.due_on, invoices.amount, invoices.amount_due, invoices.discount, invoices.tax, "+
 		"invoices.total, invoices.status, invoices.paid_status, invoices.payment, invoices.note, invoices.tax_receipt_id, invoices.transaction_kind, "+
-		"invoices.source, invoices.tax_number, invoices.note, customers.id, customers.uuid, customers.name, customers.email, customers.phone "+
+		"invoices.source, invoices.tax_number, invoices.note, customers.id, customers.uuid, customers.name, customers.email, customers.phone, customers.address "+
 		"FROM invoices "+
 		"INNER JOIN companies ON (invoices.company_id = companies.id) "+
 		"INNER JOIN customers ON (invoices.company_id = customers.company_id AND invoices.customer_id = customers.id) "+
@@ -208,7 +206,8 @@ func (s *Server) findInvoicesByID(companyID, invoiceId int) (*invoice, error) {
 			&i.Customer.UUID,
 			&i.Customer.Name,
 			&i.Customer.Email,
-			&i.Customer.Phone)
+			&i.Customer.Phone,
+			&i.Customer.Address)
 	if err != nil {
 		return nil, err
 	}
@@ -218,8 +217,6 @@ func (s *Server) findInvoicesByID(companyID, invoiceId int) (*invoice, error) {
 		// Difference in days
 		i.Terms = fmt.Sprintf("net%d", int(difference.Hours())/24)
 	}
-
-	i.Customer.Address = "LOUISVILLE, Selby 3864 Johnson Street, United States of America"
 
 	return i, nil
 }

@@ -122,6 +122,7 @@ type customerInsert struct {
 	CustomerType  string  `db:"customer_type"`
 	TaxReceiptID  int     `db:"tax_receipt_id"`
 	Code          string  `db:"code"`
+	Address       string  `db:"address"`
 }
 
 func (customerInsert) TableName() string { return "customers" }
@@ -142,6 +143,7 @@ type vendorInsert struct {
 	AmountPayable float64 `db:"amount_payable"`
 	VendorType    string  `db:"vendor_type"`
 	Code          string  `db:"code"`
+	Address       string  `db:"address"`
 }
 
 func (vendorInsert) TableName() string { return "vendors" }

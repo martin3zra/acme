@@ -110,7 +110,7 @@ func (s *Server) findPaymentByUUID(ctx context.Context, uuid string) (*payment, 
     where receivables_income.company_id = receivables_income_items.company_id
     and receivables_income.id = receivables_income_items.receivable_income_id
     ) as invoices,
-    customers.id, customers.uuid, customers.name, customers.email, customers.amount_due
+    customers.id, customers.uuid, customers.name, customers.email, customers.amount_due, customers.address
     FROM receivables_income
     INNER JOIN customers ON (receivables_income.company_id = customers.company_id AND receivables_income.customer_id = customers.id)
     WHERE receivables_income.company_id = $1
@@ -132,12 +132,11 @@ func (s *Server) findPaymentByUUID(ctx context.Context, uuid string) (*payment, 
 		&i.Customer.Name,
 		&i.Customer.Email,
 		&i.Customer.AmountDue,
+		&i.Customer.Address,
 	)
 	if err != nil {
 		return nil, err
 	}
-
-	i.Customer.Address = "LOUISVILLE, Selby 3864 Johnson Street, United States of America"
 
 	return i, nil
 }
