@@ -6,7 +6,11 @@ import (
 	"github.com/martin3zra/forge/foundation"
 )
 
-var rolePermissionsCache = map[string]map[string]bool{}
+// rolePermissionsCache holds the flattened permission set for every known role.
+// It is built once at package initialization from groupedPermissions (whose set
+// of roles is static) and never written to afterwards, so the concurrent reads
+// from request goroutines in Can() need no locking.
+var rolePermissionsCache = buildRolePermissions()
 
 var groupedPermissions = map[string]map[string][]string{
 	"owner": {"*": {"*"}},
@@ -32,14 +36,12 @@ var groupedPermissions = map[string]map[string][]string{
 	},
 }
 
-func permissions(role string) map[string]bool {
-	if cached, exists := rolePermissionsCache[role]; exists {
-		return cached
-	}
-
-	flatPermissions := make(map[string]bool)
-
-	if rolePermissions, exists := groupedPermissions[role]; exists {
+// buildRolePermissions flattens every role in groupedPermissions once. Called
+// only during package initialization, so it does not race with request reads.
+func buildRolePermissions() map[string]map[string]bool {
+	cache := make(map[string]map[string]bool, len(groupedPermissions))
+	for role, rolePermissions := range groupedPermissions {
+		flatPermissions := make(map[string]bool)
 		for action, modules := range rolePermissions {
 			for _, module := range modules {
 				flatPermissions[action+":"+module] = true
@@ -60,10 +62,17 @@ func permissions(role string) map[string]bool {
 		if _, exists := rolePermissions["*"]; exists {
 			flatPermissions["*"] = true
 		}
-	}
 
-	rolePermissionsCache[role] = flatPermissions
-	return flatPermissions
+		cache[role] = flatPermissions
+	}
+	return cache
+}
+
+// permissions returns the precomputed permission set for a role. Unknown roles
+// return nil; reading a nil map yields false, so Can() denies them. Read-only —
+// the cache is never mutated after init.
+func permissions(role string) map[string]bool {
+	return rolePermissionsCache[role]
 }
 
 func Can(user foundation.Authenticatable, actionModule string) bool {
@@ -79,14 +88,20 @@ func Can(user foundation.Authenticatable, actionModule string) bool {
 		return true
 	}
 
+	// Wildcard checks need an "action:module" shape. A string without a colon
+	// can't be split, so skip straight to the complete-wildcard check rather
+	// than slicing on a missing separator (which would panic).
+	action, module, ok := strings.Cut(actionModule, ":")
+	if !ok {
+		return permissions["*"]
+	}
+
 	// Action-wide wildcard (e.g., "view:*")
-	action := actionModule[:strings.Index(actionModule, ":")]
 	if permissions[action+":*"] {
 		return true
 	}
 
 	// Module-wide wildcard (e.g., "*:invoice")
-	module := actionModule[strings.Index(actionModule, ":")+1:]
 	if permissions["*:"+module] {
 		return true
 	}
