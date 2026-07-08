@@ -207,6 +207,14 @@ func mkVariantItem(t *testing.T, f *fixture, price float64) (itemID int, variant
 	).Scan(&itemID); err != nil {
 		t.Fatalf("load variant item: %v", err)
 	}
+	// Combos carry no explicit price (they coalesce to 0); price every variant so
+	// search/line assertions see a realistic per-variant price.
+	if _, err := f.s.db.Exec(
+		`UPDATE items_variants SET price = $2 WHERE company_id = $1 AND item_id = $3`,
+		f.company.ID, price, itemID,
+	); err != nil {
+		t.Fatalf("price variants: %v", err)
+	}
 	rows, err := f.s.db.Query(
 		`SELECT id FROM items_variants WHERE company_id = $1 AND item_id = $2 ORDER BY id`,
 		f.company.ID, itemID,

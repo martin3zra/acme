@@ -176,7 +176,7 @@ func (s *Server) findPurchaseLines(ctx context.Context, companyID, purchaseID in
     pi.qty::bigint,
     pi.unit_price::float8,
     COALESCE(pi.unit_id, items_units.unit_id),
-    it.name,
+    CASE WHEN iv.is_default THEN it.name ELSE it.name || ' — ' || iv.name END,
     it.description,
     COALESCE(unit_selected.name, items_units.name),
     pi.created_at,

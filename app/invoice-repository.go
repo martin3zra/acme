@@ -449,23 +449,31 @@ func (s *Server) processInvoiceLines(tx *sql.Tx, companyId, invoiceId int, form 
 				return err
 			}
 			line.VariantID = variantID
+			// Match on variant_id too: one item may appear on several lines as
+			// different variants, so item_id alone no longer identifies a row.
 			if _, err := ptx.Model(&InvoiceItem{}).
 				WhereEq("company_id", companyId).
 				WhereEq("invoice_id", invoiceId).
 				WhereEq("item_id", line.ID).
+				WhereEq("variant_id", line.VariantID).
 				Update(context.Background(), map[string]any{
 					"qty":          line.Qty,
-					"variant_id":   line.VariantID,
 					"unit_id":      line.Unit,
 					"warehouse_id": line.WarehouseID,
 				}); err != nil {
 				return err
 			}
 		case DELETED:
+			variantID, err := resolveVariantForLine(tx, companyId, line.ID, line.VariantID)
+			if err != nil {
+				return err
+			}
+			line.VariantID = variantID
 			if _, err := ptx.Model(&InvoiceItem{}).
 				WhereEq("company_id", companyId).
 				WhereEq("invoice_id", invoiceId).
 				WhereEq("item_id", line.ID).
+				WhereEq("variant_id", line.VariantID).
 				Delete(context.Background()); err != nil {
 				return err
 			}
@@ -479,7 +487,9 @@ func (s *Server) processInvoiceLines(tx *sql.Tx, companyId, invoiceId int, form 
 func (s *Server) findInvoiceLines(ctx context.Context, companyID, invoiceID int) ([]*line, error) {
 	rows, err := s.db.Query(`
     SELECT ii.item_id, ii.variant_id, iv.name, COALESCE(iv.sku, ''),
-    ii.qty, ii.price, items_units.unit_id, it.name, it.description, items_units.name,
+    ii.qty, ii.price, items_units.unit_id,
+    CASE WHEN iv.is_default THEN it.name ELSE it.name || ' — ' || iv.name END,
+    it.description, items_units.name,
     ii.created_at, ii.updated_at, ii.deleted_at, 'unchanged' as action, ii.amount, ii.total,
     taxes.id as tax_id, taxes.name as tax_name, ii.rate, ii.tax, it.identifiers, ii.warehouse_id
     FROM invoices_items AS ii

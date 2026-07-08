@@ -127,7 +127,7 @@ export default function Edit({
   }, [debouncedVendorSearch]);
 
   const findCurrentItem = useCallback(() => {
-    const exists = (element: LineForm) => element.id === currentItem?.id;
+    const exists = (element: LineForm) => element.id === currentItem?.id && element.variant_id === currentItem?.variant_id;
     const index = purchaseForm.lines.findIndex(exists);
     if (index >= 0) {
       setEditing(true);
@@ -174,7 +174,7 @@ export default function Edit({
     const line = currentItem!;
 
     if (isEditing) {
-      const index = purchaseForm.lines.findIndex((element: LineForm) => element.id === line.id);
+      const index = purchaseForm.lines.findIndex((element: LineForm) => element.id === line.id && element.variant_id === line.variant_id);
       if (index >= 0) {
         purchaseForm.lines[index].qty = qtyInputRef.current?.valueAsNumber || 0;
         purchaseForm.lines[index].amount = amount;
@@ -288,6 +288,7 @@ export default function Edit({
         source: purchaseForm.source,
         lines: purchaseForm.lines.map((line) => ({
           id: line.id,
+          variant_id: line.variant_id,
           unit: line.unit.id,
           qty: line.qty,
           price: line.price,

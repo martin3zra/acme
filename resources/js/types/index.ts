@@ -178,6 +178,8 @@ export interface ItemIdentifiers {
 export interface Item {
   id: number;
   uuid: string;
+  variant_id: number;
+  sku?: string;
   name: string;
   price: number;
   tax: Tax;
@@ -205,6 +207,8 @@ export interface InvoiceLine extends Item {
   remaining_qty?: number;
   amount: number;
   total: number;
+  variant_name?: string;
+  variant_sku?: string;
   tax: TaxWithAmount;
   action: LineAction;
 }

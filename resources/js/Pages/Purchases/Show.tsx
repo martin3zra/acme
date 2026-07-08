@@ -125,7 +125,7 @@ export default function Show({ kind, purchase, auth }: Props) {
             </thead>
             <tbody>
               {purchase.lines.map((line) => (
-                <tr key={line.id}>
+                <tr key={`${line.id}-${line.variant_id}`}>
                   <td>{line.id}</td>
                   <td>{line.name}</td>
                   <td>{line.unit.name}</td>

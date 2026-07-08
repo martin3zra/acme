@@ -1,6 +1,7 @@
 package app
 
 import (
+	"strings"
 	"testing"
 	"time"
 )
@@ -96,6 +97,10 @@ func TestFlowInvoiceLinesCarryVariant(t *testing.T) {
 	is.Equal(len(lines), 1)
 	is.Equal(int(lines[0].VariantID), blue)
 	is.Equal(lines[0].VariantName, blueName)
+	// Display name composes item + variant so Show/Edit read like the search rows.
+	if !strings.Contains(lines[0].Name, blueName) || !strings.Contains(lines[0].Name, "—") {
+		t.Fatalf("expected composed line name, got %q", lines[0].Name)
+	}
 }
 
 // TestFlowInvoiceVariantRequired: a has_variants item on a line with no variant
