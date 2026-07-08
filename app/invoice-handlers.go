@@ -437,18 +437,26 @@ func (s *Server) printInvoiceHandler(ctx *routing.Context) {
 	data, err := cache.Remember(ctx.Request.Context(), c, key, func() (invoiceData, error) {
 		invoice, err := s.findInvoicesByUUID(ctx.Request.Context(), kind, company.ID, uuid)
 		if err != nil {
-			return invoiceData{}, nil
+			return invoiceData{}, err
 		}
 
 		lines, err := s.findInvoiceLines(ctx.Request.Context(), invoice.CompanyID, invoice.ID)
 		if err != nil {
-			return invoiceData{}, nil
+			return invoiceData{}, err
 		}
 		return invoiceData{
 			Header: invoice,
 			Lines:  lines,
 		}, nil
 	})
+	if err != nil {
+		ctx.Error(err)
+		return
+	}
+	if data.Header == nil {
+		ctx.Error(fmt.Errorf("%s %s not found", kind, uuid))
+		return
+	}
 
 	invoice, err := NewInvoicePDF(s.translator, data.Header, data.Lines)
 	if err != nil {
