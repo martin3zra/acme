@@ -277,6 +277,23 @@ func (s *Server) updateInvoice(ctx context.Context, uuid string, form *UpdateInv
 			return err
 		}
 
+		// Keep inventory in step with the edited lines. Only invoices/orders that
+		// already moved stock get reconciled — drafts and estimates never did.
+		if form.Kind == TransactionKinds.Invoice || form.Kind == TransactionKinds.Order {
+			var movementRecorded bool
+			if err = tx.QueryRow(
+				"SELECT movement_recorded FROM invoices WHERE company_id = $1 AND id = $2",
+				companyID, invoice.ID,
+			).Scan(&movementRecorded); err != nil {
+				return err
+			}
+			if movementRecorded {
+				if err = s.reconcileInvoiceStock(tx, companyID, invoice.ID); err != nil {
+					return err
+				}
+			}
+		}
+
 		if form.Kind != TransactionKinds.Invoice {
 			return nil
 		}
@@ -832,6 +849,121 @@ func (s *Server) recordInvoiceMovements(tx *sql.Tx, companyID, invoiceID int, li
 			tx, companyID,
 			l.VariantID, l.WarehouseID, l.Unit,
 			-float64(l.Qty), l.Price,
+			InventoryMovementKinds.Sale,
+			"invoice", invoiceID,
+		); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// reconcileInvoiceStock re-aligns an invoice's inventory footprint with its
+// current lines after an edit. It first neutralises whatever the invoice has
+// moved so far — one adjustment per (variant, warehouse) that nets the running
+// total back to zero — then re-records fresh OUT movements from the surviving
+// invoices_items rows through recordMovement, reusing its unit conversion and
+// track_inventory rules. Reconciling an unchanged invoice nets to the same
+// balance, so it is safe to run on every edit; callers gate it on
+// movement_recorded so drafts and estimates (which never moved stock) are left
+// alone. Handles qty changes, added/removed lines, and variant swaps (which
+// arrive as delete+add) uniformly, since it works from the persisted rows.
+func (s *Server) reconcileInvoiceStock(tx *sql.Tx, companyID, invoiceID int) error {
+	// 1. Neutralise the invoice's current net contribution per variant+warehouse.
+	rows, err := tx.Query(
+		`SELECT variant_id, warehouse_id, SUM(qty)::float8
+		   FROM inventory_movements
+		  WHERE company_id = $1 AND reference_type = 'invoice' AND reference_id = $2
+		  GROUP BY variant_id, warehouse_id
+		 HAVING SUM(qty) <> 0`,
+		companyID, invoiceID,
+	)
+	if err != nil {
+		return fmt.Errorf("reconcileInvoiceStock: query recorded: %w", err)
+	}
+	type netMove struct {
+		variantID, warehouseID int
+		qty                    float64
+	}
+	var recorded []netMove
+	for rows.Next() {
+		var m netMove
+		if err := rows.Scan(&m.variantID, &m.warehouseID, &m.qty); err != nil {
+			rows.Close()
+			return fmt.Errorf("reconcileInvoiceStock: scan recorded: %w", err)
+		}
+		recorded = append(recorded, m)
+	}
+	if err := rows.Err(); err != nil {
+		rows.Close()
+		return err
+	}
+	rows.Close()
+
+	ptx, err := playTx(tx)
+	if err != nil {
+		return err
+	}
+	for _, m := range recorded {
+		neutral := -m.qty
+		if err := ptx.Insert(context.Background(), &InventoryMovement{
+			CompanyID:       companyID,
+			VariantID:       m.variantID,
+			WarehouseID:     m.warehouseID,
+			TransactionKind: InventoryMovementKinds.Adjustment,
+			Qty:             neutral,
+			ReferenceType:   "invoice",
+			ReferenceID:     invoiceID,
+			CreatedAt:       time.Now().UTC(),
+		}); err != nil {
+			return fmt.Errorf("reconcileInvoiceStock: insert adjustment: %w", err)
+		}
+		if _, err := tx.Exec(
+			`UPDATE inventory_balances SET quantity = quantity + $1, updated_at = NOW()
+			  WHERE company_id = $2 AND variant_id = $3 AND warehouse_id = $4`,
+			neutral, companyID, m.variantID, m.warehouseID,
+		); err != nil {
+			return fmt.Errorf("reconcileInvoiceStock: neutralise balance: %w", err)
+		}
+	}
+
+	// 2. Re-record OUT movements from the surviving lines. Collect first, then
+	// record — recordMovement issues its own queries on tx, which cannot run
+	// while a Rows from the same connection is still open.
+	lineRows, err := tx.Query(
+		`SELECT variant_id, warehouse_id, unit_id, qty, price
+		   FROM invoices_items
+		  WHERE company_id = $1 AND invoice_id = $2 AND deleted_at IS NULL AND warehouse_id <> 0`,
+		companyID, invoiceID,
+	)
+	if err != nil {
+		return fmt.Errorf("reconcileInvoiceStock: query lines: %w", err)
+	}
+	type lineMove struct {
+		variantID, warehouseID, unitID, qty int
+		price                               float64
+	}
+	var lines []lineMove
+	for lineRows.Next() {
+		var l lineMove
+		if err := lineRows.Scan(&l.variantID, &l.warehouseID, &l.unitID, &l.qty, &l.price); err != nil {
+			lineRows.Close()
+			return fmt.Errorf("reconcileInvoiceStock: scan line: %w", err)
+		}
+		lines = append(lines, l)
+	}
+	if err := lineRows.Err(); err != nil {
+		lineRows.Close()
+		return err
+	}
+	lineRows.Close()
+
+	for _, l := range lines {
+		// OUT movement: qty is negative.
+		if err := s.recordMovement(
+			tx, companyID,
+			l.variantID, l.warehouseID, l.unitID,
+			-float64(l.qty), l.price,
 			InventoryMovementKinds.Sale,
 			"invoice", invoiceID,
 		); err != nil {
