@@ -49,7 +49,7 @@ type purchase struct {
 func (s *Server) findPurchases(ctx context.Context, kind PurchaseTransactionKind) ([]*purchase, error) {
 	rows, err := s.db.Query(
 		"SELECT p.id, p.uuid, p.code, p.warehouse_id, p.date, p.due_date, p.subtotal, p.discount_amount, p.tax_amount, p.total, p.status, COALESCE(p.purchase_status::text, ''), p.payment_status, COALESCE(p.notes, ''), p.transaction_kind, p.source, COALESCE(p.invoice_number, ''), "+
-			"v.id, v.uuid, v.name, v.email, v.phone "+
+			"v.id, v.uuid, v.name, v.email, v.phone, v.address "+
 			"FROM purchases p "+
 			"INNER JOIN companies ON (p.company_id = companies.id) "+
 			"INNER JOIN vendors v ON (p.company_id = v.company_id AND p.vendor_id = v.id) "+
@@ -88,6 +88,7 @@ func (s *Server) findPurchases(ctx context.Context, kind PurchaseTransactionKind
 			&p.Vendor.Name,
 			&p.Vendor.Email,
 			&p.Vendor.Phone,
+			&p.Vendor.Address,
 		); err != nil {
 			return nil, err
 		}
@@ -104,7 +105,6 @@ func (s *Server) findPurchases(ctx context.Context, kind PurchaseTransactionKind
 			difference := p.DueOn.Sub(p.Date)
 			p.Terms = fmt.Sprintf("net%d", int(difference.Hours())/24)
 		}
-		p.Vendor.Address = "LOUISVILLE, Selby 3864 Johnson Street, United States of America"
 		data = append(data, p)
 	}
 
@@ -116,7 +116,7 @@ func (s *Server) findPurchaseByUUID(ctx context.Context, companyID int, uuid str
 	var discountAmount float64
 	err := s.db.QueryRow(
 		"SELECT p.company_id, p.id, p.uuid, p.code, p.warehouse_id, p.date, p.due_date, p.subtotal, p.discount_amount, p.tax_amount, p.total, p.status, COALESCE(p.purchase_status::text, ''), p.payment_status, COALESCE(p.notes, ''), p.transaction_kind, p.source, COALESCE(p.invoice_number, ''), "+
-			"v.id, v.uuid, v.name, v.email, v.phone "+
+			"v.id, v.uuid, v.name, v.email, v.phone, v.address "+
 			"FROM purchases p "+
 			"INNER JOIN companies ON (p.company_id = companies.id) "+
 			"INNER JOIN vendors v ON (p.company_id = v.company_id AND p.vendor_id = v.id) "+
@@ -146,6 +146,7 @@ func (s *Server) findPurchaseByUUID(ctx context.Context, companyID int, uuid str
 		&p.Vendor.Name,
 		&p.Vendor.Email,
 		&p.Vendor.Phone,
+		&p.Vendor.Address,
 	)
 	if err != nil {
 		return nil, err
@@ -163,7 +164,6 @@ func (s *Server) findPurchaseByUUID(ctx context.Context, companyID int, uuid str
 		difference := p.DueOn.Sub(p.Date)
 		p.Terms = fmt.Sprintf("net%d", int(difference.Hours())/24)
 	}
-	p.Vendor.Address = "LOUISVILLE, Selby 3864 Johnson Street, United States of America"
 	return p, nil
 }
 

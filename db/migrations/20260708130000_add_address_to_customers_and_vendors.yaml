@@ -1,0 +1,17 @@
+# Customer/vendor postal address. Previously the repositories hard-coded a fake
+# constant address onto every read; this adds the real backing column so invoices,
+# PDFs and vendor views carry user-entered data. NOT NULL default '' so existing
+# rows and the write models (which always pass a value) stay valid.
+up:
+  add_address_to_customers_and_vendors:
+    action: raw
+    statements:
+      - ALTER TABLE customers ADD COLUMN address VARCHAR(255) NOT NULL DEFAULT '';
+      - ALTER TABLE vendors ADD COLUMN address VARCHAR(255) NOT NULL DEFAULT '';
+
+down:
+  add_address_to_customers_and_vendors:
+    action: raw
+    statements:
+      - ALTER TABLE customers DROP COLUMN IF EXISTS address;
+      - ALTER TABLE vendors DROP COLUMN IF EXISTS address;

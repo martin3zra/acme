@@ -35,6 +35,24 @@ func (b *vendorBuilder) Terms(terms string) *vendorBuilder {
 	return b
 }
 
+// Named sets the vendor's name explicitly (for search-by-name assertions).
+func (b *vendorBuilder) Named(name string) *vendorBuilder {
+	b.form.Name = name
+	return b
+}
+
+// WithAddress sets the vendor's postal address.
+func (b *vendorBuilder) WithAddress(address string) *vendorBuilder {
+	b.form.Address = address
+	return b
+}
+
+// Individual makes the vendor an individual rather than a business.
+func (b *vendorBuilder) Individual() *vendorBuilder {
+	b.form.VendorType = "individual"
+	return b
+}
+
 // Build persists the vendor via storeVendor and returns its id + uuid.
 func (b *vendorBuilder) Build() (id int, uuid string) {
 	b.t.Helper()

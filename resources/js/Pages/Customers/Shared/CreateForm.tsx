@@ -37,6 +37,7 @@ type CustomerForm = {
   contact: string;
   email: string;
   phone: string;
+  address: string;
   payment_method?: string;
   payment_terms?: string;
   credit_limited: boolean;
@@ -59,6 +60,7 @@ export default function CreateForm({ onFinish, params }: CreateFormProps) {
     contact: params.customer?.contact_name || '',
     email: params.customer?.email || '',
     phone: params.customer?.phone || '',
+    address: params.customer?.address || '',
     payment_method: params.customer?.payment_method || '',
     payment_terms: params.customer?.payment_terms || '',
     credit_limited: params.customer?.credit_limited || false,
@@ -169,6 +171,18 @@ export default function CreateForm({ onFinish, params }: CreateFormProps) {
               readOnly={viewMode}
             />
             <InputError className="mt-2" message={errors.phone} />
+          </div>
+          <div className="col-span-6 gap-2">
+            <Label htmlFor="address">{t('global.address')}</Label>
+            <Input
+              id="address"
+              className="mt-1 block w-full"
+              value={data.address}
+              onChange={(e) => setData('address', e.target.value)}
+              placeholder={t('global.address')}
+              readOnly={viewMode}
+            />
+            <InputError className="mt-2" message={errors.address} />
           </div>
           <Separator className="col-span-6" />
           <div className="col-span-6">
