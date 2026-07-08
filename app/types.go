@@ -2137,9 +2137,12 @@ func (form StoreAdjustmentForm) Rules() map[string]any {
 }
 
 // TransferLineInput is a single product line on a transfer document. ID is the
-// item id (resolved to its default variant on store, like purchases/invoices).
+// item id plus the specific variant to move. VariantID may be 0 for a plain
+// item (resolved to its default variant on store, like purchases/invoices); a
+// has_variants item must name one explicitly.
 type TransferLineInput struct {
 	ID          int     `json:"id"`
+	VariantID   int     `json:"variant_id"`
 	Qty         float64 `json:"qty"`
 	Unit        int     `json:"unit"`
 	Cost        float64 `json:"cost"`

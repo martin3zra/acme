@@ -139,7 +139,7 @@ export default function Create({
       to_warehouse_id: Number(form.header.to),
       date: form.header.date,
       notes: form.header.notes || '',
-      lines: form.lines.map((l) => ({ id: l.id, qty: l.qty, unit: l.unit?.id ?? 0, cost: l.cost, description: l.description || '' })),
+      lines: form.lines.map((l) => ({ id: l.id, variant_id: l.variant_id, qty: l.qty, unit: l.unit?.id ?? 0, cost: l.cost, description: l.description || '' })),
     }));
     post('/inventories/transfers', {
       ...headers,

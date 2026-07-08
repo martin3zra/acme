@@ -329,77 +329,118 @@ func firstWarehouseID(tx *sql.Tx, companyID int) (int, error) {
 	return warehouseID, nil
 }
 
-// resolveDefaultVariantIDs maps each item to its default variant (is_default
-// first, else lowest id). Used where a line does not name a variant — e.g.
-// transfers, which move an item as a whole rather than a chosen variant.
-func resolveDefaultVariantIDs(tx *sql.Tx, companyID int, itemIDs []int) (map[int]int, error) {
+// resolveVariantsForLines resolves the variant every sales/purchase line
+// transacts and writes it back onto each line's VariantID, in two queries total
+// regardless of line count. Rules per line:
+//   - names a variant: it must belong to the line's item (company, item, not deleted);
+//   - names none: the item's default variant is used, EXCEPT an item flagged
+//     has_variants MUST name a variant explicitly (no silent guess across variants).
+func resolveVariantsForLines(tx *sql.Tx, companyID int, lines []*Line) error {
+	if len(lines) == 0 {
+		return nil
+	}
+
+	// Collect the distinct item set (for default resolution) and the explicit
+	// variant ids named by lines (for ownership validation).
+	itemIDSet := make(map[int]struct{}, len(lines))
+	variantIDSet := make(map[int]struct{})
+	for _, l := range lines {
+		itemIDSet[l.ID] = struct{}{}
+		if l.VariantID != 0 {
+			variantIDSet[l.VariantID] = struct{}{}
+		}
+	}
+	itemIDs := make([]int, 0, len(itemIDSet))
+	for id := range itemIDSet {
+		itemIDs = append(itemIDs, id)
+	}
+
+	// Query 1: per item, its has_variants flag and default variant id.
+	type itemInfo struct {
+		hasVariants    bool
+		defaultVariant sql.NullInt64
+	}
+	items := make(map[int]itemInfo, len(itemIDs))
 	rows, err := tx.Query(
-		`SELECT DISTINCT ON (iv.item_id) iv.item_id, iv.id
-     FROM items_variants iv
-     WHERE iv.company_id = $1 AND iv.item_id = ANY($2)
-     ORDER BY iv.item_id, iv.is_default DESC, iv.id`,
-		companyID,
-		pq.Array(itemIDs),
-	)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	m := make(map[int]int, len(itemIDs))
-	for rows.Next() {
-		var itemID int
-		var variantID int
-		if err := rows.Scan(&itemID, &variantID); err != nil {
-			return nil, err
-		}
-		m[itemID] = variantID
-	}
-	return m, nil
-}
-
-// resolveVariantForLine determines the variant a sales/purchase line transacts.
-// If the line names a variant it must belong to (company, item). Otherwise the
-// item's default variant is used — but an item flagged has_variants MUST name a
-// variant explicitly (no silent guessing across its variants).
-func resolveVariantForLine(tx *sql.Tx, companyID, itemID, variantID int) (int, error) {
-	if variantID != 0 {
-		var ok bool
-		if err := tx.QueryRow(
-			`SELECT EXISTS(
-			   SELECT 1 FROM items_variants
-			   WHERE id = $1 AND item_id = $2 AND company_id = $3 AND deleted_at IS NULL)`,
-			variantID, itemID, companyID,
-		).Scan(&ok); err != nil {
-			return 0, err
-		}
-		if !ok {
-			return 0, fmt.Errorf("variant %d does not belong to item %d", variantID, itemID)
-		}
-		return variantID, nil
-	}
-
-	var hasVariants bool
-	var defaultVariant sql.NullInt64
-	if err := tx.QueryRow(
-		`SELECT i.has_variants,
+		`SELECT i.id, i.has_variants,
 		        (SELECT iv.id FROM items_variants iv
-		           WHERE iv.company_id = $1 AND iv.item_id = $2 AND iv.deleted_at IS NULL
+		           WHERE iv.company_id = i.company_id AND iv.item_id = i.id AND iv.deleted_at IS NULL
 		           ORDER BY iv.is_default DESC, iv.id
 		           LIMIT 1)
 		   FROM items i
-		  WHERE i.id = $2 AND i.company_id = $1`,
-		companyID, itemID,
-	).Scan(&hasVariants, &defaultVariant); err != nil {
-		return 0, err
+		  WHERE i.company_id = $1 AND i.id = ANY($2)`,
+		companyID, pq.Array(itemIDs),
+	)
+	if err != nil {
+		return err
 	}
-	if hasVariants {
-		return 0, fmt.Errorf("item %d requires an explicit variant", itemID)
+	for rows.Next() {
+		var id int
+		var info itemInfo
+		if err := rows.Scan(&id, &info.hasVariants, &info.defaultVariant); err != nil {
+			rows.Close()
+			return err
+		}
+		items[id] = info
 	}
-	if !defaultVariant.Valid {
-		return 0, fmt.Errorf("missing item variant for item_id=%d", itemID)
+	if err := rows.Err(); err != nil {
+		rows.Close()
+		return err
 	}
-	return int(defaultVariant.Int64), nil
+	rows.Close()
+
+	// Query 2: for every explicitly named variant, the item it belongs to
+	// (deleted variants excluded, so a soft-deleted variant can't be transacted).
+	variantOwner := make(map[int]int, len(variantIDSet))
+	if len(variantIDSet) > 0 {
+		variantIDs := make([]int, 0, len(variantIDSet))
+		for id := range variantIDSet {
+			variantIDs = append(variantIDs, id)
+		}
+		vrows, err := tx.Query(
+			`SELECT id, item_id FROM items_variants
+			  WHERE company_id = $1 AND id = ANY($2) AND deleted_at IS NULL`,
+			companyID, pq.Array(variantIDs),
+		)
+		if err != nil {
+			return err
+		}
+		for vrows.Next() {
+			var variantID, itemID int
+			if err := vrows.Scan(&variantID, &itemID); err != nil {
+				vrows.Close()
+				return err
+			}
+			variantOwner[variantID] = itemID
+		}
+		if err := vrows.Err(); err != nil {
+			vrows.Close()
+			return err
+		}
+		vrows.Close()
+	}
+
+	// Apply the rules in-memory, mutating each line's resolved variant.
+	for _, l := range lines {
+		if l.VariantID != 0 {
+			if owner, ok := variantOwner[l.VariantID]; !ok || owner != l.ID {
+				return fmt.Errorf("variant %d does not belong to item %d", l.VariantID, l.ID)
+			}
+			continue
+		}
+		info, ok := items[l.ID]
+		if !ok {
+			return fmt.Errorf("missing item variant for item_id=%d", l.ID)
+		}
+		if info.hasVariants {
+			return fmt.Errorf("item %d requires an explicit variant", l.ID)
+		}
+		if !info.defaultVariant.Valid {
+			return fmt.Errorf("missing item variant for item_id=%d", l.ID)
+		}
+		l.VariantID = int(info.defaultVariant.Int64)
+	}
+	return nil
 }
 
 func resolveItemTaxIDs(tx *sql.Tx, companyID int, itemIDs []int) (map[int]*int, error) {
@@ -626,18 +667,16 @@ func (s *Server) attachPurchaseLines(tx *sql.Tx, companyID, purchaseID int, form
 	if err != nil {
 		return err
 	}
+	if err := resolveVariantsForLines(tx, companyID, form.Lines); err != nil {
+		return err
+	}
 
 	rows := make([]map[string]any, 0, len(form.Lines))
 	for _, l := range form.Lines {
-		variantID, err := resolveVariantForLine(tx, companyID, l.ID, l.VariantID)
-		if err != nil {
-			return err
-		}
-		l.VariantID = variantID
 		rows = append(rows, map[string]any{
 			"company_id":  companyID,
 			"purchase_id": purchaseID,
-			"variant_id":  variantID,
+			"variant_id":  l.VariantID,
 			"qty":         l.Qty,
 			"unit_price":  l.Price,
 			"line_total":  l.total,
@@ -806,13 +845,12 @@ func (s *Server) processPurchaseLines(tx *sql.Tx, companyID, purchaseID int, for
 	if err != nil {
 		return err
 	}
+	if err := resolveVariantsForLines(tx, companyID, lines); err != nil {
+		return err
+	}
 
 	for _, l := range lines {
-		variantID, err := resolveVariantForLine(tx, companyID, l.ID, l.VariantID)
-		if err != nil {
-			return err
-		}
-		l.VariantID = variantID
+		variantID := l.VariantID
 
 		// Guard: never reduce a PO line below the already-received qty.
 		if form.Kind == PurchaseTransactionKinds.PurchaseOrder &&
