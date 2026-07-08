@@ -51,6 +51,14 @@ func (b *purchaseBuilder) WithLine(itemID, qty int, price, rate float64) *purcha
 	return b
 }
 
+// WithVariantLine adds a line that names an explicit variant of the item.
+func (b *purchaseBuilder) WithVariantLine(itemID, variantID, qty int, price, rate float64) *purchaseBuilder {
+	l := mkLine(itemID, b.f.unitID, b.f.warehouseID, qty, price, rate)
+	l.VariantID = variantID
+	b.lines = append(b.lines, l)
+	return b
+}
+
 // Build persists the purchase via storePurchase and returns its uuid.
 func (b *purchaseBuilder) Build() string {
 	b.t.Helper()

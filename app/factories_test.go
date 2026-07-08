@@ -160,3 +160,67 @@ func mkItem(t *testing.T, f *fixture, price, cost float64) (itemID, variantID in
 	}
 	return itemID, variantID
 }
+
+// mkVariantItem creates a has_variants product with a Color attribute (two
+// values) and returns the item id plus its two variant ids ordered by id. The
+// item has NO default variant, matching the wired variant-matrix behaviour.
+func mkVariantItem(t *testing.T, f *fixture, price float64) (itemID int, variantIDs []int) {
+	t.Helper()
+	color := uniq("Color")
+	if err := f.s.storeAttribute(f.ctx, &StoreAttributeForm{Name: color, Type: "select", DisplayName: color}); err != nil {
+		t.Fatalf("storeAttribute: %v", err)
+	}
+	attrs, err := f.s.findAttributes(f.ctx)
+	if err != nil {
+		t.Fatalf("findAttributes: %v", err)
+	}
+	var colorID int
+	for _, a := range attrs {
+		if a.Name == color {
+			colorID = a.ID
+		}
+	}
+	for _, v := range []string{"Red", "Blue"} {
+		if err := f.s.storeAttributeValue(f.ctx, &StoreAttributeValueForm{AttributeID: colorID, Value: v, DisplayName: v}); err != nil {
+			t.Fatalf("storeAttributeValue: %v", err)
+		}
+	}
+	vals, err := f.s.findAttributeValuesByAttribute(f.ctx, colorID)
+	if err != nil {
+		t.Fatalf("findAttributeValuesByAttribute: %v", err)
+	}
+
+	name := uniq("VariantItem")
+	form := &StoreItemWithAttributesForm{
+		Name: name, Price: price, TaxID: f.taxID, UnitID: f.unitID, ItemType: "product",
+		AttributeIDs: []int{colorID},
+		VariantCombos: []VariantCombo{
+			{AttributeValueIDs: map[int]int{colorID: vals[0].ID}},
+			{AttributeValueIDs: map[int]int{colorID: vals[1].ID}},
+		},
+	}
+	if err := f.s.storeItemWithVariants(f.ctx, form); err != nil {
+		t.Fatalf("storeItemWithVariants: %v", err)
+	}
+	if err := f.s.db.QueryRow(
+		`SELECT id FROM items WHERE company_id = $1 AND name = $2`, f.company.ID, name,
+	).Scan(&itemID); err != nil {
+		t.Fatalf("load variant item: %v", err)
+	}
+	rows, err := f.s.db.Query(
+		`SELECT id FROM items_variants WHERE company_id = $1 AND item_id = $2 ORDER BY id`,
+		f.company.ID, itemID,
+	)
+	if err != nil {
+		t.Fatalf("load variants: %v", err)
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var id int
+		if err := rows.Scan(&id); err != nil {
+			t.Fatalf("scan variant: %v", err)
+		}
+		variantIDs = append(variantIDs, id)
+	}
+	return itemID, variantIDs
+}

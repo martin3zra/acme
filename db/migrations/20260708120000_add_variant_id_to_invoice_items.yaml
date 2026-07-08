@@ -1,0 +1,31 @@
+# invoices_items gains variant_id so sales movements debit the exact variant sold
+# (purchase_items already has it). Backfill existing rows to each item's default
+# (or lowest-id) variant, then lock NOT NULL + FK. Raw DDL: multi-step add →
+# backfill → constrain can't be expressed as a single alter.
+up:
+  add_variant_id_to_invoice_items:
+    action: raw
+    statements:
+      - ALTER TABLE invoices_items ADD COLUMN variant_id bigint;
+      - |
+        UPDATE invoices_items ii SET variant_id = (
+            SELECT iv.id FROM items_variants iv
+            WHERE iv.company_id = ii.company_id
+              AND iv.item_id = ii.item_id
+            ORDER BY iv.is_default DESC, iv.id
+            LIMIT 1
+        );
+      - ALTER TABLE invoices_items ALTER COLUMN variant_id SET NOT NULL;
+      - |
+        ALTER TABLE invoices_items
+            ADD CONSTRAINT invoices_items_variant_id_fkey
+            FOREIGN KEY (variant_id) REFERENCES items_variants(id);
+      - CREATE INDEX idx_invoices_items_variant ON invoices_items(variant_id);
+
+down:
+  add_variant_id_to_invoice_items:
+    action: raw
+    statements:
+      - DROP INDEX IF EXISTS idx_invoices_items_variant;
+      - ALTER TABLE invoices_items DROP CONSTRAINT IF EXISTS invoices_items_variant_id_fkey;
+      - ALTER TABLE invoices_items DROP COLUMN IF EXISTS variant_id;

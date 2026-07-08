@@ -597,7 +597,7 @@ func (s *Server) storeTransfer(ctx context.Context, form *StoreTransferForm) err
 	for _, l := range form.Lines {
 		itemIDs = append(itemIDs, l.ID)
 	}
-	variantIDs, err := resolveItemVariantIDs(tx, companyID, itemIDs)
+	variantIDs, err := resolveDefaultVariantIDs(tx, companyID, itemIDs)
 	if err != nil {
 		return err
 	}
