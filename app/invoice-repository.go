@@ -39,7 +39,9 @@ type invoice struct {
 
 type line struct {
 	ID           int64           `json:"id"`
-	VariantID    int64           `json:"-"`
+	VariantID    int64           `json:"variant_id"`
+	VariantName  string          `json:"variant_name"`
+	VariantSKU   string          `json:"variant_sku,omitempty"`
 	WarehouseID  int64           `json:"warehouse_id"`
 	Qty          int64           `json:"qty"`
 	RemainingQty *int64          `json:"remaining_qty,omitempty"`
@@ -476,13 +478,15 @@ func (s *Server) processInvoiceLines(tx *sql.Tx, companyId, invoiceId int, form 
 
 func (s *Server) findInvoiceLines(ctx context.Context, companyID, invoiceID int) ([]*line, error) {
 	rows, err := s.db.Query(`
-    SELECT ii.item_id, ii.qty, ii.price, items_units.unit_id, it.name, it.description, items_units.name,
+    SELECT ii.item_id, ii.variant_id, iv.name, COALESCE(iv.sku, ''),
+    ii.qty, ii.price, items_units.unit_id, it.name, it.description, items_units.name,
     ii.created_at, ii.updated_at, ii.deleted_at, 'unchanged' as action, ii.amount, ii.total,
     taxes.id as tax_id, taxes.name as tax_name, ii.rate, ii.tax, it.identifiers, ii.warehouse_id
     FROM invoices_items AS ii
     INNER JOIN companies AS com ON (ii.company_id = com.id)
     INNER JOIN invoices AS i ON (ii.invoice_id = i.id AND ii.company_id = i.company_id)
     INNER JOIN items AS it ON(ii.item_id = it.id AND ii.company_id = it.company_id)
+    INNER JOIN items_variants AS iv ON (ii.variant_id = iv.id AND ii.company_id = iv.company_id)
     LEFT JOIN LATERAL (
       SELECT items_units.unit_id, units.name
       FROM items_units
@@ -501,6 +505,9 @@ func (s *Server) findInvoiceLines(ctx context.Context, companyID, invoiceID int)
 
 		if err = rows.Scan(
 			&i.ID,
+			&i.VariantID,
+			&i.VariantName,
+			&i.VariantSKU,
 			&i.Qty,
 			&i.Price,
 			&i.Unit.ID,

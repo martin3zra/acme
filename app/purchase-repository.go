@@ -171,6 +171,8 @@ func (s *Server) findPurchaseLines(ctx context.Context, companyID, purchaseID in
 	rows, err := s.db.Query(`
     SELECT it.id,
     pi.variant_id::bigint,
+    iv.name,
+    COALESCE(iv.sku, ''),
     pi.qty::bigint,
     pi.unit_price::float8,
     COALESCE(pi.unit_id, items_units.unit_id),
@@ -215,6 +217,8 @@ func (s *Server) findPurchaseLines(ctx context.Context, companyID, purchaseID in
 		if err = rows.Scan(
 			&l.ID,
 			&l.VariantID,
+			&l.VariantName,
+			&l.VariantSKU,
 			&l.Qty,
 			&l.Price,
 			&l.Unit.ID,

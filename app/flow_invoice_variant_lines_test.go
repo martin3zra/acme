@@ -70,6 +70,34 @@ func TestFlowInvoiceVariantMovementHitsChosenVariant(t *testing.T) {
 	assertNoRow(t, s.db, "inventory_movements", map[string]any{"variant_id": red})
 }
 
+// TestFlowInvoiceLinesCarryVariant: the read path (findInvoiceLines, backing
+// Show/Edit) returns the line's variant id and name so an edit round-trips it.
+func TestFlowInvoiceLinesCarryVariant(t *testing.T) {
+	s := newTestServer(t)
+	is := newIs(t)
+	f := mkAccountCompany(t, s)
+	g := newFaker(t)
+
+	itemID, variantIDs := mkVariantItem(t, f, 100)
+	blue := variantIDs[1]
+	custID, _ := newCustomer(t, f, g).Build()
+
+	uuid := newInvoice(t, f, g).ForCustomer(custID).Cash().
+		WithVariantLine(itemID, blue, 2, 100, 18).Build()
+
+	var invID int
+	is.NoErr(s.db.QueryRow(`SELECT id FROM invoices WHERE uuid = $1`, uuid).Scan(&invID))
+
+	var blueName string
+	is.NoErr(s.db.QueryRow(`SELECT name FROM items_variants WHERE id = $1`, blue).Scan(&blueName))
+
+	lines, err := f.s.findInvoiceLines(f.ctx, f.company.ID, invID)
+	is.NoErr(err)
+	is.Equal(len(lines), 1)
+	is.Equal(int(lines[0].VariantID), blue)
+	is.Equal(lines[0].VariantName, blueName)
+}
+
 // TestFlowInvoiceVariantRequired: a has_variants item on a line with no variant
 // is rejected — no silent fallback across its variants.
 func TestFlowInvoiceVariantRequired(t *testing.T) {
