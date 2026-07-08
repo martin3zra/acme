@@ -79,14 +79,20 @@ func Can(user foundation.Authenticatable, actionModule string) bool {
 		return true
 	}
 
+	// Wildcard checks need an "action:module" shape. A string without a colon
+	// can't be split, so skip straight to the complete-wildcard check rather
+	// than slicing on a missing separator (which would panic).
+	action, module, ok := strings.Cut(actionModule, ":")
+	if !ok {
+		return permissions["*"]
+	}
+
 	// Action-wide wildcard (e.g., "view:*")
-	action := actionModule[:strings.Index(actionModule, ":")]
 	if permissions[action+":*"] {
 		return true
 	}
 
 	// Module-wide wildcard (e.g., "*:invoice")
-	module := actionModule[strings.Index(actionModule, ":")+1:]
 	if permissions["*:"+module] {
 		return true
 	}
