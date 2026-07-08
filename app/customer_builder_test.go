@@ -46,6 +46,18 @@ func (b *customerBuilder) CreditLimit(limit float64) *customerBuilder {
 	return b
 }
 
+// Named sets the customer's name explicitly (for search-by-name assertions).
+func (b *customerBuilder) Named(name string) *customerBuilder {
+	b.form.Name = name
+	return b
+}
+
+// WithAddress sets the customer's postal address.
+func (b *customerBuilder) WithAddress(address string) *customerBuilder {
+	b.form.Address = address
+	return b
+}
+
 // Individual makes the customer an individual person rather than a business.
 func (b *customerBuilder) Individual(g fakeGen) *customerBuilder {
 	b.form.CustomerType = "individual"

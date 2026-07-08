@@ -9,6 +9,7 @@ import (
 
 	"github.com/martin3zra/forge/database"
 	"github.com/martin3zra/forge/foundation"
+	"github.com/martin3zra/playsql"
 )
 
 type OpenBalance struct {
@@ -61,23 +62,30 @@ type receivable struct {
 }
 
 func (s *Server) findCustomeByID(ctx context.Context, customerID int) (*customer, error) {
-
-	var c customer
-	err := s.db.QueryRow("SELECT c.id, c.uuid, c.code, c.name, c.contact_name, c.phone, c.email, c.status, c.amount_due, c.credit_limited, c.credit_limit, c.address, "+
-		"c.created_at, c.updated_at, c.deleted_at "+
-		"FROM customers c "+
-		"INNER JOIN companies ON (c.company_id = companies.id) "+
-		"WHERE c.company_id = $1 "+
-		"AND c.id = $2 "+
-		"AND c.deleted_at IS NULL", CurrentCompany(ctx).ID, customerID).
-		Scan(&c.ID, &c.UUID, &c.Code, &c.Name, &c.ContactName, &c.Phone, &c.Email, &c.Status, &c.AmountDue, &c.CreditLimited, &c.CreditLimit, &c.Address, &c.CreatedAt, &c.UpdatedAt, &c.DeletedAt)
+	pdb, err := s.play()
 	if err != nil {
 		return nil, err
 	}
 
-	return &c, nil
+	// The old query INNER JOINed companies purely to assert the tenant row
+	// exists; the company_id predicate already scopes it, so the join is
+	// dropped. The softdelete tag on customerRead adds "deleted_at IS NULL".
+	var row customerRead
+	err = pdb.Model(&customerRead{}).
+		WhereEq("company_id", CurrentCompany(ctx).ID).
+		WhereEq("id", customerID).
+		First(ctx, &row)
+	if err != nil {
+		return nil, err
+	}
+
+	return row.toCustomer(), nil
 }
 
+// findCustomeByUUID stays on raw database/sql: it LEFT JOINs a derived
+// "opening balance" invoice subquery onto the customer and reads its columns
+// into an OpenBalance struct — a correlated join to a filtered subquery that
+// playsql's model/relation reads don't express. See playsql-phase2 notes.
 func (s *Server) findCustomeByUUID(ctx context.Context, customerID string) (*customer, error) {
 
 	var c customer
@@ -107,46 +115,25 @@ func (s *Server) findCustomeByUUID(ctx context.Context, customerID string) (*cus
 }
 
 func (s *Server) findCustomers(ctx context.Context, customerType CustomerType) ([]*customer, error) {
-
-	rows, err := s.db.Query("SELECT c.id, c.uuid, c.code, c.name, c.contact_name, c.phone, c.email, c.status, c.amount_due, "+
-		"c.customer_type, c.payment_method, c.credit_limited, c.credit_limit, c.payment_terms, c.tax_receipt_id, c.address, c.created_at, c.updated_at, c.deleted_at "+
-		"FROM customers c "+
-		"INNER JOIN companies ON (c.company_id = companies.id) "+
-		"WHERE c.company_id = $1 "+
-		"AND c.deleted_at IS NULL AND ($2 = 'all' OR c.customer_type = $2::customer_types) ORDER BY c.name", CurrentCompany(ctx).ID, customerType)
+	pdb, err := s.play()
 	if err != nil {
 		return nil, err
 	}
-	data := make([]*customer, 0)
-	for rows.Next() {
-		row := new(customer)
-		if err = rows.Scan(
-			&row.ID,
-			&row.UUID,
-			&row.Code,
-			&row.Name,
-			&row.ContactName,
-			&row.Phone,
-			&row.Email,
-			&row.Status,
-			&row.AmountDue,
-			&row.CustomerType,
-			&row.PaymentMethod,
-			&row.CreditLimited,
-			&row.CreditLimit,
-			&row.PaymentTerms,
-			&row.TaxReceipt,
-			&row.Address,
-			&row.CreatedAt,
-			&row.UpdatedAt,
-			&row.DeletedAt,
-		); err != nil {
-			return data, err
-		}
 
-		data = append(data, row)
+	q := pdb.Model(&customerRead{}).WhereEq("company_id", CurrentCompany(ctx).ID)
+	if customerType != "all" {
+		q = q.WhereEq("customer_type", string(customerType))
 	}
 
+	var rows []customerRead
+	if err := q.OrderBy("name", playsql.Asc).Get(ctx, &rows); err != nil {
+		return nil, err
+	}
+
+	data := make([]*customer, 0, len(rows))
+	for _, r := range rows {
+		data = append(data, r.toCustomer())
+	}
 	return data, nil
 }
 
@@ -154,42 +141,27 @@ func (s *Server) findCustomersBySearchCriteria(ctx context.Context, term string)
 	if len(strings.TrimSpace(term)) == 0 {
 		return nil, errors.New("need to specifiy the customer you're looking for")
 	}
-	rows, err := s.db.Query("SELECT c.id, c.uuid, c.code, c.name, c.contact_name, c.phone, c.email, c.amount_due, "+
-		"c.customer_type, c.payment_method, c.credit_limited, c.credit_limit, c.payment_terms, c.tax_receipt_id, c.address "+
-		"FROM customers c "+
-		"INNER JOIN companies ON (c.company_id = companies.id) "+
-		"WHERE c.company_id = $1 "+
-		"AND c.name ILIKE $2 "+
-		"AND c.deleted_at IS NULL AND c.status = 'enabled' ORDER BY c.name LIMIT 5 ", CurrentCompany(ctx).ID, "%"+term+"%")
+	pdb, err := s.play()
 	if err != nil {
 		return nil, err
 	}
-	data := make([]*customer, 0)
-	for rows.Next() {
-		row := new(customer)
-		if err = rows.Scan(
-			&row.ID,
-			&row.UUID,
-			&row.Code,
-			&row.Name,
-			&row.ContactName,
-			&row.Phone,
-			&row.Email,
-			&row.AmountDue,
-			&row.CustomerType,
-			&row.PaymentMethod,
-			&row.CreditLimited,
-			&row.CreditLimit,
-			&row.PaymentTerms,
-			&row.TaxReceipt,
-			&row.Address,
-		); err != nil {
-			return data, err
-		}
 
-		data = append(data, row)
+	var rows []customerRead
+	err = pdb.Model(&customerRead{}).
+		WhereEq("company_id", CurrentCompany(ctx).ID).
+		Where("name", "ILIKE", "%"+term+"%").
+		WhereEq("status", "enabled").
+		OrderBy("name", playsql.Asc).
+		Limit(5).
+		Get(ctx, &rows)
+	if err != nil {
+		return nil, err
 	}
 
+	data := make([]*customer, 0, len(rows))
+	for _, r := range rows {
+		data = append(data, r.toCustomer())
+	}
 	return data, nil
 }
 

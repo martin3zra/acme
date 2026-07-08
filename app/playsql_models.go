@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"time"
 
+	"github.com/martin3zra/forge/foundation"
 	"github.com/martin3zra/playsql"
 )
 
@@ -17,6 +18,68 @@ import (
 // tx and its commit/rollback.
 func playTx(tx *sql.Tx) (*playsql.Tx, error) {
 	return playsql.UseTx(tx, "postgres")
+}
+
+// play wraps the server's *sql.DB with playsql under the Postgres grammar for
+// read paths that are not inside a transaction (list/detail queries). Reads use
+// dedicated *Read models below (the JSON response structs can't double as playsql
+// models: they embed foundation.Timestamps, which the parser skips, and hold
+// pointer-to-struct fields it would misread as relations).
+func (s *Server) play() (*playsql.DB, error) {
+	return playsql.Use(s.db, "postgres")
+}
+
+// customerRead is the playsql read model for the customers table. Only real
+// columns are mapped (db tags); deleted_at carries play:"softdelete" so queries
+// exclude soft-deleted rows automatically, matching the old "deleted_at IS NULL".
+type customerRead struct {
+	ID            int        `db:"id" play:"pk,incrementing"`
+	UUID          string     `db:"uuid"`
+	Code          string     `db:"code"`
+	Name          string     `db:"name"`
+	ContactName   string     `db:"contact_name"`
+	Phone         string     `db:"phone"`
+	Email         string     `db:"email"`
+	Status        string     `db:"status"`
+	AmountDue     float64    `db:"amount_due"`
+	Address       string     `db:"address"`
+	CustomerType  string     `db:"customer_type"`
+	PaymentMethod string     `db:"payment_method"`
+	CreditLimited bool       `db:"credit_limited"`
+	CreditLimit   float64    `db:"credit_limit"`
+	PaymentTerms  string     `db:"payment_terms"`
+	TaxReceiptID  *int       `db:"tax_receipt_id"`
+	CreatedAt     *time.Time `db:"created_at"`
+	UpdatedAt     *time.Time `db:"updated_at"`
+	DeletedAt     *time.Time `db:"deleted_at" play:"softdelete"`
+}
+
+func (customerRead) TableName() string { return "customers" }
+
+// toCustomer maps the read model onto the JSON response struct.
+func (r customerRead) toCustomer() *customer {
+	c := &customer{
+		ID:            r.ID,
+		UUID:          r.UUID,
+		Code:          r.Code,
+		Name:          r.Name,
+		ContactName:   r.ContactName,
+		Phone:         r.Phone,
+		Email:         r.Email,
+		AmountDue:     r.AmountDue,
+		Address:       r.Address,
+		CustomerType:  r.CustomerType,
+		PaymentMethod: r.PaymentMethod,
+		CreditLimited: r.CreditLimited,
+		CreditLimit:   r.CreditLimit,
+		PaymentTerms:  r.PaymentTerms,
+		TaxReceipt:    r.TaxReceiptID,
+		Status:        foundation.Status(r.Status),
+	}
+	c.CreatedAt = r.CreatedAt
+	c.UpdatedAt = r.UpdatedAt
+	c.DeletedAt = r.DeletedAt
+	return c
 }
 
 // Receivable is the write model for the receivables table. The pk is DB-assigned
