@@ -82,6 +82,56 @@ func (r customerRead) toCustomer() *customer {
 	return c
 }
 
+// vendorRead is the playsql read model for the vendors table — same pattern as
+// customerRead (real columns only, softdelete on deleted_at).
+type vendorRead struct {
+	ID            int        `db:"id" play:"pk,incrementing"`
+	UUID          string     `db:"uuid"`
+	Code          string     `db:"code"`
+	Name          string     `db:"name"`
+	ContactName   string     `db:"contact_name"`
+	Phone         string     `db:"phone"`
+	Email         string     `db:"email"`
+	Status        string     `db:"status"`
+	AmountPayable float64    `db:"amount_payable"`
+	PurchaseNote  string     `db:"purchase_note"`
+	LeadTimeDays  int        `db:"lead_time_days"`
+	Address       string     `db:"address"`
+	VendorType    string     `db:"vendor_type"`
+	PaymentMethod string     `db:"payment_method"`
+	PaymentTerms  string     `db:"payment_terms"`
+	CreatedAt     *time.Time `db:"created_at"`
+	UpdatedAt     *time.Time `db:"updated_at"`
+	DeletedAt     *time.Time `db:"deleted_at" play:"softdelete"`
+}
+
+func (vendorRead) TableName() string { return "vendors" }
+
+// toVendor maps the read model onto the JSON response struct.
+func (r vendorRead) toVendor() *vendor {
+	v := &vendor{
+		ID:            r.ID,
+		UUID:          r.UUID,
+		Code:          r.Code,
+		Name:          r.Name,
+		ContactName:   r.ContactName,
+		Phone:         r.Phone,
+		Email:         r.Email,
+		PurchaseNote:  r.PurchaseNote,
+		LeadTimeDays:  r.LeadTimeDays,
+		AmountPayable: r.AmountPayable,
+		Address:       r.Address,
+		VendorType:    r.VendorType,
+		PaymentMethod: r.PaymentMethod,
+		PaymentTerms:  r.PaymentTerms,
+		Status:        foundation.Status(r.Status),
+	}
+	v.CreatedAt = r.CreatedAt
+	v.UpdatedAt = r.UpdatedAt
+	v.DeletedAt = r.DeletedAt
+	return v
+}
+
 // Receivable is the write model for the receivables table. The pk is DB-assigned
 // (serial); playsql omits the zero id on insert and reads it back via RETURNING.
 // Columns with database defaults (timestamps) are intentionally not mapped, so
