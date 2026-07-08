@@ -132,6 +132,34 @@ func (r vendorRead) toVendor() *vendor {
 	return v
 }
 
+// unitRead is the playsql read model for the units table. Unlike customerRead/
+// vendorRead it carries NO play:"softdelete" tag: the original unit reads never
+// filtered deleted_at (units are not soft-deleted — the repo has no delete path),
+// so the model maps deleted_at as a plain column to keep "return all rows".
+type unitRead struct {
+	ID        int64      `db:"id" play:"pk,incrementing"`
+	Name      string     `db:"name"`
+	BaseQty   int        `db:"base_qty"`
+	CreatedAt *time.Time `db:"created_at"`
+	UpdatedAt *time.Time `db:"updated_at"`
+	DeletedAt *time.Time `db:"deleted_at"`
+}
+
+func (unitRead) TableName() string { return "units" }
+
+// toUnit maps the read model onto the JSON response struct.
+func (r unitRead) toUnit() *unit {
+	u := &unit{
+		ID:      r.ID,
+		Name:    r.Name,
+		BaseQty: r.BaseQty,
+	}
+	u.CreatedAt = r.CreatedAt
+	u.UpdatedAt = r.UpdatedAt
+	u.DeletedAt = r.DeletedAt
+	return u
+}
+
 // Receivable is the write model for the receivables table. The pk is DB-assigned
 // (serial); playsql omits the zero id on insert and reads it back via RETURNING.
 // Columns with database defaults (timestamps) are intentionally not mapped, so
