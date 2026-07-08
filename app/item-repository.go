@@ -13,6 +13,8 @@ import (
 type item struct {
 	ID          int             `json:"id"`
 	UUID        string          `json:"uuid"`
+	VariantID   int             `json:"variant_id"`
+	SKU         string          `json:"sku,omitempty"`
 	Name        string          `json:"name"`
 	Price       float64         `json:"price"`
 	Description string          `json:"description"`
@@ -104,9 +106,16 @@ func (s *Server) findItemsByCriteria(ctx context.Context, term string) ([]*item,
 	if len(strings.TrimSpace(term)) == 0 {
 		return nil, errors.New("need to specifiy the item you're looking for")
 	}
-	is, err := s.db.Query("SELECT i.id, i.uuid, i.name, i.price, i.description, i.tax_id, t.name, t.rate, i.status, "+
+	// One row per sellable variant: a variant item expands to a row per variant
+	// ("Item — Variant"), a plain item to a single default-variant row. The term
+	// matches item fields or the variant's own sku/reference/barcode/name, so a
+	// search can land directly on a specific variant.
+	is, err := s.db.Query("SELECT i.id, i.uuid, iv.id as variant_id, COALESCE(iv.sku, ''), "+
+		"CASE WHEN iv.is_default THEN i.name ELSE i.name || ' — ' || iv.name END as name, "+
+		"iv.price, i.description, i.tax_id, t.name, t.rate, i.status, "+
 		"i.item_type, i.identifiers,i.created_at, i.updated_at, i.deleted_at, iu.unit_id, iu.name as unit_name "+
 		"FROM items i "+
+		"INNER JOIN items_variants iv ON (iv.item_id = i.id AND iv.company_id = i.company_id AND iv.deleted_at IS NULL) "+
 		"INNER JOIN taxes t ON(i.company_id = t.company_id AND i.tax_id = t.id) "+
 		"LEFT JOIN LATERAL (SELECT iu.unit_id, u.name FROM items_units iu INNER JOIN units u ON (iu.unit_id = u.id) WHERE iu.item_id = i.id limit 1) iu ON true "+
 		"WHERE i.company_id = $1 AND ("+
@@ -115,9 +124,10 @@ func (s *Server) findItemsByCriteria(ctx context.Context, term string) ([]*item,
 		"identifiers->>'code' ILIKE $2 OR "+
 		"identifiers->>'sku' ILIKE $2 OR "+
 		"identifiers->>'barcode' ILIKE $2 OR "+
-		"identifiers->>'vendor_reference' ILIKE $2"+
+		"identifiers->>'vendor_reference' ILIKE $2 OR "+
+		"iv.name ILIKE $2 OR iv.sku ILIKE $2 OR iv.reference ILIKE $2 OR iv.barcode ILIKE $2"+
 		") "+
-		"AND i.deleted_at IS NULL ORDER BY i.name",
+		"AND i.deleted_at IS NULL ORDER BY i.name, iv.is_default DESC, iv.name",
 		CurrentCompany(ctx).ID, "%"+term+"%",
 	)
 	if err != nil {
@@ -129,6 +139,8 @@ func (s *Server) findItemsByCriteria(ctx context.Context, term string) ([]*item,
 		if err = is.Scan(
 			&i.ID,
 			&i.UUID,
+			&i.VariantID,
+			&i.SKU,
 			&i.Name,
 			&i.Price,
 			&i.Description,
@@ -156,12 +168,22 @@ func (s *Server) findItemsByReference(ctx context.Context, term string) (*item, 
 		return nil, errors.New("need to specifiy the item you're looking for")
 	}
 
-	result := s.db.QueryRow("SELECT i.id, i.uuid, i.name, i.price, i.description, i.item_type, i.identifiers, i.tax_id, t.name, t.rate, "+
+	// Exact match resolves to one variant: a variant's own sku/reference/barcode
+	// selects that variant directly; an item-level reference falls to the item's
+	// default variant (is_default first).
+	result := s.db.QueryRow("SELECT i.id, i.uuid, iv.id as variant_id, COALESCE(iv.sku, ''), "+
+		"CASE WHEN iv.is_default THEN i.name ELSE i.name || ' — ' || iv.name END as name, "+
+		"iv.price, i.description, i.item_type, i.identifiers, i.tax_id, t.name, t.rate, "+
 		"iu.unit_id, iu.name as unit_name "+
 		"FROM items i "+
+		"INNER JOIN items_variants iv ON (iv.item_id = i.id AND iv.company_id = i.company_id AND iv.deleted_at IS NULL) "+
 		"INNER JOIN taxes t ON(i.company_id = t.company_id AND i.tax_id = t.id) "+
 		"LEFT JOIN LATERAL (SELECT iu.unit_id, u.name FROM items_units iu INNER JOIN units u ON (iu.unit_id = u.id) WHERE iu.item_id = i.id limit 1) iu ON true "+
-		"WHERE i.company_id = $1 AND i.identifiers->>'reference' = $2 AND i.deleted_at IS NULL", CurrentCompany(ctx).ID, term)
+		"WHERE i.company_id = $1 AND ("+
+		"i.identifiers->>'reference' = $2 OR iv.sku = $2 OR iv.reference = $2 OR iv.barcode = $2"+
+		") AND i.deleted_at IS NULL "+
+		"ORDER BY (iv.sku = $2 OR iv.reference = $2 OR iv.barcode = $2) DESC, iv.is_default DESC LIMIT 1",
+		CurrentCompany(ctx).ID, term)
 	if result.Err() != nil {
 		return nil, result.Err()
 	}
@@ -170,6 +192,8 @@ func (s *Server) findItemsByReference(ctx context.Context, term string) (*item, 
 	if err := result.Scan(
 		&i.ID,
 		&i.UUID,
+		&i.VariantID,
+		&i.SKU,
 		&i.Name,
 		&i.Price,
 		&i.Description,

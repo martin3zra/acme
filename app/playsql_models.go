@@ -40,6 +40,7 @@ type InvoiceItem struct {
 	CompanyID   int     `db:"company_id"`
 	InvoiceID   int     `db:"invoice_id"`
 	ItemID      int     `db:"item_id"`
+	VariantID   int     `db:"variant_id"`
 	UnitID      int     `db:"unit_id"`
 	Qty         int     `db:"qty"`
 	Price       float64 `db:"price"`

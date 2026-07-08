@@ -80,6 +80,14 @@ func (b *invoiceBuilder) WithLine(itemID, qty int, price, rate float64) *invoice
 	return b
 }
 
+// WithVariantLine adds a line that names an explicit variant of the item.
+func (b *invoiceBuilder) WithVariantLine(itemID, variantID, qty int, price, rate float64) *invoiceBuilder {
+	l := mkLine(itemID, b.f.unitID, b.f.warehouseID, qty, price, rate)
+	l.VariantID = variantID
+	b.lines = append(b.lines, l)
+	return b
+}
+
 // WithItem adds a line for an item with a faker-generated quantity (1-5) and
 // price, taxed at the fixture's default rate (18%).
 func (b *invoiceBuilder) WithItem(itemID int) *invoiceBuilder {

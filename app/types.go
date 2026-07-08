@@ -881,6 +881,7 @@ func (d *Payment) Scan(value any) error {
 
 type Line struct {
 	ID          int        `json:"id"`
+	VariantID   int        `json:"variant_id"`
 	Unit        int        `json:"unit"`
 	Qty         int        `json:"qty"`
 	Price       float64    `json:"price"`

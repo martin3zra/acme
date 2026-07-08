@@ -124,7 +124,7 @@ export default function Create({
   useEffect(() => setCurrentItem(item), [item]);
 
   const findCurrentItem = useCallback(() => {
-    const exists = (element: LineForm) => element.id === currentItem?.id;
+    const exists = (element: LineForm) => element.id === currentItem?.id && element.variant_id === currentItem?.variant_id;
     const index = invoiceForm.lines.findIndex(exists);
     if (index >= 0) {
       setEditing(true);
@@ -192,7 +192,7 @@ export default function Create({
     const line = currentItem!;
 
     if (isEditing) {
-      const index = invoiceForm.lines.findIndex((element: LineForm) => element.id === line.id);
+      const index = invoiceForm.lines.findIndex((element: LineForm) => element.id === line.id && element.variant_id === line.variant_id);
       if (index >= 0) {
         invoiceForm.lines[index].qty = qtyInputRef.current?.valueAsNumber || 0;
         invoiceForm.lines[index].amount = amount;
@@ -340,7 +340,7 @@ export default function Create({
         notes: invoiceForm.header.notes || '',
         kind: invoiceForm.kind,
         lines: invoiceForm.lines.map((line) => {
-          return { id: line.id, qty: line.qty, unit: line.unit.id, price: line.price, rate: line.tax.rate, action: line.action };
+          return { id: line.id, variant_id: line.variant_id, qty: line.qty, unit: line.unit.id, price: line.price, rate: line.tax.rate, action: line.action };
         }),
         // payment: invoiceForm.payment,
       };

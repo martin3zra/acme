@@ -132,7 +132,7 @@ export default function Create({
   }, [purchaseForm.header.terms]);
 
   const findCurrentItem = useCallback(() => {
-    const exists = (element: LineForm) => element.id === currentItem?.id;
+    const exists = (element: LineForm) => element.id === currentItem?.id && element.variant_id === currentItem?.variant_id;
     const index = purchaseForm.lines.findIndex(exists);
     if (index >= 0) {
       setEditing(true);
@@ -172,7 +172,7 @@ export default function Create({
     const line = currentItem!;
 
     if (isEditing) {
-      const index = purchaseForm.lines.findIndex((element: LineForm) => element.id === line.id);
+      const index = purchaseForm.lines.findIndex((element: LineForm) => element.id === line.id && element.variant_id === line.variant_id);
       if (index >= 0) {
         purchaseForm.lines[index].qty = qtyInputRef.current?.valueAsNumber || 0;
         purchaseForm.lines[index].amount = amount;
@@ -303,7 +303,7 @@ export default function Create({
         source: purchaseForm.source,
         lines: purchaseForm.lines
           .filter((l) => l.action !== 'deleted')
-          .map((line) => ({ id: line.id, qty: line.qty, unit: line.unit.id, price: line.price, rate: line.tax.rate, action: 'added' })),
+          .map((line) => ({ id: line.id, variant_id: line.variant_id, qty: line.qty, unit: line.unit.id, price: line.price, rate: line.tax.rate, action: 'added' })),
       };
 
       if (kind === 'purchase_receipt') {

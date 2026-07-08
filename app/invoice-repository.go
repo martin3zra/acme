@@ -39,7 +39,9 @@ type invoice struct {
 
 type line struct {
 	ID           int64           `json:"id"`
-	VariantID    int64           `json:"-"`
+	VariantID    int64           `json:"variant_id"`
+	VariantName  string          `json:"variant_name"`
+	VariantSKU   string          `json:"variant_sku,omitempty"`
 	WarehouseID  int64           `json:"warehouse_id"`
 	Qty          int64           `json:"qty"`
 	RemainingQty *int64          `json:"remaining_qty,omitempty"`
@@ -393,6 +395,7 @@ func (s *Server) attachInvoiceLines(tx *sql.Tx, companyId, invoiceId int, form *
 			"company_id":   companyId,
 			"invoice_id":   invoiceId,
 			"item_id":      line.ID,
+			"variant_id":   line.VariantID,
 			"unit_id":      line.Unit,
 			"qty":          line.Qty,
 			"price":        line.Price,
@@ -419,6 +422,11 @@ func (s *Server) processInvoiceLines(tx *sql.Tx, companyId, invoiceId int, form 
 	for _, line := range lines {
 		switch line.Action {
 		case ADDED:
+			variantID, err := resolveVariantForLine(tx, companyId, line.ID, line.VariantID)
+			if err != nil {
+				return err
+			}
+			line.VariantID = variantID
 			// Preserves the original column set exactly: only these eight columns,
 			// with the tax column carrying the line rate (rate/amount/total are left
 			// to their defaults on this path, unlike the create-time bulk insert).
@@ -426,6 +434,7 @@ func (s *Server) processInvoiceLines(tx *sql.Tx, companyId, invoiceId int, form 
 				"company_id":   companyId,
 				"invoice_id":   invoiceId,
 				"item_id":      line.ID,
+				"variant_id":   line.VariantID,
 				"unit_id":      line.Unit,
 				"qty":          line.Qty,
 				"price":        line.Price,
@@ -435,10 +444,18 @@ func (s *Server) processInvoiceLines(tx *sql.Tx, companyId, invoiceId int, form 
 				return err
 			}
 		case UPDATED:
+			variantID, err := resolveVariantForLine(tx, companyId, line.ID, line.VariantID)
+			if err != nil {
+				return err
+			}
+			line.VariantID = variantID
+			// Match on variant_id too: one item may appear on several lines as
+			// different variants, so item_id alone no longer identifies a row.
 			if _, err := ptx.Model(&InvoiceItem{}).
 				WhereEq("company_id", companyId).
 				WhereEq("invoice_id", invoiceId).
 				WhereEq("item_id", line.ID).
+				WhereEq("variant_id", line.VariantID).
 				Update(context.Background(), map[string]any{
 					"qty":          line.Qty,
 					"unit_id":      line.Unit,
@@ -447,10 +464,16 @@ func (s *Server) processInvoiceLines(tx *sql.Tx, companyId, invoiceId int, form 
 				return err
 			}
 		case DELETED:
+			variantID, err := resolveVariantForLine(tx, companyId, line.ID, line.VariantID)
+			if err != nil {
+				return err
+			}
+			line.VariantID = variantID
 			if _, err := ptx.Model(&InvoiceItem{}).
 				WhereEq("company_id", companyId).
 				WhereEq("invoice_id", invoiceId).
 				WhereEq("item_id", line.ID).
+				WhereEq("variant_id", line.VariantID).
 				Delete(context.Background()); err != nil {
 				return err
 			}
@@ -463,13 +486,17 @@ func (s *Server) processInvoiceLines(tx *sql.Tx, companyId, invoiceId int, form 
 
 func (s *Server) findInvoiceLines(ctx context.Context, companyID, invoiceID int) ([]*line, error) {
 	rows, err := s.db.Query(`
-    SELECT ii.item_id, ii.qty, ii.price, items_units.unit_id, it.name, it.description, items_units.name,
+    SELECT ii.item_id, ii.variant_id, iv.name, COALESCE(iv.sku, ''),
+    ii.qty, ii.price, items_units.unit_id,
+    CASE WHEN iv.is_default THEN it.name ELSE it.name || ' — ' || iv.name END,
+    it.description, items_units.name,
     ii.created_at, ii.updated_at, ii.deleted_at, 'unchanged' as action, ii.amount, ii.total,
     taxes.id as tax_id, taxes.name as tax_name, ii.rate, ii.tax, it.identifiers, ii.warehouse_id
     FROM invoices_items AS ii
     INNER JOIN companies AS com ON (ii.company_id = com.id)
     INNER JOIN invoices AS i ON (ii.invoice_id = i.id AND ii.company_id = i.company_id)
     INNER JOIN items AS it ON(ii.item_id = it.id AND ii.company_id = it.company_id)
+    INNER JOIN items_variants AS iv ON (ii.variant_id = iv.id AND ii.company_id = iv.company_id)
     LEFT JOIN LATERAL (
       SELECT items_units.unit_id, units.name
       FROM items_units
@@ -488,6 +515,9 @@ func (s *Server) findInvoiceLines(ctx context.Context, companyID, invoiceID int)
 
 		if err = rows.Scan(
 			&i.ID,
+			&i.VariantID,
+			&i.VariantName,
+			&i.VariantSKU,
 			&i.Qty,
 			&i.Price,
 			&i.Unit.ID,
@@ -699,6 +729,15 @@ func (s *Server) storeInvoiceInternal(tx *sql.Tx, companyID int, form *StoreInvo
 			line.WarehouseID = 1
 		}
 	}
+	// Resolve each line's variant (explicit, or the item's default) before the
+	// line is persisted, so invoices_items.variant_id is populated correctly.
+	for _, line := range form.Lines {
+		variantID, err := resolveVariantForLine(tx, companyID, line.ID, line.VariantID)
+		if err != nil {
+			return invoiceUUID, err
+		}
+		line.VariantID = variantID
+	}
 	if err = s.attachInvoiceLines(tx, companyID, invoiceID, form); err != nil {
 		return invoiceUUID, err
 	}
@@ -789,35 +828,25 @@ func (s *Server) purgeCacheByID(tx *sql.Tx, kind TransactionKind, uuid string) e
 	return nil
 }
 
-// recordInvoiceMovements resolves the variant_id for each invoice line and
-// records an OUT movement (negative qty) per line.
+// recordInvoiceMovements records an OUT movement (negative qty) per line against
+// the variant the line already resolved to (see resolveVariantForLine, run before
+// the lines were persisted). Lines carry a concrete variant_id by this point; a
+// zero here is a programming error, not something to paper over silently.
 func (s *Server) recordInvoiceMovements(tx *sql.Tx, companyID, invoiceID int, lines []*Line) error {
-	itemIDs := make([]int, 0, len(lines))
-	for _, l := range lines {
-		itemIDs = append(itemIDs, l.ID)
-	}
-
-	variantIDs, err := resolveItemVariantIDs(tx, companyID, itemIDs)
-	if err != nil {
-		return fmt.Errorf("recordInvoiceMovements: resolve variants: %w", err)
-	}
-
 	for _, l := range lines {
 		if l.Action == LineActions.Deleted {
-			continue
-		}
-		variantID, ok := variantIDs[l.ID]
-		if !ok {
-			// Item has no default variant; skip silently.
 			continue
 		}
 		if l.WarehouseID == 0 {
 			continue
 		}
+		if l.VariantID == 0 {
+			return fmt.Errorf("recordInvoiceMovements: line for item_id=%d has no resolved variant", l.ID)
+		}
 		// OUT movement: qty is negative.
 		if err := s.recordMovement(
 			tx, companyID,
-			variantID, l.WarehouseID, l.Unit,
+			l.VariantID, l.WarehouseID, l.Unit,
 			-float64(l.Qty), l.Price,
 			InventoryMovementKinds.Sale,
 			"invoice", invoiceID,

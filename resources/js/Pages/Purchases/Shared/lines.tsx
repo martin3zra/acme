@@ -115,8 +115,8 @@ export const Lines = ({
               {items?.map((item) => (
                 <CommandItem
                   asChild
-                  value={String(item.id)}
-                  key={String(item.id)}
+                  value={`${item.id}-${item.variant_id}`}
+                  key={`${item.id}-${item.variant_id}`}
                   onSelect={() => {
                     handleOnSelected(item);
                     setOpen(false);
