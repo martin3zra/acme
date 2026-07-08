@@ -195,7 +195,11 @@ const navSecondary: NavItem[] = [
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const { auth } = usePage<PageProps>().props;
-  const groups = buildNavGroups(navMain);
+  // Attributes drive the product-variant matrix; hide the nav entry unless the
+  // company has the variants feature flag enabled.
+  const handlesVariants = auth.company?.handles_variants === true;
+  const items = handlesVariants ? navMain : navMain.filter((item) => item.url !== '/attributes');
+  const groups = buildNavGroups(items);
   return (
     <Sidebar variant="inset" {...props}>
       <SidebarHeader>

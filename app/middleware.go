@@ -53,6 +53,18 @@ func (s *Server) SharedProps(next routing.HandlerFunc) routing.HandlerFunc {
 			ownedBy = getAccount(attrs)
 		}
 
+		// The session company predates the variants flag (stored in
+		// companies_settings), so refresh it here to keep auth.company.handles_variants
+		// correct on every page — the sidebar gates the Attributes nav on it.
+		if currentCompany != nil {
+			enabled, err := s.handlesVariantsByCompanyID(ctx.Request.Context(), currentCompany.ID)
+			if err != nil {
+				log.Printf("Error fetching handles_variants for shared props: %v", err)
+			} else {
+				currentCompany.HandlesVariants = enabled
+			}
+		}
+
 		props := map[string]any{
 			"auth": map[string]any{
 				"user":    sessionUser,
@@ -69,6 +81,24 @@ func (s *Server) SharedProps(next routing.HandlerFunc) routing.HandlerFunc {
 
 		ctxWithProps := gonertia.SetProps(ctx.Request.Context(), props)
 		next(ctx.WithContext(ctxWithProps))
+	}
+}
+
+// RequiresVariants gates a route on the company's variants feature flag. When
+// off the route responds 404 so the attribute endpoints are fully hidden,
+// matching the sidebar/editor gating.
+func (s *Server) RequiresVariants(next routing.HandlerFunc) routing.HandlerFunc {
+	return func(ctx *routing.Context) {
+		enabled, err := s.companyHandlesVariants(ctx.Request.Context())
+		if err != nil {
+			ctx.Error(err)
+			return
+		}
+		if !enabled {
+			ctx.Error(foundation.HTTPError{StatusCode: http.StatusNotFound, Message: "Not Found"})
+			return
+		}
+		next(ctx)
 	}
 }
 

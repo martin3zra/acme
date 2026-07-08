@@ -318,10 +318,17 @@ func (s *Server) updateRedirectPreferences(ctx context.Context, uuid string, for
 // companyHandlesVariants reports whether the current company manages product
 // variants (the feature flag that gates the variant UI in the item editor).
 func (s *Server) companyHandlesVariants(ctx context.Context) (bool, error) {
+	return s.handlesVariantsByCompanyID(ctx, CurrentCompany(ctx).ID)
+}
+
+// handlesVariantsByCompanyID reads the flag by company id. Used by SharedProps,
+// which runs before the CompanyKey context is populated and so cannot rely on
+// CurrentCompany(ctx).
+func (s *Server) handlesVariantsByCompanyID(ctx context.Context, companyID int) (bool, error) {
 	var enabled bool
 	err := s.db.QueryRowContext(ctx,
 		`SELECT COALESCE(handles_variants, false) FROM companies_settings WHERE company_id = $1`,
-		CurrentCompany(ctx).ID,
+		companyID,
 	).Scan(&enabled)
 	if errors.Is(err, sql.ErrNoRows) {
 		return false, nil
