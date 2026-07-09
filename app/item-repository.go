@@ -264,9 +264,23 @@ func (s *Server) storeDefaultVariant(tx *sql.Tx, companyID, itemID int, name str
 	return err
 }
 
+// attachItemUnit sets the item's unit, creating the link row or replacing the unit
+// on the existing one.
+//
+// The statement it replaced conflicted on `id`, the serial primary key, which the
+// insert never supplies — so the ON CONFLICT branch could never fire and there was
+// no unique index for it to target either. Every call appended a row, and because
+// both item reads pick the unit through `LEFT JOIN LATERAL (... LIMIT 1)` with no
+// ORDER BY, editing an item's unit silently kept the old one. The migration in
+// 20260709120000 dedupes the table and adds the (company_id, item_id) constraint
+// this now conflicts on.
 func (s *Server) attachItemUnit(tx *sql.Tx, companyID, itemID, unitID int) error {
-	_, err := tx.Exec("INSERT INTO items_units (company_id, item_id, unit_id) VALUES($1, $2, $3) "+
-		"ON CONFLICT (id) DO UPDATE SET updated_at = now()", companyID, itemID, unitID)
+	_, err := tx.Exec(
+		`INSERT INTO items_units (company_id, item_id, unit_id) VALUES ($1, $2, $3)
+		 ON CONFLICT (company_id, item_id)
+		 DO UPDATE SET unit_id = EXCLUDED.unit_id, updated_at = now()`,
+		companyID, itemID, unitID,
+	)
 	return err
 }
 

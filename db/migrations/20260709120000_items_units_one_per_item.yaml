@@ -1,0 +1,40 @@
+# One unit per item.
+#
+# attachItemUnit has always ended with `ON CONFLICT (id) DO UPDATE SET updated_at
+# = now()`. `id` is the serial primary key and the insert never supplies it, so
+# that clause could never fire, and no unique index existed on (company_id,
+# item_id) for it to target. Every call therefore appended a row.
+#
+# Both item reads resolve the unit through `LEFT JOIN LATERAL (... LIMIT 1)` with
+# no ORDER BY, so after an edit the item's unit was whichever duplicate Postgres
+# happened to return — in practice the original one. Changing an item's unit
+# looked like it worked and did nothing.
+#
+# The reads have always treated this as one-unit-per-item. This makes that the
+# schema's rule, so the upsert in attachItemUnit has a constraint to conflict on.
+#
+# action: raw — Camel's DSL has no dedupe step, and the constraint must be added
+# only after the duplicates are gone.
+up:
+  items_units_one_per_item:
+    action: raw
+    statements:
+      # Keep the earliest row per (company_id, item_id); it is the one the
+      # LATERAL was already returning, so no item's unit changes here.
+      - |
+        DELETE FROM public.items_units a
+        USING public.items_units b
+        WHERE a.company_id = b.company_id
+          AND a.item_id = b.item_id
+          AND a.id > b.id;
+      - |
+        ALTER TABLE ONLY public.items_units
+            ADD CONSTRAINT items_units_company_item_unique UNIQUE (company_id, item_id);
+
+down:
+  items_units_one_per_item:
+    action: raw
+    statements:
+      - |
+        ALTER TABLE ONLY public.items_units
+            DROP CONSTRAINT IF EXISTS items_units_company_item_unique;
