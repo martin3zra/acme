@@ -111,6 +111,35 @@ func TestGrabTaxReceiptSequence_ForeignCompany(t *testing.T) {
 	is.Equal(after, before) // the foreign counter never moved
 }
 
+// TestGrabTaxReceiptSequence_SoftDeleted: a retired receipt must not keep issuing
+// fiscal numbers.
+//
+// Nothing in the codebase soft-deletes a tax receipt today — no handler, no
+// migration, no stored procedure writes tax_receipts.deleted_at — so this pins
+// intended behaviour rather than fixing a live bug. The test sets the column by hand.
+func TestGrabTaxReceiptSequence_SoftDeleted(t *testing.T) {
+	s := newTestServer(t)
+	is := newIs(t)
+	f := mkAccountCompany(t, s)
+
+	before := scalarInt(t, s.db, `SELECT current FROM tax_receipts WHERE id = $1`, f.taxReceiptID)
+
+	_, err := s.db.Exec(`UPDATE tax_receipts SET deleted_at = NOW() WHERE id = $1`, f.taxReceiptID)
+	is.NoErr(err)
+
+	tx, err := s.db.Begin()
+	is.NoErr(err)
+	defer tx.Rollback()
+
+	_, err = s.grabTaxReceiptSequence(tx, f.company.ID, f.taxReceiptID)
+	is.True(errors.Is(err, ErrTaxReceiptNotFound), "a soft-deleted receipt is not found")
+	is.True(!errors.Is(err, ErrTaxReceiptReachEnd), "and not exhaustion")
+	is.NoErr(tx.Rollback())
+
+	after := scalarInt(t, s.db, `SELECT current FROM tax_receipts WHERE id = $1`, f.taxReceiptID)
+	is.Equal(after, before) // the counter never moved
+}
+
 // TestGrabTaxReceiptSequence_ConcurrentTxDistinct is the regression test.
 //
 // It runs the real code on two genuinely concurrent transactions against the base

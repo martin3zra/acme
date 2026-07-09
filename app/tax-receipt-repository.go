@@ -120,15 +120,20 @@ var (
 //
 // The `current < sequence_end` predicate replaces the old pre-read exhaustion check,
 // so the last issuable number is sequence_end - 1, as it always was. Updating no row
-// is ambiguous — spent range, unknown id, or another company's id — so the cause is
-// resolved with a follow-up read rather than reported as exhaustion either way.
+// is ambiguous — spent range, unknown id, another company's id, or a soft-deleted
+// receipt — so the cause is resolved with a follow-up read rather than reported as
+// exhaustion either way.
+//
+// `deleted_at IS NULL` is defensive: nothing in the codebase soft-deletes a tax
+// receipt today, so no live path reaches it. If one is ever added, a retired receipt
+// must not keep issuing fiscal numbers.
 func (s *Server) grabTaxReceiptSequence(tx *sql.Tx, companyId, taxReceiptID int) (*taxReceiptSeq, error) {
 	var sequence int64
 	var serie string
 	err := tx.QueryRow(
 		`UPDATE tax_receipts
 		    SET current = current + 1, updated_at = NOW()
-		  WHERE company_id = $1 AND id = $2 AND current < sequence_end
+		  WHERE company_id = $1 AND id = $2 AND deleted_at IS NULL AND current < sequence_end
 		 RETURNING serie, current - 1`,
 		companyId, taxReceiptID,
 	).Scan(&serie, &sequence)
@@ -150,7 +155,7 @@ func (s *Server) grabTaxReceiptSequence(tx *sql.Tx, companyId, taxReceiptID int)
 func (s *Server) explainNoSequence(tx *sql.Tx, companyId, taxReceiptID int) error {
 	var exists bool
 	err := tx.QueryRow(
-		"SELECT true FROM tax_receipts WHERE company_id = $1 AND id = $2",
+		"SELECT true FROM tax_receipts WHERE company_id = $1 AND id = $2 AND deleted_at IS NULL",
 		companyId, taxReceiptID,
 	).Scan(&exists)
 	if errors.Is(err, sql.ErrNoRows) {
