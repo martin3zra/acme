@@ -3,12 +3,12 @@ package app
 import (
 	"context"
 	"database/sql"
-	"encoding/json"
 	"errors"
 	"time"
 
 	"github.com/martin3zra/forge/database"
 	"github.com/martin3zra/forge/foundation"
+	"github.com/martin3zra/playsql"
 )
 
 type vendorPayment struct {
@@ -37,52 +37,36 @@ type vendorPaymentLine struct {
 	PaidStatus string    `json:"paid_status"`
 }
 
+// findPayables lists the company's outstanding AP entries with their payables
+// register row. The old query was rooted on payables and joined up to
+// accounts_payable; this reads accounts_payable as the root because every filter
+// and the ordering belong to it, and pulls the register row through Has/With.
+//
+// The dropped joins are all redundant: INNER JOIN companies and INNER JOIN vendors
+// only asserted existence (both are NOT NULL FKs, and company_id already scopes
+// the query), and payables.company_id / payables.vendor_id are copies of the AP
+// row's own columns, so matching on accounts_payable_id alone selects the same row.
 func (s *Server) findPayables(ctx context.Context) ([]*Payable, error) {
-	rows, err := s.db.QueryContext(ctx, `
-		SELECT
-			p.id, p.uuid,
-			ap.uuid, ap.id, ap.invoice_number,
-			ap.invoice_date, ap.due_date,
-			ap.amount_total, ap.amount_payable, ap.amount_paid,
-			ap.status, ap.paid_status, COALESCE(ap.notes, '')
-		FROM payables p
-		INNER JOIN companies        ON (p.company_id = companies.id)
-		INNER JOIN accounts_payable ap ON (p.company_id = ap.company_id AND p.vendor_id = ap.vendor_id AND p.accounts_payable_id = ap.id)
-		INNER JOIN vendors          ON (p.company_id = vendors.company_id AND p.vendor_id = vendors.id)
-		WHERE p.company_id = $1
-		  AND ap.status != 'void'
-		  AND ap.paid_status != 'paid'
-		ORDER BY ap.due_date ASC`,
-		CurrentCompany(ctx).ID,
-	)
+	pdb, err := s.play()
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
 
-	data := make([]*Payable, 0)
-	for rows.Next() {
-		row := new(Payable)
-		var notes string
-		if err = rows.Scan(
-			&row.ID,
-			&row.UUID,
-			&row.InvoiceUUID,
-			&row.InvoiceID,
-			&row.InvoiceNumber,
-			&row.InvoiceDate,
-			&row.DueDate,
-			&row.AmountTotal,
-			&row.AmountPayable,
-			&row.AmountPaid,
-			&row.Status,
-			&row.PaidStatus,
-			&notes,
-		); err != nil {
-			return data, err
-		}
-		row.Notes = &notes
-		data = append(data, row)
+	var rows []accountsPayableRead
+	if err := pdb.Model(&accountsPayableRead{}).
+		With("Register").
+		Has("Register").
+		WhereEq("company_id", CurrentCompany(ctx).ID).
+		Where("status", "!=", "void").
+		Where("paid_status", "!=", "paid").
+		OrderBy("due_date", playsql.Asc).
+		Get(ctx, &rows); err != nil {
+		return nil, err
+	}
+
+	data := make([]*Payable, 0, len(rows))
+	for _, r := range rows {
+		data = append(data, r.toPayable())
 	}
 	return data, nil
 }
@@ -145,16 +129,34 @@ func (s *Server) storeVendorPayment(ctx context.Context, form *StoreVendorPaymen
 	})
 }
 
+// findAPByUUID resolves an AP entry inside the caller's transaction. Unlike
+// toPayable, ID/UUID here are the accounts_payable row's own identifiers — the
+// caller wants the AP entry, not its payables register row.
 func (s *Server) findAPByUUID(tx *sql.Tx, companyID int, uuid string) (*Payable, error) {
-	ap := new(Payable)
-	err := tx.QueryRow(
-		"SELECT id, uuid, amount_payable, amount_paid FROM accounts_payable WHERE company_id = $1 AND uuid = $2",
-		companyID, uuid,
-	).Scan(&ap.ID, &ap.UUID, &ap.AmountPayable, &ap.AmountPaid)
-	return ap, err
+	ptx, err := playTx(tx)
+	if err != nil {
+		return nil, err
+	}
+
+	var row accountsPayableRead
+	if err := ptx.Model(&accountsPayableRead{}).
+		WhereEq("company_id", companyID).
+		WhereEq("uuid", uuid).
+		First(context.Background(), &row); err != nil {
+		return nil, err
+	}
+
+	return &Payable{
+		ID:            row.ID,
+		UUID:          row.UUID,
+		AmountPayable: row.AmountPayable,
+		AmountPaid:    row.AmountPaid,
+	}, nil
 }
 
 func (s *Server) updateAPBalance(tx *sql.Tx, companyID int, apID int64, paymentAmount float64) error {
+	// Stays raw: playsql's Update replaces a column, it cannot express the
+	// self-referencing increment `amount_paid = amount_paid + $3`.
 	var newPaid float64
 	var amountPayable float64
 	err := tx.QueryRow(
@@ -175,23 +177,32 @@ func (s *Server) updateAPBalance(tx *sql.Tx, companyID int, apID int64, paymentA
 		newStatus = PaidStatuses.UnPaid
 	}
 
-	if newStatus == PaidStatuses.Paid {
-		_, err = tx.Exec(
-			"UPDATE accounts_payable SET paid_status = $3, paid_at = NOW(), updated_at = NOW() WHERE company_id = $1 AND id = $2",
-			companyID, apID, newStatus,
-		)
-	} else {
-		_, err = tx.Exec(
-			"UPDATE accounts_payable SET paid_status = $3, updated_at = NOW() WHERE company_id = $1 AND id = $2",
-			companyID, apID, newStatus,
-		)
-	}
+	ptx, err := playTx(tx)
 	if err != nil {
 		return err
 	}
 
+	// accountsPayableInsert leaves updated_at/paid_at unmapped, so both are passed
+	// explicitly; mass-assignment is unrestricted on these models. The old code ran
+	// two near-identical statements to conditionally add paid_at.
+	changes := map[string]any{
+		"paid_status": string(newStatus),
+		"updated_at":  time.Now(),
+	}
+	if newStatus == PaidStatuses.Paid {
+		changes["paid_at"] = time.Now()
+	}
+	if _, err = ptx.Model(&accountsPayableInsert{}).
+		WhereEq("company_id", companyID).
+		WhereEq("id", apID).
+		Update(context.Background(), changes); err != nil {
+		return err
+	}
+
 	// Propagate payment status to the source purchase order (if this AP entry
-	// was created from a vendor bill that is linked to a PO via source).
+	// was created from a vendor bill that is linked to a PO via source). Stays
+	// raw: the join predicate casts a JSON field to uuid, which no builder
+	// relation can express.
 	var poUUID string
 	lookupErr := tx.QueryRow(
 		`SELECT p_po.uuid::text
@@ -218,60 +229,59 @@ func (s *Server) updateAPBalance(tx *sql.Tx, companyID int, apID int64, paymentA
 }
 
 func (s *Server) findVendorPaymentByUUID(ctx context.Context, uuid string) (*vendorPayment, error) {
-	p := new(vendorPayment)
-	var paymentJSON []byte
-	err := s.db.QueryRowContext(ctx, `
-		SELECT vp.id, vp.uuid, vp.date, vp.amount, COALESCE(vp.notes,''), vp.payment, vp.status, vp.code,
-		       v.id, v.uuid, v.name, v.email, v.phone
-		FROM vendor_payments vp
-		INNER JOIN vendors v ON (vp.company_id = v.company_id AND vp.vendor_id = v.id)
-		WHERE vp.company_id = $1 AND vp.uuid = $2`,
-		CurrentCompany(ctx).ID, uuid,
-	).Scan(
-		&p.ID, &p.UUID, &p.Date, &p.Amount, &p.Notes, &paymentJSON, &p.Status, &p.Code,
-		&p.Vendor.ID, &p.Vendor.UUID, &p.Vendor.Name, &p.Vendor.Email, &p.Vendor.Phone,
-	)
+	pdb, err := s.play()
 	if err != nil {
 		return nil, err
 	}
-	if len(paymentJSON) > 0 {
-		pm := new(Payment)
-		if err = json.Unmarshal(paymentJSON, pm); err == nil {
-			p.Payment = pm
-		}
+
+	var row vendorPaymentRead
+	if err := pdb.Model(&vendorPaymentRead{}).
+		WithConstraint("Vendor", withTrashedRelation).
+		WhereEq("company_id", CurrentCompany(ctx).ID).
+		WhereEq("uuid", uuid).
+		First(ctx, &row); err != nil {
+		return nil, err
 	}
-	return p, nil
+
+	return row.toVendorPayment(), nil
 }
 
+// findVendorPaymentLines lists the AP entries a vendor payment settled. The old
+// query's CASE expression is computed in Go instead; the bill columns come from
+// the eager-loaded AP entry.
 func (s *Server) findVendorPaymentLines(ctx context.Context, paymentID int) ([]*vendorPaymentLine, error) {
-	rows, err := s.db.QueryContext(ctx, `
-		SELECT vpi.id,
-		       ap.id, ap.uuid, ap.invoice_number,
-		       ap.invoice_date, ap.due_date,
-		       vpi.amount_due, vpi.payment_amount,
-		       CASE WHEN (vpi.amount_due - vpi.payment_amount) <= 0 THEN 'paid' ELSE 'partial' END
-		FROM vendor_payment_items vpi
-		INNER JOIN accounts_payable ap ON (vpi.company_id = ap.company_id AND vpi.accounts_payable_id = ap.id)
-		WHERE vpi.company_id = $1 AND vpi.vendor_payment_id = $2
-		ORDER BY vpi.id`,
-		CurrentCompany(ctx).ID, paymentID,
-	)
+	pdb, err := s.play()
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
 
-	data := make([]*vendorPaymentLine, 0)
-	for rows.Next() {
-		l := new(vendorPaymentLine)
-		if err = rows.Scan(
-			&l.ID,
-			&l.APID, &l.APUUID, &l.BillNumber,
-			&l.BillDate, &l.DueDate,
-			&l.AmountDue, &l.Payment,
-			&l.PaidStatus,
-		); err != nil {
-			return data, err
+	var rows []vendorPaymentItemRead
+	if err := pdb.Model(&vendorPaymentItemRead{}).
+		With("AccountsPayable").
+		WhereEq("company_id", CurrentCompany(ctx).ID).
+		WhereEq("vendor_payment_id", paymentID).
+		OrderBy("id", playsql.Asc).
+		Get(ctx, &rows); err != nil {
+		return nil, err
+	}
+
+	data := make([]*vendorPaymentLine, 0, len(rows))
+	for _, r := range rows {
+		l := &vendorPaymentLine{
+			ID:         int(r.ID),
+			APID:       r.AccountsPayableID,
+			AmountDue:  r.AmountDue,
+			Payment:    r.PaymentAmount,
+			PaidStatus: "partial",
+		}
+		if r.AmountDue-r.PaymentAmount <= 0 {
+			l.PaidStatus = "paid"
+		}
+		if ap := r.AccountsPayable; ap != nil {
+			l.APUUID = ap.UUID
+			l.BillNumber = ap.InvoiceNumber
+			l.BillDate = ap.InvoiceDate
+			l.DueDate = ap.DueDate
 		}
 		data = append(data, l)
 	}
@@ -294,14 +304,23 @@ func (s *Server) voidVendorPayment(ctx context.Context, uuid string) error {
 
 	companyID := CurrentCompany(ctx).ID
 	return database.WithTransaction(s.db, func(tx *sql.Tx) error {
+		ptx, err := playTx(tx)
+		if err != nil {
+			return err
+		}
+
 		for _, l := range lines {
 			if err = s.updateAPBalance(tx, companyID, l.APID, -l.Payment); err != nil {
 				return err
 			}
-			if _, err = tx.Exec(
-				"UPDATE vendor_payment_items SET payment_amount = 0, updated_at = NOW() WHERE company_id = $1 AND vendor_payment_id = $2 AND accounts_payable_id = $3",
-				companyID, p.ID, l.APID,
-			); err != nil {
+			if _, err = ptx.Model(&vendorPaymentItem{}).
+				WhereEq("company_id", companyID).
+				WhereEq("vendor_payment_id", p.ID).
+				WhereEq("accounts_payable_id", l.APID).
+				Update(context.Background(), map[string]any{
+					"payment_amount": 0,
+					"updated_at":     time.Now(),
+				}); err != nil {
 				return err
 			}
 		}
@@ -310,46 +329,36 @@ func (s *Server) voidVendorPayment(ctx context.Context, uuid string) error {
 			return err
 		}
 
-		_, err = tx.Exec(
-			"UPDATE vendor_payments SET amount = 0, status = 'void', updated_at = NOW() WHERE company_id = $1 AND id = $2",
-			companyID, p.ID,
-		)
+		_, err = ptx.Model(&vendorPaymentInsert{}).
+			WhereEq("company_id", companyID).
+			WhereEq("id", p.ID).
+			Update(context.Background(), map[string]any{
+				"amount":     0,
+				"status":     "void",
+				"updated_at": time.Now(),
+			})
 		return err
 	})
 }
 
 func (s *Server) findVendorPayments(ctx context.Context) ([]*vendorPayment, error) {
-	rows, err := s.db.QueryContext(ctx, `
-		SELECT vp.id, vp.uuid, vp.date, vp.amount, COALESCE(vp.notes,''), vp.payment, vp.status, vp.code,
-		       v.id, v.uuid, v.name, v.email, v.phone
-		FROM vendor_payments vp
-		INNER JOIN vendors v ON (vp.company_id = v.company_id AND vp.vendor_id = v.id)
-		WHERE vp.company_id = $1
-		ORDER BY vp.id DESC`,
-		CurrentCompany(ctx).ID,
-	)
+	pdb, err := s.play()
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
 
-	data := make([]*vendorPayment, 0)
-	for rows.Next() {
-		p := new(vendorPayment)
-		var paymentJSON []byte
-		if err = rows.Scan(
-			&p.ID, &p.UUID, &p.Date, &p.Amount, &p.Notes, &paymentJSON, &p.Status, &p.Code,
-			&p.Vendor.ID, &p.Vendor.UUID, &p.Vendor.Name, &p.Vendor.Email, &p.Vendor.Phone,
-		); err != nil {
-			return data, err
-		}
-		if len(paymentJSON) > 0 {
-			pm := new(Payment)
-			if err = json.Unmarshal(paymentJSON, pm); err == nil {
-				p.Payment = pm
-			}
-		}
-		data = append(data, p)
+	var rows []vendorPaymentRead
+	if err := pdb.Model(&vendorPaymentRead{}).
+		WithConstraint("Vendor", withTrashedRelation).
+		WhereEq("company_id", CurrentCompany(ctx).ID).
+		OrderBy("id", playsql.Desc).
+		Get(ctx, &rows); err != nil {
+		return nil, err
+	}
+
+	data := make([]*vendorPayment, 0, len(rows))
+	for _, r := range rows {
+		data = append(data, r.toVendorPayment())
 	}
 	return data, nil
 }

@@ -2,10 +2,10 @@ package app
 
 import (
 	"context"
-	"fmt"
 	"time"
 
 	"github.com/martin3zra/forge/foundation"
+	"github.com/martin3zra/playsql"
 )
 
 type expenseCategory struct {
@@ -68,284 +68,255 @@ func IncludeDeleted() ExpenseOption {
 	}
 }
 
-func (s *Server) findExpenseByUUID(ctx context.Context, uuid string) (*expense, error) {
-	var c expense
-	err := s.db.QueryRow(`
-   select expenses.id, expenses.uuid, expenses.amount, expenses.notes, expenses.date, expenses.created_at, expenses.updated_at, expenses.deleted_at,
-    expenses_categories.id, expenses_categories.uuid, expenses_categories.name
-    from expenses
-    inner join expenses_categories on (expenses.company_id = expenses_categories.company_id AND expenses.category_id = expenses_categories.id)
-    where expenses.company_id = $1
-    and expenses.uuid = $2
-  `, CurrentCompany(ctx).ID, uuid).Scan(
-		&c.ID,
-		&c.UUID,
-		&c.Amount,
-		&c.Notes,
-		&c.Date.Time,
-		&c.CreatedAt,
-		&c.UpdatedAt,
-		&c.DeletedAt,
-		&c.Category.ID,
-		&c.Category.UUID,
-		&c.Category.Name,
-	)
-	return &c, err
+// applyExpenseFilter narrows a query over the expenses table by the caller's
+// options. It is shared by findExpenses and findExpensesByCategories, where it
+// constrains both the aggregate subquery and its matching existence check so the
+// two can never drift apart.
+func applyExpenseFilter(companyID int, filter ExpenseFilter) func(*playsql.Builder) {
+	return func(b *playsql.Builder) {
+		b.WhereEq("company_id", companyID)
+		if filter.FromDate != nil {
+			b.Where("date", ">=", *filter.FromDate)
+		}
+		if filter.ToDate != nil {
+			b.Where("date", "<=", *filter.ToDate)
+		}
+		if filter.CategoryID != nil {
+			b.WhereEq("category_id", *filter.CategoryID)
+		}
+	}
 }
 
+func expenseFilterFrom(opts []ExpenseOption) ExpenseFilter {
+	filter := ExpenseFilter{}
+	for _, opt := range opts {
+		opt(&filter)
+	}
+	return filter
+}
+
+// findExpenseByUUID reads one expense with its category. It uses WithTrashed
+// because the old query had no deleted_at predicate: a soft-deleted expense is
+// still previewable by uuid.
+func (s *Server) findExpenseByUUID(ctx context.Context, uuid string) (*expense, error) {
+	pdb, err := s.play()
+	if err != nil {
+		return nil, err
+	}
+
+	var row expenseRead
+	if err := pdb.Model(&expenseRead{}).
+		With("Category").
+		WithTrashed().
+		WhereEq("company_id", CurrentCompany(ctx).ID).
+		WhereEq("uuid", uuid).
+		First(ctx, &row); err != nil {
+		return nil, err
+	}
+
+	return row.toExpense(), nil
+}
+
+// findExpenses lists the company's expenses, newest first.
+//
+// IncludeDeleted now works. The old query hardcoded `AND expenses.deleted_at IS
+// NULL` into its base string and then appended the same predicate again when the
+// option was absent, so the option could never widen the result set. It maps onto
+// WithTrashed here. No caller passes it, so no caller changes behaviour.
 func (s *Server) findExpenses(ctx context.Context, opts ...ExpenseOption) ([]*expense, error) {
 	companyID := CurrentCompany(ctx).ID
+	filter := expenseFilterFrom(opts)
 
-	// Default filter
-	filter := ExpenseFilter{}
-
-	// Apply options
-	for _, opt := range opts {
-		opt(&filter)
-	}
-
-	query := `
-    select expenses.id, expenses.uuid, expenses.amount, expenses.notes, expenses.date, expenses.created_at, expenses.updated_at, expenses.deleted_at,
-    expenses_categories.id, expenses_categories.uuid, expenses_categories.name
-    from expenses
-    inner join expenses_categories on (expenses.company_id = expenses_categories.company_id AND expenses.category_id = expenses_categories.id)
-    where expenses.company_id = $1
-    AND expenses.deleted_at IS NULL
-  `
-	args := []any{companyID}
-	argPos := 2
-
-	// Soft delete handling
-	if !filter.IncludeDeleted {
-		query += " AND expenses.deleted_at IS NULL"
-	}
-
-	// Date filters
-	if filter.FromDate != nil {
-		query += fmt.Sprintf(" AND expenses.date >= $%d", argPos)
-		args = append(args, *filter.FromDate)
-		argPos++
-	}
-
-	if filter.ToDate != nil {
-		query += fmt.Sprintf(" AND expenses.date <= $%d", argPos)
-		args = append(args, *filter.ToDate)
-		argPos++
-	}
-
-	// Category filter
-	if filter.CategoryID != nil {
-		query += fmt.Sprintf(" AND expenses.category_id = $%d", argPos)
-		args = append(args, *filter.CategoryID)
-		argPos++
-	}
-
-	query += " ORDER BY expenses.id DESC"
-	rows, err := s.db.QueryContext(ctx, query, args...)
+	pdb, err := s.play()
 	if err != nil {
 		return nil, err
 	}
-	data := make([]*expense, 0)
-	for rows.Next() {
-		i := new(expense)
 
-		if err = rows.Scan(
-			&i.ID,
-			&i.UUID,
-			&i.Amount,
-			&i.Notes,
-			&i.Date.Time,
-			&i.CreatedAt,
-			&i.UpdatedAt,
-			&i.DeletedAt,
-			&i.Category.ID,
-			&i.Category.UUID,
-			&i.Category.Name,
-		); err != nil {
-			return nil, err
-		}
+	q := pdb.Model(&expenseRead{}).With("Category")
+	if filter.IncludeDeleted {
+		q.WithTrashed()
+	}
+	applyExpenseFilter(companyID, filter)(q)
 
-		data = append(data, i)
+	var rows []expenseRead
+	if err := q.OrderBy("id", playsql.Desc).Get(ctx, &rows); err != nil {
+		return nil, err
+	}
+
+	data := make([]*expense, 0, len(rows))
+	for _, r := range rows {
+		data = append(data, r.toExpense())
 	}
 	return data, nil
 }
 
+// findExpensesByCategories rolls each category's expenses up into a total.
+//
+// The old GROUP BY over an INNER JOIN becomes a correlated SUM subquery per
+// category (WithSum) plus a matching WhereHas, which reproduces the inner join's
+// "only categories with a matching expense" semantics — and keeps SUM from
+// returning NULL over an empty set, since the old COALESCE is gone.
+//
+// One semantic narrowing: playsql always excludes soft-deleted rows from an
+// aggregate subquery and from a relation-existence check, so IncludeDeleted no
+// longer widens this rollup. Deleted expenses are now always out of the total.
+// No caller passes IncludeDeleted, so no report changes.
 func (s *Server) findExpensesByCategories(ctx context.Context, opts ...ExpenseOption) ([]*expenseCategory, error) {
 	companyID := CurrentCompany(ctx).ID
+	filter := expenseFilterFrom(opts)
+	constrain := applyExpenseFilter(companyID, filter)
 
-	// Default filter
-	filter := ExpenseFilter{}
-
-	// Apply options
-	for _, opt := range opts {
-		opt(&filter)
-	}
-
-	query := `
-    select expenses_categories.id,
-		expenses_categories.name,
-		COALESCE(SUM(expenses.amount), 0) as total_amount
-    from expenses
-    inner join expenses_categories on (expenses.company_id = expenses_categories.company_id AND expenses.category_id = expenses_categories.id)
-    where expenses.company_id = $1
-  `
-	args := []any{companyID}
-	argPos := 2
-
-	// Soft delete handling
-	if !filter.IncludeDeleted {
-		query += " AND expenses.deleted_at IS NULL"
-	}
-
-	// Date filters
-	if filter.FromDate != nil && filter.ToDate != nil {
-		query += fmt.Sprintf(" AND expenses.date BETWEEN $%d AND $%d", argPos, argPos+1)
-		args = append(args, *filter.FromDate)
-		args = append(args, *filter.ToDate)
-		argPos += 2
-	} else {
-
-		if filter.FromDate != nil {
-			query += fmt.Sprintf(" AND expenses.date >= $%d::date", argPos)
-			args = append(args, *filter.FromDate)
-			argPos++
-		}
-
-		if filter.ToDate != nil {
-			query += fmt.Sprintf(" AND expenses.date <= $%d::date", argPos)
-			args = append(args, *filter.ToDate)
-			argPos++
-		}
-	}
-
-	// Category filter
-	if filter.CategoryID != nil {
-		query += fmt.Sprintf(" AND expenses.category_id = $%d", argPos)
-		args = append(args, *filter.CategoryID)
-		argPos++
-	}
-
-	query += `
-    GROUP BY expenses_categories.id, expenses_categories.name
-    ORDER BY total_amount DESC
-`
-
-	rows, err := s.db.QueryContext(ctx, query, args...)
+	pdb, err := s.play()
 	if err != nil {
 		return nil, err
 	}
-	data := make([]*expenseCategory, 0)
-	for rows.Next() {
-		i := new(expenseCategory)
 
-		if err = rows.Scan(
-			&i.ID,
-			&i.Name,
-			&i.TotalAmount,
-		); err != nil {
-			return nil, err
-		}
+	var rows []expenseCategoryRead
+	if err := pdb.Model(&expenseCategoryRead{}).
+		Select("id", "name").
+		WithSum("Expenses", "amount", playsql.As("total_amount"), playsql.Constrain(constrain)).
+		WhereHas("Expenses", constrain).
+		WhereEq("company_id", companyID).
+		OrderBy("total_amount", playsql.Desc).
+		Get(ctx, &rows); err != nil {
+		return nil, err
+	}
 
-		data = append(data, i)
+	data := make([]*expenseCategory, 0, len(rows))
+	for _, r := range rows {
+		data = append(data, r.toExpenseCategory())
 	}
 	return data, nil
 }
 
+// findExpensesCategories is the only category read that hides soft-deleted rows,
+// so it filters explicitly — expenseCategoryRead carries no softdelete tag.
 func (s *Server) findExpensesCategories(ctx context.Context) ([]*expenseCategory, error) {
-	rows, err := s.db.Query(`
-    select id, uuid, name, description, created_at, updated_at, deleted_at
-    from expenses_categories
-    where company_id = $1
-    AND deleted_at IS NULL
-    ORDER BY id DESC
-  `, CurrentCompany(ctx).ID)
+	pdb, err := s.play()
 	if err != nil {
 		return nil, err
 	}
-	data := make([]*expenseCategory, 0)
-	for rows.Next() {
-		i := new(expenseCategory)
 
-		if err = rows.Scan(
-			&i.ID,
-			&i.UUID,
-			&i.Name,
-			&i.Description,
-			&i.CreatedAt,
-			&i.UpdatedAt,
-			&i.DeletedAt,
-		); err != nil {
-			return nil, err
-		}
+	var rows []expenseCategoryRead
+	if err := pdb.Model(&expenseCategoryRead{}).
+		WhereEq("company_id", CurrentCompany(ctx).ID).
+		WhereNull("deleted_at").
+		OrderBy("id", playsql.Desc).
+		Get(ctx, &rows); err != nil {
+		return nil, err
+	}
 
-		data = append(data, i)
+	data := make([]*expenseCategory, 0, len(rows))
+	for _, r := range rows {
+		data = append(data, r.toExpenseCategory())
 	}
 	return data, nil
 }
 
 func (s *Server) findExpenseCategory(ctx context.Context, uuid string) (*expenseCategory, error) {
-	var c expenseCategory
-	err := s.db.QueryRow(`
-   select id, uuid, name, description, created_at, updated_at, deleted_at
-    from expenses_categories
-    where company_id = $1
-    AND uuid = $2
-  `, CurrentCompany(ctx).ID, uuid).Scan(
-		&c.ID,
-		&c.UUID,
-		&c.Name,
-		&c.Description,
-		&c.CreatedAt,
-		&c.UpdatedAt,
-		&c.DeletedAt,
-	)
-	return &c, err
+	pdb, err := s.play()
+	if err != nil {
+		return nil, err
+	}
+
+	var row expenseCategoryRead
+	if err := pdb.Model(&expenseCategoryRead{}).
+		WhereEq("company_id", CurrentCompany(ctx).ID).
+		WhereEq("uuid", uuid).
+		First(ctx, &row); err != nil {
+		return nil, err
+	}
+
+	return row.toExpenseCategory(), nil
 }
 
 func (s *Server) storeExpense(ctx context.Context, form *StoreExpenseForm) error {
-
 	c, err := s.findExpenseCategory(ctx, form.Category)
 	if err != nil {
 		return err
 	}
 
-	_, err = s.db.Exec("INSERT INTO expenses (company_id, category_id, date, amount, notes) VALUES($1, $2, $3, $4, $5)",
-		CurrentCompany(ctx).ID, c.ID, form.Date, form.Amount, form.Notes)
-	return err
+	pdb, err := s.play()
+	if err != nil {
+		return err
+	}
+
+	return pdb.Insert(ctx, &expenseInsert{
+		CompanyID:  CurrentCompany(ctx).ID,
+		CategoryID: c.ID,
+		Date:       form.Date,
+		Amount:     form.Amount,
+		Notes:      form.Notes,
+	})
 }
 
+// deleteExpense soft-deletes via Update rather than Delete: Builder.Delete stamps
+// deleted_at only, and the statement it replaced bumped updated_at too. Update
+// stamps updated_at for free because expenseRead maps it, and expenseRead's
+// softdelete tag adds the `deleted_at IS NULL` guard the raw statement lacked.
 func (s *Server) deleteExpense(ctx context.Context, expenseID string) error {
-	_, err := s.db.Exec(
-		"UPDATE expenses SET deleted_at = now(), updated_at = now() WHERE company_id = $1 AND uuid = $2",
-		CurrentCompany(ctx).ID, expenseID,
-	)
+	pdb, err := s.play()
+	if err != nil {
+		return err
+	}
 
+	_, err = pdb.Model(&expenseRead{}).
+		WhereEq("company_id", CurrentCompany(ctx).ID).
+		WhereEq("uuid", expenseID).
+		Update(ctx, map[string]any{"deleted_at": time.Now()})
 	return err
 }
 
 func (s *Server) updateExpense(ctx context.Context, expenseID string, form *StoreExpenseForm) error {
-
 	c, err := s.findExpenseCategory(ctx, form.Category)
 	if err != nil {
 		return err
 	}
 
-	_, err = s.db.Exec(
-		"UPDATE expenses SET date = $1, amount = $2, notes = $3, category_id = $4 WHERE company_id = $5 AND uuid = $6",
-		form.Date, form.Amount, form.Notes, c.ID, CurrentCompany(ctx).ID, expenseID,
-	)
+	pdb, err := s.play()
+	if err != nil {
+		return err
+	}
 
+	_, err = pdb.Model(&expenseInsert{}).
+		WhereEq("company_id", CurrentCompany(ctx).ID).
+		WhereEq("uuid", expenseID).
+		Update(ctx, map[string]any{
+			"date":        form.Date,
+			"amount":      form.Amount,
+			"notes":       form.Notes,
+			"category_id": c.ID,
+		})
 	return err
 }
 
 func (s *Server) storeExpenseCategory(ctx context.Context, form *StoreExpenseCategoryForm) error {
-	_, err := s.db.Exec("INSERT INTO expenses_categories (company_id, name, description) VALUES($1, $2, $3)",
-		CurrentCompany(ctx).ID, form.Name, form.Description)
-	return err
+	pdb, err := s.play()
+	if err != nil {
+		return err
+	}
+
+	return pdb.Insert(ctx, &expenseCategoryInsert{
+		CompanyID:   CurrentCompany(ctx).ID,
+		Name:        form.Name,
+		Description: form.Description,
+	})
 }
 
+// updateExpenseCategory uses the read model so playsql stamps updated_at, which
+// the statement it replaced set with NOW().
 func (s *Server) updateExpenseCategory(ctx context.Context, uuid string, form *StoreExpenseCategoryForm) error {
-	_, err := s.db.Exec("UPDATE expenses_categories SET name = $3, description = $4, updated_at = NOW() WHERE company_id = $1 AND uuid = $2",
-		CurrentCompany(ctx).ID, uuid, form.Name, form.Description)
+	pdb, err := s.play()
+	if err != nil {
+		return err
+	}
+
+	_, err = pdb.Model(&expenseCategoryRead{}).
+		WhereEq("company_id", CurrentCompany(ctx).ID).
+		WhereEq("uuid", uuid).
+		Update(ctx, map[string]any{
+			"name":        form.Name,
+			"description": form.Description,
+		})
 	return err
 }

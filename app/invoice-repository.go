@@ -65,160 +65,121 @@ type line struct {
 	Action LineAction `json:"action"`
 }
 
+// deriveTerms labels the invoice from the gap between its date and due date. Only
+// the two detail reads do this; the list read leaves Terms empty, as it always has.
+func (i *invoice) deriveTerms() {
+	i.Terms = "pia"
+	if i.DueOn != nil {
+		difference := i.DueOn.Sub(i.Date)
+		// Difference in days
+		i.Terms = fmt.Sprintf("net%d", int(difference.Hours())/24)
+	}
+}
+
+// The three header reads below dropped two joins each.
+//
+// INNER JOIN companies asserted existence only: company_id is a NOT NULL FK and the
+// company_id predicate already scopes the query.
+//
+// LEFT JOIN tax_receipts contributed no columns and, being a LEFT join, could not
+// filter — the NCF comes from invoices.tax_number, not from the receipt. tax_receipts.id
+// is its primary key, so it could not duplicate rows either. It was dead weight.
+//
+// INNER JOIN customers becomes a belongsTo eager load. It needs WithTrashed: customerRead
+// is softdelete-tagged, but the join never filtered customers.deleted_at, and an invoice
+// to a since-deleted customer must still render.
+
 func (s *Server) findInvoices(ctx context.Context, kind TransactionKind, invoiceType InvoiceType) ([]*invoice, error) {
-	rows, err := s.db.Query("SELECT invoices.id, invoices.uuid, invoices.code, invoices.date, invoices.due_on, invoices.amount, invoices.discount, invoices.tax, "+
-		"invoices.total, invoices.amount_due, invoices.status, invoices.paid_status, invoices.payment, invoices.note, invoices.tax_receipt_id, invoices.transaction_kind, "+
-		"invoices.source, invoices.tax_number, customers.id, customers.uuid, customers.name, customers.email, customers.phone, customers.address "+
-		"FROM invoices "+
-		"INNER JOIN companies ON (invoices.company_id = companies.id) "+
-		"INNER JOIN customers ON (invoices.company_id = customers.company_id AND invoices.customer_id = customers.id) "+
-		"LEFT JOIN tax_receipts ON (invoices.company_id = tax_receipts.company_id AND invoices.tax_receipt_id = tax_receipts.id) "+
-		"WHERE invoices.company_id = $1 "+
-		"AND invoices.transaction_kind = $2 "+
-		"AND ($2 != 'invoice' OR $3 = 'all' OR invoices.type = $3::invoice_terms) ORDER BY invoices.id DESC", CurrentCompany(ctx).ID, kind, invoiceType)
+	pdb, err := s.play()
 	if err != nil {
 		return nil, err
 	}
-	data := make([]*invoice, 0)
-	for rows.Next() {
-		i := new(invoice)
 
-		if err = rows.Scan(
-			&i.ID,
-			&i.UUID,
-			&i.Number,
-			&i.Date,
-			&i.DueOn,
-			&i.Amount,
-			&i.Discount,
-			&i.Tax,
-			&i.Total,
-			&i.AmountDue,
-			&i.Status,
-			&i.PaidStatus,
-			&i.Payment,
-			&i.Notes,
-			&i.TaxReceiptID,
-			&i.Kind,
-			&i.Source,
-			&i.NCF,
-			&i.Customer.ID,
-			&i.Customer.UUID,
-			&i.Customer.Name,
-			&i.Customer.Email,
-			&i.Customer.Phone,
-			&i.Customer.Address,
-		); err != nil {
-			return nil, err
-		}
+	q := pdb.Model(&invoiceRead{}).
+		Select(invoiceListColumns...).
+		WithConstraint("Customer", withTrashedRelation).
+		WhereEq("company_id", CurrentCompany(ctx).ID).
+		WhereEq("transaction_kind", string(kind))
 
-		data = append(data, i)
+	// The old `($2 != 'invoice' OR $3 = 'all' OR invoices.type = $3::invoice_terms)`
+	// predicate: the type filter only applies to invoices, and only when narrowed.
+	if kind == TransactionKinds.Invoice && invoiceType != InvoiceTypeAll {
+		q.WhereEq("type", string(invoiceType))
+	}
+
+	var rows []invoiceRead
+	if err := q.OrderBy("id", playsql.Desc).Get(ctx, &rows); err != nil {
+		return nil, err
+	}
+
+	data := make([]*invoice, 0, len(rows))
+	for _, r := range rows {
+		data = append(data, r.toInvoice())
 	}
 	return data, nil
 }
 
 func (s *Server) findInvoicesByUUID(ctx context.Context, kind TransactionKind, companyID int, uuid string) (*invoice, error) {
-	i := new(invoice)
-	err := s.db.QueryRow("SELECT invoices.company_id, invoices.id, invoices.uuid, invoices.code, invoices.date, invoices.due_on, invoices.amount, invoices.amount_due, invoices.discount, invoices.tax, "+
-		"invoices.total, invoices.status, invoices.paid_status, invoices.payment, invoices.note, invoices.tax_receipt_id, invoices.transaction_kind, "+
-		"invoices.source, invoices.tax_number, invoices.note, customers.id, customers.uuid, customers.name, customers.email, customers.phone, customers.address "+
-		"FROM invoices "+
-		"INNER JOIN companies ON (invoices.company_id = companies.id) "+
-		"INNER JOIN customers ON (invoices.company_id = customers.company_id AND invoices.customer_id = customers.id) "+
-		"LEFT JOIN tax_receipts ON (invoices.company_id = tax_receipts.company_id AND invoices.tax_receipt_id = tax_receipts.id) "+
-		"WHERE invoices.company_id = $1 "+
-		"AND invoices.transaction_kind = $2 "+
-		"AND invoices.uuid = $3", companyID, kind, uuid).
-		Scan(
-			&i.CompanyID,
-			&i.ID,
-			&i.UUID,
-			&i.Number,
-			&i.Date,
-			&i.DueOn,
-			&i.Amount,
-			&i.AmountDue,
-			&i.Discount,
-			&i.Tax,
-			&i.Total,
-			&i.Status,
-			&i.PaidStatus,
-			&i.Payment,
-			&i.Notes,
-			&i.TaxReceiptID,
-			&i.Kind,
-			&i.Source,
-			&i.NCF,
-			&i.Notes,
-			&i.Customer.ID,
-			&i.Customer.UUID,
-			&i.Customer.Name,
-			&i.Customer.Email,
-			&i.Customer.Phone,
-			&i.Customer.Address)
+	pdb, err := s.play()
 	if err != nil {
 		return nil, err
 	}
-	i.Terms = "pia"
-	if i.DueOn != nil {
-		difference := i.DueOn.Sub(i.Date)
-		// Difference in days
-		i.Terms = fmt.Sprintf("net%d", int(difference.Hours())/24)
+
+	var row invoiceRead
+	if err := pdb.Model(&invoiceRead{}).
+		WithConstraint("Customer", withTrashedRelation).
+		WhereEq("company_id", companyID).
+		WhereEq("transaction_kind", string(kind)).
+		WhereEq("uuid", uuid).
+		First(ctx, &row); err != nil {
+		return nil, err
 	}
 
+	i := row.toInvoice()
+	i.deriveTerms()
 	return i, nil
 }
 
+// findInvoicesByID matches on the primary key alone — no transaction_kind filter, so
+// templates/estimates/orders stay findable (the recurrence generator relies on this).
 func (s *Server) findInvoicesByID(companyID, invoiceId int) (*invoice, error) {
-	i := new(invoice)
-	err := s.db.QueryRow("SELECT invoices.company_id,invoices.id, invoices.uuid, invoices.code, invoices.date, invoices.due_on, invoices.amount, invoices.amount_due, invoices.discount, invoices.tax, "+
-		"invoices.total, invoices.status, invoices.paid_status, invoices.payment, invoices.note, invoices.tax_receipt_id, invoices.transaction_kind, "+
-		"invoices.source, invoices.tax_number, invoices.note, customers.id, customers.uuid, customers.name, customers.email, customers.phone, customers.address "+
-		"FROM invoices "+
-		"INNER JOIN companies ON (invoices.company_id = companies.id) "+
-		"INNER JOIN customers ON (invoices.company_id = customers.company_id AND invoices.customer_id = customers.id) "+
-		// LEFT JOIN: templates/estimates/orders have no tax receipt, but must
-		// still be findable (this is hit by the recurrence generator).
-		"LEFT JOIN tax_receipts ON (invoices.company_id = tax_receipts.company_id AND invoices.tax_receipt_id = tax_receipts.id) "+
-		"WHERE invoices.company_id = $1 AND invoices.id = $2", companyID, invoiceId).
-		Scan(
-			&i.CompanyID,
-			&i.ID,
-			&i.UUID,
-			&i.Number,
-			&i.Date,
-			&i.DueOn,
-			&i.Amount,
-			&i.AmountDue,
-			&i.Discount,
-			&i.Tax,
-			&i.Total,
-			&i.Status,
-			&i.PaidStatus,
-			&i.Payment,
-			&i.Notes,
-			&i.TaxReceiptID,
-			&i.Kind,
-			&i.Source,
-			&i.NCF,
-			&i.Notes,
-			&i.Customer.ID,
-			&i.Customer.UUID,
-			&i.Customer.Name,
-			&i.Customer.Email,
-			&i.Customer.Phone,
-			&i.Customer.Address)
+	pdb, err := s.play()
 	if err != nil {
 		return nil, err
 	}
-	i.Terms = "pia"
-	if i.DueOn != nil {
-		difference := i.DueOn.Sub(i.Date)
-		// Difference in days
-		i.Terms = fmt.Sprintf("net%d", int(difference.Hours())/24)
+
+	var row invoiceRead
+	if err := pdb.Model(&invoiceRead{}).
+		WithConstraint("Customer", withTrashedRelation).
+		WhereEq("company_id", companyID).
+		WhereEq("id", invoiceId).
+		First(context.Background(), &row); err != nil {
+		return nil, err
 	}
 
+	i := row.toInvoice()
+	i.deriveTerms()
 	return i, nil
+}
+
+// playSession is satisfied by both *playsql.DB and *playsql.Tx.
+type playSession interface {
+	Model(model any) *playsql.Builder
+}
+
+// invoiceMovementRecorded reports whether the invoice already moved stock. The two
+// call sites read it from different sessions on purpose: updateInvoice reads inside
+// its transaction, voidInvoice reads outside it.
+func invoiceMovementRecorded(ctx context.Context, sess playSession, companyID, invoiceID int) (bool, error) {
+	var row invoiceRead
+	if err := sess.Model(&invoiceRead{}).
+		Select("movement_recorded").
+		WhereEq("company_id", companyID).
+		WhereEq("id", invoiceID).
+		First(ctx, &row); err != nil {
+		return false, err
+	}
+	return row.MovementRecorded, nil
 }
 
 func (s *Server) storeInvoice(ctx context.Context, form *StoreInvoiceForm) (string, error) {
@@ -277,11 +238,12 @@ func (s *Server) updateInvoice(ctx context.Context, uuid string, form *UpdateInv
 		// Keep inventory in step with the edited lines. Only invoices/orders that
 		// already moved stock get reconciled — drafts and estimates never did.
 		if form.Kind == TransactionKinds.Invoice || form.Kind == TransactionKinds.Order {
-			var movementRecorded bool
-			if err = tx.QueryRow(
-				"SELECT movement_recorded FROM invoices WHERE company_id = $1 AND id = $2",
-				companyID, invoice.ID,
-			).Scan(&movementRecorded); err != nil {
+			ptx, err := playTx(tx)
+			if err != nil {
+				return err
+			}
+			movementRecorded, err := invoiceMovementRecorded(context.Background(), ptx, companyID, invoice.ID)
+			if err != nil {
 				return err
 			}
 			if movementRecorded {
@@ -383,11 +345,12 @@ func (s *Server) voidInvoice(ctx context.Context, kind TransactionKind, uuid str
 
 		// The reverse side effects (receivable removal, and stock reversal when the
 		// invoice moved stock) react to InvoiceVoided within this same transaction.
+		// Read outside the transaction, and errors ignored, exactly as before: a
+		// failure here just leaves movementRecorded false.
 		var movementRecorded bool
-		_ = s.db.QueryRowContext(ctx,
-			"SELECT movement_recorded FROM invoices WHERE company_id = $1 AND id = $2",
-			companyID, invoice.ID,
-		).Scan(&movementRecorded)
+		if pdb, perr := s.play(); perr == nil {
+			movementRecorded, _ = invoiceMovementRecorded(ctx, pdb, companyID, invoice.ID)
+		}
 
 		return s.dispatcher().Dispatch(context.Background(), tx, InvoiceVoided{
 			CompanyID:        companyID,

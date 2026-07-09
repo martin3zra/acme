@@ -15,33 +15,39 @@ type unit struct {
 }
 
 func (s *Server) findUnitByBasedQty(companyID int) (int, error) {
-	var id int
-	err := s.db.QueryRow(`SELECT id FROM units WHERE company_id = $1 AND base_qty = 1`, companyID).Scan(&id)
+	pdb, err := s.play()
+	if err != nil {
+		return 0, err
+	}
 
-	return id, err
+	var row unitRead
+	err = pdb.Model(&unitRead{}).
+		WhereEq("company_id", companyID).
+		WhereEq("base_qty", 1).
+		First(context.Background(), &row)
+	if err != nil {
+		return 0, err
+	}
+
+	return int(row.ID), nil
 }
 
 func (s *Server) findUnits(ctx context.Context) ([]*unit, error) {
-	rows, err := s.db.Query("SELECT id, name, base_qty, created_at, updated_at, deleted_at FROM units WHERE company_id = $1", CurrentCompany(ctx).ID)
+	pdb, err := s.play()
 	if err != nil {
 		return nil, err
 	}
-	data := make([]*unit, 0)
-	for rows.Next() {
-		u := new(unit)
-		if err = rows.Scan(
-			&u.ID,
-			&u.Name,
-			&u.BaseQty,
-			&u.CreatedAt,
-			&u.UpdatedAt,
-			&u.DeletedAt,
-		); err != nil {
-			return nil, err
-		}
 
-		data = append(data, u)
+	var rows []unitRead
+	if err := pdb.Model(&unitRead{}).
+		WhereEq("company_id", CurrentCompany(ctx).ID).
+		Get(ctx, &rows); err != nil {
+		return nil, err
+	}
 
+	data := make([]*unit, 0, len(rows))
+	for _, r := range rows {
+		data = append(data, r.toUnit())
 	}
 	return data, nil
 }

@@ -7,6 +7,7 @@ import (
 
 	"github.com/martin3zra/forge/database"
 	"github.com/martin3zra/forge/foundation"
+	"github.com/martin3zra/playsql"
 )
 
 type UserLinkedCompany struct {
@@ -15,114 +16,94 @@ type UserLinkedCompany struct {
 	Role string `json:"role"`
 }
 
-// userColumns is the explicit projection for every users read below, listed in the
-// order scanUser consumes them.
-//
-// Never use SELECT * (or RETURNING *) here. The scans are positional, so a
-// migration that appends a column shifts every destination by one and the query
-// fails at runtime with "expected N destination arguments". That is exactly what
-// happened when remember_token was added: it silently broke login and user
-// creation. auth-user.go's credential resolver already lists its columns for the
-// same reason.
-const userColumns = "id, name, email, password, email_verified_at, last_password_reset, " +
-	"created_at, updated_at, deleted_at, uuid, status, must_change_password, pending_email"
-
-// rowScanner is satisfied by both *sql.Row and *sql.Rows.
-type rowScanner interface {
-	Scan(dest ...any) error
-}
-
-// scanUser reads a userColumns projection into u. Keeping the single scan next to
-// the column list is what stops the two from drifting apart again.
-func scanUser(row rowScanner, u *User) error {
-	return row.Scan(
-		&u.Id, &u.Name, &u.Email, &u.Password, &u.EmailVerifiedAt, &u.LastPasswordReset,
-		&u.CreatedAt, &u.UpdatedAt, &u.DeletedAt, &u.UUID, &u.Status, &u.MustChangePassword,
-		&u.PendingEmail,
-	)
-}
-
-func (s *Server) findUsers(ctx context.Context) ([]*User, error) {
-	rows, err := s.db.Query(`
-    SELECT id, uuid, name, email, email_verified_at, status, created_at, updated_at,
-    (
-      SELECT COUNT(*)
-	    FROM companies_users
-	    INNER JOIN companies ON companies_users.company_id = companies.id AND companies.account_id = $1
-	    WHERE users.id = companies_users.user_id
-    ) as linked
-    FROM users
-    WHERE EXISTS (
-      SELECT 1 FROM accounts_users WHERE accounts_users.user_id = users.id AND accounts_users.account_id = $1
-    )
-  `, CurrentAccount(ctx))
+// findUser resolves a single user by one column. playsql selects and scans by
+// column name, so a migration that appends a column to users can no longer shift
+// the scan — the failure mode that broke login in 53c9d58.
+func (s *Server) findUser(column string, value any) (*User, error) {
+	pdb, err := s.play()
 	if err != nil {
 		return nil, err
 	}
-	data := make([]*User, 0)
-	for rows.Next() {
-		u := new(User)
-		if err = rows.Scan(&u.Id, &u.UUID, &u.Name, &u.Email, &u.EmailVerifiedAt, &u.Status, &u.CreatedAt, &u.UpdatedAt, &u.Linked); err != nil {
-			return nil, err
-		}
-		data = append(data, u)
+
+	var row userRead
+	if err := pdb.Model(&userRead{}).WhereEq(column, value).First(context.Background(), &row); err != nil {
+		return nil, err
+	}
+	return row.toUser(), nil
+}
+
+// findUsers lists the account's users with the number of companies each is linked
+// to. The old EXISTS(accounts_users …) predicate becomes WhereRelation over the
+// accounts_users pivot; the correlated COUNT that joined companies_users to
+// companies becomes WithCount over the companies_users pivot, constrained to this
+// account. Both express the pivot as belongsToMany rather than a hand-written join.
+func (s *Server) findUsers(ctx context.Context) ([]*User, error) {
+	accountID := CurrentAccount(ctx)
+
+	pdb, err := s.play()
+	if err != nil {
+		return nil, err
+	}
+
+	var rows []userRead
+	if err := pdb.Model(&userRead{}).
+		// Same projection as before — notably no password hash.
+		Select("id", "uuid", "name", "email", "email_verified_at", "status", "created_at", "updated_at").
+		WithCount("Companies", playsql.As("linked"), playsql.Constrain(func(b *playsql.Builder) {
+			b.WhereEq("account_id", accountID)
+		})).
+		WhereRelation("Accounts", "id", "=", accountID).
+		Get(ctx, &rows); err != nil {
+		return nil, err
+	}
+
+	data := make([]*User, 0, len(rows))
+	for _, r := range rows {
+		data = append(data, r.toUser())
 	}
 	return data, nil
 }
 
 func (s *Server) findUserByEmail(email string) (*User, error) {
-	user := new(User)
-
-	err := scanUser(s.db.QueryRow(
-		fmt.Sprintf("SELECT %s FROM users WHERE email = $1", userColumns), email), user)
-	if err != nil {
-		return nil, err
-	}
-	return user, nil
+	return s.findUser("email", email)
 }
 
 func (s *Server) findUserByUUID(uuid string) (*User, error) {
-	user := new(User)
-
-	err := scanUser(s.db.QueryRow(
-		fmt.Sprintf("SELECT %s FROM users WHERE uuid = $1", userColumns), uuid), user)
-	if err != nil {
-		return nil, err
-	}
-	return user, nil
+	return s.findUser("uuid", uuid)
 }
 
+// findUserLinkedCompanies reads the link rows directly and pulls each company
+// through a belongsTo. The users join is dropped: it only asserted the user exists,
+// which the user_id filter already implies.
 func (s *Server) findUserLinkedCompanies(ctx context.Context, id int) ([]*UserLinkedCompany, error) {
-	rows, err := s.db.Query(`
-    SELECT companies.id, companies.uuid, companies_users.role
-    FROM companies
-    INNER JOIN companies_users ON companies.id = companies_users.company_id
-    INNER JOIN users ON companies_users.user_id = users.id
-    WHERE companies.account_id = $1 AND users.id = $2
-  `, CurrentAccount(ctx), id)
-
+	pdb, err := s.play()
 	if err != nil {
 		return nil, err
 	}
 
-	data := make([]*UserLinkedCompany, 0)
-	for rows.Next() {
-		l := new(UserLinkedCompany)
-		if err = rows.Scan(
-			&l.ID,
-			&l.UUID,
-			&l.Role,
-		); err != nil {
-			return nil, err
-		}
-
-		data = append(data, l)
-
+	var rows []companyUserRead
+	if err := pdb.Model(&companyUserRead{}).
+		With("Company").
+		WhereRelation("Company", "account_id", "=", CurrentAccount(ctx)).
+		WhereEq("user_id", id).
+		Get(ctx, &rows); err != nil {
+		return nil, err
 	}
 
-	return data, err
+	data := make([]*UserLinkedCompany, 0, len(rows))
+	for _, r := range rows {
+		l := &UserLinkedCompany{Role: r.Role}
+		if c := r.Company; c != nil {
+			l.ID = c.ID
+			l.UUID = c.UUID
+		}
+		data = append(data, l)
+	}
+	return data, nil
 }
 
+// Stays raw: a CASE assignment guarded by a scalar subquery in the WHERE clause.
+// playsql's Update replaces a column with a value and has no subquery predicate.
 func (s *Server) updateProfile(uuid string, form *StoreProfileForm) error {
 	_, err := s.db.Exec(`
     UPDATE users
@@ -132,152 +113,185 @@ func (s *Server) updateProfile(uuid string, form *StoreProfileForm) error {
 	return err
 }
 
+// findUserByAccountUUID returns the account's owner. The old `id = (SELECT owner_id
+// FROM accounts WHERE uuid = $1)` scalar subquery becomes two reads; playsql has no
+// subquery predicate, and an unknown uuid still yields a not-found error either way.
 func (s *Server) findUserByAccountUUID(uuid string) (*User, error) {
-	user := new(User)
-
-	err := scanUser(s.db.QueryRow(fmt.Sprintf(
-		"SELECT %s FROM users WHERE id = (SELECT owner_id FROM accounts WHERE uuid = $1)",
-		userColumns), uuid), user)
+	pdb, err := s.play()
 	if err != nil {
 		return nil, err
 	}
-	return user, nil
+
+	var acc accountRead
+	if err := pdb.Model(&accountRead{}).
+		WhereEq("uuid", uuid).
+		First(context.Background(), &acc); err != nil {
+		return nil, err
+	}
+
+	return s.findUser("id", acc.OwnerID)
 }
 
+// Stays raw: `email = pending_email` is a column-to-column assignment, which
+// playsql's Update cannot express (it binds values, not column references).
 func (s *Server) updatePendingEmail(user *User) error {
 	_, err := s.db.Exec("UPDATE users SET email = pending_email, pending_email = NULL WHERE id = $1 AND pending_email = $2", user.Id, user.PendingEmail)
 	return err
 }
 
+// attachUserCompanies links a user to each named company, marking the first one
+// current. The old statement was an INSERT ... SELECT over companies that relied on
+// zero rows affected to detect an unknown uuid; playsql cannot express that, so the
+// company is resolved first and a missing one raises the same error.
+func attachUserCompanies(ptx *playsql.Tx, accountID, userID int, companies []CompanyRole) error {
+	for i, cr := range companies {
+		var company companyRead
+		err := ptx.Model(&companyRead{}).
+			WhereEq("account_id", accountID).
+			WhereEq("uuid", cr.Company).
+			First(context.Background(), &company)
+		if err == playsql.ErrNotFound {
+			return fmt.Errorf("company with UUID %s not found", cr.Company)
+		}
+		if err != nil {
+			return err
+		}
+
+		if err := ptx.Insert(context.Background(), &companyUserInsert{
+			CompanyID: company.ID,
+			UserID:    userID,
+			Role:      cr.Role,
+			Current:   i == 0,
+		}); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 func (s *Server) storeUser(ctx context.Context, form *StoreUserForm) (*User, error) {
 	accountID := CurrentAccount(ctx)
-	var user User
+	user := new(User)
 
 	err := database.WithTransaction(s.db, func(tx *sql.Tx) error {
-		stmt, err := tx.Prepare(fmt.Sprintf(
-			"INSERT INTO users (name, email, password, status) VALUES($1,$2,$3,$4) RETURNING %s",
-			userColumns))
-		if err != nil {
-			return err
-		}
-		err = scanUser(stmt.QueryRow(
-			form.Name, form.Email, foundation.NewHashable().Make("password"), "disabled"), &user)
+		ptx, err := playTx(tx)
 		if err != nil {
 			return err
 		}
 
-		stmt, err = tx.Prepare("INSERT INTO accounts_users (account_id, user_id) VALUES($1, $2)")
-		if err != nil {
+		row := &userInsert{
+			Name:     form.Name,
+			Email:    form.Email,
+			Password: foundation.NewHashable().Make("password"),
+			Status:   "disabled",
+		}
+		if err := ptx.Insert(context.Background(), row); err != nil {
 			return err
 		}
 
-		_, err = stmt.Exec(accountID, user.Id)
-		if err != nil {
+		// Insert only returns the pk, so the DB-generated uuid and defaults are read
+		// back. This replaces the old INSERT ... RETURNING * projection.
+		var stored userRead
+		if err := ptx.Model(&userRead{}).
+			WhereEq("id", row.ID).
+			First(context.Background(), &stored); err != nil {
+			return err
+		}
+		*user = *stored.toUser()
+
+		if err := ptx.Insert(context.Background(), &accountUserInsert{
+			AccountID: accountID,
+			UserID:    user.Id,
+		}); err != nil {
 			return err
 		}
 
-		stmt, err = tx.Prepare("INSERT INTO companies_users (company_id, user_id, role, current) SELECT id, $1, $2, $3 FROM companies WHERE account_id = $4 AND uuid = $5")
-		if err != nil {
-			return err
-		}
-
-		current := false
-		for i, cr := range form.Companies {
-			if i == 0 {
-				current = true
-			}
-			res, err := stmt.Exec(user.Id, cr.Role, current, accountID, cr.Company)
-			if err != nil {
-				return err
-			}
-			current = false
-
-			affected, err := res.RowsAffected()
-			if err != nil {
-				return err
-			}
-			if affected == 0 {
-				return fmt.Errorf("company with UUID %s not found", cr.Company)
-			}
-		}
-
-		return err
+		return attachUserCompanies(ptx, accountID, user.Id, form.Companies)
 	})
 
-	return &user, err
+	return user, err
 }
 
 func (s *Server) updateUser(ctx context.Context, form *StoreUserForm) error {
 	accountID := CurrentAccount(ctx)
-	var userId = 0
 
-	err := database.WithTransaction(s.db, func(tx *sql.Tx) error {
-		stmt, err := tx.Prepare("UPDATE users SET name = $2 WHERE uuid = $1 RETURNING id")
-		if err != nil {
-			return err
-		}
-		err = stmt.QueryRow(form.Param("id"), form.Name).Scan(&userId)
+	return database.WithTransaction(s.db, func(tx *sql.Tx) error {
+		ptx, err := playTx(tx)
 		if err != nil {
 			return err
 		}
 
-		_, err = tx.Exec("DELETE FROM companies_users WHERE user_id = $1", userId)
-		if err != nil {
+		// The old statement was an UPDATE ... RETURNING id, so an unknown uuid failed
+		// with no rows; resolving the id first preserves that.
+		var stored userRead
+		if err := ptx.Model(&userRead{}).
+			Select("id").
+			WhereEq("uuid", form.Param("id")).
+			First(context.Background(), &stored); err != nil {
 			return err
 		}
 
-		stmt, err = tx.Prepare("INSERT INTO companies_users (company_id, user_id, role, current) SELECT id, $1, $2, $3 FROM companies WHERE account_id = $4 AND uuid = $5")
-		if err != nil {
+		if _, err := ptx.Model(&userInsert{}).
+			WhereEq("id", stored.ID).
+			Update(context.Background(), map[string]any{"name": form.Name}); err != nil {
 			return err
 		}
 
-		current := false
-		for i, cr := range form.Companies {
-			if i == 0 {
-				current = true
-			}
-			res, err := stmt.Exec(userId, cr.Role, current, accountID, cr.Company)
-			if err != nil {
-				return err
-			}
-			current = false
-
-			affected, err := res.RowsAffected()
-			if err != nil {
-				return err
-			}
-			if affected == 0 {
-				return fmt.Errorf("company with UUID %s not found", cr.Company)
-			}
+		// companies_users has a deleted_at column but no softdelete tag on its write
+		// model, so this is a hard DELETE, matching the statement it replaces.
+		if _, err := ptx.Model(&companyUserInsert{}).
+			WhereEq("user_id", stored.ID).
+			Delete(context.Background()); err != nil {
+			return err
 		}
 
-		return err
+		return attachUserCompanies(ptx, accountID, stored.ID, form.Companies)
 	})
+}
 
+// setRememberToken writes users.remember_token. The column is deliberately unmapped
+// on userInsert — nothing else should write it — but mass-assignment is unrestricted,
+// so it is passed as an explicit key. A nil value writes NULL.
+func (s *Server) setRememberToken(id int, hashed any) error {
+	pdb, err := s.play()
+	if err != nil {
+		return err
+	}
+
+	_, err = pdb.Model(&userInsert{}).
+		WhereEq("id", id).
+		Update(context.Background(), map[string]any{"remember_token": hashed})
 	return err
 }
 
 // storeRememberToken persists the hash of a user's remember token.
 func (s *Server) storeRememberToken(id int, hashed string) error {
-	_, err := s.db.Exec("UPDATE users SET remember_token = $2 WHERE id = $1", id, hashed)
-	return err
+	return s.setRememberToken(id, hashed)
 }
 
 // clearRememberToken removes a user's remember token (logout / rotation cleanup).
 func (s *Server) clearRememberToken(id int) error {
-	_, err := s.db.Exec("UPDATE users SET remember_token = NULL WHERE id = $1", id)
-	return err
+	return s.setRememberToken(id, nil)
 }
 
 // findUserIDByRememberToken returns the user id whose stored hash matches, or 0.
 func (s *Server) findUserIDByRememberToken(hashed string) (int, error) {
-	var id int
-	err := s.db.QueryRow(
-		"SELECT id FROM users WHERE remember_token = $1 AND status = 'enabled' LIMIT 1",
-		hashed,
-	).Scan(&id)
-	if err == sql.ErrNoRows {
+	pdb, err := s.play()
+	if err != nil {
+		return 0, err
+	}
+
+	var row userRead
+	err = pdb.Model(&userRead{}).
+		Select("id").
+		WhereEq("remember_token", hashed).
+		WhereEq("status", "enabled").
+		First(context.Background(), &row)
+	if err == playsql.ErrNotFound {
 		return 0, nil
 	}
-	return id, err
+	if err != nil {
+		return 0, err
+	}
+	return row.ID, nil
 }
