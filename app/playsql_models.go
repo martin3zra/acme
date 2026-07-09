@@ -479,10 +479,99 @@ type paymentItemRead struct {
 
 func (paymentItemRead) TableName() string { return "receivables_income_items" }
 
+// invoiceRead is the playsql read model for the invoices table — the header, not the
+// lines (findInvoiceLines stays raw; see there).
+//
+// discount, payment and source are jsonb. They map as []byte and are decoded in
+// toInvoice: playsql classifies a pointer-to-struct field as a relation, which is
+// what invoice.Source is, and decoding here keeps a malformed blob from failing the
+// whole read.
+//
+// No softdelete tag: none of the three header reads filtered invoices.deleted_at.
+type invoiceRead struct {
+	ID               int             `db:"id" play:"pk,incrementing"`
+	CompanyID        int             `db:"company_id"`
+	CustomerID       int             `db:"customer_id"`
+	UUID             string          `db:"uuid"`
+	Code             string          `db:"code"`
+	Date             time.Time       `db:"date"`
+	DueOn            *time.Time      `db:"due_on"`
+	Amount           float64         `db:"amount"`
+	AmountDue        float64         `db:"amount_due"`
+	Discount         []byte          `db:"discount"`
+	Tax              float64         `db:"tax"`
+	Total            float64         `db:"total"`
+	Status           InvoiceStatus   `db:"status"`
+	PaidStatus       PaidStatus      `db:"paid_status"`
+	Payment          []byte          `db:"payment"`
+	Note             string          `db:"note"`
+	TaxReceiptID     *int            `db:"tax_receipt_id"`
+	TaxNumber        *string         `db:"tax_number"`
+	TransactionKind  TransactionKind `db:"transaction_kind"`
+	Source           []byte          `db:"source"`
+	MovementRecorded bool            `db:"movement_recorded"`
+
+	Customer *customerRead `play:"belongsTo,fk=customer_id"`
+}
+
+func (invoiceRead) TableName() string { return "invoices" }
+
+// invoiceListColumns is the projection the list read used. It omits company_id and
+// movement_recorded, which are internal and were never sent to the client.
+var invoiceListColumns = []string{
+	"id", "uuid", "code", "date", "due_on", "amount", "discount", "tax", "total",
+	"amount_due", "status", "paid_status", "payment", "note", "tax_receipt_id",
+	"transaction_kind", "source", "tax_number", "customer_id",
+}
+
+// toInvoice maps the read model onto the response struct. Terms is not derived here:
+// the list read never set it, only the two detail reads do (see deriveTerms).
+func (r invoiceRead) toInvoice() *invoice {
+	i := &invoice{
+		CompanyID:    r.CompanyID,
+		ID:           r.ID,
+		UUID:         r.UUID,
+		Number:       r.Code,
+		NCF:          r.TaxNumber,
+		Date:         r.Date,
+		DueOn:        r.DueOn,
+		TaxReceiptID: r.TaxReceiptID,
+		Amount:       r.Amount,
+		Tax:          r.Tax,
+		Total:        r.Total,
+		AmountDue:    r.AmountDue,
+		Status:       r.Status,
+		PaidStatus:   r.PaidStatus,
+		Notes:        r.Note,
+		Kind:         r.TransactionKind,
+	}
+	if len(r.Discount) > 0 {
+		_ = json.Unmarshal(r.Discount, &i.Discount)
+	}
+	if len(r.Payment) > 0 {
+		_ = json.Unmarshal(r.Payment, &i.Payment)
+	}
+	if len(r.Source) > 0 {
+		src := new(TransactionSource)
+		if err := json.Unmarshal(r.Source, src); err == nil {
+			i.Source = src
+		}
+	}
+	if c := r.Customer; c != nil {
+		i.Customer.ID = c.ID
+		i.Customer.UUID = c.UUID
+		i.Customer.Name = c.Name
+		i.Customer.Email = c.Email
+		i.Customer.Phone = c.Phone
+		i.Customer.Address = c.Address
+	}
+	return i
+}
+
 // paymentInvoiceRead is a narrow projection of the invoices table: only the columns
-// a payment line reports. It is deliberately separate from any future invoiceRead —
-// the payment-line joins never filtered invoices.deleted_at, so this model carries
-// no softdelete tag, whereas a general invoice read model would want one.
+// a payment line reports. It stays separate from invoiceRead because the two answer
+// different queries; both deliberately omit a softdelete tag, since neither the
+// payment-line joins nor the invoice header reads filtered invoices.deleted_at.
 //
 // tax_number is nullable; playsql scans a SQL NULL as the field's zero value, so an
 // invoice with no tax receipt reports an empty NCF rather than dropping the line.
