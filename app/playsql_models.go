@@ -219,17 +219,182 @@ func (r userRead) toUser() *User {
 	return u
 }
 
-// companyRead is a narrow read model for the companies table — only what the user
-// queries need. No softdelete tag: the old `linked` count and the linked-companies
-// join both ignored companies.deleted_at.
+// companyRead is the playsql read model for the companies table. No softdelete tag:
+// neither the `linked` count, the linked-companies join, nor any of the company
+// reads ever filtered companies.deleted_at.
+//
+// identifier is nullable in the schema; playsql scans a SQL NULL as the zero value,
+// which is what the old reads assumed all along.
 type companyRead struct {
-	ID        int    `db:"id" play:"pk,incrementing"`
-	UUID      string `db:"uuid"`
-	Name      string `db:"name"`
-	AccountID int    `db:"account_id"`
+	ID         int        `db:"id" play:"pk,incrementing"`
+	UUID       string     `db:"uuid"`
+	Name       string     `db:"name"`
+	Identifier string     `db:"identifier"`
+	City       string     `db:"city"`
+	Address    string     `db:"address"`
+	AccountID  int        `db:"account_id"`
+	CreatedAt  *time.Time `db:"created_at"`
+	UpdatedAt  *time.Time `db:"updated_at"`
+	DeletedAt  *time.Time `db:"deleted_at"`
 }
 
 func (companyRead) TableName() string { return "companies" }
+
+// toCompany maps the read model onto the response struct. The nested settings
+// (sequences, redirect preferences, variants flag) are loaded separately, as before.
+func (r companyRead) toCompany() *Company {
+	c := &Company{
+		ID:         r.ID,
+		UUID:       r.UUID,
+		Name:       r.Name,
+		Identifier: r.Identifier,
+		City:       r.City,
+		Address:    r.Address,
+	}
+	c.CreatedAt = r.CreatedAt
+	c.UpdatedAt = r.UpdatedAt
+	c.DeletedAt = r.DeletedAt
+	return c
+}
+
+// companyInsert is the write model for the companies table. uuid and the timestamps
+// are DB-generated and stay unmapped.
+type companyInsert struct {
+	ID         int64  `db:"id" play:"pk,incrementing"`
+	AccountID  int    `db:"account_id"`
+	Name       string `db:"name"`
+	Identifier string `db:"identifier"`
+	City       string `db:"city"`
+	Address    string `db:"address"`
+}
+
+func (companyInsert) TableName() string { return "companies" }
+
+// companySettingsRead is the playsql model for companies_settings. It backs the reads
+// and the writes both: updated_at is mapped, so playsql stamps it on every Update and
+// Upsert exactly where the raw statements said `updated_at = now()`.
+//
+// sequences and redirect_preferences are jsonb, mapped as []byte and decoded by the
+// caller — CompanySequence and RedirectPreferences are structs, and a plain struct
+// field would need a json cast to stay clear of playsql's relation heuristics.
+//
+// All three columns are NOT NULL with defaults. The old reads wrapped the flag in
+// COALESCE(handles_variants, false), which never had anything to coalesce.
+type companySettingsRead struct {
+	ID                  int       `db:"id" play:"pk,incrementing"`
+	CompanyID           int       `db:"company_id"`
+	Sequences           []byte    `db:"sequences"`
+	RedirectPreferences []byte    `db:"redirect_preferences"`
+	HandlesVariants     bool      `db:"handles_variants"`
+	UpdatedAt           time.Time `db:"updated_at"`
+}
+
+func (companySettingsRead) TableName() string { return "companies_settings" }
+
+// uploadSessionRead is the playsql model for upload_sessions, backing its reads and
+// its writes. The primary key is a string, so playsql treats it as non-incrementing
+// and inserts the supplied value instead of asking the database for one.
+//
+// The nullable columns are pointers here and converted to sql.Null* in
+// toUploadSession; a sql.NullInt64 field would be a plain struct, which playsql maps
+// as a column but scans through an awkward double-pointer path.
+type uploadSessionRead struct {
+	ID             string    `db:"id" play:"pk"`
+	UserID         int64     `db:"user_id"`
+	Filename       string    `db:"filename"`
+	FileSize       int64     `db:"file_size"`
+	Delimiter      string    `db:"delimiter"`
+	Encoding       string    `db:"encoding"`
+	Status         string    `db:"status"`
+	TotalChunks    *int64    `db:"total_chunks"`
+	UploadedChunks int       `db:"uploaded_chunks"`
+	ErrorMessage   *string   `db:"error_message"`
+	CreatedAt      time.Time `db:"created_at"`
+	UpdatedAt      time.Time `db:"updated_at"`
+}
+
+func (uploadSessionRead) TableName() string { return "upload_sessions" }
+
+// toUploadSession maps the read model onto the response struct.
+func (r uploadSessionRead) toUploadSession() *UploadSession {
+	u := &UploadSession{
+		ID:             r.ID,
+		UserID:         r.UserID,
+		Filename:       r.Filename,
+		FileSize:       r.FileSize,
+		Delimiter:      r.Delimiter,
+		Encoding:       r.Encoding,
+		Status:         r.Status,
+		UploadedChunks: r.UploadedChunks,
+		CreatedAt:      r.CreatedAt,
+		UpdatedAt:      r.UpdatedAt,
+	}
+	if r.TotalChunks != nil {
+		u.TotalChunks = sql.NullInt64{Int64: *r.TotalChunks, Valid: true}
+	}
+	if r.ErrorMessage != nil {
+		u.ErrorMessage = sql.NullString{String: *r.ErrorMessage, Valid: true}
+	}
+	return u
+}
+
+// importRead is the playsql model for the imports table, backing its reads and its
+// writes. Like upload_sessions the primary key is a string (a uuid). The table has no
+// updated_at, so playsql stamps nothing on update — matching the raw statements.
+type importRead struct {
+	ID            string     `db:"id" play:"pk"`
+	UploadID      string     `db:"upload_id"`
+	UserID        string     `db:"user_id"`
+	Source        *string    `db:"source"`
+	Status        string     `db:"status"`
+	Phase         *string    `db:"phase"`
+	TotalRows     *int       `db:"total_rows"`
+	ProcessedRows *int       `db:"processed_rows"`
+	SuccessRows   *int       `db:"success_rows"`
+	FailedRows    *int       `db:"failed_rows"`
+	WarningRows   *int       `db:"warning_rows"`
+	ErrorMessage  *string    `db:"error_message"`
+	CreatedAt     *time.Time `db:"created_at"`
+	StartedAt     *time.Time `db:"started_at"`
+	FinishedAt    *time.Time `db:"finished_at"`
+}
+
+func (importRead) TableName() string { return "imports" }
+
+// toImportFile maps the read model onto the internal struct.
+func (r importRead) toImportFile() *importFile {
+	return &importFile{
+		ID:            r.ID,
+		UploadID:      r.UploadID,
+		UserID:        r.UserID,
+		Source:        r.Source,
+		Status:        r.Status,
+		Phase:         r.Phase,
+		TotalRows:     r.TotalRows,
+		ProcessedRows: r.ProcessedRows,
+		SuccessRows:   r.SuccessRows,
+		FailedRows:    r.FailedRows,
+		WarningRows:   r.WarningRows,
+		ErrorMEssage:  r.ErrorMessage,
+		CreatedAt:     r.CreatedAt,
+		StartedAt:     r.StartedAt,
+		FinishedAt:    r.FinishedAt,
+	}
+}
+
+// importRowIssue is the write model for import_row_issues. created_at is left to its
+// database default.
+type importRowIssue struct {
+	ID         int64  `db:"id" play:"pk,incrementing"`
+	ImportID   string `db:"import_id"`
+	RowNumber  int    `db:"row_number"`
+	ColumnName string `db:"column_name"`
+	Level      string `db:"level"`
+	Message    string `db:"message"`
+	Value      string `db:"value"`
+}
+
+func (importRowIssue) TableName() string { return "import_row_issues" }
 
 // accountRead is a narrow read model for the accounts table.
 type accountRead struct {
