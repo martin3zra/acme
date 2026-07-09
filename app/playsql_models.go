@@ -554,6 +554,72 @@ func (r purchaseRead) toPurchase() *purchase {
 	return p
 }
 
+// inventoryTransferRead is the playsql model for inventory_transfers, backing the
+// insert and the three status transitions. updated_at is mapped, so playsql stamps it
+// where the raw statements said `updated_at = NOW()`.
+//
+// It deliberately does NOT back loadTransferForUpdate: that read takes a FOR UPDATE
+// row lock, which playsql cannot express, and the lock is what serialises concurrent
+// transitions of the same transfer.
+type inventoryTransferRead struct {
+	ID              int        `db:"id" play:"pk,incrementing"`
+	CompanyID       int        `db:"company_id"`
+	UUID            string     `db:"uuid"`
+	FromWarehouseID int        `db:"from_warehouse_id"`
+	ToWarehouseID   int        `db:"to_warehouse_id"`
+	Notes           *string    `db:"notes"`
+	Status          string     `db:"status"`
+	RequestedBy     *int       `db:"requested_by"`
+	DispatchedAt    *time.Time `db:"dispatched_at"`
+	ReceivedAt      *time.Time `db:"received_at"`
+	CreatedAt       time.Time  `db:"created_at"`
+	UpdatedAt       time.Time  `db:"updated_at"`
+}
+
+func (inventoryTransferRead) TableName() string { return "inventory_transfers" }
+
+// inventoryTransferLine is the write model for a transfer's product lines.
+type inventoryTransferLine struct {
+	ID          int64   `db:"id" play:"pk,incrementing"`
+	CompanyID   int     `db:"company_id"`
+	TransferID  int     `db:"transfer_id"`
+	VariantID   int     `db:"variant_id"`
+	Qty         float64 `db:"qty"`
+	UnitID      *int    `db:"unit_id"`
+	UnitCost    float64 `db:"unit_cost"`
+	Description *string `db:"description"`
+}
+
+func (inventoryTransferLine) TableName() string { return "inventory_transfer_lines" }
+
+// itemVariantRead is a narrow read model for items_variants: only the columns the
+// inventory paths need. No softdelete tag — recordMovement's track_inventory lookup
+// never filtered deleted_at.
+type itemVariantRead struct {
+	ID             int  `db:"id" play:"pk,incrementing"`
+	CompanyID      int  `db:"company_id"`
+	ItemID         int  `db:"item_id"`
+	TrackInventory bool `db:"track_inventory"`
+}
+
+func (itemVariantRead) TableName() string { return "items_variants" }
+
+// inventoryMovementRead is the read side of inventory_movements. The write model is
+// InventoryMovement; this one exists so reverseMovements can select its four columns.
+type inventoryMovementRead struct {
+	ID              int64                 `db:"id" play:"pk,incrementing"`
+	CompanyID       int                   `db:"company_id"`
+	VariantID       int                   `db:"variant_id"`
+	WarehouseID     int                   `db:"warehouse_id"`
+	Qty             float64               `db:"qty"`
+	UnitCost        float64               `db:"unit_cost"`
+	TransactionKind InventoryMovementKind `db:"transaction_kind"`
+	ReferenceType   string                `db:"reference_type"`
+	ReferenceID     int                   `db:"reference_id"`
+}
+
+func (inventoryMovementRead) TableName() string { return "inventory_movements" }
+
 // warehouseRead is a narrow read model for the warehouses table. softdelete matches
 // the `deleted_at IS NULL` every warehouse read carries.
 type warehouseRead struct {
