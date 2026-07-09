@@ -111,6 +111,58 @@ type transferItemOption struct {
 	} `json:"unit"`
 }
 
+// ErrWarehouseNotInCompany is returned when a request names a warehouse the current
+// company does not own, or one that has been deleted.
+var ErrWarehouseNotInCompany = errors.New("warehouse does not belong to this company")
+
+// assertWarehousesInCompany fails unless every id names a live warehouse owned by
+// the company. Ids of zero are ignored: those columns are NOT NULL and the foreign
+// key would reject them anyway.
+//
+// Warehouse ids arrive straight from the request on invoice lines and on a
+// transfer's from/to, and nothing downstream checked them. recordMovement took the
+// id on trust, so a foreign warehouse produced an inventory_balances row keyed to
+// the caller's company_id and someone else's warehouse_id. findStocks joins
+// `w.company_id = ib.company_id`, so that row leaked nothing — it simply vanished,
+// leaving stock recorded and invisible to everyone. Purchases were never exposed:
+// they take their warehouse from firstWarehouseID, which is already company-scoped.
+//
+// warehouseRead carries play:"softdelete", so a deleted warehouse does not count.
+func assertWarehousesInCompany(tx *sql.Tx, companyID int, ids ...int) error {
+	wanted := make(map[int]struct{}, len(ids))
+	for _, id := range ids {
+		if id > 0 {
+			wanted[id] = struct{}{}
+		}
+	}
+	if len(wanted) == 0 {
+		return nil
+	}
+
+	ptx, err := playTx(tx)
+	if err != nil {
+		return err
+	}
+
+	values := make([]any, 0, len(wanted))
+	for id := range wanted {
+		values = append(values, id)
+	}
+
+	var rows []warehouseRead
+	if err := ptx.Model(&warehouseRead{}).
+		Select("id").
+		WhereEq("company_id", companyID).
+		WhereIn("id", values...).
+		Get(context.Background(), &rows); err != nil {
+		return err
+	}
+	if len(rows) != len(wanted) {
+		return ErrWarehouseNotInCompany
+	}
+	return nil
+}
+
 // ── Core movement helpers ────────────────────────────────────────────────────
 
 // recordMovement inserts one row into inventory_movements and upserts
@@ -128,6 +180,11 @@ func (s *Server) recordMovement(
 	referenceType string,
 	referenceID int,
 ) error {
+	// The warehouse comes from the caller, which in turn takes it from the request.
+	if err := assertWarehousesInCompany(tx, companyID, warehouseID); err != nil {
+		return fmt.Errorf("recordMovement: %w", err)
+	}
+
 	ptx, err := playTx(tx)
 	if err != nil {
 		return err
@@ -582,6 +639,10 @@ func (s *Server) storeTransfer(ctx context.Context, form *StoreTransferForm) err
 		return err
 	}
 	defer tx.Rollback()
+
+	if err := assertWarehousesInCompany(tx, companyID, form.FromWarehouseID, form.ToWarehouseID); err != nil {
+		return err
+	}
 
 	ptx, err := playTx(tx)
 	if err != nil {

@@ -361,7 +361,22 @@ func (s *Server) voidInvoice(ctx context.Context, kind TransactionKind, uuid str
 	})
 }
 
+// lineWarehouseIDs collects the warehouse ids named by a set of lines.
+func lineWarehouseIDs(lines []*Line) []int {
+	ids := make([]int, 0, len(lines))
+	for _, line := range lines {
+		ids = append(ids, int(line.WarehouseID))
+	}
+	return ids
+}
+
 func (s *Server) attachInvoiceLines(tx *sql.Tx, companyId, invoiceId int, form *StoreInvoiceForm) error {
+	// Line warehouses come straight from the request. Checked here as well as in
+	// recordMovement, because a draft writes the lines without moving stock.
+	if err := assertWarehousesInCompany(tx, companyId, lineWarehouseIDs(form.Lines)...); err != nil {
+		return err
+	}
+
 	ptx, err := playTx(tx)
 	if err != nil {
 		return err
@@ -396,6 +411,9 @@ func (s *Server) processInvoiceLines(tx *sql.Tx, companyId, invoiceId int, form 
 	}
 
 	lines := s.filterInvoiceLines(form.Lines, ADDED, UPDATED, DELETED)
+	if err := assertWarehousesInCompany(tx, companyId, lineWarehouseIDs(lines)...); err != nil {
+		return err
+	}
 	if err := resolveVariantsForLines(tx, companyId, lines); err != nil {
 		return err
 	}
