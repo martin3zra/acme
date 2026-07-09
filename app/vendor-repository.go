@@ -285,21 +285,21 @@ func (s *Server) registerPayable(tx *sql.Tx, companyID int, apID, vendorID int) 
 
 func (s *Server) updateVendor(ctx context.Context, vendorID int, form *UpdateVendorForm) error {
 
-	_, err := s.db.Exec(
+	res, err := s.db.Exec(
 		"UPDATE vendors SET name = $1, contact_name = $2, email = $3, phone = $4, payment_method = $5, payment_terms = $6, vendor_type = $7, purchase_note = $8, lead_time_days = $9, address = $10 WHERE company_id = $11 AND id = $12",
 		form.Name, form.Contact, form.Email, form.Phone, form.PaymentMethod, form.PaymentTerms, form.VendorType, form.PurchaseNote, form.LeadTimeDays, form.Address, CurrentCompany(ctx).ID, vendorID,
 	)
 
-	return err
+	return mustAffectRow(res, err, "vendor")
 }
 
 func (s *Server) deleteVendor(ctx context.Context, vendorID int) error {
-	_, err := s.db.Exec(
+	res, err := s.db.Exec(
 		"UPDATE vendors SET deleted_at = now(), updated_at = now() WHERE company_id = $1 AND id = $2",
 		CurrentCompany(ctx).ID, vendorID,
 	)
 
-	return err
+	return mustAffectRow(res, err, "vendor")
 }
 
 func (s *Server) toggleVendorStatus(ctx context.Context, vendor *vendor) error {
@@ -309,11 +309,12 @@ func (s *Server) toggleVendorStatus(ctx context.Context, vendor *vendor) error {
 	} else {
 		status = "enabled"
 	}
-	_, err := s.db.Exec(
+	res, err := s.db.Exec(
 		"UPDATE vendors SET updated_at = now(), status = $3 WHERE company_id = $1 AND id = $2",
 		CurrentCompany(ctx).ID, vendor.ID, status,
 	)
-	return err
+
+	return mustAffectRow(res, err, "vendor")
 }
 
 func (s *Server) updateVendorAmountPayable(tx *sql.Tx, companyId, vendorId int, amountPayable float64) error {

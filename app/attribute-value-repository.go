@@ -167,7 +167,7 @@ func (s *Server) updateAttributeValue(ctx context.Context, uuid string, form *St
 		return errors.New("attribute value already exists")
 	}
 
-	_, err = s.db.ExecContext(
+	res, err := s.db.ExecContext(
 		ctx,
 		`UPDATE attribute_values
 		 SET value = $1, display_name = $2, sort_order = $3, updated_at = NOW()
@@ -175,14 +175,14 @@ func (s *Server) updateAttributeValue(ctx context.Context, uuid string, form *St
 		form.Value, form.DisplayName, form.SortOrder, companyID, uuid,
 	)
 
-	return err
+	return mustAffectRow(res, err, "attribute value")
 }
 
 // deleteAttributeValue soft-deletes an attribute value
 func (s *Server) deleteAttributeValue(ctx context.Context, uuid string) error {
 	companyID := CurrentCompany(ctx).ID
 
-	_, err := s.db.ExecContext(
+	res, err := s.db.ExecContext(
 		ctx,
 		`UPDATE attribute_values
 		 SET deleted_at = NOW(), updated_at = NOW()
@@ -190,5 +190,5 @@ func (s *Server) deleteAttributeValue(ctx context.Context, uuid string) error {
 		companyID, uuid,
 	)
 
-	return err
+	return mustAffectRow(res, err, "attribute value")
 }

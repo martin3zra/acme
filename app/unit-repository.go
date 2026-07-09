@@ -59,7 +59,8 @@ func (s *Server) storeUnit(ctx context.Context, form *StoreUnitForm) error {
 }
 
 func (s *Server) updateUnit(ctx context.Context, id int, form *StoreUnitForm) error {
-	_, err := s.db.Exec("UPDATE units SET name = $3, base_qty = $4, updated_at = NOW() WHERE company_id = $1 AND id = $2",
+	res, err := s.db.Exec("UPDATE units SET name = $3, base_qty = $4, updated_at = NOW() WHERE company_id = $1 AND id = $2",
 		CurrentCompany(ctx).ID, id, form.Name, form.BaseQty)
-	return err
+
+	return mustAffectRow(res, err, "unit")
 }

@@ -67,23 +67,25 @@ func (s *Server) storeWarehouse(ctx context.Context, form *StoreWarehouseForm) e
 
 func (s *Server) updateWarehouse(ctx context.Context, warehouseID int, form *UpdateWarehouseForm) error {
 	location := sql.NullString{String: form.Location, Valid: form.Location != ""}
-	_, err := s.db.Exec(
+	res, err := s.db.Exec(
 		"UPDATE warehouses SET name = $1, location = $2, updated_at = now() WHERE company_id = $3 AND id = $4",
 		form.Name,
 		location,
 		CurrentCompany(ctx).ID,
 		warehouseID,
 	)
-	return err
+
+	return mustAffectRow(res, err, "warehouse")
 }
 
 func (s *Server) deleteWarehouse(ctx context.Context, warehouseID int) error {
-	_, err := s.db.Exec(
+	res, err := s.db.Exec(
 		"UPDATE warehouses SET deleted_at = now(), updated_at = now() WHERE company_id = $1 AND id = $2",
 		CurrentCompany(ctx).ID,
 		warehouseID,
 	)
-	return err
+
+	return mustAffectRow(res, err, "warehouse")
 }
 
 func (s *Server) toggleWarehouseStatus(ctx context.Context, w *warehouse) error {
@@ -93,11 +95,12 @@ func (s *Server) toggleWarehouseStatus(ctx context.Context, w *warehouse) error 
 	} else {
 		status = "enabled"
 	}
-	_, err := s.db.Exec(
+	res, err := s.db.Exec(
 		"UPDATE warehouses SET updated_at = now(), status = $3 WHERE company_id = $1 AND id = $2",
 		CurrentCompany(ctx).ID,
 		w.ID,
 		status,
 	)
-	return err
+
+	return mustAffectRow(res, err, "warehouse")
 }

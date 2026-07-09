@@ -239,21 +239,21 @@ func (s *Server) storeCustomerInternal(tx *sql.Tx, companyID int, code string, f
 
 func (s *Server) updateCustomer(ctx context.Context, customerID int, form *UpdateCustomerForm) error {
 
-	_, err := s.db.Exec(
+	res, err := s.db.Exec(
 		"UPDATE customers SET name = $1, contact_name = $2,  email = $3, phone = $4, payment_method = $5, payment_terms = $6, credit_limit = $7, customer_type = $8, tax_receipt_id = $9, credit_limited = $10, address = $11 WHERE company_id = $12 AND id = $13",
 		form.Name, form.Contact, form.Email, form.Phone, form.PaymentMethod, form.PaymentTerms, form.CreditLimit, form.CustomerType, form.TaxReceipt, form.CreditLimited, form.Address, CurrentCompany(ctx).ID, customerID,
 	)
 
-	return err
+	return mustAffectRow(res, err, "customer")
 }
 
 func (s *Server) deleteCustomer(ctx context.Context, customerID int) error {
-	_, err := s.db.Exec(
+	res, err := s.db.Exec(
 		"UPDATE customers SET deleted_at = now(), updated_at = now() WHERE company_id = $1 AND id = $2",
 		CurrentCompany(ctx).ID, customerID,
 	)
 
-	return err
+	return mustAffectRow(res, err, "customer")
 }
 
 func (s *Server) toggleCustomerStatus(ctx context.Context, customer *customer) error {
@@ -263,11 +263,12 @@ func (s *Server) toggleCustomerStatus(ctx context.Context, customer *customer) e
 	} else {
 		status = "enabled"
 	}
-	_, err := s.db.Exec(
+	res, err := s.db.Exec(
 		"UPDATE customers SET updated_at = now(), status = $3 WHERE company_id = $1 AND id = $2",
 		CurrentCompany(ctx).ID, customer.ID, status,
 	)
-	return err
+
+	return mustAffectRow(res, err, "customer")
 }
 
 func (s *Server) updateCustomerAmountDue(tx *sql.Tx, companyId, customerId int, amountDue float64) error {
