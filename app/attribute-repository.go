@@ -159,7 +159,7 @@ func (s *Server) updateAttribute(ctx context.Context, id int, form *StoreAttribu
 		return errors.New("attribute name already exists")
 	}
 
-	_, err = s.db.ExecContext(
+	res, err := s.db.ExecContext(
 		ctx,
 		`UPDATE attributes
 		 SET name = $1, type = $2, display_name = $3, description = $4, updated_at = NOW()
@@ -167,7 +167,7 @@ func (s *Server) updateAttribute(ctx context.Context, id int, form *StoreAttribu
 		form.Name, form.Type, form.DisplayName, form.Description, companyID, id,
 	)
 
-	return err
+	return mustAffectRow(res, err, "attribute")
 }
 
 // findAttributesWithValues returns all active attributes including active values

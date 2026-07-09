@@ -53,7 +53,8 @@ func (s *Server) storeTax(ctx context.Context, form *StoreTaxForm) error {
 }
 
 func (s *Server) updateTax(ctx context.Context, uuid string, form *StoreTaxForm) error {
-	_, err := s.db.Exec("UPDATE taxes SET name = $3, rate = $4, updated_at = NOW() WHERE company_id = $1 AND uuid = $2",
+	res, err := s.db.Exec("UPDATE taxes SET name = $3, rate = $4, updated_at = NOW() WHERE company_id = $1 AND uuid = $2",
 		CurrentCompany(ctx).ID, uuid, form.Name, form.Rate)
-	return err
+
+	return mustAffectRow(res, err, "tax")
 }

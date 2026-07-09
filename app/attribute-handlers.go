@@ -79,11 +79,14 @@ func (s *Server) deleteAttributeHandler() routing.HandlerFunc {
 			return
 		}
 
-		if _, err := s.db.ExecContext(
+		// The attribute_values update above may legitimately match no row (an
+		// attribute with no values); this one must match exactly one.
+		res, err := s.db.ExecContext(
 			ctx.Request.Context(),
 			`UPDATE attributes SET deleted_at = NOW(), updated_at = NOW() WHERE id = $1 AND company_id = $2`,
 			attributeID, companyID,
-		); err != nil {
+		)
+		if err := mustAffectRow(res, err, "attribute"); err != nil {
 			ctx.BackWithError(err)
 			return
 		}

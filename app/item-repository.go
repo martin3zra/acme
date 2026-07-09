@@ -323,12 +323,12 @@ func (s *Server) updateItem(ctx context.Context, itemID int, form *UpdateItemFor
 	companyID := CurrentCompany(ctx).ID
 	return database.WithTransaction(s.db, func(tx *sql.Tx) error {
 
-		_, err := tx.Exec(
+		res, err := tx.Exec(
 			"UPDATE items SET name = $1, description = $2, price = $3, tax_id = $4, item_type = $5, identifiers = $6 WHERE company_id = $7 AND id = $8",
 			form.Name, form.Description, form.Price, form.TaxID, form.ItemType, foundation.ToJSON(form.Identifiers), companyID, itemID,
 		)
 
-		if err != nil {
+		if err := mustAffectRow(res, err, "item"); err != nil {
 			return err
 		}
 
@@ -342,12 +342,12 @@ func (s *Server) updateItem(ctx context.Context, itemID int, form *UpdateItemFor
 
 func (s *Server) deleteItem(ctx context.Context, itemID int) error {
 
-	_, err := s.db.Exec(
+	res, err := s.db.Exec(
 		"UPDATE items SET deleted_at = now(), updated_at = now() WHERE company_id = $1 AND id = $2",
 		CurrentCompany(ctx).ID, itemID,
 	)
 
-	return err
+	return mustAffectRow(res, err, "item")
 }
 
 func (s *Server) toggleItemStatus(ctx context.Context, item *item) error {
@@ -357,9 +357,9 @@ func (s *Server) toggleItemStatus(ctx context.Context, item *item) error {
 	} else {
 		status = "enabled"
 	}
-	_, err := s.db.Exec(
+	res, err := s.db.Exec(
 		"UPDATE items SET updated_at = now(), status = $3 WHERE company_id = $1 AND id = $2",
 		CurrentCompany(ctx).ID, item.ID, status,
 	)
-	return err
+	return mustAffectRow(res, err, "item")
 }
