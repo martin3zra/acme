@@ -15,6 +15,33 @@ type UserLinkedCompany struct {
 	Role string `json:"role"`
 }
 
+// userColumns is the explicit projection for every users read below, listed in the
+// order scanUser consumes them.
+//
+// Never use SELECT * (or RETURNING *) here. The scans are positional, so a
+// migration that appends a column shifts every destination by one and the query
+// fails at runtime with "expected N destination arguments". That is exactly what
+// happened when remember_token was added: it silently broke login and user
+// creation. auth-user.go's credential resolver already lists its columns for the
+// same reason.
+const userColumns = "id, name, email, password, email_verified_at, last_password_reset, " +
+	"created_at, updated_at, deleted_at, uuid, status, must_change_password, pending_email"
+
+// rowScanner is satisfied by both *sql.Row and *sql.Rows.
+type rowScanner interface {
+	Scan(dest ...any) error
+}
+
+// scanUser reads a userColumns projection into u. Keeping the single scan next to
+// the column list is what stops the two from drifting apart again.
+func scanUser(row rowScanner, u *User) error {
+	return row.Scan(
+		&u.Id, &u.Name, &u.Email, &u.Password, &u.EmailVerifiedAt, &u.LastPasswordReset,
+		&u.CreatedAt, &u.UpdatedAt, &u.DeletedAt, &u.UUID, &u.Status, &u.MustChangePassword,
+		&u.PendingEmail,
+	)
+}
+
 func (s *Server) findUsers(ctx context.Context) ([]*User, error) {
 	rows, err := s.db.Query(`
     SELECT id, uuid, name, email, email_verified_at, status, created_at, updated_at,
@@ -46,10 +73,8 @@ func (s *Server) findUsers(ctx context.Context) ([]*User, error) {
 func (s *Server) findUserByEmail(email string) (*User, error) {
 	user := new(User)
 
-	err := s.db.QueryRow("SELECT * FROM users where email = $1 ", email).
-		Scan(&user.Id, &user.Name, &user.Email,
-			&user.Password, &user.EmailVerifiedAt, &user.LastPasswordReset, &user.CreatedAt,
-			&user.UpdatedAt, &user.DeletedAt, &user.UUID, &user.Status, &user.MustChangePassword, &user.PendingEmail)
+	err := scanUser(s.db.QueryRow(
+		fmt.Sprintf("SELECT %s FROM users WHERE email = $1", userColumns), email), user)
 	if err != nil {
 		return nil, err
 	}
@@ -59,10 +84,8 @@ func (s *Server) findUserByEmail(email string) (*User, error) {
 func (s *Server) findUserByUUID(uuid string) (*User, error) {
 	user := new(User)
 
-	err := s.db.QueryRow("SELECT * FROM users where uuid = $1 ", uuid).
-		Scan(&user.Id, &user.Name, &user.Email,
-			&user.Password, &user.EmailVerifiedAt, &user.LastPasswordReset, &user.CreatedAt,
-			&user.UpdatedAt, &user.DeletedAt, &user.UUID, &user.Status, &user.MustChangePassword, &user.PendingEmail)
+	err := scanUser(s.db.QueryRow(
+		fmt.Sprintf("SELECT %s FROM users WHERE uuid = $1", userColumns), uuid), user)
 	if err != nil {
 		return nil, err
 	}
@@ -112,10 +135,9 @@ func (s *Server) updateProfile(uuid string, form *StoreProfileForm) error {
 func (s *Server) findUserByAccountUUID(uuid string) (*User, error) {
 	user := new(User)
 
-	err := s.db.QueryRow("SELECT * FROM users where id = (SELECT owner_id FROM accounts WHERE uuid = $1) ", uuid).
-		Scan(&user.Id, &user.Name, &user.Email,
-			&user.Password, &user.EmailVerifiedAt, &user.LastPasswordReset, &user.CreatedAt,
-			&user.UpdatedAt, &user.DeletedAt, &user.UUID, &user.Status, &user.MustChangePassword, &user.PendingEmail)
+	err := scanUser(s.db.QueryRow(fmt.Sprintf(
+		"SELECT %s FROM users WHERE id = (SELECT owner_id FROM accounts WHERE uuid = $1)",
+		userColumns), uuid), user)
 	if err != nil {
 		return nil, err
 	}
@@ -132,14 +154,14 @@ func (s *Server) storeUser(ctx context.Context, form *StoreUserForm) (*User, err
 	var user User
 
 	err := database.WithTransaction(s.db, func(tx *sql.Tx) error {
-		stmt, err := tx.Prepare("INSERT INTO users (name, email, password, status) VALUES($1,$2,$3,$4) RETURNING *")
+		stmt, err := tx.Prepare(fmt.Sprintf(
+			"INSERT INTO users (name, email, password, status) VALUES($1,$2,$3,$4) RETURNING %s",
+			userColumns))
 		if err != nil {
 			return err
 		}
-		err = stmt.QueryRow(form.Name, form.Email, foundation.NewHashable().Make("password"), "disabled").
-			Scan(&user.Id, &user.Name, &user.Email, &user.Password, &user.EmailVerifiedAt, &user.LastPasswordReset, &user.CreatedAt,
-				&user.UpdatedAt, &user.DeletedAt, &user.UUID, &user.Status, &user.MustChangePassword, &user.PendingEmail,
-			)
+		err = scanUser(stmt.QueryRow(
+			form.Name, form.Email, foundation.NewHashable().Make("password"), "disabled"), &user)
 		if err != nil {
 			return err
 		}
