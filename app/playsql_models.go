@@ -2,6 +2,7 @@ package app
 
 import (
 	"database/sql"
+	"encoding/json"
 	"time"
 
 	"github.com/martin3zra/forge/foundation"
@@ -159,6 +160,146 @@ func (r unitRead) toUnit() *unit {
 	u.DeletedAt = r.DeletedAt
 	return u
 }
+
+// accountsPayableRead is the playsql read model for the accounts_payable table.
+// The table has no deleted_at, so there is no softdelete tag. amount_payable is a
+// generated column: it is read here but must never be written (see
+// accountsPayableInsert, which leaves it unmapped).
+//
+// Register is the one-to-one payables cross-reference row. findPayables reads the
+// AP entry as the root (it owns the filters and the due_date ordering) and pulls
+// p.id / p.uuid through this relation, which is the inverse of the old query's
+// payables-rooted INNER JOIN.
+type accountsPayableRead struct {
+	ID            int64     `db:"id" play:"pk,incrementing"`
+	UUID          string    `db:"uuid"`
+	VendorID      int64     `db:"vendor_id"`
+	InvoiceNumber string    `db:"invoice_number"`
+	InvoiceDate   time.Time `db:"invoice_date"`
+	DueDate       time.Time `db:"due_date"`
+	AmountTotal   float64   `db:"amount_total"`
+	AmountPayable float64   `db:"amount_payable"`
+	AmountPaid    float64   `db:"amount_paid"`
+	Status        string    `db:"status"`
+	PaidStatus    string    `db:"paid_status"`
+	Notes         *string   `db:"notes"`
+
+	Register *payableRegisterRead `play:"hasOne,fk=accounts_payable_id"`
+}
+
+func (accountsPayableRead) TableName() string { return "accounts_payable" }
+
+// toPayable maps an AP entry plus its payables register row onto the response
+// struct. Payable.ID/UUID identify the payables row; Payable.InvoiceID/InvoiceUUID
+// identify the accounts_payable row.
+func (r accountsPayableRead) toPayable() *Payable {
+	notes := ""
+	if r.Notes != nil {
+		notes = *r.Notes
+	}
+	p := &Payable{
+		InvoiceID:     r.ID,
+		InvoiceUUID:   r.UUID,
+		InvoiceNumber: r.InvoiceNumber,
+		InvoiceDate:   r.InvoiceDate,
+		DueDate:       r.DueDate,
+		AmountTotal:   r.AmountTotal,
+		AmountPayable: r.AmountPayable,
+		AmountPaid:    r.AmountPaid,
+		Status:        PayableStatus(r.Status),
+		PaidStatus:    PaidStatus(r.PaidStatus),
+		Notes:         &notes,
+	}
+	if r.Register != nil {
+		p.ID = r.Register.ID
+		p.UUID = r.Register.UUID
+	}
+	return p
+}
+
+// payableRegisterRead is the read side of the payables table. It is separate from
+// the payableRegister write model because it maps uuid, which is DB-generated and
+// must stay unmapped on insert.
+type payableRegisterRead struct {
+	ID                int64  `db:"id" play:"pk,incrementing"`
+	UUID              string `db:"uuid"`
+	AccountsPayableID int64  `db:"accounts_payable_id"`
+	VendorID          int64  `db:"vendor_id"`
+}
+
+func (payableRegisterRead) TableName() string { return "payables" }
+
+// vendorPaymentRead is the playsql read model for the vendor_payments table.
+// company_id and the timestamps are deliberately unmapped: the old reads never
+// selected them and vendorPayment leaves them zero.
+//
+// payment is jsonb; it is scanned raw and unmarshalled in toVendorPayment so a
+// malformed blob leaves Payment nil instead of failing the whole read, matching
+// the previous behaviour.
+type vendorPaymentRead struct {
+	ID   int64  `db:"id" play:"pk,incrementing"`
+	UUID string `db:"uuid"`
+	// int, not int64: eager loading matches this against vendorRead.ID by Go value,
+	// so a widened type would silently never match and leave Vendor nil.
+	VendorID int       `db:"vendor_id"`
+	Date     time.Time `db:"date"`
+	Amount   float64   `db:"amount"`
+	Notes    *string   `db:"notes"`
+	Payment  []byte    `db:"payment"`
+	Status   string    `db:"status"`
+	Code     string    `db:"code"`
+
+	Vendor *vendorRead `play:"belongsTo,fk=vendor_id"`
+}
+
+func (vendorPaymentRead) TableName() string { return "vendor_payments" }
+
+// toVendorPayment maps the read model onto the JSON response struct. Only the
+// five vendor columns the old INNER JOIN selected are copied across.
+func (r vendorPaymentRead) toVendorPayment() *vendorPayment {
+	p := &vendorPayment{
+		ID:     int(r.ID),
+		UUID:   r.UUID,
+		Date:   r.Date,
+		Amount: r.Amount,
+		Status: r.Status,
+		Code:   r.Code,
+	}
+	if r.Notes != nil {
+		p.Notes = *r.Notes
+	}
+	if len(r.Payment) > 0 {
+		pm := new(Payment)
+		if err := json.Unmarshal(r.Payment, pm); err == nil {
+			p.Payment = pm
+		}
+	}
+	if r.Vendor != nil {
+		p.Vendor = vendor{
+			ID:    r.Vendor.ID,
+			UUID:  r.Vendor.UUID,
+			Name:  r.Vendor.Name,
+			Email: r.Vendor.Email,
+			Phone: r.Vendor.Phone,
+		}
+	}
+	return p
+}
+
+// vendorPaymentItemRead is the read side of vendor_payment_items, carrying the
+// settled AP entry as a belongsTo so the line can report the bill's number and
+// dates. The write model (vendorPaymentItem) stays separate.
+type vendorPaymentItemRead struct {
+	ID                int64   `db:"id" play:"pk,incrementing"`
+	VendorPaymentID   int64   `db:"vendor_payment_id"`
+	AccountsPayableID int64   `db:"accounts_payable_id"`
+	AmountDue         float64 `db:"amount_due"`
+	PaymentAmount     float64 `db:"payment_amount"`
+
+	AccountsPayable *accountsPayableRead `play:"belongsTo,fk=accounts_payable_id"`
+}
+
+func (vendorPaymentItemRead) TableName() string { return "vendor_payment_items" }
 
 // Receivable is the write model for the receivables table. The pk is DB-assigned
 // (serial); playsql omits the zero id on insert and reads it back via RETURNING.
