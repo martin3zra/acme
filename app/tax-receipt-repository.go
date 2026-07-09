@@ -91,6 +91,16 @@ func (s *Server) findTaxesReceipts(ctx context.Context) ([]*taxReceipt, error) {
 	return data, nil
 }
 
+var (
+	// ErrTaxReceiptReachEnd means the receipt's sequence range is spent.
+	ErrTaxReceiptReachEnd = errors.New("tax receipt reach end")
+	// ErrTaxReceiptNotFound means no such receipt exists for this company. The
+	// StoreInvoiceForm rule is `exists:tax_receipts,id`, which is not scoped to a
+	// company, so a request naming another tenant's receipt id gets here. The
+	// company_id predicate below is what actually keeps it from being consumed.
+	ErrTaxReceiptNotFound = errors.New("tax receipt not found for this company")
+)
+
 // grabTaxReceiptSequence consumes the next fiscal sequence for a tax receipt and
 // returns it with its formatted NCF.
 //
@@ -108,22 +118,27 @@ func (s *Server) findTaxesReceipts(ctx context.Context) ([]*taxReceipt, error) {
 // itself takes, so each caller gets a distinct sequence. GetNextSequence, the
 // company-code sequence next door, already guarded itself with FOR UPDATE.
 //
-// The `current < sequence_end` predicate replaces the old pre-read exhaustion check:
-// no row is updated when the range is spent, which surfaces as ErrNoRows.
+// The `current < sequence_end` predicate replaces the old pre-read exhaustion check,
+// so the last issuable number is sequence_end - 1, as it always was. Updating no row
+// is ambiguous — spent range, unknown id, another company's id, or a soft-deleted
+// receipt — so the cause is resolved with a follow-up read rather than reported as
+// exhaustion either way.
+//
+// `deleted_at IS NULL` is defensive: nothing in the codebase soft-deletes a tax
+// receipt today, so no live path reaches it. If one is ever added, a retired receipt
+// must not keep issuing fiscal numbers.
 func (s *Server) grabTaxReceiptSequence(tx *sql.Tx, companyId, taxReceiptID int) (*taxReceiptSeq, error) {
 	var sequence int64
 	var serie string
 	err := tx.QueryRow(
 		`UPDATE tax_receipts
 		    SET current = current + 1, updated_at = NOW()
-		  WHERE company_id = $1 AND id = $2 AND current < sequence_end
+		  WHERE company_id = $1 AND id = $2 AND deleted_at IS NULL AND current < sequence_end
 		 RETURNING serie, current - 1`,
 		companyId, taxReceiptID,
 	).Scan(&serie, &sequence)
 	if errors.Is(err, sql.ErrNoRows) {
-		// Either the receipt does not exist, or its range is exhausted. The caller
-		// only ever passes a receipt it just read, so exhaustion is the real case.
-		return nil, errors.New("tax receipt reach end") //new(ErrTaxReceiptReachEnd)
+		return nil, s.explainNoSequence(tx, companyId, taxReceiptID)
 	}
 	if err != nil {
 		return nil, err
@@ -132,4 +147,22 @@ func (s *Server) grabTaxReceiptSequence(tx *sql.Tx, companyId, taxReceiptID int)
 	taxNumber := foundation.GeneratePrefixedNumber(serie, 8, int(sequence))
 
 	return &taxReceiptSeq{Seq: sequence, Number: taxNumber}, nil
+}
+
+// explainNoSequence distinguishes an exhausted receipt from one that does not belong
+// to the company. Reading ErrNoRows does not abort the caller's transaction, so this
+// second query is safe to run on it.
+func (s *Server) explainNoSequence(tx *sql.Tx, companyId, taxReceiptID int) error {
+	var exists bool
+	err := tx.QueryRow(
+		"SELECT true FROM tax_receipts WHERE company_id = $1 AND id = $2 AND deleted_at IS NULL",
+		companyId, taxReceiptID,
+	).Scan(&exists)
+	if errors.Is(err, sql.ErrNoRows) {
+		return ErrTaxReceiptNotFound
+	}
+	if err != nil {
+		return err
+	}
+	return ErrTaxReceiptReachEnd
 }

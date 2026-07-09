@@ -2,6 +2,7 @@ package app
 
 import (
 	"database/sql"
+	"errors"
 	"testing"
 	"time"
 )
@@ -40,8 +41,8 @@ func TestGrabTaxReceiptSequence_Increments(t *testing.T) {
 }
 
 // TestGrabTaxReceiptSequence_Exhausted: when current reaches sequence_end the range
-// is spent and no further number is issued. The UPDATE matches no row, which the
-// caller reports as "tax receipt reach end" rather than silently succeeding.
+// is spent and no further number is issued. The UPDATE matches no row, and the cause
+// is reported as exhaustion rather than silently succeeding.
 func TestGrabTaxReceiptSequence_Exhausted(t *testing.T) {
 	s := newTestServer(t)
 	is := newIs(t)
@@ -61,13 +62,82 @@ func TestGrabTaxReceiptSequence_Exhausted(t *testing.T) {
 	is.True(last.Number != "", "the final number in the range is still issued")
 
 	_, err = s.grabTaxReceiptSequence(tx, f.company.ID, f.taxReceiptID)
-	is.Err(err, "an exhausted range must not issue another number")
+	is.True(errors.Is(err, ErrTaxReceiptReachEnd), "an exhausted range reports exhaustion")
 
 	// The counter did not run past the end.
 	var current, end int64
 	is.NoErr(tx.QueryRow(
 		`SELECT current, sequence_end FROM tax_receipts WHERE id = $1`, f.taxReceiptID).Scan(&current, &end))
 	is.Equal(int(current), int(end))
+}
+
+// TestGrabTaxReceiptSequence_UnknownReceipt: updating no row is ambiguous, so an
+// unknown id must not be reported as an exhausted range.
+func TestGrabTaxReceiptSequence_UnknownReceipt(t *testing.T) {
+	s := newTestServer(t)
+	is := newIs(t)
+	f := mkAccountCompany(t, s)
+
+	tx, err := s.db.Begin()
+	is.NoErr(err)
+	defer tx.Rollback()
+
+	_, err = s.grabTaxReceiptSequence(tx, f.company.ID, 99999999)
+	is.True(errors.Is(err, ErrTaxReceiptNotFound), "an unknown receipt reports not-found")
+	is.True(!errors.Is(err, ErrTaxReceiptReachEnd), "and not exhaustion")
+}
+
+// TestGrabTaxReceiptSequence_ForeignCompany: StoreInvoiceForm validates tax_receipt
+// with `exists:tax_receipts,id`, which is not scoped to a company — so a request can
+// name another tenant's receipt id. The company_id predicate is what stops it being
+// consumed. This pins that: the foreign receipt's counter must not move.
+func TestGrabTaxReceiptSequence_ForeignCompany(t *testing.T) {
+	s := newTestServer(t)
+	is := newIs(t)
+	f := mkAccountCompany(t, s)
+	other := mkAccountCompany(t, s)
+
+	before := scalarInt(t, s.db, `SELECT current FROM tax_receipts WHERE id = $1`, other.taxReceiptID)
+
+	tx, err := s.db.Begin()
+	is.NoErr(err)
+	defer tx.Rollback()
+
+	_, err = s.grabTaxReceiptSequence(tx, f.company.ID, other.taxReceiptID)
+	is.True(errors.Is(err, ErrTaxReceiptNotFound), "another company's receipt is not found")
+	is.NoErr(tx.Rollback())
+
+	after := scalarInt(t, s.db, `SELECT current FROM tax_receipts WHERE id = $1`, other.taxReceiptID)
+	is.Equal(after, before) // the foreign counter never moved
+}
+
+// TestGrabTaxReceiptSequence_SoftDeleted: a retired receipt must not keep issuing
+// fiscal numbers.
+//
+// Nothing in the codebase soft-deletes a tax receipt today — no handler, no
+// migration, no stored procedure writes tax_receipts.deleted_at — so this pins
+// intended behaviour rather than fixing a live bug. The test sets the column by hand.
+func TestGrabTaxReceiptSequence_SoftDeleted(t *testing.T) {
+	s := newTestServer(t)
+	is := newIs(t)
+	f := mkAccountCompany(t, s)
+
+	before := scalarInt(t, s.db, `SELECT current FROM tax_receipts WHERE id = $1`, f.taxReceiptID)
+
+	_, err := s.db.Exec(`UPDATE tax_receipts SET deleted_at = NOW() WHERE id = $1`, f.taxReceiptID)
+	is.NoErr(err)
+
+	tx, err := s.db.Begin()
+	is.NoErr(err)
+	defer tx.Rollback()
+
+	_, err = s.grabTaxReceiptSequence(tx, f.company.ID, f.taxReceiptID)
+	is.True(errors.Is(err, ErrTaxReceiptNotFound), "a soft-deleted receipt is not found")
+	is.True(!errors.Is(err, ErrTaxReceiptReachEnd), "and not exhaustion")
+	is.NoErr(tx.Rollback())
+
+	after := scalarInt(t, s.db, `SELECT current FROM tax_receipts WHERE id = $1`, f.taxReceiptID)
+	is.Equal(after, before) // the counter never moved
 }
 
 // TestGrabTaxReceiptSequence_ConcurrentTxDistinct is the regression test.
