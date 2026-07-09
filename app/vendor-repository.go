@@ -140,13 +140,14 @@ func (s *Server) findVendors(ctx context.Context, vendorType VendorType) ([]*ven
 		return nil, err
 	}
 
-	q := pdb.Model(&vendorRead{}).WhereEq("company_id", CurrentCompany(ctx).ID)
-	if vendorType != "all" {
-		q = q.WhereEq("vendor_type", string(vendorType))
-	}
-
 	var rows []vendorRead
-	if err := q.OrderBy("name", playsql.Asc).Get(ctx, &rows); err != nil {
+	if err := pdb.Model(&vendorRead{}).
+		WhereEq("company_id", CurrentCompany(ctx).ID).
+		Unless(vendorType == "all", func(q *playsql.Builder) {
+			q.WhereEq("vendor_type", string(vendorType))
+		}).
+		OrderBy("name", playsql.Asc).
+		Get(ctx, &rows); err != nil {
 		return nil, err
 	}
 

@@ -40,6 +40,8 @@ func (s *Server) runRecurrenceScheduler() error {
         )
       ORDER BY recurrence_next_run_at
       LIMIT 1
+      -- Stays raw: playsql's LockForUpdate has no SKIP LOCKED mode, and skipping
+      -- locked rows is what lets several schedulers drain the queue in parallel.
       FOR UPDATE SKIP LOCKED;
   `).Scan(&invoiceID, &companyID, &recurrenceData)
 		if err == sql.ErrNoRows {

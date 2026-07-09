@@ -95,20 +95,21 @@ func (s *Server) findInvoices(ctx context.Context, kind TransactionKind, invoice
 		return nil, err
 	}
 
-	q := pdb.Model(&invoiceRead{}).
+	// The old `($2 != 'invoice' OR $3 = 'all' OR invoices.type = $3::invoice_terms)`
+	// predicate: the type filter only applies to invoices, and only when narrowed.
+	narrowed := kind == TransactionKinds.Invoice && invoiceType != InvoiceTypeAll
+
+	var rows []invoiceRead
+	if err := pdb.Model(&invoiceRead{}).
 		Select(invoiceListColumns...).
 		WithConstraint("Customer", withTrashedRelation).
 		WhereEq("company_id", CurrentCompany(ctx).ID).
-		WhereEq("transaction_kind", string(kind))
-
-	// The old `($2 != 'invoice' OR $3 = 'all' OR invoices.type = $3::invoice_terms)`
-	// predicate: the type filter only applies to invoices, and only when narrowed.
-	if kind == TransactionKinds.Invoice && invoiceType != InvoiceTypeAll {
-		q.WhereEq("type", string(invoiceType))
-	}
-
-	var rows []invoiceRead
-	if err := q.OrderBy("id", playsql.Desc).Get(ctx, &rows); err != nil {
+		WhereEq("transaction_kind", string(kind)).
+		When(narrowed, func(q *playsql.Builder) {
+			q.WhereEq("type", string(invoiceType))
+		}).
+		OrderBy("id", playsql.Desc).
+		Get(ctx, &rows); err != nil {
 		return nil, err
 	}
 

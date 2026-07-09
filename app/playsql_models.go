@@ -555,12 +555,12 @@ func (r purchaseRead) toPurchase() *purchase {
 }
 
 // inventoryTransferRead is the playsql model for inventory_transfers, backing the
-// insert and the three status transitions. updated_at is mapped, so playsql stamps it
-// where the raw statements said `updated_at = NOW()`.
+// insert, the three status transitions, and the locking read in
+// loadTransferForUpdate. updated_at is mapped, so playsql stamps it where the raw
+// statements said `updated_at = NOW()`.
 //
-// It deliberately does NOT back loadTransferForUpdate: that read takes a FOR UPDATE
-// row lock, which playsql cannot express, and the lock is what serialises concurrent
-// transitions of the same transfer.
+// playsql v0.3.0 added LockForUpdate, so that read no longer has to stay raw. The
+// lock is what serialises concurrent transitions of the same transfer.
 type inventoryTransferRead struct {
 	ID              int        `db:"id" play:"pk,incrementing"`
 	CompanyID       int        `db:"company_id"`
@@ -591,6 +591,22 @@ type inventoryTransferLine struct {
 }
 
 func (inventoryTransferLine) TableName() string { return "inventory_transfer_lines" }
+
+// inventoryBalanceRead is the read side of inventory_balances, used by
+// dispatchTransfer to lock a source balance before checking it.
+//
+// The table has no surrogate id — its key is (company_id, variant_id, warehouse_id) —
+// so no field carries play:"pk". Nothing writes through this model: the balance
+// upsert and the reversal increment are both raw, because playsql cannot express a
+// conflict branch that accumulates. Only First/Get, which never touch the pk.
+type inventoryBalanceRead struct {
+	CompanyID   int     `db:"company_id"`
+	VariantID   int     `db:"variant_id"`
+	WarehouseID int     `db:"warehouse_id"`
+	Quantity    float64 `db:"quantity"`
+}
+
+func (inventoryBalanceRead) TableName() string { return "inventory_balances" }
 
 // itemVariantRead is a narrow read model for items_variants: only the columns the
 // inventory paths need. No softdelete tag — recordMovement's track_inventory lookup

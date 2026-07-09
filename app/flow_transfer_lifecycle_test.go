@@ -108,8 +108,8 @@ func TestTransferLifecycle(t *testing.T) {
 	is.EqualFloat(qtyAt(dest), 10)
 }
 
-// TestDispatchTransfer_InsufficientStock: the FOR UPDATE balance check stays raw,
-// and still refuses to move more than is on hand.
+// TestDispatchTransfer_InsufficientStock: the FOR UPDATE balance check (now
+// lockedBalance, on playsql) still refuses to move more than is on hand.
 func TestDispatchTransfer_InsufficientStock(t *testing.T) {
 	s := newTestServer(t)
 	is := newIs(t)
