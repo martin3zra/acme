@@ -30,6 +30,12 @@ func (s *Server) play() (*playsql.DB, error) {
 	return playsql.Use(s.db, "postgres")
 }
 
+// withTrashedRelation opts an eager-loaded relation into soft-deleted rows. Use it
+// wherever the raw SQL used a plain INNER JOIN with no deleted_at predicate but the
+// related read model is softdelete-tagged (customerRead, vendorRead): without it the
+// parent row comes back with a nil relation once the related row is soft-deleted.
+func withTrashedRelation(b *playsql.Builder) { b.WithTrashed() }
+
 // customerRead is the playsql read model for the customers table. Only real
 // columns are mapped (db tags); deleted_at carries play:"softdelete" so queries
 // exclude soft-deleted rows automatically, matching the old "deleted_at IS NULL".
@@ -266,6 +272,112 @@ type expenseCategoryInsert struct {
 }
 
 func (expenseCategoryInsert) TableName() string { return "expenses_categories" }
+
+// paymentRead is the playsql read model for the receivables_income table (customer
+// payments). payment is jsonb and maps as []byte: playsql classifies any pointer or
+// slice-of-struct field as a relation, and a plain struct field would need a json
+// cast, so the blob is decoded in toPayment — which also keeps the previous
+// behaviour of tolerating a malformed blob instead of failing the read.
+//
+// Invoices is play:"readonly": it has no backing column and carries the WithCount
+// aggregate that replaced the old correlated `(select count(*) …) as invoices`.
+type paymentRead struct {
+	ID         int           `db:"id" play:"pk,incrementing"`
+	UUID       string        `db:"uuid"`
+	Code       string        `db:"code"`
+	CustomerID int           `db:"customer_id"`
+	Date       time.Time     `db:"date"`
+	Amount     float64       `db:"amount"`
+	Notes      string        `db:"notes"`
+	Payment    []byte        `db:"payment"`
+	Status     PaymentStatus `db:"status"`
+	CreatedAt  *time.Time    `db:"created_at"`
+	UpdatedAt  *time.Time    `db:"updated_at"`
+	DeletedAt  *time.Time    `db:"deleted_at" play:"softdelete"`
+	Invoices   int           `db:"invoices" play:"readonly"`
+
+	Customer *customerRead      `play:"belongsTo,fk=customer_id"`
+	Items    []*paymentItemRead `play:"hasMany,fk=receivable_income_id"`
+}
+
+func (paymentRead) TableName() string { return "receivables_income" }
+
+// toPayment maps the read model onto the JSON response struct.
+//
+// It fills every customer field the response struct has. The old list query only
+// selected uuid/name/amount_due while the detail query also took id/email/address,
+// so the list response now carries those three as well — a superset of the same
+// tenant's own data, which no caller depends on being absent.
+func (r paymentRead) toPayment() *payment {
+	p := &payment{
+		ID:       r.ID,
+		UUID:     r.UUID,
+		Code:     r.Code,
+		Date:     r.Date,
+		Amount:   r.Amount,
+		Notes:    r.Notes,
+		Invoices: r.Invoices,
+		Status:   r.Status,
+	}
+	p.CreatedAt = r.CreatedAt
+	p.UpdatedAt = r.UpdatedAt
+	p.DeletedAt = r.DeletedAt
+	if len(r.Payment) > 0 {
+		pm := new(Payment)
+		if err := json.Unmarshal(r.Payment, pm); err == nil {
+			p.Payment = *pm
+		}
+	}
+	if c := r.Customer; c != nil {
+		p.Customer.ID = c.ID
+		p.Customer.UUID = c.UUID
+		p.Customer.Name = c.Name
+		p.Customer.Email = c.Email
+		p.Customer.AmountDue = c.AmountDue
+		p.Customer.Address = c.Address
+		p.Customer.Phone = c.Phone
+	}
+	return p
+}
+
+// paymentItemRead is the read side of receivables_income_items. It carries no
+// play:"softdelete" tag even though deleted_at exists: neither the old count
+// subquery nor findPaymentLines filtered it, and playsql would otherwise exclude
+// trashed children from the WithCount aggregate too.
+type paymentItemRead struct {
+	ID                 int        `db:"id" play:"pk,incrementing"`
+	ReceivableIncomeID int        `db:"receivable_income_id"`
+	InvoiceID          int        `db:"invoice_id"`
+	AmountDue          float64    `db:"amount_due"`
+	PaymentAmount      float64    `db:"payment_amount"`
+	CreatedAt          *time.Time `db:"created_at"`
+	UpdatedAt          *time.Time `db:"updated_at"`
+	DeletedAt          *time.Time `db:"deleted_at"`
+
+	Invoice *paymentInvoiceRead `play:"belongsTo,fk=invoice_id"`
+}
+
+func (paymentItemRead) TableName() string { return "receivables_income_items" }
+
+// paymentInvoiceRead is a narrow projection of the invoices table: only the columns
+// a payment line reports. It is deliberately separate from any future invoiceRead —
+// the payment-line joins never filtered invoices.deleted_at, so this model carries
+// no softdelete tag, whereas a general invoice read model would want one.
+//
+// tax_number is nullable; playsql scans a SQL NULL as the field's zero value, so an
+// invoice with no tax receipt reports an empty NCF rather than dropping the line.
+type paymentInvoiceRead struct {
+	ID        int        `db:"id" play:"pk,incrementing"`
+	UUID      string     `db:"uuid"`
+	Code      string     `db:"code"`
+	Date      time.Time  `db:"date"`
+	DueOn     *time.Time `db:"due_on"`
+	Total     float64    `db:"total"`
+	TaxNumber string     `db:"tax_number"`
+	Note      string     `db:"note"`
+}
+
+func (paymentInvoiceRead) TableName() string { return "invoices" }
 
 // accountsPayableRead is the playsql read model for the accounts_payable table.
 // The table has no deleted_at, so there is no softdelete tag. amount_payable is a

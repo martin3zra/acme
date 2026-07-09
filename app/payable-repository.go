@@ -228,11 +228,6 @@ func (s *Server) updateAPBalance(tx *sql.Tx, companyID int, apID int64, paymentA
 	return nil
 }
 
-// withVendor eager-loads the payment's vendor. vendorRead is soft-deletable, so
-// WithTrashed is required: the old INNER JOIN never filtered deleted_at, and
-// without it a payment to a since-deleted vendor would come back vendor-less.
-func withVendor(b *playsql.Builder) { b.WithTrashed() }
-
 func (s *Server) findVendorPaymentByUUID(ctx context.Context, uuid string) (*vendorPayment, error) {
 	pdb, err := s.play()
 	if err != nil {
@@ -241,7 +236,7 @@ func (s *Server) findVendorPaymentByUUID(ctx context.Context, uuid string) (*ven
 
 	var row vendorPaymentRead
 	if err := pdb.Model(&vendorPaymentRead{}).
-		WithConstraint("Vendor", withVendor).
+		WithConstraint("Vendor", withTrashedRelation).
 		WhereEq("company_id", CurrentCompany(ctx).ID).
 		WhereEq("uuid", uuid).
 		First(ctx, &row); err != nil {
@@ -354,7 +349,7 @@ func (s *Server) findVendorPayments(ctx context.Context) ([]*vendorPayment, erro
 
 	var rows []vendorPaymentRead
 	if err := pdb.Model(&vendorPaymentRead{}).
-		WithConstraint("Vendor", withVendor).
+		WithConstraint("Vendor", withTrashedRelation).
 		WhereEq("company_id", CurrentCompany(ctx).ID).
 		OrderBy("id", playsql.Desc).
 		Get(ctx, &rows); err != nil {
