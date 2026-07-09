@@ -3,6 +3,7 @@ package app
 import (
 	"database/sql"
 	"encoding/json"
+	"fmt"
 	"time"
 
 	"github.com/martin3zra/forge/foundation"
@@ -451,6 +452,184 @@ type companyUserInsert struct {
 }
 
 func (companyUserInsert) TableName() string { return "companies_users" }
+
+// purchaseRead is the playsql read model for the purchases table (the header, not
+// the lines — findPurchaseLines stays raw).
+//
+// deleted_at carries play:"softdelete": every purchase read filtered it.
+//
+// source is jsonb and maps as []byte, decoded in toPurchase; purchase.Source is a
+// pointer-to-struct, which playsql would otherwise read as a relation.
+//
+// notes and invoice_number are nullable and the old reads wrapped them in COALESCE.
+// purchase_status is NOT NULL, so its COALESCE(...::text, ”) never had anything to
+// coalesce. playsql scans a SQL NULL as the zero value in every case.
+type purchaseRead struct {
+	ID               int                     `db:"id" play:"pk,incrementing"`
+	CompanyID        int                     `db:"company_id"`
+	VendorID         int                     `db:"vendor_id"`
+	WarehouseID      int                     `db:"warehouse_id"`
+	UUID             string                  `db:"uuid"`
+	Code             string                  `db:"code"`
+	Date             time.Time               `db:"date"`
+	DueDate          *time.Time              `db:"due_date"`
+	Subtotal         float64                 `db:"subtotal"`
+	DiscountAmount   float64                 `db:"discount_amount"`
+	TaxAmount        float64                 `db:"tax_amount"`
+	Total            float64                 `db:"total"`
+	Status           string                  `db:"status"`
+	PurchaseStatus   string                  `db:"purchase_status"`
+	PaymentStatus    PaidStatus              `db:"payment_status"`
+	Notes            string                  `db:"notes"`
+	InvoiceNumber    string                  `db:"invoice_number"`
+	TransactionKind  PurchaseTransactionKind `db:"transaction_kind"`
+	Source           []byte                  `db:"source"`
+	MovementRecorded bool                    `db:"movement_recorded"`
+	CreatedAt        *time.Time              `db:"created_at"`
+	UpdatedAt        *time.Time              `db:"updated_at"`
+	DeletedAt        *time.Time              `db:"deleted_at" play:"softdelete"`
+
+	Vendor *vendorRead `play:"belongsTo,fk=vendor_id"`
+}
+
+func (purchaseRead) TableName() string { return "purchases" }
+
+// purchaseListColumns is the projection the list read used: no company_id, no
+// movement_recorded, no timestamps.
+var purchaseListColumns = []string{
+	"id", "uuid", "code", "warehouse_id", "date", "due_date", "subtotal",
+	"discount_amount", "tax_amount", "total", "status", "purchase_status",
+	"payment_status", "notes", "transaction_kind", "source", "invoice_number",
+	"vendor_id",
+}
+
+// toPurchase maps the read model onto the response struct, deriving the three
+// computed fields the old scan loops built by hand.
+func (r purchaseRead) toPurchase() *purchase {
+	p := &purchase{
+		CompanyID:     r.CompanyID,
+		ID:            r.ID,
+		UUID:          r.UUID,
+		Number:        r.Code,
+		WarehouseID:   r.WarehouseID,
+		Date:          r.Date,
+		DueOn:         r.DueDate,
+		Amount:        r.Subtotal,
+		Discount:      Discount{Val: r.DiscountAmount, Type: "fixed"},
+		Tax:           r.TaxAmount,
+		Total:         r.Total,
+		InvoiceNumber: r.InvoiceNumber,
+		Status:        r.PurchaseStatus,
+		PaymentStatus: r.PaymentStatus,
+		Notes:         r.Notes,
+		Kind:          r.TransactionKind,
+		EntityStatus:  foundation.Status(r.Status),
+	}
+
+	p.AmountDue = p.Total
+	if p.PaymentStatus == PaidStatuses.Paid {
+		p.AmountDue = 0
+	}
+
+	p.Terms = "pia"
+	if p.DueOn != nil {
+		difference := p.DueOn.Sub(p.Date)
+		p.Terms = fmt.Sprintf("net%d", int(difference.Hours())/24)
+	}
+
+	if len(r.Source) > 0 {
+		src := new(PurchaseSource)
+		if err := json.Unmarshal(r.Source, src); err == nil {
+			p.Source = src
+		}
+	}
+	if v := r.Vendor; v != nil {
+		p.Vendor.ID = v.ID
+		p.Vendor.UUID = v.UUID
+		p.Vendor.Name = v.Name
+		p.Vendor.Email = v.Email
+		p.Vendor.Phone = v.Phone
+		p.Vendor.Address = v.Address
+	}
+	return p
+}
+
+// inventoryTransferRead is the playsql model for inventory_transfers, backing the
+// insert and the three status transitions. updated_at is mapped, so playsql stamps it
+// where the raw statements said `updated_at = NOW()`.
+//
+// It deliberately does NOT back loadTransferForUpdate: that read takes a FOR UPDATE
+// row lock, which playsql cannot express, and the lock is what serialises concurrent
+// transitions of the same transfer.
+type inventoryTransferRead struct {
+	ID              int        `db:"id" play:"pk,incrementing"`
+	CompanyID       int        `db:"company_id"`
+	UUID            string     `db:"uuid"`
+	FromWarehouseID int        `db:"from_warehouse_id"`
+	ToWarehouseID   int        `db:"to_warehouse_id"`
+	Notes           *string    `db:"notes"`
+	Status          string     `db:"status"`
+	RequestedBy     *int       `db:"requested_by"`
+	DispatchedAt    *time.Time `db:"dispatched_at"`
+	ReceivedAt      *time.Time `db:"received_at"`
+	CreatedAt       time.Time  `db:"created_at"`
+	UpdatedAt       time.Time  `db:"updated_at"`
+}
+
+func (inventoryTransferRead) TableName() string { return "inventory_transfers" }
+
+// inventoryTransferLine is the write model for a transfer's product lines.
+type inventoryTransferLine struct {
+	ID          int64   `db:"id" play:"pk,incrementing"`
+	CompanyID   int     `db:"company_id"`
+	TransferID  int     `db:"transfer_id"`
+	VariantID   int     `db:"variant_id"`
+	Qty         float64 `db:"qty"`
+	UnitID      *int    `db:"unit_id"`
+	UnitCost    float64 `db:"unit_cost"`
+	Description *string `db:"description"`
+}
+
+func (inventoryTransferLine) TableName() string { return "inventory_transfer_lines" }
+
+// itemVariantRead is a narrow read model for items_variants: only the columns the
+// inventory paths need. No softdelete tag — recordMovement's track_inventory lookup
+// never filtered deleted_at.
+type itemVariantRead struct {
+	ID             int  `db:"id" play:"pk,incrementing"`
+	CompanyID      int  `db:"company_id"`
+	ItemID         int  `db:"item_id"`
+	TrackInventory bool `db:"track_inventory"`
+}
+
+func (itemVariantRead) TableName() string { return "items_variants" }
+
+// inventoryMovementRead is the read side of inventory_movements. The write model is
+// InventoryMovement; this one exists so reverseMovements can select its four columns.
+type inventoryMovementRead struct {
+	ID              int64                 `db:"id" play:"pk,incrementing"`
+	CompanyID       int                   `db:"company_id"`
+	VariantID       int                   `db:"variant_id"`
+	WarehouseID     int                   `db:"warehouse_id"`
+	Qty             float64               `db:"qty"`
+	UnitCost        float64               `db:"unit_cost"`
+	TransactionKind InventoryMovementKind `db:"transaction_kind"`
+	ReferenceType   string                `db:"reference_type"`
+	ReferenceID     int                   `db:"reference_id"`
+}
+
+func (inventoryMovementRead) TableName() string { return "inventory_movements" }
+
+// warehouseRead is a narrow read model for the warehouses table. softdelete matches
+// the `deleted_at IS NULL` every warehouse read carries.
+type warehouseRead struct {
+	ID        int        `db:"id" play:"pk,incrementing"`
+	CompanyID int        `db:"company_id"`
+	Name      string     `db:"name"`
+	DeletedAt *time.Time `db:"deleted_at" play:"softdelete"`
+}
+
+func (warehouseRead) TableName() string { return "warehouses" }
 
 // expenseRead is the playsql read model for the expenses table. receipt_url is
 // deliberately unmapped: it is nullable, no read ever selected it, and mapping it
