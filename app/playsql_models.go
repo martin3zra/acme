@@ -161,6 +161,112 @@ func (r unitRead) toUnit() *unit {
 	return u
 }
 
+// expenseRead is the playsql read model for the expenses table. receipt_url is
+// deliberately unmapped: it is nullable, no read ever selected it, and mapping it
+// would pull a NULL into the default projection.
+type expenseRead struct {
+	ID         int        `db:"id" play:"pk,incrementing"`
+	UUID       string     `db:"uuid"`
+	CategoryID int        `db:"category_id"`
+	Date       time.Time  `db:"date"`
+	Amount     float64    `db:"amount"`
+	Notes      string     `db:"notes"`
+	CreatedAt  *time.Time `db:"created_at"`
+	UpdatedAt  *time.Time `db:"updated_at"`
+	DeletedAt  *time.Time `db:"deleted_at" play:"softdelete"`
+
+	Category *expenseCategoryRead `play:"belongsTo,fk=category_id"`
+}
+
+func (expenseRead) TableName() string { return "expenses" }
+
+// toExpense maps the read model onto the JSON response struct. Only the three
+// category columns the old INNER JOIN selected are copied across.
+func (r expenseRead) toExpense() *expense {
+	e := &expense{
+		ID:     r.ID,
+		UUID:   r.UUID,
+		Date:   Date{Time: r.Date},
+		Amount: r.Amount,
+		Notes:  r.Notes,
+	}
+	e.CreatedAt = r.CreatedAt
+	e.UpdatedAt = r.UpdatedAt
+	e.DeletedAt = r.DeletedAt
+	if r.Category != nil {
+		e.Category = expenseCategory{
+			ID:   r.Category.ID,
+			UUID: r.Category.UUID,
+			Name: r.Category.Name,
+		}
+	}
+	return e
+}
+
+// expenseCategoryRead is the playsql read model for the expenses_categories table.
+// It carries no play:"softdelete" tag even though the column exists: only
+// findExpensesCategories filtered deleted_at, and the other three reads must keep
+// resolving a soft-deleted category (storeExpense/updateExpense look one up by
+// uuid). That one read filters explicitly with WhereNull.
+//
+// TotalAmount is play:"readonly" — it has no backing column and is excluded from
+// the default projection, appearing only as the WithSum aggregate alias in
+// findExpensesByCategories.
+type expenseCategoryRead struct {
+	ID          int        `db:"id" play:"pk,incrementing"`
+	UUID        string     `db:"uuid"`
+	Name        string     `db:"name"`
+	Description string     `db:"description"`
+	CreatedAt   *time.Time `db:"created_at"`
+	UpdatedAt   *time.Time `db:"updated_at"`
+	DeletedAt   *time.Time `db:"deleted_at"`
+	TotalAmount float64    `db:"total_amount" play:"readonly"`
+
+	Expenses []*expenseRead `play:"hasMany,fk=category_id"`
+}
+
+func (expenseCategoryRead) TableName() string { return "expenses_categories" }
+
+// toExpenseCategory maps the read model onto the JSON response struct.
+func (r expenseCategoryRead) toExpenseCategory() *expenseCategory {
+	c := &expenseCategory{
+		ID:          r.ID,
+		UUID:        r.UUID,
+		Name:        r.Name,
+		Description: r.Description,
+		TotalAmount: r.TotalAmount,
+	}
+	c.CreatedAt = r.CreatedAt
+	c.UpdatedAt = r.UpdatedAt
+	c.DeletedAt = r.DeletedAt
+	return c
+}
+
+// expenseInsert is the write model for the expenses table. uuid, receipt_url and
+// the timestamps stay unmapped so the database fills them. It also backs
+// updateExpense, which — like the statement it replaced — must not bump
+// updated_at: playsql only stamps it when the column is mapped.
+type expenseInsert struct {
+	ID         int64     `db:"id" play:"pk,incrementing"`
+	CompanyID  int       `db:"company_id"`
+	CategoryID int       `db:"category_id"`
+	Date       time.Time `db:"date"`
+	Amount     float64   `db:"amount"`
+	Notes      string    `db:"notes"`
+}
+
+func (expenseInsert) TableName() string { return "expenses" }
+
+// expenseCategoryInsert is the write model for expenses_categories.
+type expenseCategoryInsert struct {
+	ID          int64  `db:"id" play:"pk,incrementing"`
+	CompanyID   int    `db:"company_id"`
+	Name        string `db:"name"`
+	Description string `db:"description"`
+}
+
+func (expenseCategoryInsert) TableName() string { return "expenses_categories" }
+
 // accountsPayableRead is the playsql read model for the accounts_payable table.
 // The table has no deleted_at, so there is no softdelete tag. amount_payable is a
 // generated column: it is read here but must never be written (see
@@ -349,7 +455,7 @@ type invoiceInsert struct {
 	TaxNumber          *string         `db:"tax_number"`
 	Date               time.Time       `db:"date"`
 	Type               *string         `db:"type"`
-	DueOn              *time.Time       `db:"due_on"`
+	DueOn              *time.Time      `db:"due_on"`
 	CustomerID         int             `db:"customer_id"`
 	Amount             float64         `db:"amount"`
 	Discount           string          `db:"discount"`
