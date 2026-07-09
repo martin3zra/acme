@@ -6,6 +6,8 @@ import (
 	"errors"
 	"fmt"
 	"time"
+
+	"github.com/martin3zra/playsql"
 )
 
 // Sentinel errors for stock transfers, mapped to form fields by the handler.
@@ -126,36 +128,45 @@ func (s *Server) recordMovement(
 	referenceType string,
 	referenceID int,
 ) error {
+	ptx, err := playTx(tx)
+	if err != nil {
+		return err
+	}
+
 	// Skip non-tracked variants.
-	var track bool
-	if err := tx.QueryRow(
-		"SELECT track_inventory FROM items_variants WHERE id = $1 AND company_id = $2",
-		variantID, companyID,
-	).Scan(&track); err != nil {
+	var variant itemVariantRead
+	if err := ptx.Model(&itemVariantRead{}).
+		Select("track_inventory").
+		WhereEq("id", variantID).
+		WhereEq("company_id", companyID).
+		First(context.Background(), &variant); err != nil {
 		return fmt.Errorf("recordMovement: lookup track_inventory: %w", err)
 	}
-	if !track {
+	if !variant.TrackInventory {
 		return nil
 	}
 
-	// Resolve base_qty for unit conversion.
+	// Resolve base_qty for unit conversion. An unknown unit leaves the multiplier at
+	// 1, as before. The old COALESCE(base_qty, 1) was dead: the column is NOT NULL.
 	baseQty := 1
 	if unitID > 0 {
-		if err := tx.QueryRow(
-			"SELECT COALESCE(base_qty, 1) FROM units WHERE id = $1 AND company_id = $2",
-			unitID, companyID,
-		).Scan(&baseQty); err != nil && err != sql.ErrNoRows {
+		var u unitRead
+		err := ptx.Model(&unitRead{}).
+			Select("base_qty").
+			WhereEq("id", unitID).
+			WhereEq("company_id", companyID).
+			First(context.Background(), &u)
+		if err != nil && !errors.Is(err, playsql.ErrNotFound) {
 			return fmt.Errorf("recordMovement: lookup base_qty: %w", err)
+		}
+		if err == nil {
+			baseQty = u.BaseQty
 		}
 	}
 
 	finalQty := qty * float64(baseQty)
 
 	// Insert movement record.
-	ptx, err := playTx(tx)
-	if err != nil {
-		return err
-	}
 	if err := ptx.Insert(context.Background(), &InventoryMovement{
 		CompanyID:       companyID,
 		VariantID:       variantID,
@@ -170,7 +181,8 @@ func (s *Server) recordMovement(
 		return fmt.Errorf("recordMovement: insert movement: %w", err)
 	}
 
-	// Upsert balance.
+	// Stays raw: the conflict branch adds EXCLUDED.quantity to the stored quantity.
+	// playsql's Upsert can only assign `col = EXCLUDED.col`, not accumulate.
 	_, err = tx.Exec(
 		`INSERT INTO inventory_balances (company_id, variant_id, warehouse_id, quantity, updated_at)
 		 VALUES ($1, $2, $3, $4, NOW())
@@ -190,49 +202,33 @@ func (s *Server) recordMovement(
 // every movement previously recorded for the given reference. The reversalKind
 // determines which enum value is used for the new rows.
 func (s *Server) reverseMovements(tx *sql.Tx, companyID int, referenceType string, referenceID int, reversalKind InventoryMovementKind) error {
-	rows, err := tx.Query(
-		`SELECT variant_id, warehouse_id, qty, unit_cost
-		   FROM inventory_movements
-		  WHERE company_id = $1 AND reference_type = $2 AND reference_id = $3
-		    AND transaction_kind NOT IN ('sale_return', 'purchase_return')`,
-		companyID, referenceType, referenceID,
-	)
-	if err != nil {
-		return fmt.Errorf("reverseMovements: query: %w", err)
-	}
-	defer rows.Close()
-
-	type mvt struct {
-		variantID, warehouseID int
-		qty, unitCost          float64
-	}
-	var movements []mvt
-	for rows.Next() {
-		var m mvt
-		if err := rows.Scan(&m.variantID, &m.warehouseID, &m.qty, &m.unitCost); err != nil {
-			return fmt.Errorf("reverseMovements: scan: %w", err)
-		}
-		movements = append(movements, m)
-	}
-	if err := rows.Err(); err != nil {
-		return err
-	}
-
-	now := time.Now().UTC()
 	ptx, err := playTx(tx)
 	if err != nil {
 		return err
 	}
+
+	var movements []inventoryMovementRead
+	if err := ptx.Model(&inventoryMovementRead{}).
+		Select("variant_id", "warehouse_id", "qty", "unit_cost").
+		WhereEq("company_id", companyID).
+		WhereEq("reference_type", referenceType).
+		WhereEq("reference_id", referenceID).
+		WhereNotIn("transaction_kind", string(InventoryMovementKinds.SaleReturn), string(InventoryMovementKinds.PurchaseReturn)).
+		Get(context.Background(), &movements); err != nil {
+		return fmt.Errorf("reverseMovements: query: %w", err)
+	}
+
+	now := time.Now().UTC()
 	for _, m := range movements {
-		reversal := -m.qty
+		reversal := -m.Qty
 
 		if err := ptx.Insert(context.Background(), &InventoryMovement{
 			CompanyID:       companyID,
-			VariantID:       m.variantID,
-			WarehouseID:     m.warehouseID,
+			VariantID:       m.VariantID,
+			WarehouseID:     m.WarehouseID,
 			TransactionKind: reversalKind,
 			Qty:             reversal,
-			UnitCost:        m.unitCost,
+			UnitCost:        m.UnitCost,
 			ReferenceType:   referenceType,
 			ReferenceID:     referenceID,
 			CreatedAt:       now,
@@ -240,11 +236,12 @@ func (s *Server) reverseMovements(tx *sql.Tx, companyID int, referenceType strin
 			return fmt.Errorf("reverseMovements: insert reversal: %w", err)
 		}
 
+		// Stays raw: `quantity = quantity + $1` is a self-referencing increment.
 		_, err = tx.Exec(
 			`UPDATE inventory_balances
 			    SET quantity = quantity + $1, updated_at = NOW()
 			  WHERE company_id = $2 AND variant_id = $3 AND warehouse_id = $4`,
-			reversal, companyID, m.variantID, m.warehouseID,
+			reversal, companyID, m.VariantID, m.WarehouseID,
 		)
 		if err != nil {
 			return fmt.Errorf("reverseMovements: update balance: %w", err)
@@ -586,16 +583,26 @@ func (s *Server) storeTransfer(ctx context.Context, form *StoreTransferForm) err
 	}
 	defer tx.Rollback()
 
-	var transferID int
-	if err := tx.QueryRow(
-		`INSERT INTO inventory_transfers
-		    (company_id, from_warehouse_id, to_warehouse_id, notes, status, requested_by, created_at)
-		 VALUES ($1, $2, $3, NULLIF($4, ''), 'requested', $5, $6)
-		 RETURNING id`,
-		companyID, form.FromWarehouseID, form.ToWarehouseID, form.Notes, requestedBy, createdAt,
-	).Scan(&transferID); err != nil {
+	ptx, err := playTx(tx)
+	if err != nil {
 		return err
 	}
+
+	// created_at is supplied, so playsql does not stamp over it. A nil map value
+	// writes NULL, which is what NULLIF($4, '') produced for an empty note.
+	id, err := ptx.Model(&inventoryTransferRead{}).Insert(context.Background(), map[string]any{
+		"company_id":        companyID,
+		"from_warehouse_id": form.FromWarehouseID,
+		"to_warehouse_id":   form.ToWarehouseID,
+		"notes":             nullIfEmpty(form.Notes),
+		"status":            string(TransferStatuses.Requested),
+		"requested_by":      requestedBy,
+		"created_at":        createdAt,
+	})
+	if err != nil {
+		return err
+	}
+	transferID := int(id)
 
 	// Resolve each line to a concrete variant with the same rules as sales and
 	// purchases: an explicit variant is validated against its item, a plain item
@@ -610,23 +617,36 @@ func (s *Server) storeTransfer(ctx context.Context, form *StoreTransferForm) err
 		return err
 	}
 
+	rows := make([]map[string]any, 0, len(form.Lines))
 	for i, l := range form.Lines {
-		variantID := stubs[i].VariantID
 		var unitID any
 		if l.Unit > 0 {
 			unitID = l.Unit
 		}
-		if _, err := tx.Exec(
-			`INSERT INTO inventory_transfer_lines
-			    (company_id, transfer_id, variant_id, qty, unit_id, unit_cost, description)
-			 VALUES ($1, $2, $3, $4, $5, $6, NULLIF($7, ''))`,
-			companyID, transferID, variantID, l.Qty, unitID, l.Cost, l.Description,
-		); err != nil {
-			return err
-		}
+		rows = append(rows, map[string]any{
+			"company_id":  companyID,
+			"transfer_id": transferID,
+			"variant_id":  stubs[i].VariantID,
+			"qty":         l.Qty,
+			"unit_id":     unitID,
+			"unit_cost":   l.Cost,
+			"description": nullIfEmpty(l.Description),
+		})
+	}
+	if _, err := ptx.Model(&inventoryTransferLine{}).InsertMany(context.Background(), rows); err != nil {
+		return err
 	}
 
 	return tx.Commit()
+}
+
+// nullIfEmpty mirrors SQL's NULLIF(x, ”): an empty string becomes a NULL column
+// value rather than an empty one.
+func nullIfEmpty(s string) any {
+	if s == "" {
+		return nil
+	}
+	return s
 }
 
 // transferHeader is the minimal header row needed to drive a status transition.
@@ -666,44 +686,86 @@ func loadTransferForUpdate(tx *sql.Tx, companyID int, uuid string) (*transferHea
 	return &h, nil
 }
 
-// loadTransferLineMovements reads the lines of a transfer for stock movement.
+// loadTransferLineMovements reads the lines of a transfer for stock movement. A NULL
+// unit_id scans as 0, which is what the old COALESCE(unit_id, 0) produced.
 func loadTransferLineMovements(tx *sql.Tx, companyID, transferID int) ([]transferLineMovement, error) {
-	rows, err := tx.Query(
-		`SELECT variant_id, COALESCE(unit_id, 0), qty, unit_cost
-		   FROM inventory_transfer_lines
-		  WHERE company_id = $1 AND transfer_id = $2`,
-		companyID, transferID,
-	)
+	ptx, err := playTx(tx)
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
 
-	var lines []transferLineMovement
-	for rows.Next() {
-		var l transferLineMovement
-		if err := rows.Scan(&l.VariantID, &l.UnitID, &l.Qty, &l.UnitCost); err != nil {
-			return nil, err
+	var rows []inventoryTransferLine
+	if err := ptx.Model(&inventoryTransferLine{}).
+		Select("variant_id", "unit_id", "qty", "unit_cost").
+		WhereEq("company_id", companyID).
+		WhereEq("transfer_id", transferID).
+		Get(context.Background(), &rows); err != nil {
+		return nil, err
+	}
+
+	lines := make([]transferLineMovement, 0, len(rows))
+	for _, r := range rows {
+		l := transferLineMovement{VariantID: r.VariantID, Qty: r.Qty, UnitCost: r.UnitCost}
+		if r.UnitID != nil {
+			l.UnitID = *r.UnitID
 		}
 		lines = append(lines, l)
 	}
-	return lines, rows.Err()
+	return lines, nil
 }
 
 // unitBaseQty returns a unit's base_qty multiplier (1 when no/unknown unit).
+//
+// The old COALESCE(base_qty, 1) was dead: the column is NOT NULL. What made an
+// unknown unit fall back to 1 was the sql.ErrNoRows guard, kept here as
+// playsql.ErrNotFound.
 func unitBaseQty(tx *sql.Tx, companyID, unitID int) (float64, error) {
 	if unitID <= 0 {
 		return 1, nil
 	}
-	var base float64 = 1
-	err := tx.QueryRow(
-		"SELECT COALESCE(base_qty, 1) FROM units WHERE id = $1 AND company_id = $2",
-		unitID, companyID,
-	).Scan(&base)
-	if err == sql.ErrNoRows {
+
+	ptx, err := playTx(tx)
+	if err != nil {
+		return 0, err
+	}
+
+	var u unitRead
+	err = ptx.Model(&unitRead{}).
+		Select("base_qty").
+		WhereEq("id", unitID).
+		WhereEq("company_id", companyID).
+		First(context.Background(), &u)
+	if errors.Is(err, playsql.ErrNotFound) {
 		return 1, nil
 	}
-	return base, err
+	if err != nil {
+		return 0, err
+	}
+	return float64(u.BaseQty), nil
+}
+
+// setTransferStatus transitions a transfer, stamping any extra timestamp columns the
+// transition owns. playsql stamps updated_at because inventoryTransferRead maps it.
+//
+// The statements this replaces matched on `id` alone. The id came from a
+// company-scoped lock, so the result is the same, but the company_id predicate is
+// carried here explicitly rather than implied.
+func setTransferStatus(tx *sql.Tx, companyID, transferID int, status TransferStatus, extra map[string]any) error {
+	ptx, err := playTx(tx)
+	if err != nil {
+		return err
+	}
+
+	changes := map[string]any{"status": string(status)}
+	for k, v := range extra {
+		changes[k] = v
+	}
+
+	_, err = ptx.Model(&inventoryTransferRead{}).
+		WhereEq("company_id", companyID).
+		WhereEq("id", transferID).
+		Update(context.Background(), changes)
+	return err
 }
 
 // dispatchTransfer moves a transfer requested -> in_transit, taking stock OUT of
@@ -764,12 +826,9 @@ func (s *Server) dispatchTransfer(ctx context.Context, uuid string) error {
 		}
 	}
 
-	if _, err := tx.Exec(
-		`UPDATE inventory_transfers
-		    SET status = 'in_transit', dispatched_at = NOW(), updated_at = NOW()
-		  WHERE id = $1`,
-		h.ID,
-	); err != nil {
+	if err := setTransferStatus(tx, companyID, h.ID, TransferStatuses.InTransit, map[string]any{
+		"dispatched_at": time.Now().UTC(),
+	}); err != nil {
 		return err
 	}
 
@@ -813,12 +872,9 @@ func (s *Server) receiveTransfer(ctx context.Context, uuid string) error {
 		}
 	}
 
-	if _, err := tx.Exec(
-		`UPDATE inventory_transfers
-		    SET status = 'received', received_at = NOW(), updated_at = NOW()
-		  WHERE id = $1`,
-		h.ID,
-	); err != nil {
+	if err := setTransferStatus(tx, companyID, h.ID, TransferStatuses.Received, map[string]any{
+		"received_at": time.Now().UTC(),
+	}); err != nil {
 		return err
 	}
 
@@ -844,12 +900,7 @@ func (s *Server) cancelTransfer(ctx context.Context, uuid string) error {
 		return ErrInvalidTransition
 	}
 
-	if _, err := tx.Exec(
-		`UPDATE inventory_transfers
-		    SET status = 'cancelled', updated_at = NOW()
-		  WHERE id = $1`,
-		h.ID,
-	); err != nil {
+	if err := setTransferStatus(tx, companyID, h.ID, TransferStatuses.Cancelled, nil); err != nil {
 		return err
 	}
 
