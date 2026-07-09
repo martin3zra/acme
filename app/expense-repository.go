@@ -74,16 +74,16 @@ func IncludeDeleted() ExpenseOption {
 // two can never drift apart.
 func applyExpenseFilter(companyID int, filter ExpenseFilter) func(*playsql.Builder) {
 	return func(b *playsql.Builder) {
-		b.WhereEq("company_id", companyID)
-		if filter.FromDate != nil {
-			b.Where("date", ">=", *filter.FromDate)
-		}
-		if filter.ToDate != nil {
-			b.Where("date", "<=", *filter.ToDate)
-		}
-		if filter.CategoryID != nil {
-			b.WhereEq("category_id", *filter.CategoryID)
-		}
+		b.WhereEq("company_id", companyID).
+			When(filter.FromDate != nil, func(q *playsql.Builder) {
+				q.Where("date", ">=", *filter.FromDate)
+			}).
+			When(filter.ToDate != nil, func(q *playsql.Builder) {
+				q.Where("date", "<=", *filter.ToDate)
+			}).
+			When(filter.CategoryID != nil, func(q *playsql.Builder) {
+				q.WhereEq("category_id", *filter.CategoryID)
+			})
 	}
 }
 
@@ -132,10 +132,12 @@ func (s *Server) findExpenses(ctx context.Context, opts ...ExpenseOption) ([]*ex
 		return nil, err
 	}
 
-	q := pdb.Model(&expenseRead{}).With("Category")
-	if filter.IncludeDeleted {
-		q.WithTrashed()
-	}
+	q := pdb.Model(&expenseRead{}).
+		With("Category").
+		When(filter.IncludeDeleted, func(q *playsql.Builder) { q.WithTrashed() })
+
+	// Applied unconditionally. playsql has no Tap, and When(true, ...) would be a
+	// condition that never varies.
 	applyExpenseFilter(companyID, filter)(q)
 
 	var rows []expenseRead

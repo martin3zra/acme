@@ -120,13 +120,14 @@ func (s *Server) findCustomers(ctx context.Context, customerType CustomerType) (
 		return nil, err
 	}
 
-	q := pdb.Model(&customerRead{}).WhereEq("company_id", CurrentCompany(ctx).ID)
-	if customerType != "all" {
-		q = q.WhereEq("customer_type", string(customerType))
-	}
-
 	var rows []customerRead
-	if err := q.OrderBy("name", playsql.Asc).Get(ctx, &rows); err != nil {
+	if err := pdb.Model(&customerRead{}).
+		WhereEq("company_id", CurrentCompany(ctx).ID).
+		Unless(customerType == "all", func(q *playsql.Builder) {
+			q.WhereEq("customer_type", string(customerType))
+		}).
+		OrderBy("name", playsql.Asc).
+		Get(ctx, &rows); err != nil {
 		return nil, err
 	}
 

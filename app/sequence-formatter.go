@@ -33,6 +33,8 @@ func GetNextSequence(tx *sql.Tx, companyID int, jsonPath string) (*SequenceInfo,
             (sequences#>>'{%s,padding}')::int AS padding
         FROM companies_settings
         WHERE company_id = $1
+        -- Stays raw: the lock is taken inside a CTE that a jsonb_set UPDATE then
+        -- reads from. playsql can lock a Builder's own SELECT, not a CTE arm.
         FOR UPDATE
     ),
     updated AS (

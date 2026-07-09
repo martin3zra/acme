@@ -26,6 +26,8 @@ github.com/martin3zra/forge v0.1.4 h1:V9uerYZRkrEBf0EaecSl77I3voWhymMjCEeDsX+nuk
 github.com/martin3zra/forge v0.1.4/go.mod h1:BdDPuD4bBE9ZXxU0MkWHztP84QC/kd2uHvqyIwCqVzo=
 github.com/martin3zra/playsql v0.2.1 h1:IwXyKkYhpNBgozfawnI0rRbNA+Kmnm+MurT+Aq+pgng=
 github.com/martin3zra/playsql v0.2.1/go.mod h1:nItoVH1wwETVqoJvBqRq5Mmf1EHtBQTq6zXgL4MguiM=
+github.com/martin3zra/playsql v0.3.0 h1:cc6v8s1rI/YYMIqdtycGLVTh1TOgHYjweC3/M/2V4es=
+github.com/martin3zra/playsql v0.3.0/go.mod h1:nItoVH1wwETVqoJvBqRq5Mmf1EHtBQTq6zXgL4MguiM=
 github.com/mattn/go-isatty v0.0.20 h1:xfD0iDuEKnDkl03q4limB+vH+GxLEtL/jb4xVJSWWEY=
 github.com/mattn/go-isatty v0.0.20/go.mod h1:W+V8PltTTMOvKvAeJH7IuucS94S2C6jfK/D7dTCTo3Y=
 github.com/microsoft/go-mssqldb v1.10.0 h1:pHEt+Qz6YFPWqREq10mqSE524QQo+/QremwTCQht7TY=

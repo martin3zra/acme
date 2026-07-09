@@ -727,24 +727,37 @@ type transferLineMovement struct {
 }
 
 // loadTransferForUpdate locks a transfer row by uuid for the current company.
+//
+// The lock is what serialises concurrent transitions of the same transfer: without
+// it, two dispatches could both read `requested` and both move stock. playsql's
+// LockForUpdate requires a transaction and fails with ErrLockOutsideTx otherwise, so
+// it cannot silently degrade into an unlocked read.
 func loadTransferForUpdate(tx *sql.Tx, companyID int, uuid string) (*transferHeader, error) {
-	var h transferHeader
-	var status string
-	err := tx.QueryRow(
-		`SELECT id, from_warehouse_id, to_warehouse_id, status::text
-		   FROM inventory_transfers
-		  WHERE company_id = $1 AND uuid = $2
-		  FOR UPDATE`,
-		companyID, uuid,
-	).Scan(&h.ID, &h.FromWh, &h.ToWh, &status)
-	if err == sql.ErrNoRows {
+	ptx, err := playTx(tx)
+	if err != nil {
+		return nil, err
+	}
+
+	var row inventoryTransferRead
+	err = ptx.Model(&inventoryTransferRead{}).
+		Select("id", "from_warehouse_id", "to_warehouse_id", "status").
+		WhereEq("company_id", companyID).
+		WhereEq("uuid", uuid).
+		LockForUpdate().
+		First(context.Background(), &row)
+	if errors.Is(err, playsql.ErrNotFound) {
 		return nil, ErrTransferNotFound
 	}
 	if err != nil {
 		return nil, err
 	}
-	h.Status = TransferStatus(status)
-	return &h, nil
+
+	return &transferHeader{
+		ID:     row.ID,
+		FromWh: row.FromWarehouseID,
+		ToWh:   row.ToWarehouseID,
+		Status: TransferStatus(row.Status),
+	}, nil
 }
 
 // loadTransferLineMovements reads the lines of a transfer for stock movement. A NULL
@@ -773,6 +786,31 @@ func loadTransferLineMovements(tx *sql.Tx, companyID, transferID int) ([]transfe
 		lines = append(lines, l)
 	}
 	return lines, nil
+}
+
+// lockedBalance takes a FOR UPDATE lock on one variant's balance in one warehouse
+// and returns the quantity on hand. A missing row is zero, not an error.
+func lockedBalance(tx *sql.Tx, companyID, variantID, warehouseID int) (float64, error) {
+	ptx, err := playTx(tx)
+	if err != nil {
+		return 0, err
+	}
+
+	var row inventoryBalanceRead
+	err = ptx.Model(&inventoryBalanceRead{}).
+		Select("quantity").
+		WhereEq("company_id", companyID).
+		WhereEq("variant_id", variantID).
+		WhereEq("warehouse_id", warehouseID).
+		LockForUpdate().
+		First(context.Background(), &row)
+	if errors.Is(err, playsql.ErrNotFound) {
+		return 0, nil
+	}
+	if err != nil {
+		return 0, err
+	}
+	return row.Quantity, nil
 }
 
 // unitBaseQty returns a unit's base_qty multiplier (1 when no/unknown unit).
@@ -861,14 +899,10 @@ func (s *Server) dispatchTransfer(ctx context.Context, uuid string) error {
 		needed := l.Qty * base
 
 		// Lock the source balance and ensure enough on hand. Missing row = zero.
-		var available float64
-		err = tx.QueryRow(
-			`SELECT quantity FROM inventory_balances
-			  WHERE company_id = $1 AND variant_id = $2 AND warehouse_id = $3
-			  FOR UPDATE`,
-			companyID, l.VariantID, h.FromWh,
-		).Scan(&available)
-		if err != nil && err != sql.ErrNoRows {
+		// The lock holds until commit, so a concurrent dispatch cannot read the same
+		// quantity and spend it twice.
+		available, err := lockedBalance(tx, companyID, l.VariantID, h.FromWh)
+		if err != nil {
 			return err
 		}
 		if available < needed {
