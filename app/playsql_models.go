@@ -219,17 +219,77 @@ func (r userRead) toUser() *User {
 	return u
 }
 
-// companyRead is a narrow read model for the companies table — only what the user
-// queries need. No softdelete tag: the old `linked` count and the linked-companies
-// join both ignored companies.deleted_at.
+// companyRead is the playsql read model for the companies table. No softdelete tag:
+// neither the `linked` count, the linked-companies join, nor any of the company
+// reads ever filtered companies.deleted_at.
+//
+// identifier is nullable in the schema; playsql scans a SQL NULL as the zero value,
+// which is what the old reads assumed all along.
 type companyRead struct {
-	ID        int    `db:"id" play:"pk,incrementing"`
-	UUID      string `db:"uuid"`
-	Name      string `db:"name"`
-	AccountID int    `db:"account_id"`
+	ID         int        `db:"id" play:"pk,incrementing"`
+	UUID       string     `db:"uuid"`
+	Name       string     `db:"name"`
+	Identifier string     `db:"identifier"`
+	City       string     `db:"city"`
+	Address    string     `db:"address"`
+	AccountID  int        `db:"account_id"`
+	CreatedAt  *time.Time `db:"created_at"`
+	UpdatedAt  *time.Time `db:"updated_at"`
+	DeletedAt  *time.Time `db:"deleted_at"`
 }
 
 func (companyRead) TableName() string { return "companies" }
+
+// toCompany maps the read model onto the response struct. The nested settings
+// (sequences, redirect preferences, variants flag) are loaded separately, as before.
+func (r companyRead) toCompany() *Company {
+	c := &Company{
+		ID:         r.ID,
+		UUID:       r.UUID,
+		Name:       r.Name,
+		Identifier: r.Identifier,
+		City:       r.City,
+		Address:    r.Address,
+	}
+	c.CreatedAt = r.CreatedAt
+	c.UpdatedAt = r.UpdatedAt
+	c.DeletedAt = r.DeletedAt
+	return c
+}
+
+// companyInsert is the write model for the companies table. uuid and the timestamps
+// are DB-generated and stay unmapped.
+type companyInsert struct {
+	ID         int64  `db:"id" play:"pk,incrementing"`
+	AccountID  int    `db:"account_id"`
+	Name       string `db:"name"`
+	Identifier string `db:"identifier"`
+	City       string `db:"city"`
+	Address    string `db:"address"`
+}
+
+func (companyInsert) TableName() string { return "companies" }
+
+// companySettingsRead is the playsql model for companies_settings. It backs the reads
+// and the writes both: updated_at is mapped, so playsql stamps it on every Update and
+// Upsert exactly where the raw statements said `updated_at = now()`.
+//
+// sequences and redirect_preferences are jsonb, mapped as []byte and decoded by the
+// caller — CompanySequence and RedirectPreferences are structs, and a plain struct
+// field would need a json cast to stay clear of playsql's relation heuristics.
+//
+// All three columns are NOT NULL with defaults. The old reads wrapped the flag in
+// COALESCE(handles_variants, false), which never had anything to coalesce.
+type companySettingsRead struct {
+	ID                  int       `db:"id" play:"pk,incrementing"`
+	CompanyID           int       `db:"company_id"`
+	Sequences           []byte    `db:"sequences"`
+	RedirectPreferences []byte    `db:"redirect_preferences"`
+	HandlesVariants     bool      `db:"handles_variants"`
+	UpdatedAt           time.Time `db:"updated_at"`
+}
+
+func (companySettingsRead) TableName() string { return "companies_settings" }
 
 // accountRead is a narrow read model for the accounts table.
 type accountRead struct {
