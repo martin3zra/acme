@@ -70,7 +70,7 @@ type StoreCustomerForm struct {
 	OpenBalanceAsOf time.Time `json:"open_balance_as_of"`
 }
 
-func (StoreCustomerForm) Rules() map[string]any {
+func (form StoreCustomerForm) Rules() map[string]any {
 	return map[string]any{
 		"name":    "required|min:3|max:120",
 		"contact": "sometimes|min:3|max:120",
@@ -89,7 +89,7 @@ func (StoreCustomerForm) Rules() map[string]any {
 		"credit_limited":     "required",
 		"credit_limit":       "sometimes|required|min:0",
 		"customer_type":      "sometimes|required|in:individual,business",
-		"tax_receipt":        "sometimes|exists:tax_receipts,id",
+		"tax_receipt":        []any{"sometimes", tenantExists(form.Context(), "tax_receipts", "id")},
 		"open_balance":       "sometimes|min:0",
 		"open_balance_as_of": "sometimes",
 	}
@@ -118,7 +118,7 @@ type StoreVendorForm struct {
 	OpenBalanceAsOf time.Time `json:"open_balance_as_of"`
 }
 
-func (StoreVendorForm) Rules() map[string]any {
+func (form StoreVendorForm) Rules() map[string]any {
 	return map[string]any{
 		"name":    "required|min:3|max:120",
 		"contact": "sometimes|min:3|max:120",
@@ -139,7 +139,7 @@ func (StoreVendorForm) Rules() map[string]any {
 		"credit_limited":     "required",
 		"credit_limit":       "sometimes|required|min:0",
 		"vendor_type":        "sometimes|required|in:individual,business",
-		"tax_receipt":        "sometimes|exists:tax_receipts,id",
+		"tax_receipt":        []any{"sometimes", tenantExists(form.Context(), "tax_receipts", "id")},
 		"open_balance":       "sometimes|min:0",
 		"open_balance_as_of": "sometimes",
 	}
@@ -189,7 +189,7 @@ func (form UpdateCustomerForm) Rules() map[string]any {
 		"payment_terms":      "sometimes|required",
 		"credit_limit":       "sometimes|required|min:0",
 		"customer_type":      "sometimes|required|in:individual,business",
-		"tax_receipt":        "sometimes|exists:tax_receipts,id",
+		"tax_receipt":        []any{"sometimes", tenantExists(form.Context(), "tax_receipts", "id")},
 		"open_balance":       "sometimes|min:0",
 		"open_balance_as_of": "sometimes",
 	}
@@ -239,7 +239,7 @@ func (form UpdateVendorForm) Rules() map[string]any {
 		"payment_terms":      "sometimes|required",
 		"credit_limit":       "sometimes|required|min:0",
 		"vendor_type":        "sometimes|required|in:individual,business",
-		"tax_receipt":        "sometimes|exists:tax_receipts,id",
+		"tax_receipt":        []any{"sometimes", tenantExists(form.Context(), "tax_receipts", "id")},
 		"open_balance":       "sometimes|min:0",
 		"open_balance_as_of": "sometimes",
 	}
@@ -333,7 +333,7 @@ func (form StoreItemForm) Authorize() bool {
 	return Can(form.User(), "create:item")
 }
 
-func (StoreItemForm) Rules() map[string]any {
+func (form StoreItemForm) Rules() map[string]any {
 	return map[string]any{
 		"name": []any{
 			"required",
@@ -343,8 +343,8 @@ func (StoreItemForm) Rules() map[string]any {
 		},
 		"description":                  "sometimes|min:3|max:120",
 		"price":                        "required|min:0",
-		"tax_id":                       "bail|required|exists:taxes,id",
-		"unit_id":                      "bail|required|exists:units,id",
+		"tax_id":                       []any{"bail", "required", tenantExists(form.Context(), "taxes", "id")},
+		"unit_id":                      []any{"bail", "required", tenantExists(form.Context(), "units", "id")},
 		"item_type":                    "bail|required|in:product,service",
 		"identifiers":                  "sometimes",
 		"identifiers.reference":        "sometimes|nullable|max:100",
@@ -411,8 +411,8 @@ func (form UpdateItemForm) Rules() map[string]any {
 		"name":                         []any{"required", "min:3", "max:120", validator.Rule{}.Unique("items", "name").Ignore(form.ID, "id")},
 		"description":                  "sometimes|min:3|max:120",
 		"price":                        "required|min:0",
-		"tax_id":                       "required|exists:taxes,id",
-		"unit_id":                      "required|exists:units,id",
+		"tax_id":                       []any{"required", tenantExists(form.Context(), "taxes", "id")},
+		"unit_id":                      []any{"required", tenantExists(form.Context(), "units", "id")},
 		"item_type":                    "bail|required|in:product,service",
 		"identifiers":                  "sometimes",
 		"identifiers.reference":        "sometimes|nullable|max:100",
@@ -932,7 +932,7 @@ func (form StoreInvoiceForm) Authorize() bool {
 
 func (form StoreInvoiceForm) Rules() map[string]any {
 	return map[string]any{
-		"customer_id":             "bail|required|exists:customers,id",
+		"customer_id":             []any{"bail", "required", tenantExists(form.Context(), "customers", "id")},
 		"kind":                    "bail|required|in:invoice,estimate,order,template",
 		"recurrence":              "bail|sometimes",
 		"recurrence.enabled":      "bail|sometimes",
@@ -948,15 +948,15 @@ func (form StoreInvoiceForm) Rules() map[string]any {
 		"source.type":             "bail|sometimes|in:estimate,order,template",
 		"date":                    "bail|sometimes|required_if:kind,invoice,estimate|date|after:yesterday",
 		"terms":                   "bail|required_if:kind,invoice,order,template|min:1",
-		"tax_receipt":             "bail|sometimes|required_if:kind,invoice|exists:tax_receipts,id",
+		"tax_receipt":             []any{"bail", "sometimes", "required_if:kind,invoice", tenantExists(form.Context(), "tax_receipts", "id")},
 		"lines":                   "required|min:1",
-		"lines.*.id":              "required|exists:items,id",
-		"lines.*.unit":            "required|exists:units,id",
+		"lines.*.id":              []any{"required", tenantExists(form.Context(), "items", "id")},
+		"lines.*.unit":            []any{"required", tenantExists(form.Context(), "units", "id")},
 		"lines.*.qty":             "required|min:1",
 		"lines.*.price":           "required",
 		"lines.*.rate":            "required",
 		"lines.*.action":          "required|in:added",
-		"lines.*.warehouse_id":    "required|exists:warehouses,id",
+		"lines.*.warehouse_id":    []any{"required", tenantExists(form.Context(), "warehouses", "id")},
 		"discount":                "required",
 		"discount.value": []any{
 			"sometimes",
@@ -1052,18 +1052,18 @@ func (form UpdateInvoiceForm) Authorize() bool {
 
 func (form UpdateInvoiceForm) Rules() map[string]any {
 	return map[string]any{
-		"customer_id":          "bail|required|exists:customers,id",
+		"customer_id":          []any{"bail", "required", tenantExists(form.Context(), "customers", "id")},
 		"date":                 "bail|required|date",
 		"terms":                "bail|sometimes|required_if:kind,invoice,order|min:1",
-		"tax_receipt":          "bail|sometimes|required_if:kind,invoice|exists:tax_receipts,id",
+		"tax_receipt":          []any{"bail", "sometimes", "required_if:kind,invoice", tenantExists(form.Context(), "tax_receipts", "id")},
 		"lines":                "required|min:1",
-		"lines.*.id":           "required|exists:items,id",
-		"lines.*.unit":         "required|exists:units,id",
+		"lines.*.id":           []any{"required", tenantExists(form.Context(), "items", "id")},
+		"lines.*.unit":         []any{"required", tenantExists(form.Context(), "units", "id")},
 		"lines.*.qty":          "required|min:1", // ADD when rule here, only validate when is the action is added or updated
 		"lines.*.price":        "required",
 		"lines.*.rate":         "required",
 		"lines.*.action":       "required|in:added,updated,deleted,unchanged",
-		"lines.*.warehouse_id": "required_unless:lines.*.action,deleted,unchanged|exists:warehouses,id",
+		"lines.*.warehouse_id": []any{"required_unless:lines.*.action,deleted,unchanged", tenantExists(form.Context(), "warehouses", "id")},
 		"discount":             "required",
 		"discount.value": []any{
 			"sometimes",
@@ -1099,15 +1099,15 @@ func (form StorePurchaseForm) Authorize() bool {
 
 func (form StorePurchaseForm) Rules() map[string]any {
 	return map[string]any{
-		"vendor_id":      "bail|required|exists:vendors,id",
+		"vendor_id":      []any{"bail", "required", tenantExists(form.Context(), "vendors", "id")},
 		"kind":           "bail|required|in:purchase_order,purchase_receipt,vendor_bill",
 		"source":         "sometimes",
 		"source.type":    "bail|sometimes|in:purchase_order,purchase_receipt,vendor_bill",
 		"date":           "bail|required|date|after:yesterday",
 		"terms":          "bail|sometimes|min:1",
 		"lines":          "required|min:1",
-		"lines.*.id":     "required|exists:items,id",
-		"lines.*.unit":   "required|exists:units,id",
+		"lines.*.id":     []any{"required", tenantExists(form.Context(), "items", "id")},
+		"lines.*.unit":   []any{"required", tenantExists(form.Context(), "units", "id")},
 		"lines.*.qty":    "required|min:1",
 		"lines.*.price":  "required",
 		"lines.*.rate":   "required",
@@ -1185,13 +1185,13 @@ func (form UpdatePurchaseForm) Authorize() bool {
 
 func (form UpdatePurchaseForm) Rules() map[string]any {
 	return map[string]any{
-		"vendor_id":      "bail|required|exists:vendors,id",
+		"vendor_id":      []any{"bail", "required", tenantExists(form.Context(), "vendors", "id")},
 		"kind":           "bail|required|in:purchase_order,purchase_receipt,vendor_bill",
 		"date":           "bail|required|date",
 		"terms":          "bail|sometimes|min:1",
 		"lines":          "required|min:1",
-		"lines.*.id":     "required|exists:items,id",
-		"lines.*.unit":   "required|exists:units,id",
+		"lines.*.id":     []any{"required", tenantExists(form.Context(), "items", "id")},
+		"lines.*.unit":   []any{"required", tenantExists(form.Context(), "units", "id")},
 		"lines.*.qty":    "required|min:1",
 		"lines.*.price":  "required",
 		"lines.*.rate":   "required",
@@ -1230,11 +1230,11 @@ func (form StoreVendorPaymentForm) Authorize() bool {
 
 func (form StoreVendorPaymentForm) Rules() map[string]any {
 	return map[string]any{
-		"vendor_id":          "bail|required|exists:vendors,uuid",
+		"vendor_id":          []any{"bail", "required", tenantExists(form.Context(), "vendors", "uuid")},
 		"date":               "bail|required|date|after:yesterday",
 		"notes":              "sometime",
 		"lines":              "required|min:1",
-		"lines.*.uuid":       "required|exists:accounts_payable,uuid",
+		"lines.*.uuid":       []any{"required", tenantExists(form.Context(), "accounts_payable", "uuid")},
 		"lines.*.amount_due": "required",
 		"lines.*.payment":    "required|min:0",
 	}
@@ -1256,12 +1256,12 @@ func (form UpdateVendorPaymentForm) Authorize() bool {
 
 func (form UpdateVendorPaymentForm) Rules() map[string]any {
 	return map[string]any{
-		"vendor_id":          "bail|required|exists:vendors,uuid",
+		"vendor_id":          []any{"bail", "required", tenantExists(form.Context(), "vendors", "uuid")},
 		"date":               "bail|required|date",
 		"notes":              "sometime",
 		"lines":              "required|min:1",
-		"lines.*.id":         "required|exists:vendor_payment_items,id",
-		"lines.*.uuid":       "required|exists:accounts_payable,uuid",
+		"lines.*.id":         []any{"required", tenantExists(form.Context(), "vendor_payment_items", "id")},
+		"lines.*.uuid":       []any{"required", tenantExists(form.Context(), "accounts_payable", "uuid")},
 		"lines.*.amount_due": "required",
 		"lines.*.payment":    "required|min:0",
 		"lines.*.action":     "required|in:added,updated,deleted,unchanged",
@@ -1293,11 +1293,11 @@ func (form StorePaymentForm) Authorize() bool {
 
 func (form StorePaymentForm) Rules() map[string]any {
 	return map[string]any{
-		"customer_id":        "bail|required|exists:customers,uuid",
+		"customer_id":        []any{"bail", "required", tenantExists(form.Context(), "customers", "uuid")},
 		"date":               "bail|required|date|after:yesterday",
 		"notes":              "sometime",
 		"lines":              "required|min:1",
-		"lines.*.uuid":       "required|exists:invoices,uuid",
+		"lines.*.uuid":       []any{"required", tenantExists(form.Context(), "invoices", "uuid")},
 		"lines.*.amount_due": "required",
 		"lines.*.payment":    "required|min:0",
 		"lines.*.discount":   "sometimes",
@@ -1321,12 +1321,12 @@ func (form UpdatePaymentForm) Authorize() bool {
 
 func (form UpdatePaymentForm) Rules() map[string]any {
 	return map[string]any{
-		"customer_id":        "bail|required|exists:customers,uuid",
+		"customer_id":        []any{"bail", "required", tenantExists(form.Context(), "customers", "uuid")},
 		"date":               "bail|required|date",
 		"notes":              "sometime",
 		"lines":              "required|min:1",
-		"lines.*.id":         "required|exists:receivables_income_items,id",
-		"lines.*.uuid":       "required|exists:invoices,uuid",
+		"lines.*.id":         []any{"required", tenantExists(form.Context(), "receivables_income_items", "id")},
+		"lines.*.uuid":       []any{"required", tenantExists(form.Context(), "invoices", "uuid")},
 		"lines.*.amount_due": "required",
 		"lines.*.payment":    "required|min:0",
 		"lines.*.discount":   "sometimes",
@@ -2022,7 +2022,7 @@ func (form StoreExpenseForm) Authorize() bool {
 
 func (form StoreExpenseForm) Rules() map[string]any {
 	return map[string]any{
-		"category": "bail|required|exists:expenses_categories,uuid",
+		"category": []any{"bail", "required", tenantExists(form.Context(), "expenses_categories", "uuid")},
 		"date":     "bail|required|date",
 		"notes":    "sometime",
 		"amount":   "required|min:0",
@@ -2136,8 +2136,8 @@ func (form StoreAdjustmentForm) Authorize() bool {
 
 func (form StoreAdjustmentForm) Rules() map[string]any {
 	return map[string]any{
-		"variant_id":   "bail|required|exists:items_variants,id",
-		"warehouse_id": "bail|required|exists:warehouses,id",
+		"variant_id":   []any{"bail", "required", tenantExists(form.Context(), "items_variants", "id")},
+		"warehouse_id": []any{"bail", "required", tenantExists(form.Context(), "warehouses", "id")},
 		"qty":          "bail|required",
 		"reason":       "bail|required|min:3|max:255",
 		"notes":        "sometimes|max:1000",
@@ -2172,8 +2172,8 @@ func (form StoreTransferForm) Authorize() bool {
 
 func (form StoreTransferForm) Rules() map[string]any {
 	return map[string]any{
-		"from_warehouse_id": "bail|required|exists:warehouses,id",
-		"to_warehouse_id":   "bail|required|exists:warehouses,id",
+		"from_warehouse_id": []any{"bail", "required", tenantExists(form.Context(), "warehouses", "id")},
+		"to_warehouse_id":   []any{"bail", "required", tenantExists(form.Context(), "warehouses", "id")},
 		"notes":             "sometimes|max:1000",
 		"lines":             "bail|required",
 	}
@@ -2298,15 +2298,15 @@ type StoreItemWithAttributesForm struct {
 	VariantCombos []VariantCombo  `json:"variant_combos,omitempty"`
 }
 
-func (StoreItemWithAttributesForm) Rules() map[string]any {
+func (form StoreItemWithAttributesForm) Rules() map[string]any {
 	return map[string]any{
 		"name":             []any{"required", "min:3", "max:120"},
 		"price":            "required|numeric|min:0",
 		"description":      "sometimes|max:1000",
-		"tax_id":           "required|exists:taxes,id",
-		"unit_id":          "required|exists:units,id",
+		"tax_id":           []any{"required", tenantExists(form.Context(), "taxes", "id")},
+		"unit_id":          []any{"required", tenantExists(form.Context(), "units", "id")},
 		"item_type":        "required",
-		"attribute_ids.*":  "sometimes|exists:attributes,id",
+		"attribute_ids.*":  []any{"sometimes", tenantExists(form.Context(), "attributes", "id")},
 		"variant_combos.*": "sometimes|array",
 	}
 }
