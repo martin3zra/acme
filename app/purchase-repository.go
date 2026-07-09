@@ -542,19 +542,32 @@ func (s *Server) storePurchaseInternal(tx *sql.Tx, companyID int, form *StorePur
 		if jsonErr := json.Unmarshal(rawSource, &existingSource); jsonErr != nil {
 			existingSource = map[string]any{}
 		}
-		existingSource["target"] = map[string]any{
-			"type": string(PurchaseTransactionKinds.VendorBill),
-			"id":   purchaseUUID,
-			"code": seqInfo.Code,
-		}
 
-		_, err = tx.Exec(
-			"UPDATE purchases SET source = $3, updated_at = NOW() WHERE company_id = $1 AND uuid = $2",
-			companyID, form.Source.ID,
-			foundation.AsJSON(existingSource),
-		)
-		if err != nil {
-			return "", err
+		// Only a document that already records where it came from can carry a forward
+		// link. purchases_source_check requires `source` to hold both `type` and `id`,
+		// so writing a bare {"target": ...} is rejected.
+		//
+		// A receipt has a source — the order it was received against — so the stamp
+		// lands. A purchase order has none, and converting one directly into a vendor
+		// bill built {"target": ...} and aborted the whole transaction on the check
+		// constraint. The bill already points back at the order through its own source,
+		// which is what updateAPBalance and updatePOPaymentStatus follow, so nothing
+		// downstream depends on this stamp.
+		if canCarryForwardLink(existingSource) {
+			existingSource["target"] = map[string]any{
+				"type": string(PurchaseTransactionKinds.VendorBill),
+				"id":   purchaseUUID,
+				"code": seqInfo.Code,
+			}
+
+			_, err = tx.Exec(
+				"UPDATE purchases SET source = $3, updated_at = NOW() WHERE company_id = $1 AND uuid = $2",
+				companyID, form.Source.ID,
+				foundation.AsJSON(existingSource),
+			)
+			if err != nil {
+				return "", err
+			}
 		}
 	}
 
@@ -564,6 +577,18 @@ func (s *Server) storePurchaseInternal(tx *sql.Tx, companyID int, form *StorePur
 	// (vendor bill) and atomically records the movements.
 
 	return purchaseUUID, nil
+}
+
+// canCarryForwardLink reports whether a source object is shaped well enough to have
+// a `target` added to it. purchases_source_check requires both `type` and `id`; a
+// document that was never converted from anything has a NULL source and neither.
+func canCarryForwardLink(source map[string]any) bool {
+	if source == nil {
+		return false
+	}
+	kind, hasKind := source["type"].(string)
+	id, hasID := source["id"].(string)
+	return hasKind && kind != "" && hasID && id != ""
 }
 
 func (s *Server) createAPForVendorBill(tx *sql.Tx, companyID, purchaseID, vendorID int, form *StorePurchaseForm) error {
