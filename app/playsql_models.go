@@ -167,6 +167,126 @@ func (r unitRead) toUnit() *unit {
 	return u
 }
 
+// userRead is the playsql read model for the users table.
+//
+// This model is the structural fix for the bug in 53c9d58: playsql selects and
+// scans by column name, so a migration that appends a column (as remember_token
+// did) can no longer shift a positional scan. remember_token is simply not mapped
+// here, and therefore never selected.
+//
+// deleted_at carries no softdelete tag — none of the user reads filtered it.
+// Linked is play:"readonly": it holds the WithCount aggregate that replaced the old
+// correlated `(SELECT COUNT(*) ...) as linked` subquery.
+type userRead struct {
+	ID                 int        `db:"id" play:"pk,incrementing"`
+	Name               string     `db:"name"`
+	Email              string     `db:"email"`
+	Password           string     `db:"password"`
+	EmailVerifiedAt    *time.Time `db:"email_verified_at"`
+	LastPasswordReset  *time.Time `db:"last_password_reset"`
+	CreatedAt          *time.Time `db:"created_at"`
+	UpdatedAt          *time.Time `db:"updated_at"`
+	DeletedAt          *time.Time `db:"deleted_at"`
+	UUID               string     `db:"uuid"`
+	Status             string     `db:"status"`
+	MustChangePassword bool       `db:"must_change_password"`
+	PendingEmail       *string    `db:"pending_email"`
+	Linked             int        `db:"linked" play:"readonly"`
+
+	Companies []*companyRead `play:"belongsToMany,pivot=companies_users,foreignPivotKey=user_id,relatedPivotKey=company_id"`
+	Accounts  []*accountRead `play:"belongsToMany,pivot=accounts_users,foreignPivotKey=user_id,relatedPivotKey=account_id"`
+}
+
+func (userRead) TableName() string { return "users" }
+
+// toUser maps the read model onto the response struct.
+func (r userRead) toUser() *User {
+	u := new(User)
+	u.Id = r.ID
+	u.Name = r.Name
+	u.Email = r.Email
+	u.Password = r.Password
+	u.EmailVerifiedAt = r.EmailVerifiedAt
+	u.LastPasswordReset = r.LastPasswordReset
+	u.UUID = r.UUID
+	u.Status = r.Status
+	u.MustChangePassword = r.MustChangePassword
+	u.PendingEmail = r.PendingEmail
+	u.Linked = r.Linked
+	u.CreatedAt = r.CreatedAt
+	u.UpdatedAt = r.UpdatedAt
+	u.DeletedAt = r.DeletedAt
+	return u
+}
+
+// companyRead is a narrow read model for the companies table — only what the user
+// queries need. No softdelete tag: the old `linked` count and the linked-companies
+// join both ignored companies.deleted_at.
+type companyRead struct {
+	ID        int    `db:"id" play:"pk,incrementing"`
+	UUID      string `db:"uuid"`
+	Name      string `db:"name"`
+	AccountID int    `db:"account_id"`
+}
+
+func (companyRead) TableName() string { return "companies" }
+
+// accountRead is a narrow read model for the accounts table.
+type accountRead struct {
+	ID      int    `db:"id" play:"pk,incrementing"`
+	UUID    string `db:"uuid"`
+	OwnerID int    `db:"owner_id"`
+}
+
+func (accountRead) TableName() string { return "accounts" }
+
+// companyUserRead is the companies_users link row. It is a table in its own right
+// (surrogate id, role, current, abilities), so the user reads model it directly
+// rather than leaning on playsql's belongsToMany pivot bag.
+type companyUserRead struct {
+	ID        int    `db:"id" play:"pk,incrementing"`
+	CompanyID int    `db:"company_id"`
+	UserID    int    `db:"user_id"`
+	Role      string `db:"role"`
+	Current   bool   `db:"current"`
+
+	Company *companyRead `play:"belongsTo,fk=company_id"`
+}
+
+func (companyUserRead) TableName() string { return "companies_users" }
+
+// userInsert is the write model for the users table. uuid and the timestamps are
+// DB-generated and stay unmapped; so does remember_token, which no write here owns.
+type userInsert struct {
+	ID       int64  `db:"id" play:"pk,incrementing"`
+	Name     string `db:"name"`
+	Email    string `db:"email"`
+	Password string `db:"password"`
+	Status   string `db:"status"`
+}
+
+func (userInsert) TableName() string { return "users" }
+
+// accountUserInsert is the write model for the accounts_users link row.
+type accountUserInsert struct {
+	ID        int64 `db:"id" play:"pk,incrementing"`
+	AccountID int   `db:"account_id"`
+	UserID    int   `db:"user_id"`
+}
+
+func (accountUserInsert) TableName() string { return "accounts_users" }
+
+// companyUserInsert is the write model for the companies_users link row.
+type companyUserInsert struct {
+	ID        int64  `db:"id" play:"pk,incrementing"`
+	CompanyID int    `db:"company_id"`
+	UserID    int    `db:"user_id"`
+	Role      string `db:"role"`
+	Current   bool   `db:"current"`
+}
+
+func (companyUserInsert) TableName() string { return "companies_users" }
+
 // expenseRead is the playsql read model for the expenses table. receipt_url is
 // deliberately unmapped: it is nullable, no read ever selected it, and mapping it
 // would pull a NULL into the default projection.
