@@ -17,6 +17,7 @@ import (
 	"github.com/lib/pq"
 	"github.com/martin3zra/forge/database"
 	"github.com/martin3zra/forge/foundation"
+	"github.com/martin3zra/playsql"
 )
 
 type Company struct {
@@ -101,93 +102,105 @@ type importFile struct {
 }
 
 func (s *Server) findCompanies(ctx context.Context) ([]*Company, error) {
-	rows, err := s.db.Query("SELECT id, uuid, name, identifier, city, address, created_at, updated_at, deleted_at FROM companies WHERE account_id = $1", CurrentAccount(ctx))
+	pdb, err := s.play()
 	if err != nil {
 		return nil, err
 	}
-	data := make([]*Company, 0)
-	for rows.Next() {
-		c := new(Company)
-		if err = rows.Scan(
-			&c.ID,
-			&c.UUID,
-			&c.Name,
-			&c.Identifier,
-			&c.City,
-			&c.Address,
-			&c.CreatedAt,
-			&c.UpdatedAt,
-			&c.DeletedAt,
-		); err != nil {
-			return nil, err
-		}
-		data = append(data, c)
+
+	var rows []companyRead
+	if err := pdb.Model(&companyRead{}).
+		WhereEq("account_id", CurrentAccount(ctx)).
+		Get(ctx, &rows); err != nil {
+		return nil, err
+	}
+
+	data := make([]*Company, 0, len(rows))
+	for _, r := range rows {
+		data = append(data, r.toCompany())
 	}
 	return data, nil
 }
 
 func (s *Server) findCompanyByUUID(ctx context.Context, uuid string) (*Company, error) {
-	c := new(Company)
-	if err := s.db.QueryRow(`
-  SELECT id, uuid, name, identifier, city, address, created_at, updated_at, deleted_at
-  FROM companies
-  WHERE account_id = $1
-  AND uuid = $2
-  `, CurrentAccount(ctx), uuid).Scan(
-		&c.ID,
-		&c.UUID,
-		&c.Name,
-		&c.Identifier,
-		&c.City,
-		&c.Address,
-		&c.CreatedAt,
-		&c.UpdatedAt,
-		&c.DeletedAt,
-	); err != nil {
+	pdb, err := s.play()
+	if err != nil {
 		return nil, err
 	}
 
-	return c, nil
+	var row companyRead
+	if err := pdb.Model(&companyRead{}).
+		WhereEq("account_id", CurrentAccount(ctx)).
+		WhereEq("uuid", uuid).
+		First(ctx, &row); err != nil {
+		return nil, err
+	}
+	return row.toCompany(), nil
 }
 
+// findCompanyByID deliberately does not scope by account — it is looked up by
+// primary key, as it always was.
 func (s *Server) findCompanyByID(ctx context.Context, id int) (*Company, error) {
-	c := new(Company)
-	if err := s.db.QueryRow(`
-  SELECT id, uuid, name, identifier, city, address, created_at, updated_at, deleted_at
-  FROM companies
-  WHERE id = $1
-  `, id).Scan(
-		&c.ID,
-		&c.UUID,
-		&c.Name,
-		&c.Identifier,
-		&c.City,
-		&c.Address,
-		&c.CreatedAt,
-		&c.UpdatedAt,
-		&c.DeletedAt,
-	); err != nil {
+	pdb, err := s.play()
+	if err != nil {
 		return nil, err
 	}
 
-	return c, nil
+	var row companyRead
+	if err := pdb.Model(&companyRead{}).WhereEq("id", id).First(ctx, &row); err != nil {
+		return nil, err
+	}
+	return row.toCompany(), nil
+}
+
+// resolveCompanyID turns an account-scoped company uuid into its id.
+//
+// Every companies_settings statement used to inline this as
+// `WHERE company_id = (SELECT id FROM companies WHERE account_id = $1 AND uuid = $2)`.
+// playsql has no subquery predicate, so the lookup is hoisted — which also makes an
+// unknown uuid an explicit error. The old UPDATEs compared company_id against a NULL
+// subquery result, matched nothing, and reported success; see the tests.
+func (s *Server) resolveCompanyID(ctx context.Context, uuid string) (int, error) {
+	pdb, err := s.play()
+	if err != nil {
+		return 0, err
+	}
+
+	var row companyRead
+	if err := pdb.Model(&companyRead{}).
+		Select("id").
+		WhereEq("account_id", CurrentAccount(ctx)).
+		WhereEq("uuid", uuid).
+		First(ctx, &row); err != nil {
+		return 0, err
+	}
+	return row.ID, nil
 }
 
 func (s *Server) storeCompany(accountID, userID int, form StoreCompanyForm) error {
 	return database.WithTransaction(s.db, func(tx *sql.Tx) error {
-		var companyID int
-		stmt, err := tx.Prepare("INSERT INTO companies (account_id, name, identifier, city, address) VALUES($1, $2, $3, $4, $5) RETURNING id")
+		ptx, err := playTx(tx)
 		if err != nil {
 			return err
 		}
 
-		if err = stmt.QueryRow(accountID, form.Name, form.RNC, form.City, form.Address).Scan(&companyID); err != nil {
+		company := &companyInsert{
+			AccountID:  accountID,
+			Name:       form.Name,
+			Identifier: form.RNC,
+			City:       form.City,
+			Address:    form.Address,
+		}
+		if err := ptx.Insert(context.Background(), company); err != nil {
 			return err
 		}
+		companyID := int(company.ID)
 
-		_, err = tx.Exec("INSERT INTO companies_users (company_id, user_id, current, role) VALUES($1, $2, $3, $4)",
-			companyID, userID, true, "owner")
-		if err != nil {
+		if err := ptx.Insert(context.Background(), &companyUserInsert{
+			CompanyID: companyID,
+			UserID:    userID,
+			Current:   true,
+			Role:      "owner",
+		}); err != nil {
 			return err
 		}
 
@@ -263,56 +276,113 @@ func (s *Server) linkCompanyDefaultSequences(tx *sql.Tx, companyID int) error {
 		Order:    RedirectPreference.List,
 	}
 
-	_, err := tx.Exec(`
-    INSERT INTO companies_settings(company_id, sequences, redirect_preferences)
-    VALUES($1, $2, $3)
-    ON CONFLICT(company_id) DO UPDATE SET sequences = $2, redirect_preferences = $3, updated_at = now()`,
-		companyID, foundation.ToJSON(defaultSequences), foundation.ToJSON(defaultRedirectPreferences),
+	ptx, err := playTx(tx)
+	if err != nil {
+		return err
+	}
+
+	// A nil updateColumns means "update every inserted column except the conflict
+	// columns and created_at", which is exactly the old DO UPDATE SET list. playsql
+	// stamps updated_at because companySettingsRead maps it.
+	_, err = ptx.Model(&companySettingsRead{}).Upsert(context.Background(),
+		[]map[string]any{{
+			"company_id":           companyID,
+			"sequences":            foundation.ToJSON(defaultSequences),
+			"redirect_preferences": foundation.ToJSON(defaultRedirectPreferences),
+		}},
+		[]string{"company_id"},
+		nil,
 	)
 	return err
 }
 
+// Stays raw: a call to a stored procedure, not a statement playsql models.
 func (s *Server) copySharedData(tx *sql.Tx, companyID int) error {
 	_, err := tx.Exec(`SELECT copy_shared_data($1);`, companyID)
 	return err
 }
 
+// findCompanySettings reads one company's settings row, projecting only the given
+// columns. updated_at is always included — every caller reports it.
+func (s *Server) findCompanySettings(ctx context.Context, uuid string, columns ...string) (*companySettingsRead, error) {
+	companyID, err := s.resolveCompanyID(ctx, uuid)
+	if err != nil {
+		return nil, err
+	}
+
+	pdb, err := s.play()
+	if err != nil {
+		return nil, err
+	}
+
+	var row companySettingsRead
+	if err := pdb.Model(&companySettingsRead{}).
+		Select(append(columns, "updated_at")...).
+		WhereEq("company_id", companyID).
+		First(ctx, &row); err != nil {
+		return nil, err
+	}
+	return &row, nil
+}
+
+// updateCompanySettings writes one company's settings row. playsql stamps updated_at.
+func (s *Server) updateCompanySettings(ctx context.Context, uuid string, changes map[string]any) error {
+	companyID, err := s.resolveCompanyID(ctx, uuid)
+	if err != nil {
+		return err
+	}
+
+	pdb, err := s.play()
+	if err != nil {
+		return err
+	}
+
+	_, err = pdb.Model(&companySettingsRead{}).
+		WhereEq("company_id", companyID).
+		Update(ctx, changes)
+	return err
+}
+
 func (s *Server) findSequences(ctx context.Context, uuid string) (*CompanySeq, error) {
-	var seq CompanySeq
-	err := s.db.QueryRow(`
-    SELECT sequences, updated_at
-    FROM companies_settings
-    WHERE company_id = (SELECT id FROM companies WHERE account_id = $1 AND uuid = $2)
-  `, CurrentAccount(ctx), uuid).
-		Scan(&seq.Sequence, &seq.UpdatedAt)
-	return &seq, err
+	row, err := s.findCompanySettings(ctx, uuid, "sequences")
+	if err != nil {
+		return nil, err
+	}
+
+	seq := &CompanySeq{UpdatedAt: row.UpdatedAt}
+	if len(row.Sequences) > 0 {
+		if err := json.Unmarshal(row.Sequences, &seq.Sequence); err != nil {
+			return nil, err
+		}
+	}
+	return seq, nil
 }
 
 func (s *Server) findRedirectPreferences(ctx context.Context, uuid string) (*CompanyRedirectPreferences, error) {
-	var crp CompanyRedirectPreferences
-	err := s.db.QueryRow(`
-    SELECT redirect_preferences, updated_at
-    FROM companies_settings
-    WHERE company_id = (SELECT id FROM companies WHERE account_id = $1 AND uuid = $2)
-  `, CurrentAccount(ctx), uuid).
-		Scan(&crp.Redirect, &crp.UpdatedAt)
-	return &crp, err
+	row, err := s.findCompanySettings(ctx, uuid, "redirect_preferences")
+	if err != nil {
+		return nil, err
+	}
+
+	crp := &CompanyRedirectPreferences{UpdatedAt: row.UpdatedAt}
+	if len(row.RedirectPreferences) > 0 {
+		if err := json.Unmarshal(row.RedirectPreferences, &crp.Redirect); err != nil {
+			return nil, err
+		}
+	}
+	return crp, nil
 }
 
 func (s *Server) updateSequences(ctx context.Context, uuid string, form *SequenceForm) error {
-	_, err := s.db.Exec(`
-    UPDATE companies_settings
-    SET sequences = $3, updated_at = now()
-    WHERE company_id = (SELECT id FROM companies WHERE account_id = $1 AND uuid = $2)`, CurrentAccount(ctx), uuid, foundation.ToJSON(form.CompanySequence))
-	return err
+	return s.updateCompanySettings(ctx, uuid, map[string]any{
+		"sequences": foundation.ToJSON(form.CompanySequence),
+	})
 }
 
 func (s *Server) updateRedirectPreferences(ctx context.Context, uuid string, form *RedirectPreferencesForm) error {
-	_, err := s.db.Exec(`
-    UPDATE companies_settings
-    SET redirect_preferences = $3, updated_at = now()
-    WHERE company_id = (SELECT id FROM companies WHERE account_id = $1 AND uuid = $2)`, CurrentAccount(ctx), uuid, foundation.ToJSON(form))
-	return err
+	return s.updateCompanySettings(ctx, uuid, map[string]any{
+		"redirect_preferences": foundation.ToJSON(form),
+	})
 }
 
 // companyHandlesVariants reports whether the current company manages product
@@ -324,38 +394,44 @@ func (s *Server) companyHandlesVariants(ctx context.Context) (bool, error) {
 // handlesVariantsByCompanyID reads the flag by company id. Used by SharedProps,
 // which runs before the CompanyKey context is populated and so cannot rely on
 // CurrentCompany(ctx).
+// A company with no settings row reports false rather than erroring, as before.
+//
+// The old query's COALESCE(handles_variants, false) was dead: the column is NOT NULL
+// with a false default. What actually made a company without settings report false
+// was the sql.ErrNoRows guard below, now playsql.ErrNotFound.
 func (s *Server) handlesVariantsByCompanyID(ctx context.Context, companyID int) (bool, error) {
-	var enabled bool
-	err := s.db.QueryRowContext(ctx,
-		`SELECT COALESCE(handles_variants, false) FROM companies_settings WHERE company_id = $1`,
-		companyID,
-	).Scan(&enabled)
-	if errors.Is(err, sql.ErrNoRows) {
+	pdb, err := s.play()
+	if err != nil {
+		return false, err
+	}
+
+	var row companySettingsRead
+	err = pdb.Model(&companySettingsRead{}).
+		Select("handles_variants").
+		WhereEq("company_id", companyID).
+		First(ctx, &row)
+	if errors.Is(err, playsql.ErrNotFound) {
 		return false, nil
 	}
-	return enabled, err
+	return row.HandlesVariants, err
 }
 
 // findHandlesVariants reads the flag for a company (by account + uuid) for the
 // settings screen.
 func (s *Server) findHandlesVariants(ctx context.Context, uuid string) (bool, error) {
-	var enabled bool
-	err := s.db.QueryRow(`
-    SELECT COALESCE(handles_variants, false)
-    FROM companies_settings
-    WHERE company_id = (SELECT id FROM companies WHERE account_id = $1 AND uuid = $2)`, CurrentAccount(ctx), uuid).Scan(&enabled)
-	return enabled, err
+	row, err := s.findCompanySettings(ctx, uuid, "handles_variants")
+	if err != nil {
+		return false, err
+	}
+	return row.HandlesVariants, nil
 }
 
 // updateHandlesVariants toggles the flag for a company (by account + uuid).
 func (s *Server) updateHandlesVariants(ctx context.Context, uuid string, enabled bool) error {
-	_, err := s.db.Exec(`
-    UPDATE companies_settings
-    SET handles_variants = $3, updated_at = now()
-    WHERE company_id = (SELECT id FROM companies WHERE account_id = $1 AND uuid = $2)`, CurrentAccount(ctx), uuid, enabled)
-	return err
+	return s.updateCompanySettings(ctx, uuid, map[string]any{"handles_variants": enabled})
 }
 
+// Stays raw: a call to a stored procedure, not a statement playsql models.
 func (s *Server) upsertTaxReceipts(ctx context.Context, form *TaxReceiptsForm) error {
 	_, err := s.db.Exec(`
       SELECT upsert_tax_receipts($1, $2::jsonb)
