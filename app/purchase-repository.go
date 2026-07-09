@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"time"
 
@@ -11,6 +12,7 @@ import (
 	"github.com/martin3zra/forge/cache"
 	"github.com/martin3zra/forge/database"
 	"github.com/martin3zra/forge/foundation"
+	"github.com/martin3zra/playsql"
 )
 
 type linkedPurchaseReceipt struct {
@@ -46,125 +48,53 @@ type purchase struct {
 	EntityStatus foundation.Status `json:"-"` // purchases.status
 }
 
+// Both header reads drop `INNER JOIN companies` (existence only — company_id is a
+// NOT NULL FK, and the company_id predicate already scopes the query) and turn
+// `INNER JOIN vendors` into a belongsTo eager load. That eager load needs
+// WithTrashed: vendorRead is softdelete-tagged, but the join never filtered
+// vendors.deleted_at, and a purchase from a since-deleted vendor must still render.
+//
+// purchaseRead's softdelete tag supplies the `p.deleted_at IS NULL` both carried.
+
 func (s *Server) findPurchases(ctx context.Context, kind PurchaseTransactionKind) ([]*purchase, error) {
-	rows, err := s.db.Query(
-		"SELECT p.id, p.uuid, p.code, p.warehouse_id, p.date, p.due_date, p.subtotal, p.discount_amount, p.tax_amount, p.total, p.status, COALESCE(p.purchase_status::text, ''), p.payment_status, COALESCE(p.notes, ''), p.transaction_kind, p.source, COALESCE(p.invoice_number, ''), "+
-			"v.id, v.uuid, v.name, v.email, v.phone, v.address "+
-			"FROM purchases p "+
-			"INNER JOIN companies ON (p.company_id = companies.id) "+
-			"INNER JOIN vendors v ON (p.company_id = v.company_id AND p.vendor_id = v.id) "+
-			"WHERE p.company_id = $1 AND p.transaction_kind = $2 AND p.deleted_at IS NULL ORDER BY p.id DESC",
-		CurrentCompany(ctx).ID, kind,
-	)
+	pdb, err := s.play()
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
 
-	data := make([]*purchase, 0)
-	for rows.Next() {
-		p := new(purchase)
-		var discountAmount float64
-		if err = rows.Scan(
-			&p.ID,
-			&p.UUID,
-			&p.Number,
-			&p.WarehouseID,
-			&p.Date,
-			&p.DueOn,
-			&p.Amount,
-			&discountAmount,
-			&p.Tax,
-			&p.Total,
-			&p.EntityStatus,
-			&p.Status,
-			&p.PaymentStatus,
-			&p.Notes,
-			&p.Kind,
-			&p.Source,
-			&p.InvoiceNumber,
-			&p.Vendor.ID,
-			&p.Vendor.UUID,
-			&p.Vendor.Name,
-			&p.Vendor.Email,
-			&p.Vendor.Phone,
-			&p.Vendor.Address,
-		); err != nil {
-			return nil, err
-		}
-
-		p.Discount = Discount{Val: discountAmount, Type: "fixed"}
-
-		p.AmountDue = p.Total
-		if p.PaymentStatus == PaidStatuses.Paid {
-			p.AmountDue = 0
-		}
-
-		p.Terms = "pia"
-		if p.DueOn != nil {
-			difference := p.DueOn.Sub(p.Date)
-			p.Terms = fmt.Sprintf("net%d", int(difference.Hours())/24)
-		}
-		data = append(data, p)
+	var rows []purchaseRead
+	if err := pdb.Model(&purchaseRead{}).
+		Select(purchaseListColumns...).
+		WithConstraint("Vendor", withTrashedRelation).
+		WhereEq("company_id", CurrentCompany(ctx).ID).
+		WhereEq("transaction_kind", string(kind)).
+		OrderBy("id", playsql.Desc).
+		Get(ctx, &rows); err != nil {
+		return nil, err
 	}
 
+	data := make([]*purchase, 0, len(rows))
+	for _, r := range rows {
+		data = append(data, r.toPurchase())
+	}
 	return data, nil
 }
 
 func (s *Server) findPurchaseByUUID(ctx context.Context, companyID int, uuid string) (*purchase, error) {
-	p := new(purchase)
-	var discountAmount float64
-	err := s.db.QueryRow(
-		"SELECT p.company_id, p.id, p.uuid, p.code, p.warehouse_id, p.date, p.due_date, p.subtotal, p.discount_amount, p.tax_amount, p.total, p.status, COALESCE(p.purchase_status::text, ''), p.payment_status, COALESCE(p.notes, ''), p.transaction_kind, p.source, COALESCE(p.invoice_number, ''), "+
-			"v.id, v.uuid, v.name, v.email, v.phone, v.address "+
-			"FROM purchases p "+
-			"INNER JOIN companies ON (p.company_id = companies.id) "+
-			"INNER JOIN vendors v ON (p.company_id = v.company_id AND p.vendor_id = v.id) "+
-			"WHERE p.company_id = $1 AND p.uuid = $2 AND p.deleted_at IS NULL",
-		companyID, uuid,
-	).Scan(
-		&p.CompanyID,
-		&p.ID,
-		&p.UUID,
-		&p.Number,
-		&p.WarehouseID,
-		&p.Date,
-		&p.DueOn,
-		&p.Amount,
-		&discountAmount,
-		&p.Tax,
-		&p.Total,
-		&p.EntityStatus,
-		&p.Status,
-		&p.PaymentStatus,
-		&p.Notes,
-		&p.Kind,
-		&p.Source,
-		&p.InvoiceNumber,
-		&p.Vendor.ID,
-		&p.Vendor.UUID,
-		&p.Vendor.Name,
-		&p.Vendor.Email,
-		&p.Vendor.Phone,
-		&p.Vendor.Address,
-	)
+	pdb, err := s.play()
 	if err != nil {
 		return nil, err
 	}
 
-	p.Discount = Discount{Val: discountAmount, Type: "fixed"}
-
-	p.AmountDue = p.Total
-	if p.PaymentStatus == PaidStatuses.Paid {
-		p.AmountDue = 0
+	var row purchaseRead
+	if err := pdb.Model(&purchaseRead{}).
+		WithConstraint("Vendor", withTrashedRelation).
+		WhereEq("company_id", companyID).
+		WhereEq("uuid", uuid).
+		First(ctx, &row); err != nil {
+		return nil, err
 	}
-
-	p.Terms = "pia"
-	if p.DueOn != nil {
-		difference := p.DueOn.Sub(p.Date)
-		p.Terms = fmt.Sprintf("net%d", int(difference.Hours())/24)
-	}
-	return p, nil
+	return row.toPurchase(), nil
 }
 
 func (s *Server) findPurchaseLines(ctx context.Context, companyID, purchaseID int) ([]*line, error) {
@@ -281,25 +211,33 @@ func (s *Server) enrichLinesWithRemainingQty(ctx context.Context, companyID int,
 	return nil
 }
 
+// findLinkedReceiptsForOrder finds the receipts booked against a purchase order.
+//
+// WhereJSON renders the Postgres path form `source #>> '{id}'`, which is equivalent
+// to the old `source->>'id'` for a top-level key. There is no expression index on
+// purchases.source, so nothing regresses.
 func (s *Server) findLinkedReceiptsForOrder(ctx context.Context, companyID int, purchaseOrderUUID string) ([]*linkedPurchaseReceipt, error) {
-	rows, err := s.db.QueryContext(ctx,
-		"SELECT id, uuid, code, date FROM purchases "+
-			"WHERE company_id = $1 AND source->>'id' = $2 AND transaction_kind = 'purchase_receipt' AND deleted_at IS NULL "+
-			"ORDER BY id",
-		companyID, purchaseOrderUUID,
-	)
+	pdb, err := s.play()
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
 
-	data := make([]*linkedPurchaseReceipt, 0)
-	for rows.Next() {
-		r := new(linkedPurchaseReceipt)
-		if err = rows.Scan(&r.ID, &r.UUID, &r.Number, &r.Date); err != nil {
-			return nil, err
-		}
-		data = append(data, r)
+	var rows []purchaseRead
+	if err := pdb.Model(&purchaseRead{}).
+		Select("id", "uuid", "code", "date").
+		WhereEq("company_id", companyID).
+		WhereJSON("source", "id", "=", purchaseOrderUUID).
+		WhereEq("transaction_kind", string(PurchaseTransactionKinds.PurchaseReceipt)).
+		OrderBy("id", playsql.Asc).
+		Get(ctx, &rows); err != nil {
+		return nil, err
+	}
+
+	data := make([]*linkedPurchaseReceipt, 0, len(rows))
+	for _, r := range rows {
+		data = append(data, &linkedPurchaseReceipt{
+			ID: r.ID, UUID: r.UUID, Number: r.Code, Date: r.Date,
+		})
 	}
 	return data, nil
 }
@@ -317,16 +255,23 @@ func (s *Server) storePurchase(ctx context.Context, form *StorePurchaseForm) (st
 	return purchaseID, err
 }
 
+// firstWarehouseID returns the company's lowest-numbered live warehouse. The
+// `deleted_at IS NULL` comes from warehouseRead's softdelete tag.
 func firstWarehouseID(tx *sql.Tx, companyID int) (int, error) {
-	var warehouseID int
-	err := tx.QueryRow(
-		"SELECT id FROM warehouses WHERE company_id = $1 AND deleted_at IS NULL ORDER BY id LIMIT 1",
-		companyID,
-	).Scan(&warehouseID)
+	ptx, err := playTx(tx)
 	if err != nil {
 		return 0, err
 	}
-	return warehouseID, nil
+
+	var row warehouseRead
+	if err := ptx.Model(&warehouseRead{}).
+		Select("id").
+		WhereEq("company_id", companyID).
+		OrderBy("id", playsql.Asc).
+		First(context.Background(), &row); err != nil {
+		return 0, err
+	}
+	return row.ID, nil
 }
 
 // resolveVariantsForLines resolves the variant every sales/purchase line
@@ -933,17 +878,35 @@ func (s *Server) destroyPurchase(ctx context.Context, uuid string) error {
 	}
 
 	err = database.WithTransaction(s.db, func(tx *sql.Tx) error {
-		_, err := tx.Exec("UPDATE purchases SET deleted_at = NOW(), updated_at = NOW() WHERE company_id = $1 AND id = $2", companyID, purchase.ID)
+		ptx, err := playTx(tx)
 		if err != nil {
 			return err
 		}
 
-		// Reverse inventory movements recorded for this purchase.
+		// Soft delete through Update, not Delete: Builder.Delete stamps deleted_at
+		// only, and the statement it replaced bumped updated_at too. purchaseRead
+		// maps updated_at, so playsql stamps it.
+		if _, err := ptx.Model(&purchaseRead{}).
+			WhereEq("company_id", companyID).
+			WhereEq("id", purchase.ID).
+			Update(context.Background(), map[string]any{"deleted_at": time.Now()}); err != nil {
+			return err
+		}
+
+		// Reverse inventory movements recorded for this purchase. Read outside the
+		// transaction, and errors ignored, exactly as before.
 		var movementRecorded bool
-		_ = s.db.QueryRowContext(ctx,
-			"SELECT movement_recorded FROM purchases WHERE company_id = $1 AND id = $2",
-			companyID, purchase.ID,
-		).Scan(&movementRecorded)
+		if pdb, perr := s.play(); perr == nil {
+			var row purchaseRead
+			if rerr := pdb.Model(&purchaseRead{}).
+				Select("movement_recorded").
+				WithTrashed().
+				WhereEq("company_id", companyID).
+				WhereEq("id", purchase.ID).
+				First(ctx, &row); rerr == nil {
+				movementRecorded = row.MovementRecorded
+			}
+		}
 		if movementRecorded {
 			if err := s.reverseMovements(tx, companyID, "purchase", purchase.ID, InventoryMovementKinds.PurchaseReturn); err != nil {
 				return err
@@ -952,24 +915,27 @@ func (s *Server) destroyPurchase(ctx context.Context, uuid string) error {
 
 		// Cancel the linked AP entry when a vendor bill is deleted.
 		if purchase.Kind == PurchaseTransactionKinds.VendorBill {
-			var apID int
-			var alreadyPaid float64
-			err := tx.QueryRow(
-				"SELECT id, amount_paid FROM accounts_payable WHERE company_id = $1 AND purchase_id = $2",
-				companyID, purchase.ID,
-			).Scan(&apID, &alreadyPaid)
-			if err != nil && err != sql.ErrNoRows {
+			var ap accountsPayableRead
+			err := ptx.Model(&accountsPayableRead{}).
+				Select("id", "amount_paid").
+				WhereEq("company_id", companyID).
+				WhereEq("purchase_id", purchase.ID).
+				First(context.Background(), &ap)
+			if err != nil && !errors.Is(err, playsql.ErrNotFound) {
 				return err
 			}
-			if apID > 0 {
-				if _, err = tx.Exec(
-					"UPDATE accounts_payable SET status = $3, updated_at = NOW() WHERE company_id = $1 AND id = $2",
-					companyID, apID, PayableStatuses.Void,
-				); err != nil {
+			if ap.ID > 0 {
+				if _, err = ptx.Model(&accountsPayableInsert{}).
+					WhereEq("company_id", companyID).
+					WhereEq("id", ap.ID).
+					Update(context.Background(), map[string]any{
+						"status":     string(PayableStatuses.Void),
+						"updated_at": time.Now(),
+					}); err != nil {
 					return err
 				}
 				// Reverse only the unpaid portion from the vendor balance.
-				remaining := purchase.Total - alreadyPaid
+				remaining := purchase.Total - ap.AmountPaid
 				if remaining > 0 {
 					if err = s.updateVendorAmountPayable(tx, companyID, purchase.Vendor.ID, -remaining); err != nil {
 						return err
