@@ -4,7 +4,7 @@ go 1.25.7
 
 require github.com/romsar/gonertia/v2 v2.0.3
 
-require github.com/martin3zra/forge v0.1.3
+require github.com/martin3zra/forge v0.1.4
 
 require github.com/martin3zra/playsql v0.2.1
 
