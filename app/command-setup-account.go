@@ -1,6 +1,7 @@
 package app
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
 	"log"
@@ -16,21 +17,7 @@ func (s *Server) SetupAccount() {
 	email := console.Ask("What's the owner email?")
 
 	if err := database.WithTransaction(s.db, func(tx *sql.Tx) error {
-
-		stmt, err := tx.Prepare("INSERT INTO users (name, email, password, status) VALUES($1,$2,$3,$4) RETURNING id")
-		if err != nil {
-			return err
-		}
-
-		var userID int
-		err = stmt.QueryRow(name, email, foundation.NewHashable().Make("password"), "disabled").Scan(&userID)
-		if err != nil {
-			return err
-		}
-
-		stmt, err = tx.Prepare("INSERT INTO accounts (owner_id) VALUES($1) RETURNING id")
-		var accountID int
-		stmt.QueryRow(userID).Scan(&accountID)
+		accountID, err := createAccountOwner(tx, name, email)
 		if err != nil {
 			return err
 		}
@@ -87,4 +74,46 @@ func (s *Server) sendAccountVerificationNotification(acc account) {
 		})
 	}
 
+}
+
+// createAccountOwner inserts the owner and the account they own, returning the
+// account id. The owner starts disabled with a placeholder password; the
+// verification email is what lets them set a real one.
+//
+// The statements it replaces had three defects. The accounts Prepare assigned to
+// `stmt` and then called stmt.QueryRow *before* checking its error, so a failed
+// Prepare dereferenced a nil pointer. That QueryRow's own Scan error was discarded
+// entirely, so a failed insert left accountID at 0 and surfaced later as a confusing
+// "account not found" from the read below. And neither statement was ever closed:
+// both were prepared for a single execution, and the first was leaked outright when
+// `stmt` was reassigned.
+//
+// The user insert's error check is belt-and-braces: dropping it leaves userID at 0,
+// and the accounts insert then fails its owner_id foreign key, so the call still
+// returns an error. It is kept for the message, not for the control flow — no test
+// pins it, because none can.
+func createAccountOwner(tx *sql.Tx, name, email string) (int, error) {
+	ptx, err := playTx(tx)
+	if err != nil {
+		return 0, err
+	}
+
+	userID, err := ptx.Model(&userInsert{}).Insert(context.Background(), map[string]any{
+		"name":     name,
+		"email":    email,
+		"password": foundation.NewHashable().Make("password"),
+		"status":   "disabled",
+	})
+	if err != nil {
+		return 0, err
+	}
+
+	accountID, err := ptx.Model(&accountRead{}).Insert(context.Background(), map[string]any{
+		"owner_id": userID,
+	})
+	if err != nil {
+		return 0, err
+	}
+
+	return int(accountID), nil
 }
