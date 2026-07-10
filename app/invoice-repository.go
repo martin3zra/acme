@@ -476,7 +476,7 @@ func (s *Server) processInvoiceLines(tx *sql.Tx, companyId, invoiceId int, form 
 //   - INNER JOIN companies and INNER JOIN invoices asserted existence of NOT NULL FKs;
 //     company_id and invoice_id already scope the read.
 //   - INNER JOIN items and INNER JOIN items_variants become belongsTo. Neither filtered
-//     deleted_at, which is why the item side uses invoiceLineItemRead rather than
+//     deleted_at, which is why the item side uses lineItemRead rather than
 //     itemRead: a line on a since-deleted item must still render its name.
 //   - LEFT JOIN LATERAL (... LIMIT 1) resolved the item's unit. Since migration
 //     20260709120000 added items_units_company_item_unique (company_id, item_id) there

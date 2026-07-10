@@ -97,86 +97,49 @@ func (s *Server) findPurchaseByUUID(ctx context.Context, companyID int, uuid str
 	return row.toPurchase(), nil
 }
 
+// findPurchaseLines reads a purchase's lines with the variant, item, tax and unit each
+// line displays. It is the sibling of findInvoiceLines, with three differences.
+//
+// The item is reached through the variant (iv.item_id): purchase_items has no item_id
+// column, so the path is Variant -> Item, nested in one traversal.
+//
+// Two columns are COALESCEd against the item's defaults. `pi.unit_id` and `pi.tax_id`
+// are nullable overrides; when NULL the line falls back to the item's unit (the old
+// LEFT JOIN LATERAL, now a hasOne) and the item's tax. Both arms are eager-loaded and
+// toPurchaseLine picks between them.
+//
+// A purchase line's rate is read off the tax row, not frozen on the line as an invoice
+// line's is — purchase_items has no rate column.
+//
+// INNER JOIN companies and INNER JOIN purchases asserted existence of NOT NULL FKs.
 func (s *Server) findPurchaseLines(ctx context.Context, companyID, purchaseID int) ([]*line, error) {
-	rows, err := s.db.Query(`
-    SELECT it.id,
-    pi.variant_id::bigint,
-    iv.name,
-    COALESCE(iv.sku, ''),
-    pi.qty::bigint,
-    pi.unit_price::float8,
-    COALESCE(pi.unit_id, items_units.unit_id),
-    CASE WHEN iv.is_default THEN it.name ELSE it.name || ' — ' || iv.name END,
-    it.description,
-    COALESCE(unit_selected.name, items_units.name),
-    pi.created_at,
-    pi.updated_at,
-    pi.deleted_at,
-    'unchanged' as action,
-    (pi.qty * pi.unit_price)::float8 as amount,
-    pi.line_total::float8,
-    taxes.id as tax_id,
-    taxes.name as tax_name,
-    taxes.rate,
-    pi.tax_amount::float8,
-    it.identifiers
-    FROM purchase_items AS pi
-    INNER JOIN companies AS com ON (pi.company_id = com.id)
-    INNER JOIN purchases AS p ON (pi.purchase_id = p.id AND pi.company_id = p.company_id)
-    INNER JOIN items_variants AS iv ON (pi.variant_id = iv.id AND pi.company_id = iv.company_id)
-    INNER JOIN items AS it ON (iv.item_id = it.id AND iv.company_id = it.company_id)
-    LEFT JOIN units unit_selected ON (pi.unit_id = unit_selected.id)
-    LEFT JOIN LATERAL (
-      SELECT items_units.unit_id, units.name
-      FROM items_units
-      INNER JOIN units ON (items_units.unit_id = units.id)
-      WHERE items_units.item_id = it.id limit 1
-    ) items_units ON true
-    INNER JOIN taxes ON (it.company_id = taxes.company_id AND COALESCE(pi.tax_id, it.tax_id) = taxes.id)
-    WHERE pi.company_id = $1
-    AND pi.purchase_id = $2
-    AND pi.deleted_at IS NULL`, companyID, purchaseID)
+	pdb, err := s.play()
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
 
-	data := make([]*line, 0)
-	for rows.Next() {
-		l := new(line)
-		if err = rows.Scan(
-			&l.ID,
-			&l.VariantID,
-			&l.VariantName,
-			&l.VariantSKU,
-			&l.Qty,
-			&l.Price,
-			&l.Unit.ID,
-			&l.Name,
-			&l.Description,
-			&l.Unit.Name,
-			&l.CreatedAt,
-			&l.UpdatedAt,
-			&l.DeletedAt,
-			&l.Action,
-			&l.Amount,
-			&l.Total,
-			&l.Tax.ID,
-			&l.Tax.Name,
-			&l.Tax.Rate,
-			&l.Tax.Amount,
-			&l.Identifier,
-		); err != nil {
-			return nil, err
-		}
-		data = append(data, l)
+	var rows []purchaseLineRead
+	if err := pdb.Model(&purchaseLineRead{}).
+		WithConstraint("Variant", withPurchaseLineVariant).
+		With("SelectedUnit").
+		With("LineTax").
+		WhereEq("company_id", companyID).
+		WhereEq("purchase_id", purchaseID).
+		Get(ctx, &rows); err != nil {
+		return nil, err
 	}
 
+	data := make([]*line, 0, len(rows))
+	for _, r := range rows {
+		data = append(data, r.toPurchaseLine())
+	}
 	return data, nil
 }
 
 // enrichLinesWithRemainingQty sets RemainingQty on each line for a purchase order,
 // calculated as ordered qty minus total qty already received across all linked receipts.
+//
+// Stays raw: a GROUP BY over SUM(qty), keyed off a jsonb predicate (p.source->>'id').
 func (s *Server) enrichLinesWithRemainingQty(ctx context.Context, companyID int, purchaseOrderUUID string, lines []*line) error {
 	rows, err := s.db.QueryContext(ctx,
 		"SELECT pi.variant_id, COALESCE(SUM(pi.qty), 0)::bigint "+
@@ -305,6 +268,8 @@ func resolveVariantsForLines(tx *sql.Tx, companyID int, lines []*Line) error {
 		hasVariants    bool
 		defaultVariant sql.NullInt64
 	}
+	// Stays raw: the projection carries a correlated scalar subquery with its own
+	// ORDER BY and LIMIT, which a model read cannot express.
 	items := make(map[int]itemInfo, len(itemIDs))
 	rows, err := tx.Query(
 		`SELECT i.id, i.has_variants,
@@ -342,27 +307,28 @@ func resolveVariantsForLines(tx *sql.Tx, companyID int, lines []*Line) error {
 		for id := range variantIDSet {
 			variantIDs = append(variantIDs, id)
 		}
-		vrows, err := tx.Query(
-			`SELECT id, item_id FROM items_variants
-			  WHERE company_id = $1 AND id = ANY($2) AND deleted_at IS NULL`,
-			companyID, pq.Array(variantIDs),
-		)
+		ptx, err := playTx(tx)
 		if err != nil {
 			return err
 		}
-		for vrows.Next() {
-			var variantID, itemID int
-			if err := vrows.Scan(&variantID, &itemID); err != nil {
-				vrows.Close()
-				return err
-			}
-			variantOwner[variantID] = itemID
+
+		// itemVariantRead carries no softdelete tag, so deleted_at is written out.
+		ids := make([]any, 0, len(variantIDs))
+		for _, id := range variantIDs {
+			ids = append(ids, id)
 		}
-		if err := vrows.Err(); err != nil {
-			vrows.Close()
+		var variants []itemVariantRead
+		if err := ptx.Model(&itemVariantRead{}).
+			Select("id", "item_id").
+			WhereEq("company_id", companyID).
+			WhereIn("id", ids...).
+			WhereNull("deleted_at").
+			Get(context.Background(), &variants); err != nil {
 			return err
 		}
-		vrows.Close()
+		for _, v := range variants {
+			variantOwner[v.ID] = v.ItemID
+		}
 	}
 
 	// Apply the rules in-memory, mutating each line's resolved variant.
@@ -388,32 +354,35 @@ func resolveVariantsForLines(tx *sql.Tx, companyID int, lines []*Line) error {
 	return nil
 }
 
+// resolveItemTaxIDs maps each item id to its tax id.
+//
+// items.tax_id is NOT NULL, so the sql.NullInt64 this used to scan into was always
+// Valid and the nil arm was dead. The map still hands back *int because its consumer
+// writes the value into purchase_items.tax_id, which *is* nullable.
 func resolveItemTaxIDs(tx *sql.Tx, companyID int, itemIDs []int) (map[int]*int, error) {
-	rows, err := tx.Query(
-		`SELECT i.id, i.tax_id
-     FROM items i
-     WHERE i.company_id = $1 AND i.id = ANY($2)`,
-		companyID,
-		pq.Array(itemIDs),
-	)
+	ptx, err := playTx(tx)
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+
+	ids := make([]any, 0, len(itemIDs))
+	for _, id := range itemIDs {
+		ids = append(ids, id)
+	}
+
+	var items []lineItemRead
+	if err := ptx.Model(&lineItemRead{}).
+		Select("id", "tax_id").
+		WhereEq("company_id", companyID).
+		WhereIn("id", ids...).
+		Get(context.Background(), &items); err != nil {
+		return nil, err
+	}
 
 	m := make(map[int]*int, len(itemIDs))
-	for rows.Next() {
-		var itemID int
-		var taxID sql.NullInt64
-		if err := rows.Scan(&itemID, &taxID); err != nil {
-			return nil, err
-		}
-		if taxID.Valid {
-			v := int(taxID.Int64)
-			m[itemID] = &v
-		} else {
-			m[itemID] = nil
-		}
+	for _, i := range items {
+		v := int(i.TaxID)
+		m[i.ID] = &v
 	}
 	return m, nil
 }
@@ -697,6 +666,7 @@ func (s *Server) updatePurchase(ctx context.Context, uuid string, form *UpdatePu
 	}
 
 	// Lock header fields (vendor, date) once a receipt exists for the PO.
+	// Stays raw: the predicate reaches into the jsonb source blob (source->>'id').
 	if purchase.Kind == PurchaseTransactionKinds.PurchaseOrder {
 		var receiptCount int
 		if err := s.db.QueryRowContext(ctx,
@@ -756,23 +726,24 @@ func (s *Server) updatePurchase(ctx context.Context, uuid string, form *UpdatePu
 
 		// Re-sync the linked AP record when a vendor bill is updated.
 		if purchase.Kind == PurchaseTransactionKinds.VendorBill {
-			_, err = tx.Exec(
-				`UPDATE accounts_payable
-				   SET invoice_number = $3,
-				       invoice_date   = $4,
-				       due_date       = $5,
-				       amount_total   = $6,
-				       tax_amount     = $7,
-				       updated_at     = NOW()
-				 WHERE company_id = $1 AND purchase_id = $2`,
-				companyID, purchase.ID,
-				form.InvoiceNumber,
-				form.Date,
-				form.dueOn,
-				form.total,
-				form.tax,
-			)
-			if err != nil {
+			// updated_at is not in the map: accounts_payable carries a BEFORE UPDATE
+			// trigger (trg_ap_updated_at) that stamps it, so the raw statement's
+			// `updated_at = NOW()` was always redundant. A key here would be overwritten
+			// by the trigger anyway.
+			//
+			// The map may name columns the model does not map — tax_amount is one — since
+			// keys are passed through to the statement rather than filtered against the
+			// struct. A column that does not exist fails loudly at the database.
+			if _, err := ptx.Model(&accountsPayableRead{}).
+				WhereEq("company_id", companyID).
+				WhereEq("purchase_id", purchase.ID).
+				Update(context.Background(), map[string]any{
+					"invoice_number": form.InvoiceNumber,
+					"invoice_date":   form.Date,
+					"due_date":       form.dueOn,
+					"amount_total":   form.total,
+					"tax_amount":     form.tax,
+				}); err != nil {
 				return err
 			}
 			// Adjust vendor.amount_payable by the delta.
@@ -790,11 +761,12 @@ func (s *Server) updatePurchase(ctx context.Context, uuid string, form *UpdatePu
 			if err != nil {
 				return err
 			}
-			_, err = tx.Exec(
-				"UPDATE purchases SET purchase_status = $3, updated_at = NOW() WHERE company_id = $1 AND uuid = $2",
-				companyID, purchase.Source.ID, poStatus,
-			)
-			if err != nil {
+			if _, err := ptx.Model(&purchaseRead{}).
+				WhereEq("company_id", companyID).
+				WhereEq("uuid", purchase.Source.ID).
+				Update(context.Background(), map[string]any{
+					"purchase_status": poStatus,
+				}); err != nil {
 				return err
 			}
 			// Invalidate the source PO's cached preview within the same transaction.
@@ -816,6 +788,11 @@ func (s *Server) processPurchaseLines(tx *sql.Tx, companyID, purchaseID int, for
 		return nil
 	}
 
+	ptx, err := playTx(tx)
+	if err != nil {
+		return err
+	}
+
 	itemIDs := make([]int, 0, len(lines))
 	for _, l := range lines {
 		itemIDs = append(itemIDs, l.ID)
@@ -833,6 +810,7 @@ func (s *Server) processPurchaseLines(tx *sql.Tx, companyID, purchaseID int, for
 		variantID := l.VariantID
 
 		// Guard: never reduce a PO line below the already-received qty.
+		// Stays raw: SUM over a join, with a scalar subquery inside a jsonb predicate.
 		if form.Kind == PurchaseTransactionKinds.PurchaseOrder &&
 			(l.Action == UPDATED || l.Action == DELETED) {
 			var alreadyReceived float64
@@ -860,37 +838,53 @@ func (s *Server) processPurchaseLines(tx *sql.Tx, companyID, purchaseID int, for
 
 		switch l.Action {
 		case ADDED:
-			stmt := `
-        INSERT INTO purchase_items (company_id, purchase_id, variant_id, qty, unit_price, line_total, unit_id, discount, tax_id, tax_amount)
-        VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
-      `
-			if _, err := tx.Exec(stmt, companyID, purchaseID, variantID, l.Qty, l.Price, l.total, l.Unit, l.discount, taxIDs[l.ID], l.tax); err != nil {
+			if _, err := ptx.Model(&purchaseLineRead{}).Insert(context.Background(), map[string]any{
+				"company_id":  companyID,
+				"purchase_id": purchaseID,
+				"variant_id":  variantID,
+				"qty":         l.Qty,
+				"unit_price":  l.Price,
+				"line_total":  l.total,
+				"unit_id":     l.Unit,
+				"discount":    l.discount,
+				"tax_id":      taxIDs[l.ID],
+				"tax_amount":  l.tax,
+			}); err != nil {
 				return err
 			}
 		case UPDATED:
-			stmt := `
-        UPDATE purchase_items
-        SET qty = $4,
-            unit_id = $5,
-            unit_price = $6,
-            line_total = $7,
-            discount = $8,
-            tax_id = $9,
-            tax_amount = $10,
-            updated_at = NOW(),
-            deleted_at = NULL
-        WHERE company_id = $1 AND purchase_id = $2 AND variant_id = $3
-      `
-			if _, err := tx.Exec(stmt, companyID, purchaseID, variantID, l.Qty, l.Unit, l.Price, l.total, l.discount, taxIDs[l.ID], l.tax); err != nil {
+			// WithTrashed is load-bearing. purchaseLineRead is softdelete-tagged, so the
+			// default scope would add `deleted_at IS NULL` and skip exactly the row this
+			// statement exists to revive: re-adding a previously removed line arrives as
+			// UPDATED, and `deleted_at = NULL` is what brings it back. The raw statement
+			// had no such predicate.
+			if _, err := ptx.Model(&purchaseLineRead{}).
+				WithTrashed().
+				WhereEq("company_id", companyID).
+				WhereEq("purchase_id", purchaseID).
+				WhereEq("variant_id", variantID).
+				Update(context.Background(), map[string]any{
+					"qty":        l.Qty,
+					"unit_id":    l.Unit,
+					"unit_price": l.Price,
+					"line_total": l.total,
+					"discount":   l.discount,
+					"tax_id":     taxIDs[l.ID],
+					"tax_amount": l.tax,
+					"deleted_at": nil,
+				}); err != nil {
 				return err
 			}
 		case DELETED:
-			stmt := `
-        UPDATE purchase_items
-        SET deleted_at = NOW(), updated_at = NOW()
-        WHERE company_id = $1 AND purchase_id = $2 AND variant_id = $3
-      `
-			if _, err := tx.Exec(stmt, companyID, purchaseID, variantID); err != nil {
+			// Update, not Delete: Builder.Delete on a softdelete model stamps deleted_at
+			// alone, and the raw statement bumped updated_at too.
+			if _, err := ptx.Model(&purchaseLineRead{}).
+				WhereEq("company_id", companyID).
+				WhereEq("purchase_id", purchaseID).
+				WhereEq("variant_id", variantID).
+				Update(context.Background(), map[string]any{
+					"deleted_at": time.Now(),
+				}); err != nil {
 				return err
 			}
 		default:
@@ -995,6 +989,7 @@ func (s *Server) destroyPurchase(ctx context.Context, uuid string) error {
 // as 'received' or 'partially_received' by comparing the total quantity of its
 // original line items against the total quantity received across all linked
 // purchase receipts (including any just inserted in the current transaction).
+// Both reads stay raw: SUM over a join, the second keyed off a jsonb predicate.
 func resolveReceivedStatus(tx *sql.Tx, companyID int, sourceUUID string) (string, error) {
 	var totalOrdered, totalReceived float64
 
@@ -1026,6 +1021,7 @@ func resolveReceivedStatus(tx *sql.Tx, companyID int, sourceUUID string) (string
 
 // resolvePOPaymentStatus calculates the payment_status for a PO based on the sum
 // of amount_paid vs amount_payable across all linked accounts_payable records.
+// Stays raw: two SUMs in one projection, over a join, keyed off a jsonb predicate.
 func resolvePOPaymentStatus(tx *sql.Tx, companyID int, poUUID string) (PaidStatus, error) {
 	var totalPayable, totalPaid float64
 	err := tx.QueryRow(
@@ -1105,41 +1101,28 @@ func updatePOPaymentStatus(tx *sql.Tx, companyID int, poUUID string) error {
 // records an IN movement for each line that has track_inventory enabled.
 // warehouseID is taken from the purchase header; kind distinguishes receipt vs vendor_bill.
 func (s *Server) recordPurchaseMovements(tx *sql.Tx, companyID, purchaseID, warehouseID int, kind InventoryMovementKind) error {
-	rows, err := tx.Query(
-		`SELECT variant_id, qty, unit_id, unit_price
-		   FROM purchase_items
-		  WHERE company_id = $1 AND purchase_id = $2 AND deleted_at IS NULL`,
-		companyID, purchaseID,
-	)
+	ptx, err := playTx(tx)
 	if err != nil {
-		return fmt.Errorf("recordPurchaseMovements: query lines: %w", err)
+		return err
 	}
 
-	type line struct {
-		variantID, unitID int
-		qty, unitPrice    float64
-	}
-	var lines []line
-	for rows.Next() {
-		var l line
-		if err := rows.Scan(&l.variantID, &l.qty, &l.unitID, &l.unitPrice); err != nil {
-			rows.Close()
-			return fmt.Errorf("recordPurchaseMovements: scan: %w", err)
-		}
-		lines = append(lines, l)
-	}
-	if err := rows.Close(); err != nil {
-		return fmt.Errorf("recordPurchaseMovements: rows close: %w", err)
-	}
-	if err := rows.Err(); err != nil {
-		return fmt.Errorf("recordPurchaseMovements: rows: %w", err)
+	// purchaseLineRead's softdelete tag supplies `deleted_at IS NULL`. Get reads the
+	// whole result set before returning, so the lines are collected before the loop
+	// calls recordMovement, which issues its own queries on the same tx.
+	var lines []purchaseLineRead
+	if err := ptx.Model(&purchaseLineRead{}).
+		Select("variant_id", "qty", "unit_id", "unit_price").
+		WhereEq("company_id", companyID).
+		WhereEq("purchase_id", purchaseID).
+		Get(context.Background(), &lines); err != nil {
+		return fmt.Errorf("recordPurchaseMovements: query lines: %w", err)
 	}
 
 	for _, l := range lines {
 		if err := s.recordMovement(
 			tx, companyID,
-			l.variantID, warehouseID, l.unitID,
-			l.qty, l.unitPrice,
+			l.VariantID, warehouseID, int(l.UnitID),
+			l.Qty, l.UnitPrice,
 			kind,
 			"purchase", purchaseID,
 		); err != nil {
