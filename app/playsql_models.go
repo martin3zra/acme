@@ -31,6 +31,12 @@ func (s *Server) play() (*playsql.DB, error) {
 	return playsql.Use(s.db, "postgres")
 }
 
+// playOn is play for the free functions and User methods that receive a bare
+// *sql.DB rather than a *Server (the auth resolvers, User.Account, and friends).
+func playOn(db *sql.DB) (*playsql.DB, error) {
+	return playsql.Use(db, "postgres")
+}
+
 // withTrashedRelation opts an eager-loaded relation into soft-deleted rows. Use it
 // wherever the raw SQL used a plain INNER JOIN with no deleted_at predicate but the
 // related read model is softdelete-tagged (customerRead, vendorRead): without it the
@@ -299,6 +305,36 @@ type userRead struct {
 }
 
 func (userRead) TableName() string { return "users" }
+
+// authUserColumns is the projection the credential resolver used. It is spelled out
+// rather than left to the default so the authentication read stays pinned to exactly
+// these columns even if userRead grows.
+var authUserColumns = []string{
+	"id", "name", "email", "password", "email_verified_at", "last_password_reset",
+	"created_at", "updated_at", "deleted_at", "uuid", "status", "must_change_password",
+	"pending_email",
+}
+
+// toAuthUser maps the read model onto the authenticated identity. Role is not a users
+// column; it is filled in from companies_users where the request needs it.
+func (r userRead) toAuthUser() *AuthUser {
+	u := &AuthUser{
+		Id:                 r.ID,
+		UUID:               r.UUID,
+		Status:             r.Status,
+		Name:               r.Name,
+		Email:              r.Email,
+		PendingEmail:       r.PendingEmail,
+		Password:           r.Password,
+		EmailVerifiedAt:    r.EmailVerifiedAt,
+		LastPasswordReset:  r.LastPasswordReset,
+		MustChangePassword: r.MustChangePassword,
+	}
+	u.CreatedAt = r.CreatedAt
+	u.UpdatedAt = r.UpdatedAt
+	u.DeletedAt = r.DeletedAt
+	return u
+}
 
 // toUser maps the read model onto the response struct.
 func (r userRead) toUser() *User {
@@ -580,6 +616,34 @@ type accountUserInsert struct {
 }
 
 func (accountUserInsert) TableName() string { return "accounts_users" }
+
+// accountUserRead is the read side of the accounts_users pivot. User.OwnedBy roots on
+// it so the account arrives through a belongsTo instead of an INNER JOIN, mirroring how
+// companyUserRead carries the role alongside its company.
+type accountUserRead struct {
+	ID        int `db:"id" play:"pk,incrementing"`
+	AccountID int `db:"account_id"`
+	UserID    int `db:"user_id"`
+
+	Account *accountRead `play:"belongsTo,fk=account_id"`
+}
+
+func (accountUserRead) TableName() string { return "accounts_users" }
+
+// toAccountStruct maps the read model onto the `account` response struct. Only
+// owner_id is carried into Owner; the old queries selected no other owner column.
+func (r accountRead) toAccountStruct() *account {
+	a := new(account)
+	a.ID = r.ID
+	a.UUID = r.UUID
+	a.Owner.ID = r.OwnerID
+	a.Status = r.Status
+	a.VerifiedAt = r.VerifiedAt
+	a.CreatedAt = r.CreatedAt
+	a.UpdatedAt = r.UpdatedAt
+	a.DeletedAt = r.DeletedAt
+	return a
+}
 
 // companyUserInsert is the write model for the companies_users link row.
 type companyUserInsert struct {

@@ -4,7 +4,6 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
-	"fmt"
 	"time"
 
 	"github.com/martin3zra/forge/auth"
@@ -57,11 +56,26 @@ func (u *AuthUser) HasNotChangedPassword() bool {
 	return u.MustChangePassword
 }
 
+// MarkPasswordAsChanged stores a new password hash and clears the change-required
+// flag. The raw statement discarded the affected-row count, so resetting the password
+// of a user id that no longer exists reported success; mustAffectRows makes it an error.
+//
+// updated_at is stamped by Update because userRead maps the column. The raw statement
+// left it alone, which meant a password reset did not touch the row's updated_at.
 func (u *AuthUser) MarkPasswordAsChanged(db *sql.DB, password string) error {
-	_, err := db.Exec("UPDATE users SET password = $2, must_change_password = FALSE, last_password_reset = NOW() WHERE id = $1",
-		u.Id, foundation.NewHashable().Make(password),
-	)
-	return err
+	pdb, err := playOn(db)
+	if err != nil {
+		return err
+	}
+
+	affected, err := pdb.Model(&userRead{}).
+		WhereEq("id", u.Id).
+		Update(context.Background(), map[string]any{
+			"password":             foundation.NewHashable().Make(password),
+			"must_change_password": false,
+			"last_password_reset":  time.Now(),
+		})
+	return mustAffectRows(affected, err, "user")
 }
 
 // AuthUserFromContext rebuilds the authenticated identity from the session value
@@ -79,29 +93,38 @@ func AuthUserFromContext(ctx context.Context) *AuthUser {
 
 func init() {
 	auth.SetCredentialResolver(func(db *sql.DB, column string, value any) (foundation.Authenticatable, error) {
-		user := new(AuthUser)
-		// Explicit columns (not SELECT *) so new table columns can't shift the
-		// scan order and break authentication.
-		err := db.QueryRow(fmt.Sprintf(
-			"SELECT id, name, email, password, email_verified_at, last_password_reset, "+
-				"created_at, updated_at, deleted_at, uuid, status, must_change_password, pending_email "+
-				"FROM users WHERE %s = $1", column), value).
-			Scan(&user.Id, &user.Name, &user.Email,
-				&user.Password, &user.EmailVerifiedAt, &user.LastPasswordReset, &user.CreatedAt,
-				&user.UpdatedAt, &user.DeletedAt, &user.UUID, &user.Status, &user.MustChangePassword, &user.PendingEmail)
+		pdb, err := playOn(db)
 		if err != nil {
 			return nil, err
 		}
-		return user, nil
+
+		// The column name is interpolated no longer: WhereEq quotes it as an identifier.
+		// Columns are mapped by name rather than by scan position, which is what broke
+		// authentication when remember_token was appended to the table.
+		var row userRead
+		if err := pdb.Model(&userRead{}).
+			Select(authUserColumns...).
+			WhereEq(column, value).
+			First(context.Background(), &row); err != nil {
+			return nil, err
+		}
+		return row.toAuthUser(), nil
 	})
 
 	auth.SetPasswordResolver(func(db *sql.DB, userID int) (string, error) {
-		var password string
-		err := db.QueryRow("SELECT password FROM users WHERE id = $1", userID).Scan(&password)
+		pdb, err := playOn(db)
 		if err != nil {
-			return password, err
+			return "", err
 		}
-		return password, nil
+
+		var row userRead
+		if err := pdb.Model(&userRead{}).
+			Select("password").
+			WhereEq("id", userID).
+			First(context.Background(), &row); err != nil {
+			return "", err
+		}
+		return row.Password, nil
 	})
 
 	auth.SetUserDecoder(func(ctx context.Context) foundation.Authenticatable {
