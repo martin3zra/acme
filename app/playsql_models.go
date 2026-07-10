@@ -397,14 +397,53 @@ type importRowIssue struct {
 
 func (importRowIssue) TableName() string { return "import_row_issues" }
 
-// accountRead is a narrow read model for the accounts table.
+// accountRead is the playsql read model for the accounts table.
+//
+// No softdelete tag: none of the account reads filtered deleted_at. accounts.uuid is
+// nullable in the schema; playsql scans a SQL NULL as the field's zero value, which
+// is what the old scan into a string assumed.
+//
+// Owner is the account's user, joined by every account read. The eager load is
+// constrained to three columns — see withAccountOwner — so a list of accounts does
+// not drag every owner's password hash into memory.
 type accountRead struct {
-	ID      int    `db:"id" play:"pk,incrementing"`
-	UUID    string `db:"uuid"`
-	OwnerID int    `db:"owner_id"`
+	ID         int        `db:"id" play:"pk,incrementing"`
+	UUID       string     `db:"uuid"`
+	OwnerID    int        `db:"owner_id"`
+	Status     string     `db:"status"`
+	VerifiedAt *time.Time `db:"verified_at"`
+	CreatedAt  *time.Time `db:"created_at"`
+	UpdatedAt  *time.Time `db:"updated_at"`
+	DeletedAt  *time.Time `db:"deleted_at"`
+
+	Owner *userRead `play:"belongsTo,fk=owner_id"`
 }
 
 func (accountRead) TableName() string { return "accounts" }
+
+// withAccountOwner eager-loads the account's owner, projecting only the three columns
+// the response struct carries. userRead maps the password hash; without this the
+// default projection would select it.
+func withAccountOwner(b *playsql.Builder) { b.Select("id", "email", "name") }
+
+// toAccount maps the read model onto the response struct.
+func (r accountRead) toAccount() *account {
+	a := &account{
+		ID:         r.ID,
+		UUID:       r.UUID,
+		Status:     r.Status,
+		VerifiedAt: r.VerifiedAt,
+	}
+	a.CreatedAt = r.CreatedAt
+	a.UpdatedAt = r.UpdatedAt
+	a.DeletedAt = r.DeletedAt
+	if o := r.Owner; o != nil {
+		a.Owner.ID = o.ID
+		a.Owner.Email = o.Email
+		a.Owner.Name = o.Name
+	}
+	return a
+}
 
 // companyUserRead is the companies_users link row. It is a table in its own right
 // (surrogate id, role, current, abilities), so the user reads model it directly
