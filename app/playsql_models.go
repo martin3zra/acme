@@ -146,6 +146,7 @@ func (r vendorRead) toVendor() *vendor {
 // so the model maps deleted_at as a plain column to keep "return all rows".
 type unitRead struct {
 	ID        int64      `db:"id" play:"pk,incrementing"`
+	CompanyID int        `db:"company_id"`
 	Name      string     `db:"name"`
 	BaseQty   int        `db:"base_qty"`
 	CreatedAt *time.Time `db:"created_at"`
@@ -675,16 +676,107 @@ type inventoryMovementRead struct {
 
 func (inventoryMovementRead) TableName() string { return "inventory_movements" }
 
-// warehouseRead is a narrow read model for the warehouses table. softdelete matches
-// the `deleted_at IS NULL` every warehouse read carries.
+// warehouseRead is the playsql model for the warehouses table, backing its reads and
+// its writes. softdelete matches the `deleted_at IS NULL` every warehouse read
+// carries.
+//
+// location is nullable and the old reads wrapped it in COALESCE(location, ”). playsql
+// scans a SQL NULL as the field's zero value, so the wrapper is unnecessary; writes
+// pass nullIfEmpty so an empty form field stores NULL rather than ”.
 type warehouseRead struct {
 	ID        int        `db:"id" play:"pk,incrementing"`
 	CompanyID int        `db:"company_id"`
+	UUID      string     `db:"uuid"`
 	Name      string     `db:"name"`
+	Location  string     `db:"location"`
+	Status    string     `db:"status"`
+	CreatedAt *time.Time `db:"created_at"`
+	UpdatedAt *time.Time `db:"updated_at"`
 	DeletedAt *time.Time `db:"deleted_at" play:"softdelete"`
 }
 
 func (warehouseRead) TableName() string { return "warehouses" }
+
+// toWarehouse maps the read model onto the JSON response struct.
+func (r warehouseRead) toWarehouse() *warehouse {
+	w := &warehouse{
+		ID:       r.ID,
+		UUID:     r.UUID,
+		Name:     r.Name,
+		Location: r.Location,
+		Status:   foundation.Status(r.Status),
+	}
+	w.CreatedAt = r.CreatedAt
+	w.UpdatedAt = r.UpdatedAt
+	w.DeletedAt = r.DeletedAt
+	return w
+}
+
+// taxRead is the playsql model for the taxes table. No softdelete tag: findTaxes
+// never filtered deleted_at, and nothing soft-deletes a tax.
+type taxRead struct {
+	ID        int64      `db:"id" play:"pk,incrementing"`
+	CompanyID int        `db:"company_id"`
+	UUID      string     `db:"uuid"`
+	Name      string     `db:"name"`
+	Rate      float64    `db:"rate"`
+	CreatedAt *time.Time `db:"created_at"`
+	UpdatedAt *time.Time `db:"updated_at"`
+	DeletedAt *time.Time `db:"deleted_at"`
+}
+
+func (taxRead) TableName() string { return "taxes" }
+
+// toTax maps the read model onto the JSON response struct.
+func (r taxRead) toTax() *tax {
+	t := &tax{ID: r.ID, UUID: r.UUID, Name: r.Name, Rate: r.Rate}
+	t.CreatedAt = r.CreatedAt
+	t.UpdatedAt = r.UpdatedAt
+	t.DeletedAt = r.DeletedAt
+	return t
+}
+
+// taxReceiptRead is the playsql read model for tax_receipts.
+//
+// No softdelete tag: neither list read filtered deleted_at, so a retired receipt
+// still appears in the settings list. grabTaxReceiptSequence filters it explicitly
+// (see there) — that asymmetry is the existing behaviour, not something this model
+// should quietly change.
+//
+// sequence_start, sequence_end and current are NOT NULL; the old reads wrapped them
+// in COALESCE(..., 0), which never had anything to coalesce.
+type taxReceiptRead struct {
+	ID            int        `db:"id" play:"pk,incrementing"`
+	CompanyID     int        `db:"company_id"`
+	Name          string     `db:"name"`
+	Serie         string     `db:"serie"`
+	Type          string     `db:"type"`
+	SequenceStart int        `db:"sequence_start"`
+	SequenceEnd   int        `db:"sequence_end"`
+	Current       int        `db:"current"`
+	CreatedAt     *time.Time `db:"created_at"`
+	UpdatedAt     *time.Time `db:"updated_at"`
+	DeletedAt     *time.Time `db:"deleted_at"`
+}
+
+func (taxReceiptRead) TableName() string { return "tax_receipts" }
+
+// toTaxReceipt maps the read model onto the JSON response struct.
+func (r taxReceiptRead) toTaxReceipt() *taxReceipt {
+	t := &taxReceipt{
+		ID:            r.ID,
+		Name:          r.Name,
+		Serie:         r.Serie,
+		Type:          r.Type,
+		SequenceStart: r.SequenceStart,
+		SequenceEnd:   r.SequenceEnd,
+		Current:       r.Current,
+	}
+	t.CreatedAt = r.CreatedAt
+	t.UpdatedAt = r.UpdatedAt
+	t.DeletedAt = r.DeletedAt
+	return t
+}
 
 // attributeRead is the playsql model for the attributes table, backing its reads and
 // its writes. Every attribute query filtered deleted_at, so deleted_at carries

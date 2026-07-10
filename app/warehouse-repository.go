@@ -2,9 +2,10 @@ package app
 
 import (
 	"context"
-	"database/sql"
+	"time"
 
 	"github.com/martin3zra/forge/foundation"
+	"github.com/martin3zra/playsql"
 )
 
 type warehouse struct {
@@ -17,90 +18,106 @@ type warehouse struct {
 }
 
 func (s *Server) findWarehouseByID(ctx context.Context, warehouseID int) (*warehouse, error) {
-	var w warehouse
-	err := s.db.QueryRow(
-		"SELECT w.id, w.uuid, w.name, COALESCE(w.location, ''), w.status, w.created_at, w.updated_at, w.deleted_at "+
-			"FROM warehouses w "+
-			"WHERE w.company_id = $1 AND w.id = $2 AND w.deleted_at IS NULL",
-		CurrentCompany(ctx).ID,
-		warehouseID,
-	).Scan(&w.ID, &w.UUID, &w.Name, &w.Location, &w.Status, &w.CreatedAt, &w.UpdatedAt, &w.DeletedAt)
+	pdb, err := s.play()
 	if err != nil {
 		return nil, err
 	}
-	return &w, nil
+
+	var row warehouseRead
+	if err := pdb.Model(&warehouseRead{}).
+		WhereEq("company_id", CurrentCompany(ctx).ID).
+		WhereEq("id", warehouseID).
+		First(ctx, &row); err != nil {
+		return nil, err
+	}
+	return row.toWarehouse(), nil
 }
 
 func (s *Server) findWarehouses(ctx context.Context) ([]*warehouse, error) {
-	rows, err := s.db.Query(
-		"SELECT w.id, w.uuid, w.name, COALESCE(w.location, ''), w.status, w.created_at, w.updated_at, w.deleted_at "+
-			"FROM warehouses w "+
-			"WHERE w.company_id = $1 AND w.deleted_at IS NULL ORDER BY w.name",
-		CurrentCompany(ctx).ID,
-	)
+	pdb, err := s.play()
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
 
-	data := make([]*warehouse, 0)
-	for rows.Next() {
-		w := new(warehouse)
-		if err := rows.Scan(&w.ID, &w.UUID, &w.Name, &w.Location, &w.Status, &w.CreatedAt, &w.UpdatedAt, &w.DeletedAt); err != nil {
-			return nil, err
-		}
-		data = append(data, w)
+	var rows []warehouseRead
+	if err := pdb.Model(&warehouseRead{}).
+		WhereEq("company_id", CurrentCompany(ctx).ID).
+		OrderBy("name", playsql.Asc).
+		Get(ctx, &rows); err != nil {
+		return nil, err
+	}
+
+	data := make([]*warehouse, 0, len(rows))
+	for _, r := range rows {
+		data = append(data, r.toWarehouse())
 	}
 	return data, nil
 }
 
 func (s *Server) storeWarehouse(ctx context.Context, form *StoreWarehouseForm) error {
-	location := sql.NullString{String: form.Location, Valid: form.Location != ""}
-	_, err := s.db.Exec(
-		"INSERT INTO warehouses (company_id, name, location) VALUES ($1, $2, $3)",
-		CurrentCompany(ctx).ID,
-		form.Name,
-		location,
-	)
+	pdb, err := s.play()
+	if err != nil {
+		return err
+	}
+
+	// nullIfEmpty keeps the sql.NullString behaviour: a blank location stores NULL.
+	_, err = pdb.Model(&warehouseRead{}).Insert(ctx, map[string]any{
+		"company_id": CurrentCompany(ctx).ID,
+		"name":       form.Name,
+		"location":   nullIfEmpty(form.Location),
+	})
 	return err
 }
 
 func (s *Server) updateWarehouse(ctx context.Context, warehouseID int, form *UpdateWarehouseForm) error {
-	location := sql.NullString{String: form.Location, Valid: form.Location != ""}
-	res, err := s.db.Exec(
-		"UPDATE warehouses SET name = $1, location = $2, updated_at = now() WHERE company_id = $3 AND id = $4",
-		form.Name,
-		location,
-		CurrentCompany(ctx).ID,
-		warehouseID,
-	)
+	pdb, err := s.play()
+	if err != nil {
+		return err
+	}
 
-	return mustAffectRow(res, err, "warehouse")
+	affected, err := pdb.Model(&warehouseRead{}).
+		WhereEq("company_id", CurrentCompany(ctx).ID).
+		WhereEq("id", warehouseID).
+		Update(ctx, map[string]any{
+			"name":     form.Name,
+			"location": nullIfEmpty(form.Location),
+		})
+	return mustAffectRows(affected, err, "warehouse")
 }
 
+// deleteWarehouse soft-deletes through Update, not Delete: Builder.Delete stamps
+// deleted_at only, and the statement it replaced bumped updated_at too. The softdelete
+// tag also adds `deleted_at IS NULL`, so deleting an already-deleted warehouse is now
+// a not-found rather than a silent second write.
 func (s *Server) deleteWarehouse(ctx context.Context, warehouseID int) error {
-	res, err := s.db.Exec(
-		"UPDATE warehouses SET deleted_at = now(), updated_at = now() WHERE company_id = $1 AND id = $2",
-		CurrentCompany(ctx).ID,
-		warehouseID,
-	)
+	pdb, err := s.play()
+	if err != nil {
+		return err
+	}
 
-	return mustAffectRow(res, err, "warehouse")
+	affected, err := pdb.Model(&warehouseRead{}).
+		WhereEq("company_id", CurrentCompany(ctx).ID).
+		WhereEq("id", warehouseID).
+		Update(ctx, map[string]any{"deleted_at": time.Now()})
+	return mustAffectRows(affected, err, "warehouse")
 }
 
 func (s *Server) toggleWarehouseStatus(ctx context.Context, w *warehouse) error {
+	pdb, err := s.play()
+	if err != nil {
+		return err
+	}
+
 	status := w.Status
 	if status == "enabled" {
 		status = "disabled"
 	} else {
 		status = "enabled"
 	}
-	res, err := s.db.Exec(
-		"UPDATE warehouses SET updated_at = now(), status = $3 WHERE company_id = $1 AND id = $2",
-		CurrentCompany(ctx).ID,
-		w.ID,
-		status,
-	)
 
-	return mustAffectRow(res, err, "warehouse")
+	affected, err := pdb.Model(&warehouseRead{}).
+		WhereEq("company_id", CurrentCompany(ctx).ID).
+		WhereEq("id", w.ID).
+		Update(ctx, map[string]any{"status": string(status)})
+	return mustAffectRows(affected, err, "warehouse")
 }
