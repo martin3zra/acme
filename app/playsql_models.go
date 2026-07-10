@@ -60,9 +60,39 @@ type customerRead struct {
 	CreatedAt     *time.Time `db:"created_at"`
 	UpdatedAt     *time.Time `db:"updated_at"`
 	DeletedAt     *time.Time `db:"deleted_at" play:"softdelete"`
+
+	// OpeningInvoice is the customer's opening-balance invoice. The raw read got it
+	// from a LEFT JOIN onto a subquery filtered to type = 'opening'; the filter now
+	// lives in withOpeningInvoice. Neither scopes by company or filters deleted_at.
+	OpeningInvoice *invoiceRead `play:"hasOne,fk=customer_id"`
 }
 
 func (customerRead) TableName() string { return "customers" }
+
+// withOpeningInvoice constrains the eager load to the opening-balance invoice, the
+// way the old LEFT JOIN's subquery did.
+// withOpeningInvoice narrows the eager load to the opening invoice, and to the four
+// columns the subquery it replaces selected.
+//
+// customer_id is in the projection because it is load-bearing, not decorative: the
+// eager loader groups the children it fetches by their foreign-key *field*, so a
+// customer_id left out of the SELECT scans as 0 and no child ever matches its parent.
+// The relation would come back nil, silently, for every customer.
+func withOpeningInvoice(b *playsql.Builder) {
+	b.Select("id", "customer_id", "date", "amount").WhereEq("type", "opening")
+}
+
+// openBalanceOfInvoice builds the customer's opening balance. A customer without an
+// opening invoice gets a struct of nil pointers, exactly as the LEFT JOIN's NULLs did.
+func openBalanceOfInvoice(inv *invoiceRead) *OpenBalance {
+	ob := new(OpenBalance)
+	if inv == nil {
+		return ob
+	}
+	id, date, amount := inv.ID, inv.Date, inv.Amount
+	ob.InvoiceID, ob.Date, ob.Amount = &id, &date, &amount
+	return ob
+}
 
 // toCustomer maps the read model onto the JSON response struct.
 func (r customerRead) toCustomer() *customer {
@@ -111,9 +141,78 @@ type vendorRead struct {
 	CreatedAt     *time.Time `db:"created_at"`
 	UpdatedAt     *time.Time `db:"updated_at"`
 	DeletedAt     *time.Time `db:"deleted_at" play:"softdelete"`
+
+	// OpeningPayable is the vendor's opening-balance AP entry. The raw read got it
+	// from a LEFT JOIN onto a subquery filtered to status = 'draft'.
+	OpeningPayable *accountsPayableRead `play:"hasOne,fk=vendor_id"`
 }
 
 func (vendorRead) TableName() string { return "vendors" }
+
+// withOpeningPayable constrains the eager load to the draft AP entry, the way the old
+// LEFT JOIN's subquery did.
+// withOpeningPayable narrows the eager load to the draft payable. vendor_id is in the
+// projection for the same reason customer_id is in withOpeningInvoice's: it is the key
+// the loader matches children to parents on.
+func withOpeningPayable(b *playsql.Builder) {
+	b.Select("id", "vendor_id", "invoice_date", "amount_total").WhereEq("status", "draft")
+}
+
+// openBalanceOfPayable builds the vendor's opening balance. Nil pointers when there is
+// no draft entry, matching the LEFT JOIN's NULLs.
+func openBalanceOfPayable(ap *accountsPayableRead) *OpenBalance {
+	ob := new(OpenBalance)
+	if ap == nil {
+		return ob
+	}
+	id := int(ap.ID)
+	date, amount := ap.InvoiceDate, ap.AmountTotal
+	ob.InvoiceID, ob.Date, ob.Amount = &id, &date, &amount
+	return ob
+}
+
+// receivableRead is the playsql read model for the receivables table, the
+// cross-reference between a credit invoice and its customer. softdelete matches the
+// `receivables.deleted_at IS NULL` the list read carried.
+type receivableRead struct {
+	ID         int        `db:"id" play:"pk,incrementing"`
+	CompanyID  int        `db:"company_id"`
+	UUID       string     `db:"uuid"`
+	InvoiceID  int        `db:"invoice_id"`
+	CustomerID int        `db:"customer_id"`
+	DeletedAt  *time.Time `db:"deleted_at" play:"softdelete"`
+
+	Invoice *invoiceRead `play:"belongsTo,fk=invoice_id"`
+}
+
+func (receivableRead) TableName() string { return "receivables" }
+
+// toReceivable maps a receivables row plus its invoice onto the response struct.
+// receivable.ID/UUID identify the receivables row; receivable.Invoice.ID/UUID
+// identify the invoice. Notes and Payment were never selected and stay zero.
+//
+// Invoice cannot be nil in practice — the read filters on it through WhereRelation,
+// which is an EXISTS — but a nil relation must not panic the way the old Scan into
+// &row.Invoice.UUID could not.
+func (r receivableRead) toReceivable() *receivable {
+	out := new(receivable)
+	out.ID = r.ID
+	out.UUID = r.UUID
+	if r.Invoice == nil {
+		return out
+	}
+
+	out.Invoice.ID = r.Invoice.ID
+	out.Invoice.UUID = r.Invoice.UUID
+	out.Invoice.Number = r.Invoice.Code
+	out.Invoice.NCF = r.Invoice.TaxNumber
+	out.Invoice.Date = r.Invoice.Date
+	out.Invoice.DueOn = r.Invoice.DueOn
+	out.Invoice.Total = r.Invoice.Total
+	out.Invoice.AmountDue = r.Invoice.AmountDue
+	out.Invoice.PaidStatus = r.Invoice.PaidStatus
+	return out
+}
 
 // toVendor maps the read model onto the JSON response struct.
 func (r vendorRead) toVendor() *vendor {
@@ -1196,7 +1295,7 @@ func (paymentInvoiceRead) TableName() string { return "invoices" }
 type accountsPayableRead struct {
 	ID            int64     `db:"id" play:"pk,incrementing"`
 	UUID          string    `db:"uuid"`
-	VendorID      int64     `db:"vendor_id"`
+	VendorID      int       `db:"vendor_id"`
 	InvoiceNumber string    `db:"invoice_number"`
 	InvoiceDate   time.Time `db:"invoice_date"`
 	DueDate       time.Time `db:"due_date"`

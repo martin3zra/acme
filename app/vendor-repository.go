@@ -103,35 +103,32 @@ func (s *Server) findVendorByID(ctx context.Context, vendorID int) (*vendor, err
 // accounts_payable ("draft") subquery to derive the vendor's opening balance —
 // a correlated join playsql's model/relation reads don't express. See
 // playsql-phase2 notes.
+// findVendorByUUID reads a vendor with its opening balance.
+//
+// The raw query LEFT JOINed a subquery over accounts_payable filtered to
+// status = 'draft'. That is a hasOne with a constraint: withOpeningPayable carries the
+// filter, and the eager load reproduces the LEFT JOIN's semantics — a vendor with no
+// draft payable still comes back, with an OpenBalance of nil pointers.
+//
+// INNER JOIN companies is dropped: existence-only, and company_id already scopes.
 func (s *Server) findVendorByUUID(ctx context.Context, vendorID string) (*vendor, error) {
-
-	var v vendor
-	var ob OpenBalance
-	err := s.db.QueryRow(
-		"SELECT v.id, v.uuid, v.code, v.name, v.contact_name, v.phone, v.email, v.status, v.amount_payable, v.purchase_note, v.lead_time_days, "+
-			"ap.id as invoice_id, ap.invoice_date, ap.amount_total, v.vendor_type, v.payment_method, v.payment_terms, v.address, "+
-			"v.created_at, v.updated_at, v.deleted_at "+
-			"FROM vendors v "+
-			"INNER JOIN companies ON (v.company_id = companies.id) "+
-			"LEFT JOIN (SELECT id, vendor_id, invoice_date, amount_total FROM accounts_payable WHERE accounts_payable.status = 'draft') ap ON ap.vendor_id = v.id "+
-			"WHERE v.company_id = $1 "+
-			"AND v.uuid = $2 "+
-			"AND v.deleted_at IS NULL",
-		CurrentCompany(ctx).ID, vendorID).
-		Scan(
-			&v.ID, &v.UUID, &v.Code, &v.Name, &v.ContactName, &v.Phone, &v.Email,
-			&v.Status, &v.AmountPayable, &v.PurchaseNote, &v.LeadTimeDays,
-			&ob.InvoiceID, &ob.Date, &ob.Amount,
-			&v.VendorType, &v.PaymentMethod, &v.PaymentTerms, &v.Address,
-			&v.CreatedAt, &v.UpdatedAt, &v.DeletedAt,
-		)
+	pdb, err := s.play()
 	if err != nil {
 		return nil, err
 	}
 
-	v.OpenBalance = &ob
+	var row vendorRead
+	if err := pdb.Model(&vendorRead{}).
+		WithConstraint("OpeningPayable", withOpeningPayable).
+		WhereEq("company_id", CurrentCompany(ctx).ID).
+		WhereEq("uuid", vendorID).
+		First(ctx, &row); err != nil {
+		return nil, err
+	}
 
-	return &v, nil
+	v := row.toVendor()
+	v.OpenBalance = openBalanceOfPayable(row.OpeningPayable)
+	return v, nil
 }
 
 func (s *Server) findVendors(ctx context.Context, vendorType VendorType) ([]*vendor, error) {
@@ -284,40 +281,68 @@ func (s *Server) registerPayable(tx *sql.Tx, companyID int, apID, vendorID int) 
 	})
 }
 
+// updateVendor, deleteVendor and toggleVendorStatus all pick up `deleted_at IS NULL`
+// from vendorRead's softdelete tag, which the raw statements lacked. Editing or
+// re-deleting a soft-deleted vendor is now a not-found.
 func (s *Server) updateVendor(ctx context.Context, vendorID int, form *UpdateVendorForm) error {
+	pdb, err := s.play()
+	if err != nil {
+		return err
+	}
 
-	res, err := s.db.Exec(
-		"UPDATE vendors SET name = $1, contact_name = $2, email = $3, phone = $4, payment_method = $5, payment_terms = $6, vendor_type = $7, purchase_note = $8, lead_time_days = $9, address = $10 WHERE company_id = $11 AND id = $12",
-		form.Name, form.Contact, form.Email, form.Phone, form.PaymentMethod, form.PaymentTerms, form.VendorType, form.PurchaseNote, form.LeadTimeDays, form.Address, CurrentCompany(ctx).ID, vendorID,
-	)
-
-	return mustAffectRow(res, err, "vendor")
+	affected, err := pdb.Model(&vendorRead{}).
+		WhereEq("company_id", CurrentCompany(ctx).ID).
+		WhereEq("id", vendorID).
+		Update(ctx, map[string]any{
+			"name":           form.Name,
+			"contact_name":   form.Contact,
+			"email":          form.Email,
+			"phone":          form.Phone,
+			"payment_method": form.PaymentMethod,
+			"payment_terms":  form.PaymentTerms,
+			"vendor_type":    form.VendorType,
+			"purchase_note":  form.PurchaseNote,
+			"lead_time_days": form.LeadTimeDays,
+			"address":        form.Address,
+		})
+	return mustAffectRows(affected, err, "vendor")
 }
 
 func (s *Server) deleteVendor(ctx context.Context, vendorID int) error {
-	res, err := s.db.Exec(
-		"UPDATE vendors SET deleted_at = now(), updated_at = now() WHERE company_id = $1 AND id = $2",
-		CurrentCompany(ctx).ID, vendorID,
-	)
+	pdb, err := s.play()
+	if err != nil {
+		return err
+	}
 
-	return mustAffectRow(res, err, "vendor")
+	affected, err := pdb.Model(&vendorRead{}).
+		WhereEq("company_id", CurrentCompany(ctx).ID).
+		WhereEq("id", vendorID).
+		Update(ctx, map[string]any{"deleted_at": time.Now()})
+	return mustAffectRows(affected, err, "vendor")
 }
 
 func (s *Server) toggleVendorStatus(ctx context.Context, vendor *vendor) error {
+	pdb, err := s.play()
+	if err != nil {
+		return err
+	}
+
 	status := vendor.Status
 	if status == "enabled" {
 		status = "disabled"
 	} else {
 		status = "enabled"
 	}
-	res, err := s.db.Exec(
-		"UPDATE vendors SET updated_at = now(), status = $3 WHERE company_id = $1 AND id = $2",
-		CurrentCompany(ctx).ID, vendor.ID, status,
-	)
 
-	return mustAffectRow(res, err, "vendor")
+	affected, err := pdb.Model(&vendorRead{}).
+		WhereEq("company_id", CurrentCompany(ctx).ID).
+		WhereEq("id", vendor.ID).
+		Update(ctx, map[string]any{"status": string(status)})
+	return mustAffectRows(affected, err, "vendor")
 }
 
+// Stays raw: `amount_payable = amount_payable + $3` is a self-referencing increment,
+// which playsql's Update cannot express.
 func (s *Server) updateVendorAmountPayable(tx *sql.Tx, companyId, vendorId int, amountPayable float64) error {
 
 	result, err := tx.Exec("UPDATE vendors SET amount_payable = amount_payable + $3 WHERE company_id = $1 AND id = $2",
@@ -336,49 +361,46 @@ func (s *Server) updateVendorAmountPayable(tx *sql.Tx, companyId, vendorId int, 
 	return err
 }
 
+// findVendorPayables lists a vendor's unpaid AP entries with their payables register
+// row. Same shape as findPayables: rooted on accounts_payable, with the register row
+// pulled through Has/With, since every column the response needs lives on one of the
+// two. The dropped joins are redundant for the reasons given there, and payables.id /
+// payables.uuid still come from the register row.
+//
+// The vendor lookup keeps WithTrashed: the old join had no deleted_at predicate on
+// vendors, so a soft-deleted vendor's payables were still listed.
 func (s *Server) findVendorPayables(ctx context.Context, vendorID string) ([]*Payable, error) {
-	rows, err := s.db.Query(`
-		SELECT
-			p.id, p.uuid,
-			ap.uuid, ap.id, ap.invoice_number,
-			ap.invoice_date, ap.due_date,
-			ap.amount_total, ap.amount_payable, ap.amount_paid,
-			ap.status, ap.paid_status, ap.notes
-		FROM payables p
-		INNER JOIN companies        ON (p.company_id = companies.id)
-		INNER JOIN accounts_payable ap ON (p.company_id = ap.company_id AND p.vendor_id = ap.vendor_id AND p.accounts_payable_id = ap.id)
-		INNER JOIN vendors          ON (p.company_id = vendors.company_id AND p.vendor_id = vendors.id)
-		WHERE p.company_id = $1
-		AND ap.paid_status != 'paid'
-		AND vendors.uuid = $2
-	`, CurrentCompany(ctx).ID, vendorID)
+	pdb, err := s.play()
 	if err != nil {
 		return nil, err
 	}
 
-	data := make([]*Payable, 0)
-	for rows.Next() {
-		row := new(Payable)
-		if err = rows.Scan(
-			&row.ID,
-			&row.UUID,
-			&row.InvoiceUUID,
-			&row.InvoiceID,
-			&row.InvoiceNumber,
-			&row.InvoiceDate,
-			&row.DueDate,
-			&row.AmountTotal,
-			&row.AmountPayable,
-			&row.AmountPaid,
-			&row.Status,
-			&row.PaidStatus,
-			&row.Notes,
-		); err != nil {
-			return data, err
-		}
+	companyID := CurrentCompany(ctx).ID
 
-		data = append(data, row)
+	var v vendorRead
+	if err := pdb.Model(&vendorRead{}).
+		Select("id").
+		WithTrashed().
+		WhereEq("company_id", companyID).
+		WhereEq("uuid", vendorID).
+		First(ctx, &v); err != nil {
+		return nil, err
 	}
 
+	var rows []accountsPayableRead
+	if err := pdb.Model(&accountsPayableRead{}).
+		With("Register").
+		Has("Register").
+		WhereEq("company_id", companyID).
+		WhereEq("vendor_id", v.ID).
+		Where("paid_status", "!=", "paid").
+		Get(ctx, &rows); err != nil {
+		return nil, err
+	}
+
+	data := make([]*Payable, 0, len(rows))
+	for _, r := range rows {
+		data = append(data, r.toPayable())
+	}
 	return data, nil
 }
