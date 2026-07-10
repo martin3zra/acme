@@ -747,14 +747,20 @@ type inventoryBalanceRead struct {
 
 func (inventoryBalanceRead) TableName() string { return "inventory_balances" }
 
-// itemVariantRead is a narrow read model for items_variants: only the columns the
-// inventory paths need. No softdelete tag — recordMovement's track_inventory lookup
-// never filtered deleted_at.
+// itemVariantRead is a read model for items_variants. No softdelete tag —
+// recordMovement's track_inventory lookup never filtered deleted_at, and neither did
+// findInvoiceLines' join.
+//
+// recordMovement pins its projection with Select("track_inventory"), so the name/sku/
+// is_default columns findInvoiceLines needs cost it nothing.
 type itemVariantRead struct {
-	ID             int  `db:"id" play:"pk,incrementing"`
-	CompanyID      int  `db:"company_id"`
-	ItemID         int  `db:"item_id"`
-	TrackInventory bool `db:"track_inventory"`
+	ID             int     `db:"id" play:"pk,incrementing"`
+	CompanyID      int     `db:"company_id"`
+	ItemID         int     `db:"item_id"`
+	TrackInventory bool    `db:"track_inventory"`
+	Name           string  `db:"name"`
+	SKU            *string `db:"sku"`
+	IsDefault      bool    `db:"is_default"`
 }
 
 func (itemVariantRead) TableName() string { return "items_variants" }
@@ -1813,4 +1819,141 @@ func (r itemRead) toItem() *item {
 	}
 
 	return i
+}
+
+// invoiceLineItemRead is a second read model over `items`, for invoice lines.
+//
+// It exists instead of reusing itemRead because itemRead carries a softdelete tag,
+// and playsql excludes soft-deleted rows from an eager load. findInvoiceLines'
+// `INNER JOIN items` never filtered deleted_at: a line on a since-deleted item still
+// rendered its name and description, and a historical invoice must keep doing so.
+type invoiceLineItemRead struct {
+	ID          int    `db:"id" play:"pk,incrementing"`
+	CompanyID   int    `db:"company_id"`
+	Name        string `db:"name"`
+	Description string `db:"description"`
+	Identifiers []byte `db:"identifiers"`
+	TaxID       int64  `db:"tax_id"`
+
+	Tax      *taxRead      `play:"belongsTo,fk=tax_id"`
+	ItemUnit *itemUnitRead `play:"hasOne,fk=item_id"`
+}
+
+func (invoiceLineItemRead) TableName() string { return "items" }
+
+// withInvoiceLineTax narrows the tax eager load to the two columns the old query
+// selected, taxes.id and taxes.name. Unlike withItemTax this is a projection
+// narrowing only, not a guard: toLine copies those two fields by hand, so a wider
+// SELECT would fetch more columns but change nothing in the response. id stays in the
+// projection because belongsTo matches on the related primary key.
+//
+// The line's rate and tax amount come off invoices_items, not off the tax row.
+func withInvoiceLineTax(b *playsql.Builder) {
+	b.Select("id", "name")
+}
+
+// withInvoiceLineItem loads the item's tax and unit from inside the item's own eager
+// load, so `Item` is traversed exactly once.
+//
+// Writing this as two paths on the root — With("Item.ItemUnit.Unit") plus
+// WithConstraint("Item.Tax", ...) — does not work: each with-clause reloads every
+// segment it names and reassigns the relation field, so the second pass replaces the
+// item structs the first had filled in and their ItemUnit goes back to nil. The unit
+// then reads as 0, which the recurring-invoice flow writes straight into
+// invoices_items.unit_id and trips a foreign key.
+func withInvoiceLineItem(b *playsql.Builder) {
+	b.With("ItemUnit.Unit").WithConstraint("Tax", withInvoiceLineTax)
+}
+
+// invoiceLineRead is the playsql read model for invoices_items.
+//
+// No softdelete tag, matching InvoiceItem, its write counterpart: the DELETED branch
+// of updateInvoiceLines calls Delete on a model without the tag, which is a hard
+// DELETE, so no soft-deleted line rows exist. findInvoiceLines never filtered
+// deleted_at either. reconcileInvoiceStock's `deleted_at IS NULL` is written out
+// explicitly where it is needed.
+type invoiceLineRead struct {
+	ID          int64      `db:"id" play:"pk,incrementing"`
+	CompanyID   int        `db:"company_id"`
+	InvoiceID   int        `db:"invoice_id"`
+	ItemID      int        `db:"item_id"`
+	VariantID   int        `db:"variant_id"`
+	UnitID      int        `db:"unit_id"`
+	Qty         int64      `db:"qty"`
+	Price       float64    `db:"price"`
+	Rate        float64    `db:"rate"`
+	Amount      float64    `db:"amount"`
+	Tax         float64    `db:"tax"`
+	Total       float64    `db:"total"`
+	WarehouseID int64      `db:"warehouse_id"`
+	CreatedAt   *time.Time `db:"created_at"`
+	UpdatedAt   *time.Time `db:"updated_at"`
+	DeletedAt   *time.Time `db:"deleted_at"`
+
+	Item    *invoiceLineItemRead `play:"belongsTo,fk=item_id"`
+	Variant *itemVariantRead     `play:"belongsTo,fk=variant_id"`
+}
+
+func (invoiceLineRead) TableName() string { return "invoices_items" }
+
+// toLine maps an invoices_items row and its relations onto the response struct.
+//
+// line.ID carries the *item* id, not the invoices_items id. That is what the old
+// query selected into it (`SELECT ii.item_id, ...` scanned into &i.ID), and
+// updateInvoiceLines matches lines on (item_id, variant_id), so the client round-trips
+// this value as the item id. Preserved deliberately.
+//
+// line.Tax.Rate and line.Tax.Amount come off the line (ii.rate, ii.tax), not off the
+// tax row — a line freezes the rate it was billed at.
+//
+// Action is the constant 'unchanged' the old projection selected.
+func (r invoiceLineRead) toLine() *line {
+	l := &line{
+		ID:          int64(r.ItemID),
+		VariantID:   int64(r.VariantID),
+		Qty:         r.Qty,
+		Price:       r.Price,
+		Amount:      r.Amount,
+		Total:       r.Total,
+		WarehouseID: r.WarehouseID,
+		Action:      UNCHANGED,
+	}
+	l.CreatedAt = r.CreatedAt
+	l.UpdatedAt = r.UpdatedAt
+	l.DeletedAt = r.DeletedAt
+
+	l.Tax.Rate = r.Rate
+	l.Tax.Amount = r.Tax
+
+	if r.Variant != nil {
+		l.VariantName = r.Variant.Name
+		if r.Variant.SKU != nil {
+			l.VariantSKU = *r.Variant.SKU
+		}
+	}
+
+	if r.Item != nil {
+		l.Name = r.Item.Name
+		l.Description = r.Item.Description
+		if len(r.Item.Identifiers) > 0 {
+			_ = json.Unmarshal(r.Item.Identifiers, &l.Identifier)
+		}
+		if r.Item.Tax != nil {
+			l.Tax.ID = r.Item.Tax.ID
+			l.Tax.Name = r.Item.Tax.Name
+		}
+		if r.Item.ItemUnit != nil {
+			l.Unit.ID = r.Item.ItemUnit.UnitID
+			if r.Item.ItemUnit.Unit != nil {
+				l.Unit.Name = r.Item.ItemUnit.Unit.Name
+			}
+		}
+	}
+
+	// `CASE WHEN iv.is_default THEN it.name ELSE it.name || ' — ' || iv.name END`.
+	if r.Item != nil && r.Variant != nil && !r.Variant.IsDefault {
+		l.Name = r.Item.Name + " — " + r.Variant.Name
+	}
+
+	return l
 }

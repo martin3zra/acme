@@ -468,63 +468,46 @@ func (s *Server) processInvoiceLines(tx *sql.Tx, companyId, invoiceId int, form 
 	return nil
 }
 
+// findInvoiceLines reads an invoice's lines with the item, variant, tax and unit each
+// line displays.
+//
+// Five joins collapse into relations:
+//
+//   - INNER JOIN companies and INNER JOIN invoices asserted existence of NOT NULL FKs;
+//     company_id and invoice_id already scope the read.
+//   - INNER JOIN items and INNER JOIN items_variants become belongsTo. Neither filtered
+//     deleted_at, which is why the item side uses invoiceLineItemRead rather than
+//     itemRead: a line on a since-deleted item must still render its name.
+//   - LEFT JOIN LATERAL (... LIMIT 1) resolved the item's unit. Since migration
+//     20260709120000 added items_units_company_item_unique (company_id, item_id) there
+//     is at most one link row per item, so it is a plain hasOne.
+//
+// The tax eager load is narrowed to (id, name): a line's rate and tax amount are
+// frozen on invoices_items, not read off the tax row.
+//
+// The item's own two relations are nested inside one constraint rather than written as
+// two `With("Item.…")` paths. Each with-clause reloads every segment it names and
+// reassigns the field, so a second path through Item would overwrite the structs the
+// first had populated and silently drop their ItemUnit.
 func (s *Server) findInvoiceLines(ctx context.Context, companyID, invoiceID int) ([]*line, error) {
-	rows, err := s.db.Query(`
-    SELECT ii.item_id, ii.variant_id, iv.name, COALESCE(iv.sku, ''),
-    ii.qty, ii.price, items_units.unit_id,
-    CASE WHEN iv.is_default THEN it.name ELSE it.name || ' — ' || iv.name END,
-    it.description, items_units.name,
-    ii.created_at, ii.updated_at, ii.deleted_at, 'unchanged' as action, ii.amount, ii.total,
-    taxes.id as tax_id, taxes.name as tax_name, ii.rate, ii.tax, it.identifiers, ii.warehouse_id
-    FROM invoices_items AS ii
-    INNER JOIN companies AS com ON (ii.company_id = com.id)
-    INNER JOIN invoices AS i ON (ii.invoice_id = i.id AND ii.company_id = i.company_id)
-    INNER JOIN items AS it ON(ii.item_id = it.id AND ii.company_id = it.company_id)
-    INNER JOIN items_variants AS iv ON (ii.variant_id = iv.id AND ii.company_id = iv.company_id)
-    LEFT JOIN LATERAL (
-      SELECT items_units.unit_id, units.name
-      FROM items_units
-      INNER JOIN units ON (items_units.unit_id = units.id)
-      WHERE items_units.item_id = it.id limit 1
-    ) items_units ON true
-    INNER JOIN taxes ON (it.company_id = taxes.company_id AND it.tax_id = taxes.id)
-    WHERE ii.company_id = $1
-    AND ii.invoice_id = $2`, companyID, invoiceID)
+	pdb, err := s.play()
 	if err != nil {
 		return nil, err
 	}
-	data := make([]*line, 0)
-	for rows.Next() {
-		i := new(line)
 
-		if err = rows.Scan(
-			&i.ID,
-			&i.VariantID,
-			&i.VariantName,
-			&i.VariantSKU,
-			&i.Qty,
-			&i.Price,
-			&i.Unit.ID,
-			&i.Name,
-			&i.Description,
-			&i.Unit.Name,
-			&i.CreatedAt,
-			&i.UpdatedAt,
-			&i.DeletedAt,
-			&i.Action,
-			&i.Amount,
-			&i.Total,
-			&i.Tax.ID,
-			&i.Tax.Name,
-			&i.Tax.Rate,
-			&i.Tax.Amount,
-			&i.Identifier,
-			&i.WarehouseID,
-		); err != nil {
-			return nil, err
-		}
+	var rows []invoiceLineRead
+	if err := pdb.Model(&invoiceLineRead{}).
+		With("Variant").
+		WithConstraint("Item", withInvoiceLineItem).
+		WhereEq("company_id", companyID).
+		WhereEq("invoice_id", invoiceID).
+		Get(ctx, &rows); err != nil {
+		return nil, err
+	}
 
-		data = append(data, i)
+	data := make([]*line, 0, len(rows))
+	for _, r := range rows {
+		data = append(data, r.toLine())
 	}
 	return data, nil
 }
@@ -589,6 +572,8 @@ func (s *Server) filterInvoiceLines(lines []*Line, actions ...LineAction) []*Lin
 	return filtered
 }
 
+// updateInvoiceBalance stays raw: `amount_due = amount_due + $3` is a self-referencing
+// increment, and both paid_status and status are CASE expressions over the new value.
 func (s *Server) updateInvoiceBalance(tx *sql.Tx, companyID, invoiceID int, balance float64) error {
 	stmt := `
     UPDATE invoices
@@ -849,6 +834,7 @@ func (s *Server) recordInvoiceMovements(tx *sql.Tx, companyID, invoiceID int, li
 // arrive as delete+add) uniformly, since it works from the persisted rows.
 func (s *Server) reconcileInvoiceStock(tx *sql.Tx, companyID, invoiceID int) error {
 	// 1. Neutralise the invoice's current net contribution per variant+warehouse.
+	// Stays raw: a GROUP BY with a HAVING over an aggregate is not a model read.
 	rows, err := tx.Query(
 		`SELECT variant_id, warehouse_id, SUM(qty)::float8
 		   FROM inventory_movements
@@ -897,6 +883,7 @@ func (s *Server) reconcileInvoiceStock(tx *sql.Tx, companyID, invoiceID int) err
 		}); err != nil {
 			return fmt.Errorf("reconcileInvoiceStock: insert adjustment: %w", err)
 		}
+		// Stays raw: `quantity = quantity + $1` is a self-referencing increment.
 		if _, err := tx.Exec(
 			`UPDATE inventory_balances SET quantity = quantity + $1, updated_at = NOW()
 			  WHERE company_id = $2 AND variant_id = $3 AND warehouse_id = $4`,
@@ -909,40 +896,27 @@ func (s *Server) reconcileInvoiceStock(tx *sql.Tx, companyID, invoiceID int) err
 	// 2. Re-record OUT movements from the surviving lines. Collect first, then
 	// record — recordMovement issues its own queries on tx, which cannot run
 	// while a Rows from the same connection is still open.
-	lineRows, err := tx.Query(
-		`SELECT variant_id, warehouse_id, unit_id, qty, price
-		   FROM invoices_items
-		  WHERE company_id = $1 AND invoice_id = $2 AND deleted_at IS NULL AND warehouse_id <> 0`,
-		companyID, invoiceID,
-	)
-	if err != nil {
+	// invoiceLineRead carries no softdelete tag, so deleted_at is written out here as
+	// the old statement had it. Get reads the whole result set before returning, so the
+	// "collect first, then record" dance below is no longer forced by an open Rows —
+	// but recordMovement still issues its own queries on tx, so the loop stays split.
+	var lines []invoiceLineRead
+	if err := ptx.Model(&invoiceLineRead{}).
+		Select("variant_id", "warehouse_id", "unit_id", "qty", "price").
+		WhereEq("company_id", companyID).
+		WhereEq("invoice_id", invoiceID).
+		WhereNull("deleted_at").
+		Where("warehouse_id", "!=", 0).
+		Get(context.Background(), &lines); err != nil {
 		return fmt.Errorf("reconcileInvoiceStock: query lines: %w", err)
 	}
-	type lineMove struct {
-		variantID, warehouseID, unitID, qty int
-		price                               float64
-	}
-	var lines []lineMove
-	for lineRows.Next() {
-		var l lineMove
-		if err := lineRows.Scan(&l.variantID, &l.warehouseID, &l.unitID, &l.qty, &l.price); err != nil {
-			lineRows.Close()
-			return fmt.Errorf("reconcileInvoiceStock: scan line: %w", err)
-		}
-		lines = append(lines, l)
-	}
-	if err := lineRows.Err(); err != nil {
-		lineRows.Close()
-		return err
-	}
-	lineRows.Close()
 
 	for _, l := range lines {
 		// OUT movement: qty is negative.
 		if err := s.recordMovement(
 			tx, companyID,
-			l.variantID, l.warehouseID, l.unitID,
-			-float64(l.qty), l.price,
+			l.VariantID, int(l.WarehouseID), l.UnitID,
+			-float64(l.Qty), l.Price,
 			InventoryMovementKinds.Sale,
 			"invoice", invoiceID,
 		); err != nil {
