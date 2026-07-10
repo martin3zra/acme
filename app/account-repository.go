@@ -1,6 +1,7 @@
 package app
 
 import (
+	"context"
 	"database/sql"
 	"log"
 	"time"
@@ -10,6 +11,7 @@ import (
 	"github.com/martin3zra/forge/foundation"
 	"github.com/martin3zra/forge/mailer"
 	"github.com/martin3zra/forge/routing"
+	"github.com/martin3zra/playsql"
 )
 
 type account struct {
@@ -29,18 +31,45 @@ func (a account) HasVerifiedAccount() bool {
 	return a.VerifiedAt != nil
 }
 
+// MarkAccountAsVerified enables the account and its owner in one transaction.
+//
+// The owner update was an `UPDATE users ... FROM accounts WHERE users.id =
+// accounts.owner_id AND accounts.id = $1` join. playsql has no UPDATE-FROM, but the
+// join was only resolving the owner id — which the caller already holds, since every
+// account read loads it. Both statements are guarded: each must touch exactly one
+// row, and a miss rolls the transaction back rather than half-verifying.
+//
+// Returns false on any error, as it always did; the caller reports a generic failure.
 func (a account) MarkAccountAsVerified(db *sql.DB) bool {
 	err := database.WithTransaction(db, func(tx *sql.Tx) error {
-		if _, err := tx.Exec("UPDATE accounts SET verified_at = $2, status = 'enabled'::entity_status WHERE id = $1", a.ID, time.Now()); err != nil {
+		ptx, err := playTx(tx)
+		if err != nil {
+			return err
+		}
+		now := time.Now()
+
+		affected, err := ptx.Model(&accountRead{}).
+			WhereEq("id", a.ID).
+			Update(context.Background(), map[string]any{
+				"verified_at": now,
+				"status":      "enabled",
+			})
+		if err := mustAffectRows(affected, err, "account"); err != nil {
 			return err
 		}
 
-		if _, err := tx.Exec("UPDATE users SET email_verified_at = $2, status = 'enabled'::user_status FROM accounts WHERE users.id = accounts.owner_id AND accounts.id = $1", a.ID, time.Now()); err != nil {
-			return err
-		}
-		return nil
+		affected, err = ptx.Model(&userInsert{}).
+			WhereEq("id", a.Owner.ID).
+			Update(context.Background(), map[string]any{
+				"email_verified_at": now,
+				"status":            "enabled",
+			})
+		return mustAffectRows(affected, err, "account owner")
 	})
 
+	if err != nil {
+		log.Println("MarkAccountAsVerified:", err)
+	}
 	return err == nil
 }
 
@@ -65,56 +94,60 @@ func (a account) GetEmailAddressForAccountVerification() string {
 	return a.Owner.Email
 }
 
-func (s *Server) findAccountByIDUsingTx(tx *sql.Tx, accountID int) (*account, error) {
-	var a account
+// The three reads below were the same query with a different WHERE. Each drops the
+// `INNER JOIN users` for a belongsTo eager load; the join only ever asserted the
+// owner exists (owner_id is a NOT NULL FK) and supplied three columns.
+//
+// findAccountByOwnerEmailAddress filters on a column of the related table, which
+// WhereRelation expresses as an EXISTS subquery. An account has exactly one owner, so
+// that selects the same rows the join did.
 
-	if err := tx.QueryRow(`
-    SELECT accounts.id, accounts.uuid, accounts.verified_at, accounts.status, accounts.created_at, accounts.updated_at, accounts.deleted_at,
-    users.id, users.email, users.name
-    FROM accounts
-    INNER JOIN users ON (accounts.owner_id = users.id)
-    WHERE accounts.id = $1
-  `, accountID).Scan(
-		&a.ID, &a.UUID, &a.VerifiedAt, &a.Status, &a.CreatedAt, &a.UpdatedAt, &a.DeletedAt, &a.Owner.ID, &a.Owner.Email, &a.Owner.Name,
-	); err != nil {
+// accountQuery builds the shared projection: the account plus its owner.
+func accountQuery(sess playSession) *playsql.Builder {
+	return sess.Model(&accountRead{}).WithConstraint("Owner", withAccountOwner)
+}
+
+func (s *Server) findAccountByIDUsingTx(tx *sql.Tx, accountID int) (*account, error) {
+	ptx, err := playTx(tx)
+	if err != nil {
 		return nil, err
 	}
 
-	return &a, nil
+	var row accountRead
+	if err := accountQuery(ptx).
+		WhereEq("id", accountID).
+		First(context.Background(), &row); err != nil {
+		return nil, err
+	}
+	return row.toAccount(), nil
 }
 
 func (s *Server) findAccountByUUID(uuid string) (*account, error) {
-	var a account
-
-	if err := s.db.QueryRow(`
-    SELECT accounts.id, accounts.uuid, accounts.verified_at, accounts.status, accounts.created_at, accounts.updated_at, accounts.deleted_at,
-    users.id, users.email, users.name
-    FROM accounts
-    INNER JOIN users ON (accounts.owner_id = users.id)
-    WHERE accounts.uuid = $1
-  `, uuid).Scan(
-		&a.ID, &a.UUID, &a.VerifiedAt, &a.Status, &a.CreatedAt, &a.UpdatedAt, &a.DeletedAt, &a.Owner.ID, &a.Owner.Email, &a.Owner.Name,
-	); err != nil {
+	pdb, err := s.play()
+	if err != nil {
 		return nil, err
 	}
 
-	return &a, nil
+	var row accountRead
+	if err := accountQuery(pdb).
+		WhereEq("uuid", uuid).
+		First(context.Background(), &row); err != nil {
+		return nil, err
+	}
+	return row.toAccount(), nil
 }
 
 func (s *Server) findAccountByOwnerEmailAddress(email string) (*account, error) {
-	var a account
-
-	if err := s.db.QueryRow(`
-    SELECT accounts.id, accounts.uuid, accounts.verified_at, accounts.status, accounts.created_at, accounts.updated_at, accounts.deleted_at,
-    users.id, users.email, users.name
-    FROM accounts
-    INNER JOIN users ON (accounts.owner_id = users.id)
-    WHERE users.email = $1
-  `, email).Scan(
-		&a.ID, &a.UUID, &a.VerifiedAt, &a.Status, &a.CreatedAt, &a.UpdatedAt, &a.DeletedAt, &a.Owner.ID, &a.Owner.Email, &a.Owner.Name,
-	); err != nil {
+	pdb, err := s.play()
+	if err != nil {
 		return nil, err
 	}
 
-	return &a, nil
+	var row accountRead
+	if err := accountQuery(pdb).
+		WhereRelation("Owner", "email", "=", email).
+		First(context.Background(), &row); err != nil {
+		return nil, err
+	}
+	return row.toAccount(), nil
 }
