@@ -354,99 +354,75 @@ func (s *Server) findStocks(ctx context.Context, companyID int) ([]*stockBalance
 	return result, rows.Err()
 }
 
-// findMovements returns the inventory movement log for a company.
+// findMovements returns the inventory movement log for a company, newest first.
+//
+// The three INNER JOINs become relations. items_variants and items carried
+// `deleted_at IS NULL` predicates, which liveVariantAndItem writes out because neither
+// read model is softdelete-tagged.
+//
+// warehouses carried no such predicate, and warehouseRead *is* softdelete-tagged, so
+// the relation is eager-loaded WithTrashed: a retired warehouse must still name the
+// movements it recorded. There is deliberately no Has("Warehouse") to stand in for the
+// INNER JOIN — warehouse_id is a NOT NULL foreign key, so the join excluded nothing,
+// and WhereHas could not express it anyway: the EXISTS subquery applies the related
+// model's soft-delete filter unconditionally, and a WithTrashed inside its closure is
+// ignored.
+//
+// TO_CHAR(created_at, ...) becomes a Go format of the scanned value; the column is
+// `timestamp without time zone`, so the rendered wall clock is the same. The two
+// COALESCEs are unnecessary: a NULL scans to the zero value the wrapper supplied.
 func (s *Server) findMovements(ctx context.Context, companyID int) ([]*inventoryMovementRow, error) {
-	rows, err := s.db.QueryContext(ctx, `
-		SELECT m.id,
-		       m.variant_id,
-		       iv.name                AS variant_name,
-		       COALESCE(iv.sku, '')   AS sku,
-		       i.name                 AS item_name,
-		       m.warehouse_id,
-		       w.name                 AS warehouse,
-		       m.transaction_kind::text AS kind,
-		       m.qty,
-		       m.unit_cost,
-		       COALESCE(m.reference_type, '') AS reference_type,
-		       COALESCE(m.reference_id,   0)  AS reference_id,
-		       TO_CHAR(m.created_at, 'YYYY-MM-DD HH24:MI') AS created_at
-		  FROM inventory_movements m
-		  JOIN items_variants iv ON iv.id = m.variant_id   AND iv.company_id = m.company_id
-		  JOIN items          i  ON i.id  = iv.item_id     AND i.company_id  = m.company_id
-		  JOIN warehouses     w  ON w.id  = m.warehouse_id AND w.company_id  = m.company_id
-		 WHERE m.company_id = $1
-		   AND iv.deleted_at IS NULL
-		   AND i.deleted_at  IS NULL
-		 ORDER BY m.created_at DESC
-		 LIMIT 500`,
-		companyID,
-	)
+	pdb, err := s.play()
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
 
-	var result []*inventoryMovementRow
-	for rows.Next() {
-		var r inventoryMovementRow
-		if err := rows.Scan(
-			&r.ID, &r.VariantID, &r.VariantName, &r.SKU, &r.ItemName,
-			&r.WarehouseID, &r.Warehouse,
-			&r.Kind, &r.Qty, &r.UnitCost,
-			&r.ReferenceType, &r.ReferenceID,
-			&r.CreatedAt,
-		); err != nil {
-			return nil, err
-		}
-		result = append(result, &r)
+	q := pdb.Model(&inventoryMovementRead{}).
+		WithConstraint("Variant", withVariantItem).
+		WithConstraint("Warehouse", withTrashedRelation).
+		WhereEq("company_id", companyID)
+
+	var rows []inventoryMovementRead
+	if err := liveVariantAndItem(q).
+		OrderBy("created_at", playsql.Desc).
+		Limit(500).
+		Get(ctx, &rows); err != nil {
+		return nil, err
 	}
-	return result, rows.Err()
+
+	result := make([]*inventoryMovementRow, 0, len(rows))
+	for _, r := range rows {
+		result = append(result, r.toMovementRow())
+	}
+	return result, nil
 }
 
-// findAdjustments returns manual stock adjustments for a company.
+// findAdjustments returns manual stock adjustments for a company, newest first. Same
+// shape as findMovements, narrowed to the adjustment kind.
 func (s *Server) findAdjustments(ctx context.Context, companyID int) ([]*adjustmentRow, error) {
-	rows, err := s.db.QueryContext(ctx, `
-		SELECT m.id,
-		       m.variant_id,
-		       iv.name                AS variant_name,
-		       COALESCE(iv.sku, '')   AS sku,
-		       i.name                 AS item_name,
-		       m.warehouse_id,
-		       w.name                 AS warehouse,
-		       m.qty,
-		       COALESCE(m.reference_type, '') AS reason,
-		       '' AS notes,
-		       TO_CHAR(m.created_at, 'YYYY-MM-DD HH24:MI') AS created_at
-		  FROM inventory_movements m
-		  JOIN items_variants iv ON iv.id = m.variant_id   AND iv.company_id = m.company_id
-		  JOIN items          i  ON i.id  = iv.item_id     AND i.company_id  = m.company_id
-		  JOIN warehouses     w  ON w.id  = m.warehouse_id AND w.company_id  = m.company_id
-		 WHERE m.company_id = $1
-		   AND m.transaction_kind = 'adjustment'
-		   AND iv.deleted_at IS NULL
-		   AND i.deleted_at  IS NULL
-		 ORDER BY m.created_at DESC`,
-		companyID,
-	)
+	pdb, err := s.play()
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
 
-	var result []*adjustmentRow
-	for rows.Next() {
-		var r adjustmentRow
-		if err := rows.Scan(
-			&r.ID, &r.VariantID, &r.VariantName, &r.SKU, &r.ItemName,
-			&r.WarehouseID, &r.Warehouse,
-			&r.Qty, &r.Reason, &r.Notes,
-			&r.CreatedAt,
-		); err != nil {
-			return nil, err
-		}
-		result = append(result, &r)
+	q := pdb.Model(&inventoryMovementRead{}).
+		WithConstraint("Variant", withVariantItem).
+		WithConstraint("Warehouse", withTrashedRelation).
+		WhereEq("company_id", companyID).
+		WhereEq("transaction_kind", string(InventoryMovementKinds.Adjustment))
+
+	var rows []inventoryMovementRead
+	if err := liveVariantAndItem(q).
+		OrderBy("created_at", playsql.Desc).
+		Get(ctx, &rows); err != nil {
+		return nil, err
 	}
-	return result, rows.Err()
+
+	result := make([]*adjustmentRow, 0, len(rows))
+	for _, r := range rows {
+		result = append(result, r.toAdjustmentRow())
+	}
+	return result, nil
 }
 
 // storeAdjustment records a manual inventory adjustment.
@@ -570,44 +546,38 @@ func (s *Server) findTransferByUUID(ctx context.Context, companyID int, uuid str
 }
 
 // findTransferLines returns the product detail lines for a transfer.
+// findTransferLines returns the product detail lines for a transfer.
+//
+// items_variants and items were INNER JOINs with no deleted_at predicate, so a line on
+// a soft-deleted variant or item still lists — no existence check stands in for them,
+// because variant_id and item_id are NOT NULL foreign keys and the joins excluded
+// nothing. units was a LEFT JOIN on a nullable unit_id, which is a belongsTo that
+// resolves to nil when the column is NULL.
+//
+// line_total was `tl.qty * tl.unit_cost` in the projection and is computed in the
+// mapper; reference came from the item's jsonb identifiers.
 func (s *Server) findTransferLines(ctx context.Context, companyID int, transferID int64) ([]*transferLineRow, error) {
-	rows, err := s.db.QueryContext(ctx, `
-		SELECT tl.id,
-		       tl.variant_id,
-		       iv.name                                  AS variant_name,
-		       COALESCE(iv.sku, '')                     AS sku,
-		       COALESCE(i.identifiers->>'reference', '') AS reference,
-		       i.name                                   AS item_name,
-		       COALESCE(tl.description, '')             AS description,
-		       COALESCE(un.name, '')                    AS unit,
-		       tl.qty,
-		       tl.unit_cost,
-		       (tl.qty * tl.unit_cost)                  AS line_total
-		  FROM inventory_transfer_lines tl
-		  JOIN items_variants iv ON iv.id = tl.variant_id AND iv.company_id = tl.company_id
-		  JOIN items          i  ON i.id  = iv.item_id    AND i.company_id  = tl.company_id
-		  LEFT JOIN units     un ON un.id = tl.unit_id
-		 WHERE tl.company_id = $1 AND tl.transfer_id = $2
-		 ORDER BY tl.id`,
-		companyID, transferID,
-	)
+	pdb, err := s.play()
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
 
-	var result []*transferLineRow
-	for rows.Next() {
-		var r transferLineRow
-		if err := rows.Scan(
-			&r.ID, &r.VariantID, &r.VariantName, &r.SKU, &r.Reference, &r.ItemName,
-			&r.Description, &r.Unit, &r.Qty, &r.UnitCost, &r.LineTotal,
-		); err != nil {
-			return nil, err
-		}
-		result = append(result, &r)
+	var rows []inventoryTransferLine
+	if err := pdb.Model(&inventoryTransferLine{}).
+		WithConstraint("Variant", withVariantItem).
+		With("Unit").
+		WhereEq("company_id", companyID).
+		WhereEq("transfer_id", transferID).
+		OrderBy("id", playsql.Asc).
+		Get(ctx, &rows); err != nil {
+		return nil, err
 	}
-	return result, rows.Err()
+
+	result := make([]*transferLineRow, 0, len(rows))
+	for _, r := range rows {
+		result = append(result, r.toTransferLineRow())
+	}
+	return result, nil
 }
 
 // storeTransfer records a new manual transfer request with its product lines.
@@ -780,9 +750,9 @@ func loadTransferLineMovements(tx *sql.Tx, companyID, transferID int) ([]transfe
 	lines := make([]transferLineMovement, 0, len(rows))
 	for _, r := range rows {
 		l := transferLineMovement{VariantID: r.VariantID, Qty: r.Qty, UnitCost: r.UnitCost}
-		if r.UnitID != nil {
-			l.UnitID = *r.UnitID
-		}
+		// unit_id is nullable; a NULL now scans to 0 rather than a nil pointer, which is
+		// the same "no unit" this branch always assigned.
+		l.UnitID = int(r.UnitID)
 		lines = append(lines, l)
 	}
 	return lines, nil
