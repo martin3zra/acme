@@ -2,15 +2,19 @@ package app
 
 import (
 	"context"
-	"database/sql"
 	"errors"
 	"strings"
+	"time"
+
+	"github.com/martin3zra/playsql"
 )
 
 func normalizeAttributeValue(value string) string {
 	return strings.ToLower(strings.TrimSpace(value))
 }
 
+// Stays raw for the same reason as hasDuplicateAttributeName: the predicate is
+// `lower(trim(value)) = $3`, which the builder cannot parameterise.
 func (s *Server) hasDuplicateAttributeValue(ctx context.Context, companyID, attributeID int, value string, exceptUUID *string) (bool, error) {
 	query := `SELECT EXISTS(
 		SELECT 1
@@ -40,79 +44,60 @@ func (s *Server) hasDuplicateAttributeValue(ctx context.Context, companyID, attr
 	return exists, err
 }
 
-// findAttributeValuesByAttribute returns all values for an attribute
+// findAttributeValuesByAttribute returns all values for an attribute. The
+// `deleted_at IS NULL` comes from attributeValueRead's softdelete tag.
 func (s *Server) findAttributeValuesByAttribute(ctx context.Context, attributeID int) ([]*attributeValue, error) {
-	rows, err := s.db.QueryContext(
-		ctx,
-		`SELECT av.id, av.uuid, av.attribute_id, av.value, av.display_name, av.sort_order,
-		        av.created_at, av.updated_at, av.deleted_at
-		 FROM attribute_values av
-		 WHERE av.company_id = $1 AND av.attribute_id = $2 AND av.deleted_at IS NULL
-		 ORDER BY av.sort_order, av.value`,
-		CurrentCompany(ctx).ID, attributeID,
-	)
+	pdb, err := s.play()
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
 
-	data := make([]*attributeValue, 0)
-	for rows.Next() {
-		av := new(attributeValue)
-		if err = rows.Scan(
-			&av.ID, &av.UUID, &av.AttributeID, &av.Value, &av.DisplayName, &av.SortOrder,
-			&av.CreatedAt, &av.UpdatedAt, &av.DeletedAt,
-		); err != nil {
-			return data, err
-		}
-		data = append(data, av)
+	var rows []attributeValueRead
+	if err := pdb.Model(&attributeValueRead{}).
+		WhereEq("company_id", CurrentCompany(ctx).ID).
+		WhereEq("attribute_id", attributeID).
+		OrderBy("sort_order", playsql.Asc).
+		OrderBy("value", playsql.Asc).
+		Get(ctx, &rows); err != nil {
+		return nil, err
 	}
 
-	return data, rows.Err()
+	data := make([]*attributeValue, 0, len(rows))
+	for _, r := range rows {
+		data = append(data, r.toAttributeValue())
+	}
+	return data, nil
+}
+
+// findAttributeValue resolves one value by a single column.
+func (s *Server) findAttributeValue(ctx context.Context, column string, value any) (*attributeValue, error) {
+	pdb, err := s.play()
+	if err != nil {
+		return nil, err
+	}
+
+	var row attributeValueRead
+	err = pdb.Model(&attributeValueRead{}).
+		WhereEq("company_id", CurrentCompany(ctx).ID).
+		WhereEq(column, value).
+		First(ctx, &row)
+	if errors.Is(err, playsql.ErrNotFound) {
+		return nil, errors.New("attribute value not found")
+	}
+	if err != nil {
+		return nil, err
+	}
+	return row.toAttributeValue(), nil
 }
 
 // findAttributeValueByID returns a single attribute value by integer ID
 func (s *Server) findAttributeValueByID(ctx context.Context, id int) (*attributeValue, error) {
-	av := new(attributeValue)
-	err := s.db.QueryRowContext(
-		ctx,
-		`SELECT av.id, av.uuid, av.attribute_id, av.value, av.display_name, av.sort_order,
-		        av.created_at, av.updated_at, av.deleted_at
-		 FROM attribute_values av
-		 WHERE av.company_id = $1 AND av.id = $2 AND av.deleted_at IS NULL`,
-		CurrentCompany(ctx).ID, id,
-	).Scan(
-		&av.ID, &av.UUID, &av.AttributeID, &av.Value, &av.DisplayName, &av.SortOrder,
-		&av.CreatedAt, &av.UpdatedAt, &av.DeletedAt,
-	)
-
-	if errors.Is(err, sql.ErrNoRows) {
-		return nil, errors.New("attribute value not found")
-	}
-
-	return av, err
+	return s.findAttributeValue(ctx, "id", id)
 }
 
 // findAttributeValueByUUID returns a single attribute value by UUID
 func (s *Server) findAttributeValueByUUID(ctx context.Context, uuid string) (*attributeValue, error) {
-	av := new(attributeValue)
-	err := s.db.QueryRowContext(
-		ctx,
-		`SELECT av.id, av.uuid, av.attribute_id, av.value, av.display_name, av.sort_order,
-		        av.created_at, av.updated_at, av.deleted_at
-		 FROM attribute_values av
-		 WHERE av.company_id = $1 AND av.uuid = $2 AND av.deleted_at IS NULL`,
-		CurrentCompany(ctx).ID, uuid,
-	).Scan(
-		&av.ID, &av.UUID, &av.AttributeID, &av.Value, &av.DisplayName, &av.SortOrder,
-		&av.CreatedAt, &av.UpdatedAt, &av.DeletedAt,
-	)
-
-	if errors.Is(err, sql.ErrNoRows) {
-		return nil, errors.New("attribute value not found")
-	}
-
-	return av, err
+	return s.findAttributeValue(ctx, "uuid", uuid)
 }
 
 // storeAttributeValue creates a new attribute value (or revives a soft-deleted one)
@@ -130,26 +115,29 @@ func (s *Server) storeAttributeValue(ctx context.Context, form *StoreAttributeVa
 		return errors.New("attribute value already exists")
 	}
 
-	stmt, err := s.db.PrepareContext(
-		ctx,
-		`INSERT INTO attribute_values (company_id, uuid, attribute_id, value, display_name, sort_order, created_at, updated_at)
-		 VALUES ($1, gen_random_uuid(), $2, $3, $4, $5, NOW(), NOW())
-		 ON CONFLICT (company_id, attribute_id, value)
-		 DO UPDATE
-		 SET
-		    deleted_at = NULL,
-		    display_name = EXCLUDED.display_name,
-		    sort_order = EXCLUDED.sort_order,
-		    updated_at = NOW()
-		 RETURNING id`,
-	)
+	pdb, err := s.play()
 	if err != nil {
 		return err
 	}
-	defer stmt.Close()
 
-	var id int
-	return stmt.QueryRowContext(ctx, companyID, form.AttributeID, form.Value, form.DisplayName, form.SortOrder).Scan(&id)
+	// Reviving a soft-deleted value is what the conflict branch is for, so deleted_at
+	// is written explicitly as nil: EXCLUDED.deleted_at is then NULL, and the update
+	// clears it. playsql stamps created_at/updated_at, and uuid keeps its DB default.
+	//
+	// The old statement's `RETURNING id` was scanned into a variable nothing read.
+	_, err = pdb.Model(&attributeValueRead{}).Upsert(context.Background(),
+		[]map[string]any{{
+			"company_id":   companyID,
+			"attribute_id": form.AttributeID,
+			"value":        form.Value,
+			"display_name": form.DisplayName,
+			"sort_order":   form.SortOrder,
+			"deleted_at":   nil,
+		}},
+		[]string{"company_id", "attribute_id", "value"},
+		[]string{"display_name", "sort_order", "deleted_at", "updated_at"},
+	)
+	return err
 }
 
 // updateAttributeValue updates an existing attribute value
@@ -167,28 +155,38 @@ func (s *Server) updateAttributeValue(ctx context.Context, uuid string, form *St
 		return errors.New("attribute value already exists")
 	}
 
-	res, err := s.db.ExecContext(
-		ctx,
-		`UPDATE attribute_values
-		 SET value = $1, display_name = $2, sort_order = $3, updated_at = NOW()
-		 WHERE company_id = $4 AND uuid = $5 AND deleted_at IS NULL`,
-		form.Value, form.DisplayName, form.SortOrder, companyID, uuid,
-	)
+	pdb, err := s.play()
+	if err != nil {
+		return err
+	}
 
-	return mustAffectRow(res, err, "attribute value")
+	affected, err := pdb.Model(&attributeValueRead{}).
+		WhereEq("company_id", companyID).
+		WhereEq("uuid", uuid).
+		Update(ctx, map[string]any{
+			"value":        form.Value,
+			"display_name": form.DisplayName,
+			"sort_order":   form.SortOrder,
+		})
+	return mustAffectRows(affected, err, "attribute value")
 }
 
 // deleteAttributeValue soft-deletes an attribute value
 func (s *Server) deleteAttributeValue(ctx context.Context, uuid string) error {
 	companyID := CurrentCompany(ctx).ID
 
-	res, err := s.db.ExecContext(
-		ctx,
-		`UPDATE attribute_values
-		 SET deleted_at = NOW(), updated_at = NOW()
-		 WHERE company_id = $1 AND uuid = $2`,
-		companyID, uuid,
-	)
+	pdb, err := s.play()
+	if err != nil {
+		return err
+	}
 
-	return mustAffectRow(res, err, "attribute value")
+	// Soft delete through Update, not Delete: Builder.Delete stamps deleted_at only,
+	// and the statement it replaced bumped updated_at too. The softdelete tag also
+	// adds `deleted_at IS NULL`, so re-deleting an already-deleted value is now a
+	// not-found rather than a silent second write.
+	affected, err := pdb.Model(&attributeValueRead{}).
+		WhereEq("company_id", companyID).
+		WhereEq("uuid", uuid).
+		Update(ctx, map[string]any{"deleted_at": time.Now()})
+	return mustAffectRows(affected, err, "attribute value")
 }

@@ -647,6 +647,111 @@ type warehouseRead struct {
 
 func (warehouseRead) TableName() string { return "warehouses" }
 
+// attributeRead is the playsql model for the attributes table, backing its reads and
+// its writes. Every attribute query filtered deleted_at, so deleted_at carries
+// play:"softdelete".
+//
+// Values is a hasMany: findAttributesWithValues used to loop over the attributes and
+// issue one query per attribute. With("Values") loads them all in a second query.
+type attributeRead struct {
+	ID          int        `db:"id" play:"pk,incrementing"`
+	CompanyID   int        `db:"company_id"`
+	UUID        string     `db:"uuid"`
+	Name        string     `db:"name"`
+	Type        string     `db:"type"`
+	DisplayName string     `db:"display_name"`
+	Description *string    `db:"description"`
+	CreatedAt   *time.Time `db:"created_at"`
+	UpdatedAt   *time.Time `db:"updated_at"`
+	DeletedAt   *time.Time `db:"deleted_at" play:"softdelete"`
+
+	Values []*attributeValueRead `play:"hasMany,fk=attribute_id"`
+}
+
+func (attributeRead) TableName() string { return "attributes" }
+
+// toAttribute maps the read model onto the JSON response struct. Values are only
+// populated when the caller eager-loaded them.
+func (r attributeRead) toAttribute() *attribute {
+	a := &attribute{
+		ID:          r.ID,
+		UUID:        r.UUID,
+		Name:        r.Name,
+		Type:        r.Type,
+		DisplayName: r.DisplayName,
+		Description: r.Description,
+	}
+	a.CreatedAt = r.CreatedAt
+	a.UpdatedAt = r.UpdatedAt
+	a.DeletedAt = r.DeletedAt
+	if r.Values != nil {
+		a.Values = make([]*attributeValue, 0, len(r.Values))
+		for _, v := range r.Values {
+			a.Values = append(a.Values, v.toAttributeValue())
+		}
+	}
+	return a
+}
+
+// attributeValueRead is the playsql model for attribute_values, backing its reads and
+// its writes. softdelete matches the `deleted_at IS NULL` every value query carried.
+//
+// display_name and sort_order are nullable in the schema; playsql scans a SQL NULL as
+// the field's zero value, which is what the old scans into string/int assumed.
+type attributeValueRead struct {
+	ID          int        `db:"id" play:"pk,incrementing"`
+	CompanyID   int        `db:"company_id"`
+	AttributeID int        `db:"attribute_id"`
+	UUID        string     `db:"uuid"`
+	Value       string     `db:"value"`
+	DisplayName string     `db:"display_name"`
+	SortOrder   int        `db:"sort_order"`
+	CreatedAt   *time.Time `db:"created_at"`
+	UpdatedAt   *time.Time `db:"updated_at"`
+	DeletedAt   *time.Time `db:"deleted_at" play:"softdelete"`
+}
+
+func (attributeValueRead) TableName() string { return "attribute_values" }
+
+// toAttributeValue maps the read model onto the JSON response struct.
+func (r attributeValueRead) toAttributeValue() *attributeValue {
+	v := &attributeValue{
+		ID:          r.ID,
+		UUID:        r.UUID,
+		AttributeID: r.AttributeID,
+		Value:       r.Value,
+		DisplayName: r.DisplayName,
+		SortOrder:   r.SortOrder,
+	}
+	v.CreatedAt = r.CreatedAt
+	v.UpdatedAt = r.UpdatedAt
+	v.DeletedAt = r.DeletedAt
+	return v
+}
+
+// productAttributeRead is the items ↔ attributes link table. Only the columns the
+// in-use checks need are mapped; the table has no deleted_at.
+type productAttributeRead struct {
+	ID          int `db:"id" play:"pk,incrementing"`
+	CompanyID   int `db:"company_id"`
+	ItemID      int `db:"item_id"`
+	AttributeID int `db:"attribute_id"`
+}
+
+func (productAttributeRead) TableName() string { return "product_attributes" }
+
+// variantAttributeValueRead is the variants ↔ attribute_values link table, used to
+// refuse deleting a value that variants still reference.
+type variantAttributeValueRead struct {
+	ID               int `db:"id" play:"pk,incrementing"`
+	CompanyID        int `db:"company_id"`
+	VariantID        int `db:"variant_id"`
+	AttributeID      int `db:"attribute_id"`
+	AttributeValueID int `db:"attribute_value_id"`
+}
+
+func (variantAttributeValueRead) TableName() string { return "variant_attribute_values" }
+
 // expenseRead is the playsql read model for the expenses table. receipt_url is
 // deliberately unmapped: it is nullable, no read ever selected it, and mapping it
 // would pull a NULL into the default projection.
