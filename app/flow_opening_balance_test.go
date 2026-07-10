@@ -6,7 +6,7 @@ import (
 )
 
 // TestFlowVendorOpeningBalance: creating a vendor with an opening balance writes
-// an opening AP entry (via the playsql openingPayableInsert) plus its payables
+// an opening AP entry (via the merged accountsPayableModel) plus its payables
 // cross-reference, and the vendor carries the balance. Also guards the created_by
 // fix: the AP entry references the authenticated user, not a hardcoded 0.
 func TestFlowVendorOpeningBalance(t *testing.T) {

@@ -156,7 +156,7 @@ func TestFindLinkedReceiptsForOrder(t *testing.T) {
 	is.Equal(len(none), 0)
 }
 
-// TestFindPurchaseByUUID_SoftDeletedVendor: vendorRead is softdelete-tagged, but the
+// TestFindPurchaseByUUID_SoftDeletedVendor: vendorModel is softdelete-tagged, but the
 // old INNER JOIN never filtered deleted_at, so the purchase must still render.
 func TestFindPurchaseByUUID_SoftDeletedVendor(t *testing.T) {
 	s := newTestServer(t)

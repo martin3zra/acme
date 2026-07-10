@@ -98,7 +98,7 @@ func createAccountOwner(tx *sql.Tx, name, email string) (int, error) {
 		return 0, err
 	}
 
-	userID, err := ptx.Model(&userInsert{}).Insert(context.Background(), map[string]any{
+	userID, err := ptx.Model(&userModel{}).Insert(context.Background(), map[string]any{
 		"name":     name,
 		"email":    email,
 		"password": foundation.NewHashable().Make("password"),

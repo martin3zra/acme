@@ -58,7 +58,7 @@ func (a account) MarkAccountAsVerified(db *sql.DB) bool {
 			return err
 		}
 
-		affected, err = ptx.Model(&userInsert{}).
+		affected, err = ptx.Model(&userModel{}).
 			WhereEq("id", a.Owner.ID).
 			Update(context.Background(), map[string]any{
 				"email_verified_at": now,

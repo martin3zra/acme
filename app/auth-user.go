@@ -60,7 +60,7 @@ func (u *AuthUser) HasNotChangedPassword() bool {
 // flag. The raw statement discarded the affected-row count, so resetting the password
 // of a user id that no longer exists reported success; mustAffectRows makes it an error.
 //
-// updated_at is stamped by Update because userRead maps the column. The raw statement
+// updated_at is stamped by Update because userModel maps the column. The raw statement
 // left it alone, which meant a password reset did not touch the row's updated_at.
 func (u *AuthUser) MarkPasswordAsChanged(db *sql.DB, password string) error {
 	pdb, err := playOn(db)
@@ -68,7 +68,7 @@ func (u *AuthUser) MarkPasswordAsChanged(db *sql.DB, password string) error {
 		return err
 	}
 
-	affected, err := pdb.Model(&userRead{}).
+	affected, err := pdb.Model(&userModel{}).
 		WhereEq("id", u.Id).
 		Update(context.Background(), map[string]any{
 			"password":             foundation.NewHashable().Make(password),
@@ -101,8 +101,8 @@ func init() {
 		// The column name is interpolated no longer: WhereEq quotes it as an identifier.
 		// Columns are mapped by name rather than by scan position, which is what broke
 		// authentication when remember_token was appended to the table.
-		var row userRead
-		if err := pdb.Model(&userRead{}).
+		var row userModel
+		if err := pdb.Model(&userModel{}).
 			Select(authUserColumns...).
 			WhereEq(column, value).
 			First(context.Background(), &row); err != nil {
@@ -117,8 +117,8 @@ func init() {
 			return "", err
 		}
 
-		var row userRead
-		if err := pdb.Model(&userRead{}).
+		var row userModel
+		if err := pdb.Model(&userModel{}).
 			Select("password").
 			WhereEq("id", userID).
 			First(context.Background(), &row); err != nil {

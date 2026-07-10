@@ -301,7 +301,7 @@ func TestFindVendorByUUID_OpeningBalance(t *testing.T) {
 }
 
 // TestFindVendorByUUID_OpeningBalanceIsNotAnotherVendors pins the FK match, and with
-// it the field type. vendorRead.ID is an int; accounts_payable.vendor_id used to map
+// it the field type. vendorModel.ID is an int; accounts_payable.vendor_id used to map
 // as an int64. The loader groups children by that field's Go value, so an int64 key
 // never matches an int parent and the relation comes back nil for every vendor.
 func TestFindVendorByUUID_OpeningBalanceIsNotAnotherVendors(t *testing.T) {

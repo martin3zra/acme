@@ -107,8 +107,8 @@ func (s *Server) findCompanies(ctx context.Context) ([]*Company, error) {
 		return nil, err
 	}
 
-	var rows []companyRead
-	if err := pdb.Model(&companyRead{}).
+	var rows []companyModel
+	if err := pdb.Model(&companyModel{}).
 		WhereEq("account_id", CurrentAccount(ctx)).
 		Get(ctx, &rows); err != nil {
 		return nil, err
@@ -127,8 +127,8 @@ func (s *Server) findCompanyByUUID(ctx context.Context, uuid string) (*Company, 
 		return nil, err
 	}
 
-	var row companyRead
-	if err := pdb.Model(&companyRead{}).
+	var row companyModel
+	if err := pdb.Model(&companyModel{}).
 		WhereEq("account_id", CurrentAccount(ctx)).
 		WhereEq("uuid", uuid).
 		First(ctx, &row); err != nil {
@@ -145,8 +145,8 @@ func (s *Server) findCompanyByID(ctx context.Context, id int) (*Company, error) 
 		return nil, err
 	}
 
-	var row companyRead
-	if err := pdb.Model(&companyRead{}).WhereEq("id", id).First(ctx, &row); err != nil {
+	var row companyModel
+	if err := pdb.Model(&companyModel{}).WhereEq("id", id).First(ctx, &row); err != nil {
 		return nil, err
 	}
 	return row.toCompany(), nil
@@ -165,8 +165,8 @@ func (s *Server) resolveCompanyID(ctx context.Context, uuid string) (int, error)
 		return 0, err
 	}
 
-	var row companyRead
-	if err := pdb.Model(&companyRead{}).
+	var row companyModel
+	if err := pdb.Model(&companyModel{}).
 		Select("id").
 		WhereEq("account_id", CurrentAccount(ctx)).
 		WhereEq("uuid", uuid).
@@ -183,19 +183,21 @@ func (s *Server) storeCompany(accountID, userID int, form StoreCompanyForm) erro
 			return err
 		}
 
-		company := &companyInsert{
-			AccountID:  accountID,
-			Name:       form.Name,
-			Identifier: form.RNC,
-			City:       form.City,
-			Address:    form.Address,
-		}
-		if err := ptx.Insert(context.Background(), company); err != nil {
+		// Map insert so uuid stays unset for the DB default; the merged
+		// companyModel maps uuid, which a struct insert would write as empty.
+		companyID64, err := ptx.Model(&companyModel{}).Insert(context.Background(), map[string]any{
+			"account_id": accountID,
+			"name":       form.Name,
+			"identifier": form.RNC,
+			"city":       form.City,
+			"address":    form.Address,
+		})
+		if err != nil {
 			return err
 		}
-		companyID := int(company.ID)
+		companyID := int(companyID64)
 
-		if err := ptx.Insert(context.Background(), &companyUserInsert{
+		if err := ptx.Insert(context.Background(), &companyUserModel{
 			CompanyID: companyID,
 			UserID:    userID,
 			Current:   true,

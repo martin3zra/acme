@@ -25,8 +25,8 @@ func (s *Server) findUser(column string, value any) (*User, error) {
 		return nil, err
 	}
 
-	var row userRead
-	if err := pdb.Model(&userRead{}).WhereEq(column, value).First(context.Background(), &row); err != nil {
+	var row userModel
+	if err := pdb.Model(&userModel{}).WhereEq(column, value).First(context.Background(), &row); err != nil {
 		return nil, err
 	}
 	return row.toUser(), nil
@@ -45,8 +45,8 @@ func (s *Server) findUsers(ctx context.Context) ([]*User, error) {
 		return nil, err
 	}
 
-	var rows []userRead
-	if err := pdb.Model(&userRead{}).
+	var rows []userModel
+	if err := pdb.Model(&userModel{}).
 		// Same projection as before — notably no password hash.
 		Select("id", "uuid", "name", "email", "email_verified_at", "status", "created_at", "updated_at").
 		WithCount("Companies", playsql.As("linked"), playsql.Constrain(func(b *playsql.Builder) {
@@ -81,8 +81,8 @@ func (s *Server) findUserLinkedCompanies(ctx context.Context, id int) ([]*UserLi
 		return nil, err
 	}
 
-	var rows []companyUserRead
-	if err := pdb.Model(&companyUserRead{}).
+	var rows []companyUserModel
+	if err := pdb.Model(&companyUserModel{}).
 		With("Company").
 		WhereRelation("Company", "account_id", "=", CurrentAccount(ctx)).
 		WhereEq("user_id", id).
@@ -149,8 +149,8 @@ func (s *Server) updatePendingEmail(user *User) error {
 // company is resolved first and a missing one raises the same error.
 func attachUserCompanies(ptx *playsql.Tx, accountID, userID int, companies []CompanyRole) error {
 	for i, cr := range companies {
-		var company companyRead
-		err := ptx.Model(&companyRead{}).
+		var company companyModel
+		err := ptx.Model(&companyModel{}).
 			WhereEq("account_id", accountID).
 			WhereEq("uuid", cr.Company).
 			First(context.Background(), &company)
@@ -161,7 +161,7 @@ func attachUserCompanies(ptx *playsql.Tx, accountID, userID int, companies []Com
 			return err
 		}
 
-		if err := ptx.Insert(context.Background(), &companyUserInsert{
+		if err := ptx.Insert(context.Background(), &companyUserModel{
 			CompanyID: company.ID,
 			UserID:    userID,
 			Role:      cr.Role,
@@ -183,27 +183,29 @@ func (s *Server) storeUser(ctx context.Context, form *StoreUserForm) (*User, err
 			return err
 		}
 
-		row := &userInsert{
-			Name:     form.Name,
-			Email:    form.Email,
-			Password: foundation.NewHashable().Make("password"),
-			Status:   "disabled",
-		}
-		if err := ptx.Insert(context.Background(), row); err != nil {
+		// Map insert so uuid stays unset for the DB default; the merged userModel
+		// maps uuid, which a struct insert would write as empty.
+		userID, err := ptx.Model(&userModel{}).Insert(context.Background(), map[string]any{
+			"name":     form.Name,
+			"email":    form.Email,
+			"password": foundation.NewHashable().Make("password"),
+			"status":   "disabled",
+		})
+		if err != nil {
 			return err
 		}
 
 		// Insert only returns the pk, so the DB-generated uuid and defaults are read
 		// back. This replaces the old INSERT ... RETURNING * projection.
-		var stored userRead
-		if err := ptx.Model(&userRead{}).
-			WhereEq("id", row.ID).
+		var stored userModel
+		if err := ptx.Model(&userModel{}).
+			WhereEq("id", userID).
 			First(context.Background(), &stored); err != nil {
 			return err
 		}
 		*user = *stored.toUser()
 
-		if err := ptx.Insert(context.Background(), &accountUserInsert{
+		if err := ptx.Insert(context.Background(), &accountUserModel{
 			AccountID: accountID,
 			UserID:    user.Id,
 		}); err != nil {
@@ -227,15 +229,15 @@ func (s *Server) updateUser(ctx context.Context, form *StoreUserForm) error {
 
 		// The old statement was an UPDATE ... RETURNING id, so an unknown uuid failed
 		// with no rows; resolving the id first preserves that.
-		var stored userRead
-		if err := ptx.Model(&userRead{}).
+		var stored userModel
+		if err := ptx.Model(&userModel{}).
 			Select("id").
 			WhereEq("uuid", form.Param("id")).
 			First(context.Background(), &stored); err != nil {
 			return err
 		}
 
-		if _, err := ptx.Model(&userInsert{}).
+		if _, err := ptx.Model(&userModel{}).
 			WhereEq("id", stored.ID).
 			Update(context.Background(), map[string]any{"name": form.Name}); err != nil {
 			return err
@@ -243,7 +245,7 @@ func (s *Server) updateUser(ctx context.Context, form *StoreUserForm) error {
 
 		// companies_users has a deleted_at column but no softdelete tag on its write
 		// model, so this is a hard DELETE, matching the statement it replaces.
-		if _, err := ptx.Model(&companyUserInsert{}).
+		if _, err := ptx.Model(&companyUserModel{}).
 			WhereEq("user_id", stored.ID).
 			Delete(context.Background()); err != nil {
 			return err
@@ -254,7 +256,7 @@ func (s *Server) updateUser(ctx context.Context, form *StoreUserForm) error {
 }
 
 // setRememberToken writes users.remember_token. The column is deliberately unmapped
-// on userInsert — nothing else should write it — but mass-assignment is unrestricted,
+// on userModel — nothing else should write it — but mass-assignment is unrestricted,
 // so it is passed as an explicit key. A nil value writes NULL.
 func (s *Server) setRememberToken(id int, hashed any) error {
 	pdb, err := s.play()
@@ -262,7 +264,7 @@ func (s *Server) setRememberToken(id int, hashed any) error {
 		return err
 	}
 
-	_, err = pdb.Model(&userInsert{}).
+	_, err = pdb.Model(&userModel{}).
 		WhereEq("id", id).
 		Update(context.Background(), map[string]any{"remember_token": hashed})
 	return err
@@ -285,8 +287,8 @@ func (s *Server) findUserIDByRememberToken(hashed string) (int, error) {
 		return 0, err
 	}
 
-	var row userRead
-	err = pdb.Model(&userRead{}).
+	var row userModel
+	err = pdb.Model(&userModel{}).
 		Select("id").
 		WhereEq("remember_token", hashed).
 		WhereEq("status", "enabled").

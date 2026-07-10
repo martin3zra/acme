@@ -158,7 +158,7 @@ func TestFindVendorPaymentLines_PaidStatus(t *testing.T) {
 	is.True(l.BillNumber != "", "bill number should come from the AP entry")
 }
 
-// TestFindVendorPaymentByUUID_SoftDeletedVendor: vendorRead is soft-deletable, so
+// TestFindVendorPaymentByUUID_SoftDeletedVendor: vendorModel is soft-deletable, so
 // the eager load has to opt into trashed rows — the old INNER JOIN never filtered
 // deleted_at, and voidVendorPayment needs Vendor.ID to restore the balance.
 func TestFindVendorPaymentByUUID_SoftDeletedVendor(t *testing.T) {
