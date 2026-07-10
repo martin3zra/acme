@@ -11,8 +11,8 @@ import (
 
 	"github.com/joho/godotenv"
 	"github.com/martin3zra/acme/app"
-	"github.com/martin3zra/forge/foundation/str"
 	"github.com/martin3zra/acme/resources"
+	"github.com/martin3zra/forge/foundation/str"
 )
 
 const (
@@ -67,15 +67,9 @@ func loadEnv() {
 }
 
 func run(args []string, stdout io.Writer) error {
-	// If the file doesn't exist, create it or append to the file
-	file, err := os.OpenFile("acme.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0666)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	// optional: log date-time, filename, and line number
-	log.SetFlags(log.Lshortfile | log.LstdFlags)
-	log.SetOutput(file)
+	// Logs go to stderr, not stdout: commands like generate:key print their
+	// result to stdout and callers pipe it.
+	app.InitLogger(os.Stderr)
 
 	var assets embed.FS
 	server := app.NewServer(assets, resources.Views)
