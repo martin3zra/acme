@@ -2,6 +2,7 @@ package app
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/martin3zra/forge/i18n"
 	"github.com/martin3zra/forge/routing"
@@ -56,12 +57,17 @@ func (s *Server) deleteAttributeHandler() routing.HandlerFunc {
 		companyID := CurrentCompany(ctx.Request.Context()).ID
 		attributeID := ctx.Int("id")
 
-		var count int64
-		if err := s.db.QueryRowContext(
-			ctx.Request.Context(),
-			`SELECT COUNT(*) FROM product_attributes WHERE attribute_id = $1 AND company_id = $2`,
-			attributeID, companyID,
-		).Scan(&count); err != nil {
+		pdb, err := s.play()
+		if err != nil {
+			ctx.BackWithError(err)
+			return
+		}
+
+		count, err := pdb.Model(&productAttributeRead{}).
+			WhereEq("company_id", companyID).
+			WhereEq("attribute_id", attributeID).
+			Count(ctx.Request.Context())
+		if err != nil {
 			ctx.BackWithError(err)
 			return
 		}
@@ -70,23 +76,23 @@ func (s *Server) deleteAttributeHandler() routing.HandlerFunc {
 			return
 		}
 
-		if _, err := s.db.ExecContext(
-			ctx.Request.Context(),
-			`UPDATE attribute_values SET deleted_at = NOW() WHERE attribute_id = $1 AND company_id = $2 AND deleted_at IS NULL`,
-			attributeID, companyID,
-		); err != nil {
+		// Bulk soft delete: an attribute with no values legitimately matches no row,
+		// so this one is not guarded. attributeValueRead's softdelete tag supplies the
+		// `deleted_at IS NULL` the raw statement carried.
+		if _, err := pdb.Model(&attributeValueRead{}).
+			WhereEq("company_id", companyID).
+			WhereEq("attribute_id", attributeID).
+			Update(ctx.Request.Context(), map[string]any{"deleted_at": time.Now()}); err != nil {
 			ctx.BackWithError(err)
 			return
 		}
 
-		// The attribute_values update above may legitimately match no row (an
-		// attribute with no values); this one must match exactly one.
-		res, err := s.db.ExecContext(
-			ctx.Request.Context(),
-			`UPDATE attributes SET deleted_at = NOW(), updated_at = NOW() WHERE id = $1 AND company_id = $2`,
-			attributeID, companyID,
-		)
-		if err := mustAffectRow(res, err, "attribute"); err != nil {
+		// The attribute itself must match exactly one row.
+		affected, err := pdb.Model(&attributeRead{}).
+			WhereEq("company_id", companyID).
+			WhereEq("id", attributeID).
+			Update(ctx.Request.Context(), map[string]any{"deleted_at": time.Now()})
+		if err := mustAffectRows(affected, err, "attribute"); err != nil {
 			ctx.BackWithError(err)
 			return
 		}
@@ -181,12 +187,17 @@ func (s *Server) deleteAttributeValueHandler() routing.HandlerFunc {
 			return
 		}
 
-		var count int64
-		if err = s.db.QueryRowContext(
-			ctx.Request.Context(),
-			`SELECT COUNT(*) FROM variant_attribute_values WHERE attribute_value_id = $1 AND company_id = $2`,
-			av.ID, CurrentCompany(ctx.Request.Context()).ID,
-		).Scan(&count); err != nil {
+		pdb, err := s.play()
+		if err != nil {
+			ctx.BackWithError(err)
+			return
+		}
+
+		count, err := pdb.Model(&variantAttributeValueRead{}).
+			WhereEq("company_id", CurrentCompany(ctx.Request.Context()).ID).
+			WhereEq("attribute_value_id", av.ID).
+			Count(ctx.Request.Context())
+		if err != nil {
 			ctx.BackWithError(err)
 			return
 		}
