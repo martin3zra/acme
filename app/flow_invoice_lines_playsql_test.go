@@ -129,7 +129,7 @@ func TestFindInvoiceLines_NamesNonDefaultVariants(t *testing.T) {
 }
 
 // TestFindInvoiceLines_KeepsLinesOfDeletedItems pins why the item side uses
-// invoiceLineItemRead rather than itemRead.
+// lineItemRead rather than itemRead.
 //
 // The old `INNER JOIN items` had no deleted_at predicate. itemRead carries a
 // softdelete tag and playsql excludes soft-deleted rows from an eager load, so

@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"sort"
 	"strings"
 
 	"github.com/martin3zra/forge/database"
@@ -50,11 +51,22 @@ func (s *CreateProductWithVariantsService) run(ctx context.Context, tx *sql.Tx, 
 		return s.createDefaultVariant(ctx, tx, companyID, itemID, form.Name)
 	}
 
-	if _, err := tx.ExecContext(
-		ctx,
-		`UPDATE items SET has_variants = true, updated_at = NOW() WHERE id = $1`,
-		itemID,
-	); err != nil {
+	ptx, err := playTx(tx)
+	if err != nil {
+		return err
+	}
+
+	// The raw statement keyed on id alone. company_id is added here: itemID always
+	// belongs to companyID on every live path (the item is inserted in this same
+	// transaction), so this narrows nothing today and stops a stray id from flipping
+	// another tenant's item tomorrow. mustAffectRows turns a zero-row update into an
+	// error rather than a silent success. updated_at is stamped by Update, since
+	// itemRead maps the column.
+	affected, err := ptx.Model(&itemRead{}).
+		WhereEq("company_id", companyID).
+		WhereEq("id", itemID).
+		Update(ctx, map[string]any{"has_variants": true})
+	if err := mustAffectRows(affected, err, "item"); err != nil {
 		return err
 	}
 
@@ -76,7 +88,7 @@ func (s *CreateProductWithVariantsService) run(ctx context.Context, tx *sql.Tx, 
 			variant.SKU = fmt.Sprintf("SKU-%s-%d", generateHashCode(form.Name, 6), itemID)
 		}
 
-		variantName, err := s.generateVariantName(ctx, tx, companyID, combo.AttributeValueIDs)
+		variantName, err := s.generateVariantName(ctx, tx, companyID, form.AttributeIDs, combo.AttributeValueIDs)
 		if err != nil {
 			return err
 		}
@@ -91,44 +103,111 @@ func (s *CreateProductWithVariantsService) run(ctx context.Context, tx *sql.Tx, 
 }
 
 // attachProductAttribute links an attribute to a product.
+//
+// The empty (but non-nil) update list is what makes this DO NOTHING: Upsert only fills
+// in a default DO UPDATE list when the slice is nil, and the grammar emits DO NOTHING
+// when it is empty. Re-attaching an attribute must not disturb its sort_order.
 func (s *CreateProductWithVariantsService) attachProductAttribute(tx *sql.Tx, companyID, itemID, attributeID, sortOrder int) error {
-	stmt, err := tx.Prepare(
-		`INSERT INTO product_attributes (company_id, item_id, attribute_id, sort_order, created_at, updated_at)
-		 VALUES ($1, $2, $3, $4, NOW(), NOW())
-		 ON CONFLICT (company_id, item_id, attribute_id) DO NOTHING`,
-	)
+	ptx, err := playTx(tx)
 	if err != nil {
 		return err
 	}
-	defer stmt.Close()
 
-	_, err = stmt.Exec(companyID, itemID, attributeID, sortOrder)
+	_, err = ptx.Model(&productAttributeRead{}).Upsert(
+		context.Background(),
+		[]map[string]any{{
+			"company_id":   companyID,
+			"item_id":      itemID,
+			"attribute_id": attributeID,
+			"sort_order":   sortOrder,
+		}},
+		[]string{"company_id", "item_id", "attribute_id"},
+		[]string{},
+	)
 	return err
 }
 
-// generateVariantName builds a human-readable name from the combo's display values.
-func (s *CreateProductWithVariantsService) generateVariantName(ctx context.Context, tx *sql.Tx, companyID int, attributeValueIDs map[int]int) (string, error) {
+// generateVariantName builds a human-readable name from the combo's display values,
+// e.g. "Red Large".
+//
+// The order comes from attributeOrder, the attribute ids as the form listed them.
+// This used to range over the combo's map directly, and Go randomises map iteration
+// order, so the same combination could be named "Red Large" on one insert and
+// "Large Red" on the next. Attribute ids absent from attributeOrder are appended in
+// ascending id order rather than left to chance.
+//
+// The display names are fetched in one query instead of one per attribute.
+// WithTrashed preserves the old behaviour: the per-value lookup did not filter
+// deleted_at, so a soft-deleted value still contributes its name.
+func (s *CreateProductWithVariantsService) generateVariantName(
+	ctx context.Context, tx *sql.Tx, companyID int, attributeOrder []int, attributeValueIDs map[int]int,
+) (string, error) {
 	if len(attributeValueIDs) == 0 {
 		return "Default", nil
 	}
 
+	ordered := orderedAttributeIDs(attributeOrder, attributeValueIDs)
+
+	ptx, err := playTx(tx)
+	if err != nil {
+		return "", err
+	}
+
+	valueIDs := make([]any, 0, len(ordered))
+	for _, attrID := range ordered {
+		valueIDs = append(valueIDs, attributeValueIDs[attrID])
+	}
+
+	var values []attributeValueRead
+	if err := ptx.Model(&attributeValueRead{}).
+		Select("id", "attribute_id", "display_name").
+		WithTrashed().
+		WhereEq("company_id", companyID).
+		WhereIn("id", valueIDs...).
+		Get(ctx, &values); err != nil {
+		return "", err
+	}
+
+	// Keyed on (attribute_id, id): the old query matched on both, so a value id paired
+	// with the wrong attribute contributed nothing.
+	type valueKey struct{ attrID, valueID int }
+	byKey := make(map[valueKey]string, len(values))
+	for _, v := range values {
+		byKey[valueKey{v.AttributeID, v.ID}] = v.DisplayName
+	}
+
 	var names []string
-	for attrID, valueID := range attributeValueIDs {
-		var displayName string
-		err := tx.QueryRowContext(
-			ctx,
-			`SELECT display_name FROM attribute_values WHERE id = $1 AND attribute_id = $2 AND company_id = $3`,
-			valueID, attrID, companyID,
-		).Scan(&displayName)
-		if err != nil && err != sql.ErrNoRows {
-			return "", err
-		}
-		if displayName != "" {
-			names = append(names, displayName)
+	for _, attrID := range ordered {
+		if name := byKey[valueKey{attrID, attributeValueIDs[attrID]}]; name != "" {
+			names = append(names, name)
 		}
 	}
 
 	return strings.Join(names, " "), nil
+}
+
+// orderedAttributeIDs returns the combo's attribute ids, those named in order first
+// (in that order), then any remainder sorted ascending so the result is deterministic.
+func orderedAttributeIDs(order []int, attributeValueIDs map[int]int) []int {
+	ordered := make([]int, 0, len(attributeValueIDs))
+	seen := make(map[int]bool, len(attributeValueIDs))
+
+	for _, attrID := range order {
+		if _, ok := attributeValueIDs[attrID]; ok && !seen[attrID] {
+			ordered = append(ordered, attrID)
+			seen[attrID] = true
+		}
+	}
+
+	rest := make([]int, 0, len(attributeValueIDs))
+	for attrID := range attributeValueIDs {
+		if !seen[attrID] {
+			rest = append(rest, attrID)
+		}
+	}
+	sort.Ints(rest)
+
+	return append(ordered, rest...)
 }
 
 // storeVariantWithAttributeMapping inserts the variant and its attribute-value
@@ -142,53 +221,66 @@ func (s *CreateProductWithVariantsService) storeVariantWithAttributeMapping(ctx 
 		cost = *variant.CostPrice
 	}
 
-	stmt, err := tx.PrepareContext(
-		ctx,
-		`INSERT INTO items_variants (company_id, item_id, uuid, sku, name, is_default, price, cost_price, created_at, updated_at)
-		 VALUES ($1, $2, gen_random_uuid(), $3, $4, $5, $6, $7, NOW(), NOW())
-		 RETURNING id`,
-	)
+	ptx, err := playTx(tx)
 	if err != nil {
 		return err
 	}
-	defer stmt.Close()
 
-	if err = stmt.QueryRowContext(
-		ctx,
-		companyID, variant.ItemID, variant.SKU, variant.Name, variant.IsDefault, price, cost,
-	).Scan(&variant.ID); err != nil {
+	// uuid is left to its column default (gen_random_uuid()), which is what the
+	// statement's explicit call produced.
+	id, err := ptx.Model(&itemVariantRead{}).Insert(ctx, map[string]any{
+		"company_id": companyID,
+		"item_id":    variant.ItemID,
+		"sku":        variant.SKU,
+		"name":       variant.Name,
+		"is_default": variant.IsDefault,
+		"price":      price,
+		"cost_price": cost,
+	})
+	if err != nil {
 		return err
 	}
+	variant.ID = int(id)
 
-	for attrID, valueID := range attributeValueIDs {
-		if _, err = tx.ExecContext(
-			ctx,
-			`INSERT INTO variant_attribute_values (company_id, variant_id, attribute_id, attribute_value_id, created_at, updated_at)
-			 VALUES ($1, $2, $3, $4, NOW(), NOW())
-			 ON CONFLICT (company_id, variant_id, attribute_id) DO NOTHING`,
-			companyID, variant.ID, attrID, valueID,
-		); err != nil {
-			return err
-		}
+	if len(attributeValueIDs) == 0 {
+		return nil
 	}
 
-	return nil
+	// One statement for the whole combo. The empty (non-nil) update list compiles to
+	// DO NOTHING, as before.
+	rows := make([]map[string]any, 0, len(attributeValueIDs))
+	for _, attrID := range orderedAttributeIDs(nil, attributeValueIDs) {
+		rows = append(rows, map[string]any{
+			"company_id":         companyID,
+			"variant_id":         variant.ID,
+			"attribute_id":       attrID,
+			"attribute_value_id": attributeValueIDs[attrID],
+		})
+	}
+
+	_, err = ptx.Model(&variantAttributeValueRead{}).Upsert(
+		ctx, rows,
+		[]string{"company_id", "variant_id", "attribute_id"},
+		[]string{},
+	)
+	return err
 }
 
 // createDefaultVariant creates the single default variant of a simple product.
 func (s *CreateProductWithVariantsService) createDefaultVariant(ctx context.Context, tx *sql.Tx, companyID, itemID int, itemName string) error {
-	stmt, err := tx.PrepareContext(
-		ctx,
-		`INSERT INTO items_variants (company_id, item_id, uuid, sku, name, is_default, created_at, updated_at)
-		 VALUES ($1, $2, gen_random_uuid(), $3, $4, true, NOW(), NOW())`,
-	)
+	ptx, err := playTx(tx)
 	if err != nil {
 		return err
 	}
-	defer stmt.Close()
 
 	sku := fmt.Sprintf("SKU-%s-%d", generateHashCode(itemName, 6), itemID)
-	_, err = stmt.ExecContext(ctx, companyID, itemID, sku, "Default")
+	_, err = ptx.Model(&itemVariantRead{}).Insert(ctx, map[string]any{
+		"company_id": companyID,
+		"item_id":    itemID,
+		"sku":        sku,
+		"name":       "Default",
+		"is_default": true,
+	})
 	return err
 }
 
