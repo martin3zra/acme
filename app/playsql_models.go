@@ -783,14 +783,21 @@ func (inventoryTransferRead) TableName() string { return "inventory_transfers" }
 
 // inventoryTransferLine is the write model for a transfer's product lines.
 type inventoryTransferLine struct {
-	ID          int64   `db:"id" play:"pk,incrementing"`
-	CompanyID   int     `db:"company_id"`
-	TransferID  int     `db:"transfer_id"`
-	VariantID   int     `db:"variant_id"`
-	Qty         float64 `db:"qty"`
-	UnitID      *int    `db:"unit_id"`
+	ID         int64   `db:"id" play:"pk,incrementing"`
+	CompanyID  int     `db:"company_id"`
+	TransferID int     `db:"transfer_id"`
+	VariantID  int     `db:"variant_id"`
+	Qty        float64 `db:"qty"`
+	// unit_id is nullable, mapped as int64 rather than *int so the belongsTo below
+	// matches: the loader compares a child's primary key against this field by Go
+	// value, and a *int never equals an int64. A NULL scans to 0, no unit carries id 0,
+	// so the relation resolves to nil — the LEFT JOIN's outer arm.
+	UnitID      int64   `db:"unit_id"`
 	UnitCost    float64 `db:"unit_cost"`
 	Description *string `db:"description"`
+
+	Variant *itemVariantRead `play:"belongsTo,fk=variant_id"`
+	Unit    *unitRead        `play:"belongsTo,fk=unit_id"`
 }
 
 func (inventoryTransferLine) TableName() string { return "inventory_transfer_lines" }
@@ -843,8 +850,14 @@ type inventoryMovementRead struct {
 	Qty             float64               `db:"qty"`
 	UnitCost        float64               `db:"unit_cost"`
 	TransactionKind InventoryMovementKind `db:"transaction_kind"`
-	ReferenceType   string                `db:"reference_type"`
-	ReferenceID     int                   `db:"reference_id"`
+	// reference_type and reference_id are nullable; a NULL scans to the zero value,
+	// which is what the old COALESCE(..., '') / COALESCE(..., 0) produced.
+	ReferenceType string     `db:"reference_type"`
+	ReferenceID   int        `db:"reference_id"`
+	CreatedAt     *time.Time `db:"created_at"`
+
+	Variant   *itemVariantRead `play:"belongsTo,fk=variant_id"`
+	Warehouse *warehouseRead   `play:"belongsTo,fk=warehouse_id"`
 }
 
 func (inventoryMovementRead) TableName() string { return "inventory_movements" }
@@ -2156,4 +2169,132 @@ func (r purchaseLineRead) toPurchaseLine() *line {
 	}
 
 	return l
+}
+
+// movementTimeLayout is the shape TO_CHAR(created_at, 'YYYY-MM-DD HH24:MI') produced.
+// created_at is `timestamp without time zone`, so formatting the scanned value
+// reproduces the same wall clock the database rendered.
+const movementTimeLayout = "2006-01-02 15:04"
+
+func formatMovementTime(t *time.Time) string {
+	if t == nil {
+		return ""
+	}
+	return t.Format(movementTimeLayout)
+}
+
+// withVariantItem loads the variant's item in the variant's own eager load, so the
+// path below Variant is traversed once. See withInvoiceLineItem for why two `With`
+// paths sharing a prefix cannot both survive.
+func withVariantItem(b *playsql.Builder) { b.With("Item") }
+
+// liveVariantAndItem reproduces `AND iv.deleted_at IS NULL AND i.deleted_at IS NULL`
+// on the movement reads' INNER JOINs. Neither itemVariantRead nor lineItemRead carries
+// a softdelete tag, so the predicates are written out.
+//
+// The dotted path puts the closure on the innermost segment, so the two calls filter
+// the variant and the item respectively.
+func liveVariantAndItem(b *playsql.Builder) *playsql.Builder {
+	return b.
+		WhereHas("Variant", func(q *playsql.Builder) { q.WhereNull("deleted_at") }).
+		WhereHas("Variant.Item", func(q *playsql.Builder) { q.WhereNull("deleted_at") })
+}
+
+// itemNameOf and variantSKUOf unwrap the eager-loaded relation defensively: the reads
+// that use them filter on the relation with WhereHas, so it is always present.
+func itemNameOf(v *itemVariantRead) string {
+	if v == nil || v.Item == nil {
+		return ""
+	}
+	return v.Item.Name
+}
+
+func variantSKUOf(v *itemVariantRead) string {
+	if v == nil || v.SKU == nil {
+		return ""
+	}
+	return *v.SKU
+}
+
+func variantNameOf(v *itemVariantRead) string {
+	if v == nil {
+		return ""
+	}
+	return v.Name
+}
+
+// toMovementRow maps an inventory_movements row and its relations onto the response.
+//
+// The warehouse came off an INNER JOIN with no deleted_at predicate, so the relation is
+// loaded WithTrashed and a retired warehouse still names the movement it recorded.
+func (r inventoryMovementRead) toMovementRow() *inventoryMovementRow {
+	row := &inventoryMovementRow{
+		ID:            r.ID,
+		VariantID:     int64(r.VariantID),
+		VariantName:   variantNameOf(r.Variant),
+		SKU:           variantSKUOf(r.Variant),
+		ItemName:      itemNameOf(r.Variant),
+		WarehouseID:   int64(r.WarehouseID),
+		Kind:          string(r.TransactionKind),
+		Qty:           r.Qty,
+		UnitCost:      r.UnitCost,
+		ReferenceType: r.ReferenceType,
+		ReferenceID:   int64(r.ReferenceID),
+		CreatedAt:     formatMovementTime(r.CreatedAt),
+	}
+	if r.Warehouse != nil {
+		row.Warehouse = r.Warehouse.Name
+	}
+	return row
+}
+
+// toAdjustmentRow maps an adjustment movement onto its response struct. `notes` was a
+// literal ” in the projection and stays empty; `reason` is the movement's
+// reference_type.
+func (r inventoryMovementRead) toAdjustmentRow() *adjustmentRow {
+	row := &adjustmentRow{
+		ID:          r.ID,
+		VariantID:   int64(r.VariantID),
+		VariantName: variantNameOf(r.Variant),
+		SKU:         variantSKUOf(r.Variant),
+		ItemName:    itemNameOf(r.Variant),
+		WarehouseID: int64(r.WarehouseID),
+		Qty:         r.Qty,
+		Reason:      r.ReferenceType,
+		Notes:       "",
+		CreatedAt:   formatMovementTime(r.CreatedAt),
+	}
+	if r.Warehouse != nil {
+		row.Warehouse = r.Warehouse.Name
+	}
+	return row
+}
+
+// toTransferLineRow maps a transfer line and its relations onto the response struct.
+// line_total was computed in the projection; reference is pulled out of the item's
+// jsonb identifiers.
+func (r inventoryTransferLine) toTransferLineRow() *transferLineRow {
+	row := &transferLineRow{
+		ID:          r.ID,
+		VariantID:   int64(r.VariantID),
+		VariantName: variantNameOf(r.Variant),
+		SKU:         variantSKUOf(r.Variant),
+		ItemName:    itemNameOf(r.Variant),
+		Qty:         r.Qty,
+		UnitCost:    r.UnitCost,
+		LineTotal:   r.Qty * r.UnitCost,
+	}
+	if r.Description != nil {
+		row.Description = *r.Description
+	}
+	if r.Unit != nil {
+		row.Unit = r.Unit.Name
+	}
+	if r.Variant != nil && r.Variant.Item != nil && len(r.Variant.Item.Identifiers) > 0 {
+		var ids ItemIdentifiers
+		if err := json.Unmarshal(r.Variant.Item.Identifiers, &ids); err == nil && ids.Reference != nil {
+			row.Reference = *ids.Reference
+		}
+	}
+	return row
 }
