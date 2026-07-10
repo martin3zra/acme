@@ -1516,14 +1516,14 @@ func (u *User) HasVerifiedEmail() bool {
 // affected-row count, so verifying a user id that matches no row returned true;
 // mustAffectRows makes that false, as the name promises.
 //
-// updated_at is stamped by Update, since userRead maps the column.
+// updated_at is stamped by Update, since userModel maps the column.
 func (u *User) MarkEmailAsVerified(db *sql.DB) bool {
 	pdb, err := playOn(db)
 	if err != nil {
 		return false
 	}
 
-	affected, err := pdb.Model(&userRead{}).
+	affected, err := pdb.Model(&userModel{}).
 		WhereEq("id", u.Id).
 		Update(context.Background(), map[string]any{"email_verified_at": time.Now()})
 	return mustAffectRows(affected, err, "user") == nil
@@ -1563,8 +1563,8 @@ func (u *User) OwnedBy(db *sql.DB) (*account, error) {
 
 	// Rooted on the pivot: the INNER JOIN becomes a belongsTo, and Has("Account") keeps
 	// the join's semantics — a membership row whose account is gone matches nothing.
-	var link accountUserRead
-	if err := pdb.Model(&accountUserRead{}).
+	var link accountUserModel
+	if err := pdb.Model(&accountUserModel{}).
 		With("Account").
 		Has("Account").
 		WhereEq("user_id", u.Id).
@@ -1625,8 +1625,8 @@ func (u *User) currentCompany(db *sql.DB) (*Company, error) {
 		return nil, err
 	}
 
-	var link companyUserRead
-	if err := pdb.Model(&companyUserRead{}).
+	var link companyUserModel
+	if err := pdb.Model(&companyUserModel{}).
 		With("Company").
 		Has("Company").
 		WhereEq("user_id", u.Id).

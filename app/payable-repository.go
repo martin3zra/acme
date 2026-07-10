@@ -52,8 +52,8 @@ func (s *Server) findPayables(ctx context.Context) ([]*Payable, error) {
 		return nil, err
 	}
 
-	var rows []accountsPayableRead
-	if err := pdb.Model(&accountsPayableRead{}).
+	var rows []accountsPayableModel
+	if err := pdb.Model(&accountsPayableModel{}).
 		With("Register").
 		Has("Register").
 		WhereEq("company_id", CurrentCompany(ctx).ID).
@@ -88,20 +88,22 @@ func (s *Server) storeVendorPayment(ctx context.Context, form *StoreVendorPaymen
 		if err != nil {
 			return err
 		}
-		payment := &vendorPaymentInsert{
-			CompanyID: companyID,
-			VendorID:  int(v.ID),
-			Date:      form.Date,
-			Amount:    form.Amount,
-			Notes:     form.Notes,
-			Payment:   foundation.ToJSON(form.Payment),
-			Status:    "completed",
-			Code:      seqInfo.Code,
-		}
-		if err = ptx.Insert(context.Background(), payment); err != nil {
+		// Map insert so uuid stays unset for the DB default; the merged
+		// vendorPaymentModel maps uuid, which a struct insert would write as empty.
+		paymentID64, err := ptx.Model(&vendorPaymentModel{}).Insert(context.Background(), map[string]any{
+			"company_id": companyID,
+			"vendor_id":  int(v.ID),
+			"date":       form.Date,
+			"amount":     form.Amount,
+			"notes":      form.Notes,
+			"payment":    foundation.ToJSON(form.Payment),
+			"status":     "completed",
+			"code":       seqInfo.Code,
+		})
+		if err != nil {
 			return err
 		}
-		paymentID := int(payment.ID)
+		paymentID := int(paymentID64)
 
 		rows := make([]map[string]any, 0, len(form.Lines))
 		for _, line := range form.Lines {
@@ -138,8 +140,8 @@ func (s *Server) findAPByUUID(tx *sql.Tx, companyID int, uuid string) (*Payable,
 		return nil, err
 	}
 
-	var row accountsPayableRead
-	if err := ptx.Model(&accountsPayableRead{}).
+	var row accountsPayableModel
+	if err := ptx.Model(&accountsPayableModel{}).
 		WhereEq("company_id", companyID).
 		WhereEq("uuid", uuid).
 		First(context.Background(), &row); err != nil {
@@ -182,7 +184,7 @@ func (s *Server) updateAPBalance(tx *sql.Tx, companyID int, apID int64, paymentA
 		return err
 	}
 
-	// accountsPayableInsert leaves updated_at/paid_at unmapped, so both are passed
+	// accountsPayableModel leaves updated_at/paid_at unmapped, so both are passed
 	// explicitly; mass-assignment is unrestricted on these models. The old code ran
 	// two near-identical statements to conditionally add paid_at.
 	changes := map[string]any{
@@ -192,7 +194,7 @@ func (s *Server) updateAPBalance(tx *sql.Tx, companyID int, apID int64, paymentA
 	if newStatus == PaidStatuses.Paid {
 		changes["paid_at"] = time.Now()
 	}
-	if _, err = ptx.Model(&accountsPayableInsert{}).
+	if _, err = ptx.Model(&accountsPayableModel{}).
 		WhereEq("company_id", companyID).
 		WhereEq("id", apID).
 		Update(context.Background(), changes); err != nil {
@@ -234,8 +236,8 @@ func (s *Server) findVendorPaymentByUUID(ctx context.Context, uuid string) (*ven
 		return nil, err
 	}
 
-	var row vendorPaymentRead
-	if err := pdb.Model(&vendorPaymentRead{}).
+	var row vendorPaymentModel
+	if err := pdb.Model(&vendorPaymentModel{}).
 		WithConstraint("Vendor", withTrashedRelation).
 		WhereEq("company_id", CurrentCompany(ctx).ID).
 		WhereEq("uuid", uuid).
@@ -329,7 +331,7 @@ func (s *Server) voidVendorPayment(ctx context.Context, uuid string) error {
 			return err
 		}
 
-		_, err = ptx.Model(&vendorPaymentInsert{}).
+		_, err = ptx.Model(&vendorPaymentModel{}).
 			WhereEq("company_id", companyID).
 			WhereEq("id", p.ID).
 			Update(context.Background(), map[string]any{
@@ -347,8 +349,8 @@ func (s *Server) findVendorPayments(ctx context.Context) ([]*vendorPayment, erro
 		return nil, err
 	}
 
-	var rows []vendorPaymentRead
-	if err := pdb.Model(&vendorPaymentRead{}).
+	var rows []vendorPaymentModel
+	if err := pdb.Model(&vendorPaymentModel{}).
 		WithConstraint("Vendor", withTrashedRelation).
 		WhereEq("company_id", CurrentCompany(ctx).ID).
 		OrderBy("id", playsql.Desc).

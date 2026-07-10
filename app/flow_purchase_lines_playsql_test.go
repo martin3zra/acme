@@ -467,7 +467,7 @@ func TestResolveVariantsForLines_SkipsSoftDeletedVariants(t *testing.T) {
 // ─── AP re-sync ───────────────────────────────────────────────────────────────
 
 // TestUpdatePurchase_ResyncsLinkedPayable: editing a vendor bill rewrites its
-// accounts_payable row and bumps updated_at (accountsPayableRead does not map the
+// accounts_payable row and bumps updated_at (accountsPayableModel does not map the
 // column, so the update sets it explicitly).
 func TestUpdatePurchase_ResyncsLinkedPayable(t *testing.T) {
 	s := newTestServer(t)
@@ -498,7 +498,7 @@ func TestUpdatePurchase_ResyncsLinkedPayable(t *testing.T) {
 	is.Equal(scalarString(t, s.db,
 		`SELECT invoice_number FROM accounts_payable WHERE purchase_id = $1`, purchaseID), newInvNo)
 
-	// tax_amount lands even though accountsPayableRead does not map the column: an
+	// tax_amount lands even though accountsPayableModel does not map the column: an
 	// Update map's keys are passed through to the statement, not filtered against the
 	// struct. (A column that does not exist fails loudly at the database.)
 	is.EqualFloat(scalarFloat(t, s.db,

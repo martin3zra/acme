@@ -215,24 +215,26 @@ func (s *Server) storeCustomerInternal(tx *sql.Tx, companyID int, code string, f
 		return err
 	}
 
-	opening := &openingInvoiceInsert{
-		CompanyID:  companyID,
-		Date:       form.OpenBalanceAsOf,
-		Type:       InvoiceTermType.Opening,
-		DueOn:      form.OpenBalanceAsOf,
-		CustomerID: customerID,
-		Amount:     form.OpenBalance,
-		AmountDue:  form.OpenBalance,
-		Total:      form.OpenBalance,
-		Note:       "Saldo inicial",
-		Status:     InvoiceStatuses.Sent,
-		PaidStatus: PaidStatuses.UnPaid,
-		Code:       openingSeq.Code,
-	}
-	if err := ptx.Insert(context.Background(), opening); err != nil {
+	// Map insert so uuid stays unset for the DB default; the merged invoiceModel
+	// maps uuid, which a struct insert would write as empty.
+	invoiceID64, err := ptx.Model(&invoiceModel{}).Insert(context.Background(), map[string]any{
+		"company_id":  companyID,
+		"date":        form.OpenBalanceAsOf,
+		"type":        InvoiceTermType.Opening,
+		"due_on":      form.OpenBalanceAsOf,
+		"customer_id": customerID,
+		"amount":      form.OpenBalance,
+		"amount_due":  form.OpenBalance,
+		"total":       form.OpenBalance,
+		"note":        "Saldo inicial",
+		"status":      InvoiceStatuses.Sent,
+		"paid_status": PaidStatuses.UnPaid,
+		"code":        openingSeq.Code,
+	})
+	if err != nil {
 		return err
 	}
-	invoiceID := int(opening.ID)
+	invoiceID := int(invoiceID64)
 
 	return s.registerReceivable(tx, companyID, invoiceID, customerID)
 }

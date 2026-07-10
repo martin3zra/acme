@@ -51,7 +51,7 @@ type purchase struct {
 // Both header reads drop `INNER JOIN companies` (existence only — company_id is a
 // NOT NULL FK, and the company_id predicate already scopes the query) and turn
 // `INNER JOIN vendors` into a belongsTo eager load. That eager load needs
-// WithTrashed: vendorRead is softdelete-tagged, but the join never filtered
+// WithTrashed: vendorModel is softdelete-tagged, but the join never filtered
 // vendors.deleted_at, and a purchase from a since-deleted vendor must still render.
 //
 // purchaseRead's softdelete tag supplies the `p.deleted_at IS NULL` both carried.
@@ -585,27 +585,30 @@ func (s *Server) createAPForVendorBill(tx *sql.Tx, companyID, purchaseID, vendor
 	}
 	// amount_total is the pre-tax subtotal; amount_payable is a generated column
 	// (amount_total + tax_amount - discount_amount) and is not written here.
-	ap := &accountsPayableInsert{
-		CompanyID:      companyID,
-		VendorID:       vendorID,
-		PurchaseID:     purchaseID,
-		InvoiceNumber:  form.InvoiceNumber,
-		InvoiceDate:    form.Date,
-		DueDate:        form.dueOn,
-		AmountTotal:    form.amount,
-		TaxAmount:      form.tax,
-		DiscountAmount: 0,
-		AmountPaid:     0,
-		Currency:       "DOP",
-		PaymentTerms:   form.Terms,
-		Status:         PayableStatuses.Pending,
-		PaidStatus:     PaidStatuses.UnPaid,
-		CreatedBy:      form.User().GetAuthIdentifier(),
-	}
-	if err = ptx.Insert(context.Background(), ap); err != nil {
+	// Map insert so uuid stays unset for the DB default and amount_payable (a
+	// generated column) is left to the database; the merged accountsPayableModel
+	// maps both.
+	apID64, err := ptx.Model(&accountsPayableModel{}).Insert(context.Background(), map[string]any{
+		"company_id":      companyID,
+		"vendor_id":       vendorID,
+		"purchase_id":     purchaseID,
+		"invoice_number":  form.InvoiceNumber,
+		"invoice_date":    form.Date,
+		"due_date":        form.dueOn,
+		"amount_total":    form.amount,
+		"tax_amount":      form.tax,
+		"discount_amount": 0,
+		"amount_paid":     0,
+		"currency":        "DOP",
+		"payment_terms":   form.Terms,
+		"status":          PayableStatuses.Pending,
+		"paid_status":     PaidStatuses.UnPaid,
+		"created_by":      form.User().GetAuthIdentifier(),
+	})
+	if err != nil {
 		return err
 	}
-	apID := int(ap.ID)
+	apID := int(apID64)
 
 	if err := s.registerPayable(tx, companyID, apID, vendorID); err != nil {
 		return err
@@ -734,7 +737,7 @@ func (s *Server) updatePurchase(ctx context.Context, uuid string, form *UpdatePu
 			// The map may name columns the model does not map — tax_amount is one — since
 			// keys are passed through to the statement rather than filtered against the
 			// struct. A column that does not exist fails loudly at the database.
-			if _, err := ptx.Model(&accountsPayableRead{}).
+			if _, err := ptx.Model(&accountsPayableModel{}).
 				WhereEq("company_id", companyID).
 				WhereEq("purchase_id", purchase.ID).
 				Update(context.Background(), map[string]any{
@@ -944,8 +947,8 @@ func (s *Server) destroyPurchase(ctx context.Context, uuid string) error {
 
 		// Cancel the linked AP entry when a vendor bill is deleted.
 		if purchase.Kind == PurchaseTransactionKinds.VendorBill {
-			var ap accountsPayableRead
-			err := ptx.Model(&accountsPayableRead{}).
+			var ap accountsPayableModel
+			err := ptx.Model(&accountsPayableModel{}).
 				Select("id", "amount_paid").
 				WhereEq("company_id", companyID).
 				WhereEq("purchase_id", purchase.ID).
@@ -954,7 +957,7 @@ func (s *Server) destroyPurchase(ctx context.Context, uuid string) error {
 				return err
 			}
 			if ap.ID > 0 {
-				if _, err = ptx.Model(&accountsPayableInsert{}).
+				if _, err = ptx.Model(&accountsPayableModel{}).
 					WhereEq("company_id", companyID).
 					WhereEq("id", ap.ID).
 					Update(context.Background(), map[string]any{

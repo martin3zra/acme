@@ -86,9 +86,9 @@ func (s *Server) findVendorByID(ctx context.Context, vendorID int) (*vendor, err
 	}
 
 	// INNER JOIN companies dropped — company_id already scopes the row; the
-	// softdelete tag on vendorRead adds "deleted_at IS NULL".
-	var row vendorRead
-	err = pdb.Model(&vendorRead{}).
+	// softdelete tag on vendorModel adds "deleted_at IS NULL".
+	var row vendorModel
+	err = pdb.Model(&vendorModel{}).
 		WhereEq("company_id", CurrentCompany(ctx).ID).
 		WhereEq("id", vendorID).
 		First(ctx, &row)
@@ -117,8 +117,8 @@ func (s *Server) findVendorByUUID(ctx context.Context, vendorID string) (*vendor
 		return nil, err
 	}
 
-	var row vendorRead
-	if err := pdb.Model(&vendorRead{}).
+	var row vendorModel
+	if err := pdb.Model(&vendorModel{}).
 		WithConstraint("OpeningPayable", withOpeningPayable).
 		WhereEq("company_id", CurrentCompany(ctx).ID).
 		WhereEq("uuid", vendorID).
@@ -137,8 +137,8 @@ func (s *Server) findVendors(ctx context.Context, vendorType VendorType) ([]*ven
 		return nil, err
 	}
 
-	var rows []vendorRead
-	if err := pdb.Model(&vendorRead{}).
+	var rows []vendorModel
+	if err := pdb.Model(&vendorModel{}).
 		WhereEq("company_id", CurrentCompany(ctx).ID).
 		Unless(vendorType == "all", func(q *playsql.Builder) {
 			q.WhereEq("vendor_type", string(vendorType))
@@ -164,8 +164,8 @@ func (s *Server) findVendorsBySearchCriteria(ctx context.Context, term string) (
 		return nil, err
 	}
 
-	var rows []vendorRead
-	err = pdb.Model(&vendorRead{}).
+	var rows []vendorModel
+	err = pdb.Model(&vendorModel{}).
 		WhereEq("company_id", CurrentCompany(ctx).ID).
 		Where("name", "ILIKE", "%"+term+"%").
 		WhereEq("status", "enabled").
@@ -202,25 +202,28 @@ func (s *Server) storeVendorInternal(tx *sql.Tx, companyID int, code string, cre
 	if err != nil {
 		return err
 	}
-	vend := &vendorInsert{
-		CompanyID:     companyID,
-		Name:          form.Name,
-		ContactName:   form.Contact,
-		Email:         form.Email,
-		Phone:         form.Phone,
-		PaymentMethod: form.PaymentMethod,
-		PaymentTerms:  form.PaymentTerms,
-		PurchaseNote:  form.PurchaseNote,
-		LeadTimeDays:  form.LeadTimeDays,
-		AmountPayable: form.OpenBalance,
-		VendorType:    form.VendorType,
-		Code:          code,
-		Address:       form.Address,
-	}
-	if err = ptx.Insert(context.Background(), vend); err != nil {
+	// Map insert (not the struct form) so uuid stays unset and the DB default
+	// fills it; the merged vendorModel maps uuid, which a struct insert would
+	// write as an empty string.
+	vendorID64, err := ptx.Model(&vendorModel{}).Insert(context.Background(), map[string]any{
+		"company_id":     companyID,
+		"name":           form.Name,
+		"contact_name":   form.Contact,
+		"email":          form.Email,
+		"phone":          form.Phone,
+		"payment_method": form.PaymentMethod,
+		"payment_terms":  form.PaymentTerms,
+		"purchase_note":  form.PurchaseNote,
+		"lead_time_days": form.LeadTimeDays,
+		"amount_payable": form.OpenBalance,
+		"vendor_type":    form.VendorType,
+		"code":           code,
+		"address":        form.Address,
+	})
+	if err != nil {
 		return err
 	}
-	vendorID := int(vend.ID)
+	vendorID := int(vendorID64)
 
 	if form.OpenBalance == 0 || form.OpenBalanceAsOf.IsZero() {
 		return nil
@@ -243,28 +246,31 @@ func (s *Server) storeVendorOpenBalance(tx *sql.Tx, companyID int, vendorID int,
 	}
 	// due_date == invoice_date: an opening balance is overdue by definition.
 	// amount_payable is a generated column and is not written here.
-	ap := &openingPayableInsert{
-		CompanyID:      companyID,
-		VendorID:       vendorID,
-		InvoiceNumber:  invoiceNumber,
-		InvoiceDate:    form.OpenBalanceAsOf,
-		DueDate:        form.OpenBalanceAsOf,
-		AmountTotal:    form.OpenBalance,
-		TaxAmount:      0,
-		DiscountAmount: 0,
-		AmountPaid:     0,
-		Currency:       "USD",
-		PaymentTerms:   form.PaymentTerms,
-		PaymentMethod:  form.PaymentMethod,
-		Status:         PayableStatuses.Pending,
-		PaidStatus:     PaidStatuses.UnPaid,
-		Notes:          "Saldo inicial",
-		CreatedBy:      createdBy,
-	}
-	if err = ptx.Insert(context.Background(), ap); err != nil {
+	// Map insert so uuid stays unset for the DB default and amount_payable (a
+	// generated column) is left to the database; the merged accountsPayableModel
+	// maps both.
+	apID64, err := ptx.Model(&accountsPayableModel{}).Insert(context.Background(), map[string]any{
+		"company_id":      companyID,
+		"vendor_id":       vendorID,
+		"invoice_number":  invoiceNumber,
+		"invoice_date":    form.OpenBalanceAsOf,
+		"due_date":        form.OpenBalanceAsOf,
+		"amount_total":    form.OpenBalance,
+		"tax_amount":      0,
+		"discount_amount": 0,
+		"amount_paid":     0,
+		"currency":        "USD",
+		"payment_terms":   form.PaymentTerms,
+		"payment_method":  form.PaymentMethod,
+		"status":          PayableStatuses.Pending,
+		"paid_status":     PaidStatuses.UnPaid,
+		"notes":           "Saldo inicial",
+		"created_by":      createdBy,
+	})
+	if err != nil {
 		return err
 	}
-	apID := int(ap.ID)
+	apID := int(apID64)
 
 	return s.registerPayable(tx, companyID, apID, vendorID)
 }
@@ -282,7 +288,7 @@ func (s *Server) registerPayable(tx *sql.Tx, companyID int, apID, vendorID int) 
 }
 
 // updateVendor, deleteVendor and toggleVendorStatus all pick up `deleted_at IS NULL`
-// from vendorRead's softdelete tag, which the raw statements lacked. Editing or
+// from vendorModel's softdelete tag, which the raw statements lacked. Editing or
 // re-deleting a soft-deleted vendor is now a not-found.
 func (s *Server) updateVendor(ctx context.Context, vendorID int, form *UpdateVendorForm) error {
 	pdb, err := s.play()
@@ -290,7 +296,7 @@ func (s *Server) updateVendor(ctx context.Context, vendorID int, form *UpdateVen
 		return err
 	}
 
-	affected, err := pdb.Model(&vendorRead{}).
+	affected, err := pdb.Model(&vendorModel{}).
 		WhereEq("company_id", CurrentCompany(ctx).ID).
 		WhereEq("id", vendorID).
 		Update(ctx, map[string]any{
@@ -314,7 +320,7 @@ func (s *Server) deleteVendor(ctx context.Context, vendorID int) error {
 		return err
 	}
 
-	affected, err := pdb.Model(&vendorRead{}).
+	affected, err := pdb.Model(&vendorModel{}).
 		WhereEq("company_id", CurrentCompany(ctx).ID).
 		WhereEq("id", vendorID).
 		Update(ctx, map[string]any{"deleted_at": time.Now()})
@@ -334,7 +340,7 @@ func (s *Server) toggleVendorStatus(ctx context.Context, vendor *vendor) error {
 		status = "enabled"
 	}
 
-	affected, err := pdb.Model(&vendorRead{}).
+	affected, err := pdb.Model(&vendorModel{}).
 		WhereEq("company_id", CurrentCompany(ctx).ID).
 		WhereEq("id", vendor.ID).
 		Update(ctx, map[string]any{"status": string(status)})
@@ -377,8 +383,8 @@ func (s *Server) findVendorPayables(ctx context.Context, vendorID string) ([]*Pa
 
 	companyID := CurrentCompany(ctx).ID
 
-	var v vendorRead
-	if err := pdb.Model(&vendorRead{}).
+	var v vendorModel
+	if err := pdb.Model(&vendorModel{}).
 		Select("id").
 		WithTrashed().
 		WhereEq("company_id", companyID).
@@ -387,8 +393,8 @@ func (s *Server) findVendorPayables(ctx context.Context, vendorID string) ([]*Pa
 		return nil, err
 	}
 
-	var rows []accountsPayableRead
-	if err := pdb.Model(&accountsPayableRead{}).
+	var rows []accountsPayableModel
+	if err := pdb.Model(&accountsPayableModel{}).
 		With("Register").
 		Has("Register").
 		WhereEq("company_id", companyID).

@@ -41,7 +41,7 @@ func playOn(db *sql.DB) (*playsql.DB, error) {
 
 // withTrashedRelation opts an eager-loaded relation into soft-deleted rows. Use it
 // wherever the raw SQL used a plain INNER JOIN with no deleted_at predicate but the
-// related read model is softdelete-tagged (customerModel, vendorRead): without it the
+// related read model is softdelete-tagged (customerModel, vendorModel): without it the
 // parent row comes back with a nil relation once the related row is soft-deleted.
 func withTrashedRelation(b *playsql.Builder) { b.WithTrashed() }
 
@@ -73,7 +73,7 @@ type customerModel struct {
 	// OpeningInvoice is the customer's opening-balance invoice. The raw read got it
 	// from a LEFT JOIN onto a subquery filtered to type = 'opening'; the filter now
 	// lives in withOpeningInvoice. Neither scopes by company or filters deleted_at.
-	OpeningInvoice *invoiceRead `play:"hasOne,fk=customer_id"`
+	OpeningInvoice *invoiceModel `play:"hasOne,fk=customer_id"`
 }
 
 func (customerModel) TableName() string { return "customers" }
@@ -93,7 +93,7 @@ func withOpeningInvoice(b *playsql.Builder) {
 
 // openBalanceOfInvoice builds the customer's opening balance. A customer without an
 // opening invoice gets a struct of nil pointers, exactly as the LEFT JOIN's NULLs did.
-func openBalanceOfInvoice(inv *invoiceRead) *OpenBalance {
+func openBalanceOfInvoice(inv *invoiceModel) *OpenBalance {
 	ob := new(OpenBalance)
 	if inv == nil {
 		return ob
@@ -129,11 +129,12 @@ func (r customerModel) toCustomer() *customer {
 	return c
 }
 
-// vendorRead is the playsql read model for the vendors table — same pattern as
+// vendorModel is the playsql read model for the vendors table — same pattern as
 // customerModel (real columns only, softdelete on deleted_at).
-type vendorRead struct {
+type vendorModel struct {
 	ID            int        `db:"id" play:"pk,incrementing"`
-	UUID          string     `db:"uuid"`
+	CompanyID     int        `db:"company_id"`
+	UUID          string     `db:"uuid" play:"guarded"`
 	Code          string     `db:"code"`
 	Name          string     `db:"name"`
 	ContactName   string     `db:"contact_name"`
@@ -153,10 +154,10 @@ type vendorRead struct {
 
 	// OpeningPayable is the vendor's opening-balance AP entry. The raw read got it
 	// from a LEFT JOIN onto a subquery filtered to status = 'draft'.
-	OpeningPayable *accountsPayableRead `play:"hasOne,fk=vendor_id"`
+	OpeningPayable *accountsPayableModel `play:"hasOne,fk=vendor_id"`
 }
 
-func (vendorRead) TableName() string { return "vendors" }
+func (vendorModel) TableName() string { return "vendors" }
 
 // withOpeningPayable constrains the eager load to the draft AP entry, the way the old
 // LEFT JOIN's subquery did.
@@ -169,7 +170,7 @@ func withOpeningPayable(b *playsql.Builder) {
 
 // openBalanceOfPayable builds the vendor's opening balance. Nil pointers when there is
 // no draft entry, matching the LEFT JOIN's NULLs.
-func openBalanceOfPayable(ap *accountsPayableRead) *OpenBalance {
+func openBalanceOfPayable(ap *accountsPayableModel) *OpenBalance {
 	ob := new(OpenBalance)
 	if ap == nil {
 		return ob
@@ -191,7 +192,7 @@ type receivableRead struct {
 	CustomerID int        `db:"customer_id"`
 	DeletedAt  *time.Time `db:"deleted_at" play:"softdelete"`
 
-	Invoice *invoiceRead `play:"belongsTo,fk=invoice_id"`
+	Invoice *invoiceModel `play:"belongsTo,fk=invoice_id"`
 }
 
 func (receivableRead) TableName() string { return "receivables" }
@@ -224,7 +225,7 @@ func (r receivableRead) toReceivable() *receivable {
 }
 
 // toVendor maps the read model onto the JSON response struct.
-func (r vendorRead) toVendor() *vendor {
+func (r vendorModel) toVendor() *vendor {
 	v := &vendor{
 		ID:            r.ID,
 		UUID:          r.UUID,
@@ -249,7 +250,7 @@ func (r vendorRead) toVendor() *vendor {
 }
 
 // unitRead is the playsql read model for the units table. Unlike customerModel/
-// vendorRead it carries NO play:"softdelete" tag: the original unit reads never
+// vendorModel it carries NO play:"softdelete" tag: the original unit reads never
 // filtered deleted_at (units are not soft-deleted — the repo has no delete path),
 // so the model maps deleted_at as a plain column to keep "return all rows".
 type unitRead struct {
@@ -277,7 +278,7 @@ func (r unitRead) toUnit() *unit {
 	return u
 }
 
-// userRead is the playsql read model for the users table.
+// userModel is the playsql read model for the users table.
 //
 // This model is the structural fix for the bug in 53c9d58: playsql selects and
 // scans by column name, so a migration that appends a column (as remember_token
@@ -287,7 +288,7 @@ func (r unitRead) toUnit() *unit {
 // deleted_at carries no softdelete tag — none of the user reads filtered it.
 // Linked is play:"readonly": it holds the WithCount aggregate that replaced the old
 // correlated `(SELECT COUNT(*) ...) as linked` subquery.
-type userRead struct {
+type userModel struct {
 	ID                 int        `db:"id" play:"pk,incrementing"`
 	Name               string     `db:"name"`
 	Email              string     `db:"email"`
@@ -297,21 +298,21 @@ type userRead struct {
 	CreatedAt          *time.Time `db:"created_at"`
 	UpdatedAt          *time.Time `db:"updated_at"`
 	DeletedAt          *time.Time `db:"deleted_at"`
-	UUID               string     `db:"uuid"`
+	UUID               string     `db:"uuid" play:"guarded"`
 	Status             string     `db:"status"`
 	MustChangePassword bool       `db:"must_change_password"`
 	PendingEmail       *string    `db:"pending_email"`
 	Linked             int        `db:"linked" play:"readonly"`
 
-	Companies []*companyRead `play:"belongsToMany,pivot=companies_users,foreignPivotKey=user_id,relatedPivotKey=company_id"`
-	Accounts  []*accountRead `play:"belongsToMany,pivot=accounts_users,foreignPivotKey=user_id,relatedPivotKey=account_id"`
+	Companies []*companyModel `play:"belongsToMany,pivot=companies_users,foreignPivotKey=user_id,relatedPivotKey=company_id"`
+	Accounts  []*accountRead  `play:"belongsToMany,pivot=accounts_users,foreignPivotKey=user_id,relatedPivotKey=account_id"`
 }
 
-func (userRead) TableName() string { return "users" }
+func (userModel) TableName() string { return "users" }
 
 // authUserColumns is the projection the credential resolver used. It is spelled out
 // rather than left to the default so the authentication read stays pinned to exactly
-// these columns even if userRead grows.
+// these columns even if userModel grows.
 var authUserColumns = []string{
 	"id", "name", "email", "password", "email_verified_at", "last_password_reset",
 	"created_at", "updated_at", "deleted_at", "uuid", "status", "must_change_password",
@@ -320,7 +321,7 @@ var authUserColumns = []string{
 
 // toAuthUser maps the read model onto the authenticated identity. Role is not a users
 // column; it is filled in from companies_users where the request needs it.
-func (r userRead) toAuthUser() *AuthUser {
+func (r userModel) toAuthUser() *AuthUser {
 	u := &AuthUser{
 		Id:                 r.ID,
 		UUID:               r.UUID,
@@ -340,7 +341,7 @@ func (r userRead) toAuthUser() *AuthUser {
 }
 
 // toUser maps the read model onto the response struct.
-func (r userRead) toUser() *User {
+func (r userModel) toUser() *User {
 	u := new(User)
 	u.Id = r.ID
 	u.Name = r.Name
@@ -359,15 +360,15 @@ func (r userRead) toUser() *User {
 	return u
 }
 
-// companyRead is the playsql read model for the companies table. No softdelete tag:
+// companyModel is the playsql read model for the companies table. No softdelete tag:
 // neither the `linked` count, the linked-companies join, nor any of the company
 // reads ever filtered companies.deleted_at.
 //
 // identifier is nullable in the schema; playsql scans a SQL NULL as the zero value,
 // which is what the old reads assumed all along.
-type companyRead struct {
+type companyModel struct {
 	ID         int        `db:"id" play:"pk,incrementing"`
-	UUID       string     `db:"uuid"`
+	UUID       string     `db:"uuid" play:"guarded"`
 	Name       string     `db:"name"`
 	Identifier string     `db:"identifier"`
 	City       string     `db:"city"`
@@ -378,11 +379,11 @@ type companyRead struct {
 	DeletedAt  *time.Time `db:"deleted_at"`
 }
 
-func (companyRead) TableName() string { return "companies" }
+func (companyModel) TableName() string { return "companies" }
 
 // toCompany maps the read model onto the response struct. The nested settings
 // (sequences, redirect preferences, variants flag) are loaded separately, as before.
-func (r companyRead) toCompany() *Company {
+func (r companyModel) toCompany() *Company {
 	c := &Company{
 		ID:         r.ID,
 		UUID:       r.UUID,
@@ -396,19 +397,6 @@ func (r companyRead) toCompany() *Company {
 	c.DeletedAt = r.DeletedAt
 	return c
 }
-
-// companyInsert is the write model for the companies table. uuid and the timestamps
-// are DB-generated and stay unmapped.
-type companyInsert struct {
-	ID         int64  `db:"id" play:"pk,incrementing"`
-	AccountID  int    `db:"account_id"`
-	Name       string `db:"name"`
-	Identifier string `db:"identifier"`
-	City       string `db:"city"`
-	Address    string `db:"address"`
-}
-
-func (companyInsert) TableName() string { return "companies" }
 
 // companySettingsRead is the playsql model for companies_settings. It backs the reads
 // and the writes both: updated_at is mapped, so playsql stamps it on every Update and
@@ -555,13 +543,13 @@ type accountRead struct {
 	UpdatedAt  *time.Time `db:"updated_at"`
 	DeletedAt  *time.Time `db:"deleted_at"`
 
-	Owner *userRead `play:"belongsTo,fk=owner_id"`
+	Owner *userModel `play:"belongsTo,fk=owner_id"`
 }
 
 func (accountRead) TableName() string { return "accounts" }
 
 // withAccountOwner eager-loads the account's owner, projecting only the three columns
-// the response struct carries. userRead maps the password hash; without this the
+// the response struct carries. userModel maps the password hash; without this the
 // default projection would select it.
 func withAccountOwner(b *playsql.Builder) { b.Select("id", "email", "name") }
 
@@ -584,46 +572,26 @@ func (r accountRead) toAccount() *account {
 	return a
 }
 
-// companyUserRead is the companies_users link row. It is a table in its own right
+// companyUserModel is the companies_users link row. It is a table in its own right
 // (surrogate id, role, current, abilities), so the user reads model it directly
 // rather than leaning on playsql's belongsToMany pivot bag.
-type companyUserRead struct {
+type companyUserModel struct {
 	ID        int    `db:"id" play:"pk,incrementing"`
 	CompanyID int    `db:"company_id"`
 	UserID    int    `db:"user_id"`
 	Role      string `db:"role"`
 	Current   bool   `db:"current"`
 
-	Company *companyRead `play:"belongsTo,fk=company_id"`
+	Company *companyModel `play:"belongsTo,fk=company_id"`
 }
 
-func (companyUserRead) TableName() string { return "companies_users" }
+func (companyUserModel) TableName() string { return "companies_users" }
 
-// userInsert is the write model for the users table. uuid and the timestamps are
-// DB-generated and stay unmapped; so does remember_token, which no write here owns.
-type userInsert struct {
-	ID       int64  `db:"id" play:"pk,incrementing"`
-	Name     string `db:"name"`
-	Email    string `db:"email"`
-	Password string `db:"password"`
-	Status   string `db:"status"`
-}
-
-func (userInsert) TableName() string { return "users" }
-
-// accountUserInsert is the write model for the accounts_users link row.
-type accountUserInsert struct {
-	ID        int64 `db:"id" play:"pk,incrementing"`
-	AccountID int   `db:"account_id"`
-	UserID    int   `db:"user_id"`
-}
-
-func (accountUserInsert) TableName() string { return "accounts_users" }
-
-// accountUserRead is the read side of the accounts_users pivot. User.OwnedBy roots on
+// accountUserModel is the merged read/write model for the accounts_users pivot.
+// User.OwnedBy roots on
 // it so the account arrives through a belongsTo instead of an INNER JOIN, mirroring how
-// companyUserRead carries the role alongside its company.
-type accountUserRead struct {
+// companyUserModel carries the role alongside its company.
+type accountUserModel struct {
 	ID        int `db:"id" play:"pk,incrementing"`
 	AccountID int `db:"account_id"`
 	UserID    int `db:"user_id"`
@@ -631,7 +599,7 @@ type accountUserRead struct {
 	Account *accountRead `play:"belongsTo,fk=account_id"`
 }
 
-func (accountUserRead) TableName() string { return "accounts_users" }
+func (accountUserModel) TableName() string { return "accounts_users" }
 
 // toAccountStruct maps the read model onto the `account` response struct. Only
 // owner_id is carried into Owner; the old queries selected no other owner column.
@@ -647,17 +615,6 @@ func (r accountRead) toAccountStruct() *account {
 	a.DeletedAt = r.DeletedAt
 	return a
 }
-
-// companyUserInsert is the write model for the companies_users link row.
-type companyUserInsert struct {
-	ID        int64  `db:"id" play:"pk,incrementing"`
-	CompanyID int    `db:"company_id"`
-	UserID    int    `db:"user_id"`
-	Role      string `db:"role"`
-	Current   bool   `db:"current"`
-}
-
-func (companyUserInsert) TableName() string { return "companies_users" }
 
 // purchaseRead is the playsql read model for the purchases table (the header, not
 // the lines — findPurchaseLines stays raw).
@@ -695,7 +652,7 @@ type purchaseRead struct {
 	UpdatedAt        *time.Time              `db:"updated_at"`
 	DeletedAt        *time.Time              `db:"deleted_at" play:"softdelete"`
 
-	Vendor *vendorRead `play:"belongsTo,fk=vendor_id"`
+	Vendor *vendorModel `play:"belongsTo,fk=vendor_id"`
 }
 
 func (purchaseRead) TableName() string { return "purchases" }
@@ -1155,7 +1112,7 @@ func (r expenseCategoryModel) toExpenseCategory() *expenseCategory {
 	return c
 }
 
-// paymentRead is the playsql read model for the receivables_income table (customer
+// paymentModel is the playsql read model for the receivables_income table (customer
 // payments). payment is jsonb and maps as []byte: playsql classifies any pointer or
 // slice-of-struct field as a relation, and a plain struct field would need a json
 // cast, so the blob is decoded in toPayment — which also keeps the previous
@@ -1163,9 +1120,10 @@ func (r expenseCategoryModel) toExpenseCategory() *expenseCategory {
 //
 // Invoices is play:"readonly": it has no backing column and carries the WithCount
 // aggregate that replaced the old correlated `(select count(*) …) as invoices`.
-type paymentRead struct {
+type paymentModel struct {
 	ID         int           `db:"id" play:"pk,incrementing"`
-	UUID       string        `db:"uuid"`
+	CompanyID  int           `db:"company_id"`
+	UUID       string        `db:"uuid" play:"guarded"`
 	Code       string        `db:"code"`
 	CustomerID int           `db:"customer_id"`
 	Date       time.Time     `db:"date"`
@@ -1182,7 +1140,7 @@ type paymentRead struct {
 	Items    []*paymentItemRead `play:"hasMany,fk=receivable_income_id"`
 }
 
-func (paymentRead) TableName() string { return "receivables_income" }
+func (paymentModel) TableName() string { return "receivables_income" }
 
 // toPayment maps the read model onto the JSON response struct.
 //
@@ -1190,7 +1148,7 @@ func (paymentRead) TableName() string { return "receivables_income" }
 // selected uuid/name/amount_due while the detail query also took id/email/address,
 // so the list response now carries those three as well — a superset of the same
 // tenant's own data, which no caller depends on being absent.
-func (r paymentRead) toPayment() *payment {
+func (r paymentModel) toPayment() *payment {
 	p := &payment{
 		ID:       r.ID,
 		UUID:     r.UUID,
@@ -1241,7 +1199,7 @@ type paymentItemRead struct {
 
 func (paymentItemRead) TableName() string { return "receivables_income_items" }
 
-// invoiceRead is the playsql read model for the invoices table — the header, not the
+// invoiceModel is the playsql read model for the invoices table — the header, not the
 // lines (findInvoiceLines stays raw; see there).
 //
 // discount, payment and source are jsonb. They map as []byte and are decoded in
@@ -1250,33 +1208,42 @@ func (paymentItemRead) TableName() string { return "receivables_income_items" }
 // whole read.
 //
 // No softdelete tag: none of the three header reads filtered invoices.deleted_at.
-type invoiceRead struct {
-	ID               int             `db:"id" play:"pk,incrementing"`
-	CompanyID        int             `db:"company_id"`
-	CustomerID       int             `db:"customer_id"`
-	UUID             string          `db:"uuid"`
-	Code             string          `db:"code"`
-	Date             time.Time       `db:"date"`
-	DueOn            *time.Time      `db:"due_on"`
-	Amount           float64         `db:"amount"`
-	AmountDue        float64         `db:"amount_due"`
-	Discount         []byte          `db:"discount"`
-	Tax              float64         `db:"tax"`
-	Total            float64         `db:"total"`
-	Status           InvoiceStatus   `db:"status"`
-	PaidStatus       PaidStatus      `db:"paid_status"`
-	Payment          []byte          `db:"payment"`
-	Note             string          `db:"note"`
-	TaxReceiptID     *int            `db:"tax_receipt_id"`
-	TaxNumber        *string         `db:"tax_number"`
-	TransactionKind  TransactionKind `db:"transaction_kind"`
-	Source           []byte          `db:"source"`
-	MovementRecorded bool            `db:"movement_recorded"`
+// invoiceModel is the merged read/write model for the invoices table. It unions
+// the read columns with the insert-only ones the two former insert models wrote
+// (type, tax_receipt_sequence, recurrence), so the map inserts pass CanFill. The
+// jsonb columns (discount, payment, source, recurrence) are []byte here for
+// reads; map inserts pass whatever form the writer already used. uuid is guarded
+// and DB-generated.
+type invoiceModel struct {
+	ID                 int             `db:"id" play:"pk,incrementing"`
+	CompanyID          int             `db:"company_id"`
+	CustomerID         int             `db:"customer_id"`
+	UUID               string          `db:"uuid" play:"guarded"`
+	Code               string          `db:"code"`
+	Date               time.Time       `db:"date"`
+	Type               *string         `db:"type"`
+	DueOn              *time.Time      `db:"due_on"`
+	Amount             float64         `db:"amount"`
+	AmountDue          float64         `db:"amount_due"`
+	Discount           []byte          `db:"discount"`
+	Tax                float64         `db:"tax"`
+	Total              float64         `db:"total"`
+	Status             InvoiceStatus   `db:"status"`
+	PaidStatus         PaidStatus      `db:"paid_status"`
+	Payment            []byte          `db:"payment"`
+	Note               string          `db:"note"`
+	TaxReceiptID       *int            `db:"tax_receipt_id"`
+	TaxReceiptSequence *int64          `db:"tax_receipt_sequence"`
+	TaxNumber          *string         `db:"tax_number"`
+	TransactionKind    TransactionKind `db:"transaction_kind"`
+	Source             []byte          `db:"source"`
+	Recurrence         []byte          `db:"recurrence"`
+	MovementRecorded   bool            `db:"movement_recorded"`
 
 	Customer *customerModel `play:"belongsTo,fk=customer_id"`
 }
 
-func (invoiceRead) TableName() string { return "invoices" }
+func (invoiceModel) TableName() string { return "invoices" }
 
 // invoiceListColumns is the projection the list read used. It omits company_id and
 // movement_recorded, which are internal and were never sent to the client.
@@ -1288,7 +1255,7 @@ var invoiceListColumns = []string{
 
 // toInvoice maps the read model onto the response struct. Terms is not derived here:
 // the list read never set it, only the two detail reads do (see deriveTerms).
-func (r invoiceRead) toInvoice() *invoice {
+func (r invoiceModel) toInvoice() *invoice {
 	i := &invoice{
 		CompanyID:    r.CompanyID,
 		ID:           r.ID,
@@ -1331,7 +1298,7 @@ func (r invoiceRead) toInvoice() *invoice {
 }
 
 // paymentInvoiceRead is a narrow projection of the invoices table: only the columns
-// a payment line reports. It stays separate from invoiceRead because the two answer
+// a payment line reports. It stays separate from invoiceModel because the two answer
 // different queries; both deliberately omit a softdelete tag, since neither the
 // payment-line joins nor the invoice header reads filtered invoices.deleted_at.
 //
@@ -1350,38 +1317,48 @@ type paymentInvoiceRead struct {
 
 func (paymentInvoiceRead) TableName() string { return "invoices" }
 
-// accountsPayableRead is the playsql read model for the accounts_payable table.
+// accountsPayableModel is the merged read/write model for accounts_payable. It
+// carries the union of the columns the two former insert models wrote (a purchase
+// AP entry and a vendor opening-balance entry), so both map inserts pass CanFill.
 // The table has no deleted_at, so there is no softdelete tag. amount_payable is a
-// generated column: it is read here but must never be written (see
-// accountsPayableInsert, which leaves it unmapped).
+// generated column: mapped so reads can select it, but never placed in an
+// insert/update map. uuid is guarded and DB-generated.
 //
 // Register is the one-to-one payables cross-reference row. findPayables reads the
 // AP entry as the root (it owns the filters and the due_date ordering) and pulls
 // p.id / p.uuid through this relation, which is the inverse of the old query's
 // payables-rooted INNER JOIN.
-type accountsPayableRead struct {
-	ID            int64     `db:"id" play:"pk,incrementing"`
-	UUID          string    `db:"uuid"`
-	VendorID      int       `db:"vendor_id"`
-	InvoiceNumber string    `db:"invoice_number"`
-	InvoiceDate   time.Time `db:"invoice_date"`
-	DueDate       time.Time `db:"due_date"`
-	AmountTotal   float64   `db:"amount_total"`
-	AmountPayable float64   `db:"amount_payable"`
-	AmountPaid    float64   `db:"amount_paid"`
-	Status        string    `db:"status"`
-	PaidStatus    string    `db:"paid_status"`
-	Notes         *string   `db:"notes"`
+type accountsPayableModel struct {
+	ID             int64     `db:"id" play:"pk,incrementing"`
+	CompanyID      int       `db:"company_id"`
+	UUID           string    `db:"uuid" play:"guarded"`
+	VendorID       int       `db:"vendor_id"`
+	PurchaseID     int       `db:"purchase_id"`
+	InvoiceNumber  string    `db:"invoice_number"`
+	InvoiceDate    time.Time `db:"invoice_date"`
+	DueDate        time.Time `db:"due_date"`
+	AmountTotal    float64   `db:"amount_total"`
+	TaxAmount      float64   `db:"tax_amount"`
+	DiscountAmount float64   `db:"discount_amount"`
+	AmountPayable  float64   `db:"amount_payable"`
+	AmountPaid     float64   `db:"amount_paid"`
+	Currency       string    `db:"currency"`
+	PaymentTerms   string    `db:"payment_terms"`
+	PaymentMethod  string    `db:"payment_method"`
+	Status         string    `db:"status"`
+	PaidStatus     string    `db:"paid_status"`
+	Notes          *string   `db:"notes"`
+	CreatedBy      int       `db:"created_by"`
 
 	Register *payableRegisterRead `play:"hasOne,fk=accounts_payable_id"`
 }
 
-func (accountsPayableRead) TableName() string { return "accounts_payable" }
+func (accountsPayableModel) TableName() string { return "accounts_payable" }
 
 // toPayable maps an AP entry plus its payables register row onto the response
 // struct. Payable.ID/UUID identify the payables row; Payable.InvoiceID/InvoiceUUID
 // identify the accounts_payable row.
-func (r accountsPayableRead) toPayable() *Payable {
+func (r accountsPayableModel) toPayable() *Payable {
 	notes := ""
 	if r.Notes != nil {
 		notes = *r.Notes
@@ -1418,17 +1395,18 @@ type payableRegisterRead struct {
 
 func (payableRegisterRead) TableName() string { return "payables" }
 
-// vendorPaymentRead is the playsql read model for the vendor_payments table.
+// vendorPaymentModel is the playsql read model for the vendor_payments table.
 // company_id and the timestamps are deliberately unmapped: the old reads never
 // selected them and vendorPayment leaves them zero.
 //
 // payment is jsonb; it is scanned raw and unmarshalled in toVendorPayment so a
 // malformed blob leaves Payment nil instead of failing the whole read, matching
 // the previous behaviour.
-type vendorPaymentRead struct {
-	ID   int64  `db:"id" play:"pk,incrementing"`
-	UUID string `db:"uuid"`
-	// int, not int64: eager loading matches this against vendorRead.ID by Go value,
+type vendorPaymentModel struct {
+	ID        int64  `db:"id" play:"pk,incrementing"`
+	CompanyID int    `db:"company_id"`
+	UUID      string `db:"uuid" play:"guarded"`
+	// int, not int64: eager loading matches this against vendorModel.ID by Go value,
 	// so a widened type would silently never match and leave Vendor nil.
 	VendorID int       `db:"vendor_id"`
 	Date     time.Time `db:"date"`
@@ -1438,14 +1416,14 @@ type vendorPaymentRead struct {
 	Status   string    `db:"status"`
 	Code     string    `db:"code"`
 
-	Vendor *vendorRead `play:"belongsTo,fk=vendor_id"`
+	Vendor *vendorModel `play:"belongsTo,fk=vendor_id"`
 }
 
-func (vendorPaymentRead) TableName() string { return "vendor_payments" }
+func (vendorPaymentModel) TableName() string { return "vendor_payments" }
 
 // toVendorPayment maps the read model onto the JSON response struct. Only the
 // five vendor columns the old INNER JOIN selected are copied across.
-func (r vendorPaymentRead) toVendorPayment() *vendorPayment {
+func (r vendorPaymentModel) toVendorPayment() *vendorPayment {
 	p := &vendorPayment{
 		ID:     int(r.ID),
 		UUID:   r.UUID,
@@ -1485,7 +1463,7 @@ type vendorPaymentItemRead struct {
 	AmountDue         float64 `db:"amount_due"`
 	PaymentAmount     float64 `db:"payment_amount"`
 
-	AccountsPayable *accountsPayableRead `play:"belongsTo,fk=accounts_payable_id"`
+	AccountsPayable *accountsPayableModel `play:"belongsTo,fk=accounts_payable_id"`
 }
 
 func (vendorPaymentItemRead) TableName() string { return "vendor_payment_items" }
@@ -1524,39 +1502,6 @@ type InvoiceItem struct {
 
 func (InvoiceItem) TableName() string { return "invoices_items" }
 
-// invoiceInsert is the write model for creating an invoice row. uuid is
-// deliberately NOT mapped: it is DB-generated, and mapping it would make playsql
-// insert an empty string over the default. After Insert sets ID, the caller reads
-// the generated uuid back. JSON columns hold pre-encoded values (foundation
-// ToJSON/AsJSON) exactly as the prior raw INSERT passed them, so encoding is
-// unchanged. Timestamp columns are left to their database defaults.
-type invoiceInsert struct {
-	ID                 int64           `db:"id" play:"pk,incrementing"`
-	CompanyID          int             `db:"company_id"`
-	TaxReceiptID       *int            `db:"tax_receipt_id"`
-	TaxReceiptSequence *int64          `db:"tax_receipt_sequence"`
-	TaxNumber          *string         `db:"tax_number"`
-	Date               time.Time       `db:"date"`
-	Type               *string         `db:"type"`
-	DueOn              *time.Time      `db:"due_on"`
-	CustomerID         int             `db:"customer_id"`
-	Amount             float64         `db:"amount"`
-	Discount           string          `db:"discount"`
-	Tax                float64         `db:"tax"`
-	AmountDue          float64         `db:"amount_due"`
-	Total              float64         `db:"total"`
-	Note               string          `db:"note"`
-	Status             InvoiceStatus   `db:"status"`
-	PaidStatus         PaidStatus      `db:"paid_status"`
-	Payment            string          `db:"payment"`
-	Code               string          `db:"code"`
-	TransactionKind    TransactionKind `db:"transaction_kind"`
-	Source             *[]byte         `db:"source"`
-	Recurrence         *[]byte         `db:"recurrence"`
-}
-
-func (invoiceInsert) TableName() string { return "invoices" }
-
 // InventoryMovement is the write model for a stock movement row. created_at is
 // set explicitly by the caller (no DB default is relied on). The balance upsert
 // that follows a movement stays raw SQL: it increments (quantity +=
@@ -1576,27 +1521,6 @@ type InventoryMovement struct {
 
 func (InventoryMovement) TableName() string { return "inventory_movements" }
 
-// vendorInsert is the write model for creating a vendor row. amount_payable seeds
-// from the opening balance; the pk is DB-assigned.
-type vendorInsert struct {
-	ID            int64   `db:"id" play:"pk,incrementing"`
-	CompanyID     int     `db:"company_id"`
-	Name          string  `db:"name"`
-	ContactName   string  `db:"contact_name"`
-	Email         string  `db:"email"`
-	Phone         string  `db:"phone"`
-	PaymentMethod string  `db:"payment_method"`
-	PaymentTerms  string  `db:"payment_terms"`
-	PurchaseNote  string  `db:"purchase_note"`
-	LeadTimeDays  int     `db:"lead_time_days"`
-	AmountPayable float64 `db:"amount_payable"`
-	VendorType    string  `db:"vendor_type"`
-	Code          string  `db:"code"`
-	Address       string  `db:"address"`
-}
-
-func (vendorInsert) TableName() string { return "vendors" }
-
 // PurchaseItem is the write model for purchase line rows (purchase_items). Backs
 // the bulk line insert; the pk is DB-assigned.
 type PurchaseItem struct {
@@ -1614,36 +1538,6 @@ type PurchaseItem struct {
 }
 
 func (PurchaseItem) TableName() string { return "purchase_items" }
-
-// paymentInsert is the write model for a customer payment (receivables_income).
-type paymentInsert struct {
-	ID         int64         `db:"id" play:"pk,incrementing"`
-	CompanyID  int           `db:"company_id"`
-	CustomerID int           `db:"customer_id"`
-	Date       time.Time     `db:"date"`
-	Amount     float64       `db:"amount"`
-	Notes      string        `db:"notes"`
-	Payment    string        `db:"payment"`
-	Status     PaymentStatus `db:"status"`
-	Code       string        `db:"code"`
-}
-
-func (paymentInsert) TableName() string { return "receivables_income" }
-
-// vendorPaymentInsert is the write model for a vendor payment (vendor_payments).
-type vendorPaymentInsert struct {
-	ID        int64     `db:"id" play:"pk,incrementing"`
-	CompanyID int       `db:"company_id"`
-	VendorID  int       `db:"vendor_id"`
-	Date      time.Time `db:"date"`
-	Amount    float64   `db:"amount"`
-	Notes     string    `db:"notes"`
-	Payment   string    `db:"payment"`
-	Status    string    `db:"status"`
-	Code      string    `db:"code"`
-}
-
-func (vendorPaymentInsert) TableName() string { return "vendor_payments" }
 
 // paymentItem is the write model for customer payment allocation rows
 // (receivables_income_items). Backs the bulk allocation insert.
@@ -1673,29 +1567,6 @@ type vendorPaymentItem struct {
 
 func (vendorPaymentItem) TableName() string { return "vendor_payment_items" }
 
-// accountsPayableInsert is the write model for an AP entry (accounts_payable).
-// amount_payable is a generated column and is intentionally not mapped.
-type accountsPayableInsert struct {
-	ID             int64         `db:"id" play:"pk,incrementing"`
-	CompanyID      int           `db:"company_id"`
-	VendorID       int           `db:"vendor_id"`
-	PurchaseID     int           `db:"purchase_id"`
-	InvoiceNumber  string        `db:"invoice_number"`
-	InvoiceDate    time.Time     `db:"invoice_date"`
-	DueDate        *time.Time    `db:"due_date"`
-	AmountTotal    float64       `db:"amount_total"`
-	TaxAmount      float64       `db:"tax_amount"`
-	DiscountAmount float64       `db:"discount_amount"`
-	AmountPaid     float64       `db:"amount_paid"`
-	Currency       string        `db:"currency"`
-	PaymentTerms   string        `db:"payment_terms"`
-	Status         PayableStatus `db:"status"`
-	PaidStatus     PaidStatus    `db:"paid_status"`
-	CreatedBy      int           `db:"created_by"`
-}
-
-func (accountsPayableInsert) TableName() string { return "accounts_payable" }
-
 // payableRegister is the write model for the payables cross-reference row.
 type payableRegister struct {
 	ID                int64 `db:"id" play:"pk,incrementing"`
@@ -1705,52 +1576,6 @@ type payableRegister struct {
 }
 
 func (payableRegister) TableName() string { return "payables" }
-
-// openingInvoiceInsert is the write model for a customer's opening-balance invoice
-// — a partial-column insert (the rest of invoices' columns take DB defaults), so
-// it is a dedicated model rather than the full invoiceInsert.
-type openingInvoiceInsert struct {
-	ID         int64         `db:"id" play:"pk,incrementing"`
-	CompanyID  int           `db:"company_id"`
-	Date       time.Time     `db:"date"`
-	Type       TermType      `db:"type"`
-	DueOn      time.Time     `db:"due_on"`
-	CustomerID int           `db:"customer_id"`
-	Amount     float64       `db:"amount"`
-	AmountDue  float64       `db:"amount_due"`
-	Total      float64       `db:"total"`
-	Note       string        `db:"note"`
-	Status     InvoiceStatus `db:"status"`
-	PaidStatus PaidStatus    `db:"paid_status"`
-	Code       string        `db:"code"`
-}
-
-func (openingInvoiceInsert) TableName() string { return "invoices" }
-
-// openingPayableInsert is the write model for a vendor's opening-balance AP entry.
-// Its column set differs from accountsPayableInsert (no purchase_id; carries
-// payment_method + notes), so it is its own model. amount_payable is generated.
-type openingPayableInsert struct {
-	ID             int64         `db:"id" play:"pk,incrementing"`
-	CompanyID      int           `db:"company_id"`
-	VendorID       int           `db:"vendor_id"`
-	InvoiceNumber  string        `db:"invoice_number"`
-	InvoiceDate    time.Time     `db:"invoice_date"`
-	DueDate        time.Time     `db:"due_date"`
-	AmountTotal    float64       `db:"amount_total"`
-	TaxAmount      float64       `db:"tax_amount"`
-	DiscountAmount float64       `db:"discount_amount"`
-	AmountPaid     float64       `db:"amount_paid"`
-	Currency       string        `db:"currency"`
-	PaymentTerms   string        `db:"payment_terms"`
-	PaymentMethod  string        `db:"payment_method"`
-	Status         PayableStatus `db:"status"`
-	PaidStatus     PaidStatus    `db:"paid_status"`
-	Notes          string        `db:"notes"`
-	CreatedBy      int           `db:"created_by"`
-}
-
-func (openingPayableInsert) TableName() string { return "accounts_payable" }
 
 // itemUnitRead is the playsql read model for the items_units link table.
 //
@@ -1785,7 +1610,7 @@ func (itemUnitRead) TableName() string { return "items_units" }
 //
 // identifiers is jsonb. ItemIdentifiers is a struct, and playsql treats a struct
 // field as a relation, so the column is scanned raw and unmarshalled in toItem —
-// the same shape invoiceRead uses for discount and payment.
+// the same shape invoiceModel uses for discount and payment.
 //
 // TaxID is an int64 to match taxRead.ID.
 type itemRead struct {

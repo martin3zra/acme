@@ -59,8 +59,8 @@ func (s *Server) findPayments(ctx context.Context) ([]*payment, error) {
 		return nil, err
 	}
 
-	var rows []paymentRead
-	if err := pdb.Model(&paymentRead{}).
+	var rows []paymentModel
+	if err := pdb.Model(&paymentModel{}).
 		WithConstraint("Customer", withTrashedRelation).
 		WithCount("Items", playsql.As("invoices")).
 		WhereEq("company_id", CurrentCompany(ctx).ID).
@@ -84,8 +84,8 @@ func (s *Server) findPaymentByUUID(ctx context.Context, uuid string) (*payment, 
 		return nil, err
 	}
 
-	var row paymentRead
-	if err := pdb.Model(&paymentRead{}).
+	var row paymentModel
+	if err := pdb.Model(&paymentModel{}).
 		WithConstraint("Customer", withTrashedRelation).
 		WithCount("Items", playsql.As("invoices")).
 		WithTrashed().
@@ -171,20 +171,22 @@ func (s *Server) storePayment(ctx context.Context, form *StorePaymentForm) error
 		if err != nil {
 			return err
 		}
-		payment := &paymentInsert{
-			CompanyID:  companyID,
-			CustomerID: int(customer.ID),
-			Date:       form.Date,
-			Amount:     form.Amount,
-			Notes:      form.Notes,
-			Payment:    foundation.ToJSON(form.Payment),
-			Status:     PaymentStatuses.Completed,
-			Code:       seqInfo.Code,
-		}
-		if err = ptx.Insert(context.Background(), payment); err != nil {
+		// Map insert so uuid stays unset for the DB default; the merged
+		// paymentModel maps uuid, which a struct insert would write as empty.
+		paymentID64, err := ptx.Model(&paymentModel{}).Insert(context.Background(), map[string]any{
+			"company_id":  companyID,
+			"customer_id": int(customer.ID),
+			"date":        form.Date,
+			"amount":      form.Amount,
+			"notes":       form.Notes,
+			"payment":     foundation.ToJSON(form.Payment),
+			"status":      PaymentStatuses.Completed,
+			"code":        seqInfo.Code,
+		})
+		if err != nil {
 			return err
 		}
-		paymentID := int(payment.ID)
+		paymentID := int(paymentID64)
 
 		if err = s.attachPaymentLines(tx, ctx, paymentID, form); err != nil {
 			return err
@@ -274,7 +276,7 @@ func (s *Server) voidPayment(ctx context.Context, uuid string) error {
 
 		// Mark the payment voided and drop its payment blob. A nil map value writes
 		// NULL; the enum needs no ::payment_status cast, Postgres resolves it.
-		_, err = ptx.Model(&paymentInsert{}).
+		_, err = ptx.Model(&paymentModel{}).
 			WhereEq("company_id", companyID).
 			WhereEq("id", payment.ID).
 			Update(context.Background(), map[string]any{
@@ -308,7 +310,7 @@ func (s *Server) updatePayment(ctx context.Context, uuid string, form *UpdatePay
 		}
 
 		// The statement it replaced was prepared for a single execution.
-		if _, err = ptx.Model(&paymentInsert{}).
+		if _, err = ptx.Model(&paymentModel{}).
 			WhereEq("company_id", CurrentCompany(ctx).ID).
 			WhereEq("id", payment.ID).
 			Update(context.Background(), map[string]any{
