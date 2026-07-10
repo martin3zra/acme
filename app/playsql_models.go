@@ -1706,3 +1706,111 @@ type openingPayableInsert struct {
 }
 
 func (openingPayableInsert) TableName() string { return "accounts_payable" }
+
+// itemUnitRead is the playsql read model for the items_units link table.
+//
+// No softdelete tag: the LEFT JOIN LATERAL it replaces never filtered deleted_at,
+// and the (company_id, item_id) unique constraint added in migration 20260709120000
+// does not consider it either.
+//
+// ItemID is an int, not an int64, so it matches itemRead.ID by Go value — the eager
+// loader groups children on that field, and a width mismatch silently yields no
+// relation. UnitID is an int64 to match unitRead.ID for the same reason.
+type itemUnitRead struct {
+	ID        int64 `db:"id" play:"pk,incrementing"`
+	CompanyID int   `db:"company_id"`
+	ItemID    int   `db:"item_id"`
+	UnitID    int64 `db:"unit_id"`
+
+	// Mapped so the upsert stamps them. playsql only emits a timestamp column the
+	// model knows about, filling it with Go's time.Now(); attachItemUnit's DO UPDATE
+	// list names updated_at, which then compiles to `updated_at = EXCLUDED.updated_at`
+	// and carries that stamp. Unmap it and EXCLUDED.updated_at falls back to the
+	// column default, CURRENT_TIMESTAMP -- the transaction's start time, which under
+	// the txdb test harness never advances.
+	CreatedAt *time.Time `db:"created_at"`
+	UpdatedAt *time.Time `db:"updated_at"`
+
+	Unit *unitRead `play:"belongsTo,fk=unit_id"`
+}
+
+func (itemUnitRead) TableName() string { return "items_units" }
+
+// itemRead is the playsql read model for the items table.
+//
+// identifiers is jsonb. ItemIdentifiers is a struct, and playsql treats a struct
+// field as a relation, so the column is scanned raw and unmarshalled in toItem —
+// the same shape invoiceRead uses for discount and payment.
+//
+// TaxID is an int64 to match taxRead.ID.
+type itemRead struct {
+	ID          int               `db:"id" play:"pk,incrementing"`
+	CompanyID   int               `db:"company_id"`
+	UUID        string            `db:"uuid"`
+	Name        string            `db:"name"`
+	Price       float64           `db:"price"`
+	Description string            `db:"description"`
+	TaxID       int64             `db:"tax_id"`
+	ItemType    string            `db:"item_type"`
+	Identifiers []byte            `db:"identifiers"`
+	Status      foundation.Status `db:"status"`
+	CreatedAt   *time.Time        `db:"created_at"`
+	UpdatedAt   *time.Time        `db:"updated_at"`
+	DeletedAt   *time.Time        `db:"deleted_at" play:"softdelete"`
+
+	Tax      *taxRead      `play:"belongsTo,fk=tax_id"`
+	ItemUnit *itemUnitRead `play:"hasOne,fk=item_id"`
+}
+
+func (itemRead) TableName() string { return "items" }
+
+// withItemTax narrows the tax eager load to the three columns the old projection
+// selected (i.tax_id, t.name, t.rate). Loading the whole row would populate tax.UUID
+// and its timestamps, which the item responses have never carried.
+//
+// id is in the projection because belongsTo matches children on their primary key;
+// dropping it would leave every item's tax nil.
+func withItemTax(b *playsql.Builder) {
+	b.Select("id", "name", "rate")
+}
+
+// toItem maps the read model onto the JSON response struct.
+//
+// Tax came off an INNER JOIN, so it is always present in practice; a nil relation
+// leaves the zero tax rather than panicking. Unit came off a LEFT JOIN, so nil is a
+// normal result and item.Unit's two fields stay nil pointers.
+//
+// A malformed identifiers blob leaves Identifiers zero instead of failing the whole
+// read, matching how the other jsonb columns are handled.
+func (r itemRead) toItem() *item {
+	i := &item{
+		ID:          r.ID,
+		UUID:        r.UUID,
+		Name:        r.Name,
+		Price:       r.Price,
+		Description: r.Description,
+		ItemType:    r.ItemType,
+		Status:      r.Status,
+	}
+	i.CreatedAt = r.CreatedAt
+	i.UpdatedAt = r.UpdatedAt
+	i.DeletedAt = r.DeletedAt
+
+	if len(r.Identifiers) > 0 {
+		_ = json.Unmarshal(r.Identifiers, &i.Identifiers)
+	}
+
+	if r.Tax != nil {
+		i.Tax = *r.Tax.toTax()
+	} else {
+		i.Tax.ID = r.TaxID
+	}
+
+	if r.ItemUnit != nil && r.ItemUnit.Unit != nil {
+		id := int(r.ItemUnit.Unit.ID)
+		name := r.ItemUnit.Unit.Name
+		i.Unit.ID, i.Unit.Name = &id, &name
+	}
+
+	return i
+}
