@@ -761,6 +761,10 @@ type itemVariantRead struct {
 	Name           string  `db:"name"`
 	SKU            *string `db:"sku"`
 	IsDefault      bool    `db:"is_default"`
+
+	// findPurchaseLines reaches the item through the variant (iv.item_id), not from a
+	// column on purchase_items. Only that read loads it.
+	Item *lineItemRead `play:"belongsTo,fk=item_id"`
 }
 
 func (itemVariantRead) TableName() string { return "items_variants" }
@@ -1821,13 +1825,14 @@ func (r itemRead) toItem() *item {
 	return i
 }
 
-// invoiceLineItemRead is a second read model over `items`, for invoice lines.
+// lineItemRead is a second read model over `items`, for invoice and purchase lines.
 //
 // It exists instead of reusing itemRead because itemRead carries a softdelete tag,
-// and playsql excludes soft-deleted rows from an eager load. findInvoiceLines'
-// `INNER JOIN items` never filtered deleted_at: a line on a since-deleted item still
-// rendered its name and description, and a historical invoice must keep doing so.
-type invoiceLineItemRead struct {
+// and playsql excludes soft-deleted rows from an eager load. Neither
+// findInvoiceLines' nor findPurchaseLines' `INNER JOIN items` filtered deleted_at: a
+// line on a since-deleted item still rendered its name and description, and a
+// historical document must keep doing so.
+type lineItemRead struct {
 	ID          int    `db:"id" play:"pk,incrementing"`
 	CompanyID   int    `db:"company_id"`
 	Name        string `db:"name"`
@@ -1839,7 +1844,7 @@ type invoiceLineItemRead struct {
 	ItemUnit *itemUnitRead `play:"hasOne,fk=item_id"`
 }
 
-func (invoiceLineItemRead) TableName() string { return "items" }
+func (lineItemRead) TableName() string { return "items" }
 
 // withInvoiceLineTax narrows the tax eager load to the two columns the old query
 // selected, taxes.id and taxes.name. Unlike withItemTax this is a projection
@@ -1890,8 +1895,8 @@ type invoiceLineRead struct {
 	UpdatedAt   *time.Time `db:"updated_at"`
 	DeletedAt   *time.Time `db:"deleted_at"`
 
-	Item    *invoiceLineItemRead `play:"belongsTo,fk=item_id"`
-	Variant *itemVariantRead     `play:"belongsTo,fk=variant_id"`
+	Item    *lineItemRead    `play:"belongsTo,fk=item_id"`
+	Variant *itemVariantRead `play:"belongsTo,fk=variant_id"`
 }
 
 func (invoiceLineRead) TableName() string { return "invoices_items" }
@@ -1953,6 +1958,137 @@ func (r invoiceLineRead) toLine() *line {
 	// `CASE WHEN iv.is_default THEN it.name ELSE it.name || ' — ' || iv.name END`.
 	if r.Item != nil && r.Variant != nil && !r.Variant.IsDefault {
 		l.Name = r.Item.Name + " — " + r.Variant.Name
+	}
+
+	return l
+}
+
+// purchaseLineRead is the playsql read model for purchase_items.
+//
+// UnitID and TaxID are nullable columns mapped as plain int64 rather than pointers.
+// A NULL scans to 0, no row carries id 0, so the belongsTo simply resolves to nil —
+// which is exactly the fallback arm of the `COALESCE(pi.unit_id, ...)` and
+// `COALESCE(pi.tax_id, it.tax_id)` the old query used. A pointer field would break the
+// relation instead: the loader matches a child's primary key against the parent's
+// foreign-key field by Go value, and a *int64 never equals an int64.
+type purchaseLineRead struct {
+	ID         int64      `db:"id" play:"pk,incrementing"`
+	CompanyID  int        `db:"company_id"`
+	PurchaseID int        `db:"purchase_id"`
+	VariantID  int        `db:"variant_id"`
+	Qty        float64    `db:"qty"`
+	UnitPrice  float64    `db:"unit_price"`
+	LineTotal  float64    `db:"line_total"`
+	UnitID     int64      `db:"unit_id"`
+	TaxID      int64      `db:"tax_id"`
+	TaxAmount  float64    `db:"tax_amount"`
+	CreatedAt  *time.Time `db:"created_at"`
+	UpdatedAt  *time.Time `db:"updated_at"`
+	DeletedAt  *time.Time `db:"deleted_at" play:"softdelete"`
+
+	Variant *itemVariantRead `play:"belongsTo,fk=variant_id"`
+	// SelectedUnit is the line's own unit override (LEFT JOIN units ON pi.unit_id).
+	SelectedUnit *unitRead `play:"belongsTo,fk=unit_id"`
+	// LineTax is the line's own tax override (the pi.tax_id arm of the COALESCE).
+	LineTax *taxRead `play:"belongsTo,fk=tax_id"`
+}
+
+func (purchaseLineRead) TableName() string { return "purchase_items" }
+
+// withPurchaseLineVariant loads the variant's item, and the item's tax and unit,
+// inside the variant's own eager load. Everything below Variant is reached in one
+// traversal for the reason withInvoiceLineItem documents: two `With` paths sharing a
+// prefix reload that prefix and discard what the earlier path attached to it.
+//
+// Splitting this into With("Variant.Item.ItemUnit.Unit") + With("Variant.Item.Tax")
+// leaves the item's unit nil. It shows up only on lines that have no unit override of
+// their own, since a line with pi.unit_id set reads its unit off SelectedUnit and never
+// consults the item's — which is why the fallback is the case worth testing.
+func withPurchaseLineVariant(b *playsql.Builder) {
+	b.WithConstraint("Item", withPurchaseLineItem)
+}
+
+// withPurchaseLineItem loads the item's unit and its full tax row.
+//
+// It cannot reuse withInvoiceLineItem: that one narrows the tax to (id, name) because
+// an invoice line freezes its own rate on invoices_items. A purchase line has no rate
+// column — the old query selected taxes.rate — so the rate must come off the tax row.
+func withPurchaseLineItem(b *playsql.Builder) {
+	b.With("ItemUnit.Unit").With("Tax")
+}
+
+// toPurchaseLine maps a purchase_items row and its relations onto the response struct.
+//
+// Like toLine, line.ID carries the *item* id — the old projection selected `it.id`
+// into it. The item is reached through the variant (iv.item_id); purchase_items has
+// no item_id column of its own.
+//
+// Two COALESCEs become nil checks:
+//
+//	COALESCE(pi.unit_id, items_units.unit_id)      -> SelectedUnit, else the item's unit
+//	COALESCE(unit_selected.name, items_units.name) -> same, for the name
+//	COALESCE(pi.tax_id, it.tax_id)                 -> LineTax, else the item's tax
+//
+// Unlike an invoice line, a purchase line's rate is read off the tax row, not frozen
+// on the line: the old query selected taxes.rate. Only tax_amount comes off the line.
+func (r purchaseLineRead) toPurchaseLine() *line {
+	l := &line{
+		ID:        0,
+		VariantID: int64(r.VariantID),
+		Qty:       int64(r.Qty),
+		Price:     r.UnitPrice,
+		Amount:    r.Qty * r.UnitPrice,
+		Total:     r.LineTotal,
+		Action:    UNCHANGED,
+	}
+	l.CreatedAt = r.CreatedAt
+	l.UpdatedAt = r.UpdatedAt
+	l.DeletedAt = r.DeletedAt
+	l.Tax.Amount = r.TaxAmount
+
+	var item *lineItemRead
+	if r.Variant != nil {
+		l.VariantName = r.Variant.Name
+		if r.Variant.SKU != nil {
+			l.VariantSKU = *r.Variant.SKU
+		}
+		item = r.Variant.Item
+	}
+
+	if item != nil {
+		l.ID = int64(item.ID)
+		l.Name = item.Name
+		l.Description = item.Description
+		if len(item.Identifiers) > 0 {
+			_ = json.Unmarshal(item.Identifiers, &l.Identifier)
+		}
+	}
+
+	// `CASE WHEN iv.is_default THEN it.name ELSE it.name || ' — ' || iv.name END`.
+	if item != nil && r.Variant != nil && !r.Variant.IsDefault {
+		l.Name = item.Name + " — " + r.Variant.Name
+	}
+
+	// COALESCE(pi.unit_id, items_units.unit_id) and its name.
+	if r.SelectedUnit != nil {
+		l.Unit.ID = r.SelectedUnit.ID
+		l.Unit.Name = r.SelectedUnit.Name
+	} else if item != nil && item.ItemUnit != nil {
+		l.Unit.ID = item.ItemUnit.UnitID
+		if item.ItemUnit.Unit != nil {
+			l.Unit.Name = item.ItemUnit.Unit.Name
+		}
+	}
+
+	// COALESCE(pi.tax_id, it.tax_id): the line's own tax wins, else the item's.
+	tax := r.LineTax
+	if tax == nil && item != nil {
+		tax = item.Tax
+	}
+	if tax != nil {
+		l.Tax.ID = tax.ID
+		l.Tax.Name = tax.Name
+		l.Tax.Rate = tax.Rate
 	}
 
 	return l
