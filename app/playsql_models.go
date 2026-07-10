@@ -33,8 +33,13 @@ func (s *Server) play() (*playsql.DB, error) {
 	return s.plan, nil
 }
 
-// playOn is play for the free functions and User methods that receive a bare
-// *sql.DB rather than a *Server (the auth resolvers, User.Account, and friends).
+// playOn wraps a request-scoped *sql.DB with playsql. Unlike (*Server).play, which
+// returns the process-wide plan built once in Boot, these callers are handed a db
+// they do not own: the forge auth resolvers (NewAuth reads the connection from the
+// request context), the validator (StoreProfileForm.Rules), and the *User/*AuthUser
+// methods invoked with the caller's db. In tests that handle is the per-test
+// transaction, so this must wrap the exact db passed — not the cached plan, which
+// would pin these paths to one Server's connection and break test isolation.
 func playOn(db *sql.DB) (*playsql.DB, error) {
 	return playsql.Use(db, "postgres")
 }
