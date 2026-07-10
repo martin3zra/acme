@@ -48,7 +48,7 @@ func (s *Server) SharedProps(next routing.HandlerFunc) routing.HandlerFunc {
 			var err error
 			currentCompany, err = getCurrentCompany(attrs)
 			if err != nil {
-				fmt.Printf("Error converting current company: %v\n", err)
+				log.Printf("Error converting current company: %v", err)
 			}
 			ownedBy = getAccount(attrs)
 		}
@@ -75,6 +75,7 @@ func (s *Server) SharedProps(next routing.HandlerFunc) routing.HandlerFunc {
 			"errors":       errors,
 			"flash":        flash,
 			"translations": translations,
+			"sse_url":      s.config.sse.url,
 		}
 
 		s.sessionManager.AgeFlash(session)

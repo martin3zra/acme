@@ -85,12 +85,15 @@ export type PageProps<T extends Record<string, unknown> = Record<string, unknown
   auth: Auth;
   flash: Flash;
   csrf_token: string;
+  /** Absolute base URL of the event-stream server, e.g. http://localhost:8090 */
+  sse_url: string;
 };
 
 export interface SharedData {
   auth: Auth;
   flash: Flash;
   csrf_token: string;
+  sse_url: string;
 }
 
 export const CustomerTypes = ['individual', 'business'] as const;

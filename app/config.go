@@ -2,7 +2,10 @@ package app
 
 import (
 	"encoding/base64"
+	"fmt"
 	"log"
+	"net"
+	"net/url"
 	"os"
 	"strconv"
 	"strings"
@@ -20,6 +23,7 @@ type Config struct {
 	session      Session
 	secretKey    []byte
 	mail         Mail
+	sse          SSE
 }
 
 func (c *Config) ensureHasBeenSet() {
@@ -54,6 +58,14 @@ func (c *Config) ensureHasBeenSet() {
 		panic("APP_KEY should be set as environment variable")
 	}
 
+	if c.sse.port == "" {
+		panic("SSE port number should be set as environment variable")
+	}
+
+	if c.sse.url == "" {
+		panic("SSE URL should be set as environment variable")
+	}
+
 }
 
 func LoadConfig() *Config {
@@ -63,6 +75,11 @@ func LoadConfig() *Config {
 	}
 
 	lifetimeSession, _ := strconv.Atoi(os.Getenv("SESSION_LIFETIME"))
+
+	ssePort := os.Getenv("SSE_PORT")
+	if ssePort == "" {
+		ssePort = defaultSSEPort
+	}
 
 	encoded := os.Getenv("APP_KEY")
 	if encoded == "" {
@@ -111,7 +128,44 @@ func LoadConfig() *Config {
 			Password:    os.Getenv("MAIL_PASSWORD"),
 			Encryption:  os.Getenv("MAIL_ENCRYPTION"),
 		},
+		sse: SSE{
+			port: ssePort,
+			url:  resolveSSEURL(os.Getenv("SSE_URL"), os.Getenv("APP_URL"), ssePort),
+		},
 	}
+}
+
+const defaultSSEPort = "8090"
+
+// SSE holds the event-stream listener's port and the absolute base URL the
+// browser dials. They differ whenever a reverse proxy terminates the stream on
+// a different host, scheme, or port than the one the process binds.
+type SSE struct {
+	port string
+	url  string
+}
+
+// resolveSSEURL prefers an explicit SSE_URL, which is what a deployment behind
+// a proxy or TLS terminator needs. Otherwise it reuses APP_URL's scheme and
+// host with the SSE port swapped in, so a stock local setup needs no extra
+// configuration. The value is served to the browser as a shared Inertia prop
+// rather than baked into the bundle, so one build runs in every environment.
+func resolveSSEURL(explicit, appURL, ssePort string) string {
+	if explicit != "" {
+		return strings.TrimSuffix(explicit, "/")
+	}
+
+	parsed, err := url.Parse(appURL)
+	if err != nil || parsed.Hostname() == "" {
+		return "http://localhost:" + ssePort
+	}
+
+	scheme := parsed.Scheme
+	if scheme == "" {
+		scheme = "http"
+	}
+
+	return fmt.Sprintf("%s://%s", scheme, net.JoinHostPort(parsed.Hostname(), ssePort))
 }
 
 type Database struct {

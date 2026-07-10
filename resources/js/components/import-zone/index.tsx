@@ -3,7 +3,8 @@ import { Separator } from '@/components/ui/separator';
 import { Sheet, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { useHeader } from '@/composables/use-headers';
 import { useTranslation } from '@/hooks/use-translation';
-import { ErrorResponse } from '@/types';
+import { ErrorResponse, PageProps } from '@/types';
+import { usePage } from '@inertiajs/react';
 import axios from 'axios';
 import { useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
@@ -74,6 +75,7 @@ type Props = {
 export function ImportDrawer({ source, openImportDrawer, setImportDrawer }: Props) {
   const headers = useHeader().headers;
   const t = useTranslation().trans;
+  const { sse_url } = usePage<PageProps>().props;
   const [fileText, setFileText] = useState<string>('');
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<CsvPreview | null>(null);
@@ -160,7 +162,7 @@ export function ImportDrawer({ source, openImportDrawer, setImportDrawer }: Prop
     // Safety: ensure we are in processing state
     setState('processing');
 
-    const es = new EventSource(`http://192.168.100.250:8090/sse/imports/${importId}`);
+    const es = new EventSource(`${sse_url}/sse/imports/${importId}`);
     sseRef.current = es;
 
     es.onmessage = (e) => {

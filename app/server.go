@@ -34,6 +34,7 @@ type Server struct {
 	translator *i18n.Translator
 	route      *routing.Router
 	httpServer *http.Server
+	sseServer  *http.Server
 	// Domain-event dispatcher, lazily built on first use (see dispatcher()).
 	events     *events.Dispatcher
 	eventsOnce sync.Once
@@ -65,6 +66,20 @@ func (s *Server) Boot() {
 
 	s.configureSessionManager()
 	s.configureRouting()
+	s.configureSSEServer()
+}
+
+// configureSSEServer builds the event-stream listener here rather than inside
+// StartSSE, which runs on its own goroutine: Shutdown reads s.sseServer from
+// the main goroutine, so the field has to be written before either one starts.
+func (s *Server) configureSSEServer() {
+	mux := http.NewServeMux()
+	mux.HandleFunc("/sse/imports/", s.importEventsHandler)
+
+	s.sseServer = &http.Server{
+		Addr:    fmt.Sprintf(":%s", s.config.sse.port), // separate port = no interference
+		Handler: mux,
+	}
 }
 
 func (s *Server) configureRouting() {
@@ -102,17 +117,9 @@ func (s *Server) StartSSE() error {
 		return nil
 	}
 
-	mux := http.NewServeMux()
+	log.Printf("SSE server listening on %s", s.sseServer.Addr)
 
-	mux.HandleFunc("/sse/imports/", s.importEventsHandler)
-
-	server := &http.Server{
-		Addr:    ":8090", // separate port = no interference
-		Handler: mux,
-	}
-
-	log.Println("SSE server listening on :8090")
-	err := server.ListenAndServe()
+	err := s.sseServer.ListenAndServe()
 	if errors.Is(err, http.ErrServerClosed) {
 		return nil
 	}
@@ -137,6 +144,12 @@ func (s *Server) Shutdown(ctx context.Context) error {
 	// Attempt graceful shutdown
 	if err := s.httpServer.Shutdown(ctx); err != nil {
 		return fmt.Errorf("http shutdown: %w", err)
+	}
+
+	if s.sseServer != nil {
+		if err := s.sseServer.Shutdown(ctx); err != nil {
+			return fmt.Errorf("sse shutdown: %w", err)
+		}
 	}
 
 	return nil

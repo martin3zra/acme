@@ -46,15 +46,7 @@ func main() {
 }
 
 func run(args []string, stdout io.Writer) error {
-	// If the file doesn't exist, create it or append to the file
-	file, err := os.OpenFile("acme.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0666)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	// optional: log date-time, filename, and line number
-	log.SetFlags(log.Lshortfile | log.LstdFlags)
-	log.SetOutput(file)
+	app.InitLogger(stdout)
 
 	server := app.NewServer(assets, resources)
 	server.Boot()
