@@ -53,14 +53,28 @@ func (s *Server) findUnits(ctx context.Context) ([]*unit, error) {
 }
 
 func (s *Server) storeUnit(ctx context.Context, form *StoreUnitForm) error {
-	_, err := s.db.Exec("INSERT INTO units (company_id, name, base_qty) VALUES($1, $2, $3)",
-		CurrentCompany(ctx).ID, form.Name, form.BaseQty)
+	pdb, err := s.play()
+	if err != nil {
+		return err
+	}
+
+	_, err = pdb.Model(&unitRead{}).Insert(ctx, map[string]any{
+		"company_id": CurrentCompany(ctx).ID,
+		"name":       form.Name,
+		"base_qty":   form.BaseQty,
+	})
 	return err
 }
 
 func (s *Server) updateUnit(ctx context.Context, id int, form *StoreUnitForm) error {
-	res, err := s.db.Exec("UPDATE units SET name = $3, base_qty = $4, updated_at = NOW() WHERE company_id = $1 AND id = $2",
-		CurrentCompany(ctx).ID, id, form.Name, form.BaseQty)
+	pdb, err := s.play()
+	if err != nil {
+		return err
+	}
 
-	return mustAffectRow(res, err, "unit")
+	affected, err := pdb.Model(&unitRead{}).
+		WhereEq("company_id", CurrentCompany(ctx).ID).
+		WhereEq("id", id).
+		Update(ctx, map[string]any{"name": form.Name, "base_qty": form.BaseQty})
+	return mustAffectRows(affected, err, "unit")
 }

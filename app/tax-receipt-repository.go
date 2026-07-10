@@ -6,6 +6,7 @@ import (
 	"errors"
 
 	"github.com/martin3zra/forge/foundation"
+	"github.com/martin3zra/playsql"
 )
 
 type taxReceipt struct {
@@ -25,70 +26,39 @@ type taxReceiptSeq struct {
 	Number string
 }
 
-func (s *Server) findTaxReceiptsForSetup(ctx context.Context) ([]*taxReceipt, error) {
-	rows, err := s.db.Query(`
-		SELECT id, name, serie, type, COALESCE(sequence_start, 0), COALESCE(sequence_end, 0), COALESCE(current, 0), created_at, updated_at, deleted_at
-		FROM tax_receipts
-		WHERE company_id = $1
-		ORDER BY id;
-  `, CurrentCompany(ctx).ID)
+// findTaxesReceipts lists the company's tax receipts, newest id last.
+//
+// Neither list read filtered deleted_at, so a retired receipt still appears here.
+// grabTaxReceiptSequence filters it explicitly; that asymmetry is existing behaviour.
+//
+// The old query wrapped sequence_start, sequence_end and current in COALESCE(..., 0).
+// All three are NOT NULL, so the wrapper never had anything to coalesce.
+func (s *Server) findTaxesReceipts(ctx context.Context) ([]*taxReceipt, error) {
+	pdb, err := s.play()
 	if err != nil {
 		return nil, err
 	}
 
-	data := make([]*taxReceipt, 0)
-	for rows.Next() {
-		t := new(taxReceipt)
-		if err = rows.Scan(
-			&t.ID,
-			&t.Name,
-			&t.Serie,
-			&t.Type,
-			&t.SequenceStart,
-			&t.SequenceEnd,
-			&t.Current,
-			&t.CreatedAt,
-			&t.UpdatedAt,
-			&t.DeletedAt,
-		); err != nil {
-			return nil, err
-		}
-
-		data = append(data, t)
+	var rows []taxReceiptRead
+	if err := pdb.Model(&taxReceiptRead{}).
+		WhereEq("company_id", CurrentCompany(ctx).ID).
+		OrderBy("id", playsql.Asc).
+		Get(ctx, &rows); err != nil {
+		return nil, err
 	}
 
+	data := make([]*taxReceipt, 0, len(rows))
+	for _, r := range rows {
+		data = append(data, r.toTaxReceipt())
+	}
 	return data, nil
 }
 
-func (s *Server) findTaxesReceipts(ctx context.Context) ([]*taxReceipt, error) {
-	rows, err := s.db.Query("SELECT id, name, serie, type, sequence_start, sequence_end, current, created_at, updated_at, deleted_at "+
-		"FROM tax_receipts WHERE company_id = $1 ORDER BY id", CurrentCompany(ctx).ID)
-	if err != nil {
-		return nil, err
-	}
-
-	data := make([]*taxReceipt, 0)
-	for rows.Next() {
-		t := new(taxReceipt)
-		if err = rows.Scan(
-			&t.ID,
-			&t.Name,
-			&t.Serie,
-			&t.Type,
-			&t.SequenceStart,
-			&t.SequenceEnd,
-			&t.Current,
-			&t.CreatedAt,
-			&t.UpdatedAt,
-			&t.DeletedAt,
-		); err != nil {
-			return nil, err
-		}
-
-		data = append(data, t)
-	}
-
-	return data, nil
+// findTaxReceiptsForSetup was a byte-for-byte duplicate of findTaxesReceipts once the
+// dead COALESCEs are removed: same columns, same WHERE, same ORDER BY. It stays as a
+// named entry point for the account-setup screen.
+func (s *Server) findTaxReceiptsForSetup(ctx context.Context) ([]*taxReceipt, error) {
+	return s.findTaxesReceipts(ctx)
 }
 
 var (
@@ -150,15 +120,25 @@ func (s *Server) grabTaxReceiptSequence(tx *sql.Tx, companyId, taxReceiptID int)
 }
 
 // explainNoSequence distinguishes an exhausted receipt from one that does not belong
-// to the company. Reading ErrNoRows does not abort the caller's transaction, so this
+// to the company. A not-found read does not abort the caller's transaction, so this
 // second query is safe to run on it.
+//
+// taxReceiptRead carries no softdelete tag — the list reads never filtered deleted_at
+// — so the predicate is written out here, matching grabTaxReceiptSequence above.
 func (s *Server) explainNoSequence(tx *sql.Tx, companyId, taxReceiptID int) error {
-	var exists bool
-	err := tx.QueryRow(
-		"SELECT true FROM tax_receipts WHERE company_id = $1 AND id = $2 AND deleted_at IS NULL",
-		companyId, taxReceiptID,
-	).Scan(&exists)
-	if errors.Is(err, sql.ErrNoRows) {
+	ptx, err := playTx(tx)
+	if err != nil {
+		return err
+	}
+
+	var row taxReceiptRead
+	err = ptx.Model(&taxReceiptRead{}).
+		Select("id").
+		WhereEq("company_id", companyId).
+		WhereEq("id", taxReceiptID).
+		WhereNull("deleted_at").
+		First(context.Background(), &row)
+	if errors.Is(err, playsql.ErrNotFound) {
 		return ErrTaxReceiptNotFound
 	}
 	if err != nil {

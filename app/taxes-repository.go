@@ -19,42 +19,51 @@ func (s *Server) findTaxes(ctx context.Context) ([]*tax, error) {
 	return s.findTaxesInternal(CurrentCompany(ctx).ID)
 }
 
+// findTaxesInternal deliberately does not filter deleted_at — the raw query never
+// did, and nothing soft-deletes a tax. taxRead therefore carries no softdelete tag.
 func (s *Server) findTaxesInternal(companyID int) ([]*tax, error) {
-	rows, err := s.db.Query("SELECT id, uuid, name, rate, created_at, updated_at, deleted_at FROM taxes WHERE company_id = $1", companyID)
+	pdb, err := s.play()
 	if err != nil {
 		return nil, err
 	}
 
-	data := make([]*tax, 0)
-	for rows.Next() {
-		i := new(tax)
-		if err = rows.Scan(
-			&i.ID,
-			&i.UUID,
-			&i.Name,
-			&i.Rate,
-			&i.CreatedAt,
-			&i.UpdatedAt,
-			&i.DeletedAt,
-		); err != nil {
-			return nil, err
-		}
-
-		data = append(data, i)
+	var rows []taxRead
+	if err := pdb.Model(&taxRead{}).
+		WhereEq("company_id", companyID).
+		Get(context.Background(), &rows); err != nil {
+		return nil, err
 	}
 
+	data := make([]*tax, 0, len(rows))
+	for _, r := range rows {
+		data = append(data, r.toTax())
+	}
 	return data, nil
 }
 
 func (s *Server) storeTax(ctx context.Context, form *StoreTaxForm) error {
-	_, err := s.db.Exec("INSERT INTO taxes (company_id, name, rate) VALUES($1, $2, $3)",
-		CurrentCompany(ctx).ID, form.Name, form.Rate)
+	pdb, err := s.play()
+	if err != nil {
+		return err
+	}
+
+	_, err = pdb.Model(&taxRead{}).Insert(ctx, map[string]any{
+		"company_id": CurrentCompany(ctx).ID,
+		"name":       form.Name,
+		"rate":       form.Rate,
+	})
 	return err
 }
 
 func (s *Server) updateTax(ctx context.Context, uuid string, form *StoreTaxForm) error {
-	res, err := s.db.Exec("UPDATE taxes SET name = $3, rate = $4, updated_at = NOW() WHERE company_id = $1 AND uuid = $2",
-		CurrentCompany(ctx).ID, uuid, form.Name, form.Rate)
+	pdb, err := s.play()
+	if err != nil {
+		return err
+	}
 
-	return mustAffectRow(res, err, "tax")
+	affected, err := pdb.Model(&taxRead{}).
+		WhereEq("company_id", CurrentCompany(ctx).ID).
+		WhereEq("uuid", uuid).
+		Update(ctx, map[string]any{"name": form.Name, "rate": form.Rate})
+	return mustAffectRows(affected, err, "tax")
 }
