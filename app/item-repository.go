@@ -5,9 +5,11 @@ import (
 	"database/sql"
 	"errors"
 	"strings"
+	"time"
 
 	"github.com/martin3zra/forge/database"
 	"github.com/martin3zra/forge/foundation"
+	"github.com/martin3zra/playsql"
 )
 
 type item struct {
@@ -31,77 +33,71 @@ type item struct {
 	foundation.Timestamps
 }
 
+// findItemByID reads one item with its tax and its unit.
+//
+// The unit came through `LEFT JOIN LATERAL (... LIMIT 1)`. That lateral existed
+// because items_units could hold several rows per item — the bug migration
+// 20260709120000 fixed. With `items_units_company_item_unique (company_id, item_id)`
+// in place there is at most one link row, so the lateral is a plain hasOne and the
+// LIMIT 1 has nothing left to disambiguate. An item with no unit still comes back,
+// with item.Unit's fields nil, as the outer join produced.
+//
+// INNER JOIN taxes becomes a constrained belongsTo. It never filtered the tax's
+// deleted_at and taxRead carries no softdelete tag, so a retired tax still resolves.
 func (s *Server) findItemByID(ctx context.Context, itemID int) (*item, error) {
-	var i item
-	err := s.db.QueryRow("SELECT i.id, i.uuid, i.name, i.price, i.description, i.tax_id, t.name, t.rate, i.status, "+
-		"i.item_type, i.identifiers, i.created_at, i.updated_at, i.deleted_at, iu.unit_id, iu.name as unit_name  "+
-		"FROM items i "+
-		"INNER JOIN taxes t ON(i.company_id = t.company_id AND i.tax_id = t.id)"+
-		"LEFT JOIN LATERAL (SELECT iu.unit_id, u.name FROM items_units iu INNER JOIN units u ON (iu.unit_id = u.id) WHERE iu.item_id = i.id limit 1) iu ON true "+
-		"WHERE i.company_id = $1 AND i.id = $2 AND i.deleted_at IS NULL", CurrentCompany(ctx).ID, itemID).Scan(
-		&i.ID,
-		&i.UUID,
-		&i.Name,
-		&i.Price,
-		&i.Description,
-		&i.Tax.ID,
-		&i.Tax.Name,
-		&i.Tax.Rate,
-		&i.Status,
-		&i.ItemType,
-		&i.Identifiers,
-		&i.CreatedAt,
-		&i.UpdatedAt,
-		&i.DeletedAt,
-		&i.Unit.ID,
-		&i.Unit.Name,
-	)
+	pdb, err := s.play()
 	if err != nil {
 		return nil, err
 	}
 
-	return &i, nil
+	var row itemRead
+	if err := pdb.Model(&itemRead{}).
+		WithConstraint("Tax", withItemTax).
+		With("ItemUnit.Unit").
+		WhereEq("company_id", CurrentCompany(ctx).ID).
+		WhereEq("id", itemID).
+		First(ctx, &row); err != nil {
+		return nil, err
+	}
+
+	return row.toItem(), nil
 }
 
+// findItems lists the company's items, ordered by name.
+//
+// `($2 = 'all' OR i.item_type = $2::item_type)` was a filter that disables itself for
+// the sentinel value; Unless says that directly. The relations are loaded as in
+// findItemByID.
 func (s *Server) findItems(ctx context.Context, itemType ItemType) ([]*item, error) {
-
-	is, err := s.db.Query("SELECT i.id, i.uuid, i.name, i.price, i.description, i.tax_id, t.name, t.rate, i.status, "+
-		"i.item_type, i.identifiers, i.created_at, i.updated_at, i.deleted_at, iu.unit_id, iu.name as unit_name "+
-		"FROM items i "+
-		"INNER JOIN taxes t ON(i.company_id = t.company_id AND i.tax_id = t.id) "+
-		"LEFT JOIN LATERAL (SELECT iu.unit_id, u.name FROM items_units iu INNER JOIN units u ON (iu.unit_id = u.id) WHERE iu.item_id = i.id limit 1) iu ON true "+
-		"WHERE i.company_id = $1 AND i.deleted_at IS NULL  AND ($2 = 'all' OR i.item_type = $2::item_type) ORDER BY i.name", CurrentCompany(ctx).ID, itemType)
+	pdb, err := s.play()
 	if err != nil {
 		return nil, err
 	}
-	data := make([]*item, 0)
-	for is.Next() {
-		i := new(item)
-		if err = is.Scan(
-			&i.ID,
-			&i.UUID,
-			&i.Name,
-			&i.Price,
-			&i.Description,
-			&i.Tax.ID,
-			&i.Tax.Name,
-			&i.Tax.Rate,
-			&i.Status,
-			&i.ItemType,
-			&i.Identifiers,
-			&i.CreatedAt,
-			&i.UpdatedAt,
-			&i.DeletedAt,
-			&i.Unit.ID,
-			&i.Unit.Name,
-		); err != nil {
-			return nil, err
-		}
-		data = append(data, i)
+
+	var rows []itemRead
+	if err := pdb.Model(&itemRead{}).
+		WithConstraint("Tax", withItemTax).
+		With("ItemUnit.Unit").
+		WhereEq("company_id", CurrentCompany(ctx).ID).
+		Unless(itemType == ItemTypeAll, func(q *playsql.Builder) {
+			q.WhereEq("item_type", string(itemType))
+		}).
+		OrderBy("name", playsql.Asc).
+		Get(ctx, &rows); err != nil {
+		return nil, err
+	}
+
+	data := make([]*item, 0, len(rows))
+	for _, r := range rows {
+		data = append(data, r.toItem())
 	}
 	return data, nil
 }
 
+// findItemsByCriteria stays on raw database/sql: it expands one row per sellable
+// variant with a CASE-built name, ORs an ILIKE across jsonb keys and joined variant
+// columns, and orders by a boolean expression. None of that is expressible as a
+// model read, and WhereRaw takes no bind parameters.
 func (s *Server) findItemsByCriteria(ctx context.Context, term string) ([]*item, error) {
 	if len(strings.TrimSpace(term)) == 0 {
 		return nil, errors.New("need to specifiy the item you're looking for")
@@ -163,6 +159,9 @@ func (s *Server) findItemsByCriteria(ctx context.Context, term string) ([]*item,
 	return data, nil
 }
 
+// findItemsByReference stays raw for the same reasons as findItemsByCriteria: the
+// CASE name, the exact-match OR group across item and variant columns, and the
+// `ORDER BY (iv.sku = $2 OR ...) DESC` that ranks a variant hit above the default.
 func (s *Server) findItemsByReference(ctx context.Context, term string) (*item, error) {
 	if len(strings.TrimSpace(term)) == 0 {
 		return nil, errors.New("need to specifiy the item you're looking for")
@@ -222,23 +221,8 @@ func (s *Server) storeItemBackground(tx *sql.Tx, companyID int, form *StoreItemF
 }
 
 func (s *Server) storeItemInternal(tx *sql.Tx, companyID int, form *StoreItemForm) error {
-	stmt, err := tx.Prepare("INSERT INTO items (name, price, description, tax_id, item_type, identifiers, company_id) " +
-		"VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id")
-	if err != nil {
-		return err
-	}
-
-	var itemID int
-	err = stmt.QueryRow(
-		&form.Name,
-		form.Price,
-		form.Description,
-		form.TaxID,
-		form.ItemType,
-		foundation.ToJSON(form.Identifiers),
-		companyID,
-	).Scan(&itemID)
-
+	itemID, err := insertItemRow(tx, companyID, form.Name, form.Price, form.Description,
+		form.TaxID, form.ItemType, form.Identifiers)
 	if err != nil {
 		return err
 	}
@@ -252,8 +236,38 @@ func (s *Server) storeItemInternal(tx *sql.Tx, companyID int, form *StoreItemFor
 	return s.storeDefaultVariant(tx, companyID, itemID, form.Name, form.Price)
 }
 
+// insertItemRow inserts the items row and returns its id. storeItemInternal and
+// insertVariantItem ran byte-for-byte identical INSERTs; they share this one now.
+//
+// The old plain-item path prepared the statement for a single execution, which costs
+// an extra round trip and leaks the *sql.Stmt — it was never closed.
+func insertItemRow(tx *sql.Tx, companyID int, name string, price float64, description string,
+	taxID int, itemType string, identifiers ItemIdentifiers) (int, error) {
+	ptx, err := playTx(tx)
+	if err != nil {
+		return 0, err
+	}
+
+	id, err := ptx.Model(&itemRead{}).Insert(context.Background(), map[string]any{
+		"company_id":  companyID,
+		"name":        name,
+		"price":       price,
+		"description": description,
+		"tax_id":      taxID,
+		"item_type":   itemType,
+		"identifiers": foundation.ToJSON(identifiers),
+	})
+	if err != nil {
+		return 0, err
+	}
+	return int(id), nil
+}
+
 // storeDefaultVariant creates the single default variant for an item (no
 // attributes). combination_signature 'default' + is_default=true.
+//
+// Stays raw: the sku is a SQL expression over gen_random_uuid(), which an Insert
+// map cannot carry as a value.
 func (s *Server) storeDefaultVariant(tx *sql.Tx, companyID, itemID int, name string, price float64) error {
 	_, err := tx.Exec(
 		`INSERT INTO items_variants
@@ -275,12 +289,17 @@ func (s *Server) storeDefaultVariant(tx *sql.Tx, companyID, itemID int, name str
 // 20260709120000 dedupes the table and adds the (company_id, item_id) constraint
 // this now conflicts on.
 func (s *Server) attachItemUnit(tx *sql.Tx, companyID, itemID, unitID int) error {
-	_, err := tx.Exec(
-		`INSERT INTO items_units (company_id, item_id, unit_id) VALUES ($1, $2, $3)
-		 ON CONFLICT (company_id, item_id)
-		 DO UPDATE SET unit_id = EXCLUDED.unit_id, updated_at = now()`,
-		companyID, itemID, unitID,
-	)
+	ptx, err := playTx(tx)
+	if err != nil {
+		return err
+	}
+
+	_, err = ptx.Model(&itemUnitRead{}).
+		Upsert(context.Background(),
+			[]map[string]any{{"company_id": companyID, "item_id": itemID, "unit_id": unitID}},
+			[]string{"company_id", "item_id"},
+			[]string{"unit_id", "updated_at"},
+		)
 	return err
 }
 
@@ -288,13 +307,12 @@ func (s *Server) attachItemUnit(tx *sql.Tx, companyID, itemID, unitID int) error
 // deliberately WITHOUT a default variant (the variant matrix supplies the
 // variants). It mirrors storeItemInternal's insert on purpose so the plain-item
 // path stays untouched.
+// insertVariantItem inserts the item row + unit for a variant-bearing item,
+// deliberately WITHOUT a default variant (the variant matrix supplies the
+// variants).
 func (s *Server) insertVariantItem(tx *sql.Tx, companyID int, form *StoreItemWithAttributesForm) (int, error) {
-	var itemID int
-	err := tx.QueryRow(
-		"INSERT INTO items (name, price, description, tax_id, item_type, identifiers, company_id) "+
-			"VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id",
-		form.Name, form.Price, form.Description, form.TaxID, form.ItemType, foundation.ToJSON(form.Identifiers), companyID,
-	).Scan(&itemID)
+	itemID, err := insertItemRow(tx, companyID, form.Name, form.Price, form.Description,
+		form.TaxID, form.ItemType, form.Identifiers)
 	if err != nil {
 		return 0, err
 	}
@@ -319,47 +337,68 @@ func (s *Server) storeItemWithVariants(ctx context.Context, form *StoreItemWithA
 	})
 }
 
+// updateItem now inherits `deleted_at IS NULL` from itemRead's softdelete tag, which
+// the raw UPDATE lacked. Editing a soft-deleted item is a not-found.
+//
+// It also stamps items.updated_at, which the raw statement never set -- Builder.Update
+// stamps the column because itemRead maps it, and the item reads need it mapped to
+// populate the response's timestamps.
 func (s *Server) updateItem(ctx context.Context, itemID int, form *UpdateItemForm) error {
 	companyID := CurrentCompany(ctx).ID
 	return database.WithTransaction(s.db, func(tx *sql.Tx) error {
-
-		res, err := tx.Exec(
-			"UPDATE items SET name = $1, description = $2, price = $3, tax_id = $4, item_type = $5, identifiers = $6 WHERE company_id = $7 AND id = $8",
-			form.Name, form.Description, form.Price, form.TaxID, form.ItemType, foundation.ToJSON(form.Identifiers), companyID, itemID,
-		)
-
-		if err := mustAffectRow(res, err, "item"); err != nil {
+		ptx, err := playTx(tx)
+		if err != nil {
 			return err
 		}
 
-		if err = s.attachItemUnit(tx, companyID, itemID, form.UnitID); err != nil {
+		affected, err := ptx.Model(&itemRead{}).
+			WhereEq("company_id", companyID).
+			WhereEq("id", itemID).
+			Update(ctx, map[string]any{
+				"name":        form.Name,
+				"description": form.Description,
+				"price":       form.Price,
+				"tax_id":      form.TaxID,
+				"item_type":   form.ItemType,
+				"identifiers": foundation.ToJSON(form.Identifiers),
+			})
+		if err := mustAffectRows(affected, err, "item"); err != nil {
 			return err
 		}
 
-		return nil
+		return s.attachItemUnit(tx, companyID, itemID, form.UnitID)
 	})
 }
 
 func (s *Server) deleteItem(ctx context.Context, itemID int) error {
+	pdb, err := s.play()
+	if err != nil {
+		return err
+	}
 
-	res, err := s.db.Exec(
-		"UPDATE items SET deleted_at = now(), updated_at = now() WHERE company_id = $1 AND id = $2",
-		CurrentCompany(ctx).ID, itemID,
-	)
-
-	return mustAffectRow(res, err, "item")
+	affected, err := pdb.Model(&itemRead{}).
+		WhereEq("company_id", CurrentCompany(ctx).ID).
+		WhereEq("id", itemID).
+		Update(ctx, map[string]any{"deleted_at": time.Now()})
+	return mustAffectRows(affected, err, "item")
 }
 
 func (s *Server) toggleItemStatus(ctx context.Context, item *item) error {
+	pdb, err := s.play()
+	if err != nil {
+		return err
+	}
+
 	status := item.Status
 	if status == "enabled" {
 		status = "disabled"
 	} else {
 		status = "enabled"
 	}
-	res, err := s.db.Exec(
-		"UPDATE items SET updated_at = now(), status = $3 WHERE company_id = $1 AND id = $2",
-		CurrentCompany(ctx).ID, item.ID, status,
-	)
-	return mustAffectRow(res, err, "item")
+
+	affected, err := pdb.Model(&itemRead{}).
+		WhereEq("company_id", CurrentCompany(ctx).ID).
+		WhereEq("id", item.ID).
+		Update(ctx, map[string]any{"status": string(status)})
+	return mustAffectRows(affected, err, "item")
 }
