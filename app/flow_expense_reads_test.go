@@ -176,8 +176,10 @@ func TestFindExpenseByUUID_TrashedStillReadable(t *testing.T) {
 	is.True(e.DeletedAt != nil, "the soft-deleted expense should still report deleted_at")
 }
 
-// TestUpdateExpense: reassigns the category and leaves updated_at alone, matching
-// the statement it replaced (expenseInsert does not map updated_at).
+// TestUpdateExpense: reassigns the category and now bumps updated_at. The merged
+// expenseModel maps updated_at, so the map Update stamps it — uniform with
+// updateExpenseCategory and the rest of the write paths (the pre-merge insert model
+// left it unmapped, so the old behavior was to leave updated_at alone).
 func TestUpdateExpense(t *testing.T) {
 	s := newTestServer(t)
 	is := newIs(t)
@@ -198,11 +200,31 @@ func TestUpdateExpense(t *testing.T) {
 	is.EqualFloat(e.Amount, 250)
 	is.Equal(e.Notes, "revised")
 	is.Equal(e.Category.Name, "Fuel")
-	is.Equal(scalarString(t, s.db, `SELECT updated_at::text FROM expenses WHERE uuid = $1`, uuid), before)
+	is.True(scalarString(t, s.db, `SELECT updated_at::text FROM expenses WHERE uuid = $1`, uuid) != before,
+		"updateExpense should now bump updated_at")
+}
+
+// TestStoreExpense_StampsTimestamps: after the Read/Insert merge, storeExpense
+// inserts through the merged expenseModel, which maps created_at/updated_at, so
+// playsql app-stamps both in one shot instead of leaving them to the DB default.
+// They must be non-nil and equal on a fresh row (uuid still comes from the DB).
+func TestStoreExpense_StampsTimestamps(t *testing.T) {
+	s := newTestServer(t)
+	is := newIs(t)
+	f := mkAccountCompany(t, s)
+
+	cat := mkExpenseCategory(t, f, "Rent")
+	uuid := mkExpense(t, f, cat, 100, day(-1))
+
+	e, err := f.s.findExpenseByUUID(f.ctx, uuid)
+	is.NoErr(err)
+	is.True(e.CreatedAt != nil, "created_at should be stamped on insert")
+	is.True(e.UpdatedAt != nil, "updated_at should be stamped on insert")
+	is.True(e.CreatedAt.Equal(*e.UpdatedAt), "a fresh row's created_at and updated_at are stamped together")
 }
 
 // TestUpdateExpenseCategory_BumpsUpdatedAt: the raw statement set updated_at =
-// NOW(); playsql stamps it because expenseCategoryRead maps the column.
+// NOW(); playsql stamps it because expenseCategoryModel maps the column.
 func TestUpdateExpenseCategory_BumpsUpdatedAt(t *testing.T) {
 	s := newTestServer(t)
 	is := newIs(t)
@@ -225,7 +247,7 @@ func TestUpdateExpenseCategory_BumpsUpdatedAt(t *testing.T) {
 }
 
 // TestFindExpensesCategories_HidesTrashed: the only category read that filters
-// deleted_at does it explicitly, since expenseCategoryRead has no softdelete tag.
+// deleted_at does it explicitly, since expenseCategoryModel has no softdelete tag.
 func TestFindExpensesCategories_HidesTrashed(t *testing.T) {
 	s := newTestServer(t)
 	is := newIs(t)

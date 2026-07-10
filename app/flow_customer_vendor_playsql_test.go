@@ -117,7 +117,7 @@ func TestFindCustomerByUUID_OpeningBalanceIsNotAnotherCustomers(t *testing.T) {
 }
 
 // TestFindCustomerByUUID_SkipsSoftDeleted: the read filtered deleted_at before, and
-// customerRead's softdelete tag keeps doing it.
+// customerModel's softdelete tag keeps doing it.
 func TestFindCustomerByUUID_SkipsSoftDeleted(t *testing.T) {
 	s := newTestServer(t)
 	is := newIs(t)
@@ -135,7 +135,7 @@ func TestFindCustomerByUUID_SkipsSoftDeleted(t *testing.T) {
 
 // TestCustomerWrites_SoftDeleteNarrowing pins a deliberate narrowing. The raw
 // UPDATEs had no deleted_at predicate, so a soft-deleted customer could still be
-// edited, toggled, and re-deleted, each reporting success. customerRead's softdelete
+// edited, toggled, and re-deleted, each reporting success. customerModel's softdelete
 // tag makes all three not-found.
 func TestCustomerWrites_SoftDeleteNarrowing(t *testing.T) {
 	s := newTestServer(t)

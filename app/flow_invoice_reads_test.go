@@ -142,7 +142,7 @@ func TestFindInvoicesByID_DocumentWithoutTaxReceipt(t *testing.T) {
 	is.True(est.Customer.UUID != "", "customer should still be eager-loaded")
 }
 
-// TestFindInvoices_SoftDeletedCustomer: customerRead is softdelete-tagged, but the
+// TestFindInvoices_SoftDeletedCustomer: customerModel is softdelete-tagged, but the
 // old INNER JOIN never filtered deleted_at, so the invoice must still render.
 func TestFindInvoices_SoftDeletedCustomer(t *testing.T) {
 	s := newTestServer(t)

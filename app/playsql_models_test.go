@@ -30,17 +30,24 @@ type psInvoice struct {
 
 func (psInvoice) TableName() string { return "invoices" }
 
-// playDB wraps the harness's per-test go-txdb connection with playsql, spoken to
-// with the "postgres" grammar. Because Use() bypasses sql.Open, reads ride the
-// same single-connection transaction as the rest of the test — same uncommitted
-// data, same rollback isolation. The caller owns s.db, so we never Close pdb.
-func playDB(t *testing.T, s *Server) *playsql.DB {
-	t.Helper()
-	pdb, err := playsql.Use(s.db, "postgres")
-	if err != nil {
-		t.Fatalf("playsql.Use: %v", err)
-	}
-	return pdb
+// TestConfigurePlan covers the production Boot wiring directly: newTestServer sets
+// s.plan inline, but Boot builds it via configurePlan. Assert that method leaves a
+// live executor that s.play() hands back and that reads through it work.
+func TestConfigurePlan(t *testing.T) {
+	is := newIs(t)
+	s := newTestServer(t)
+	s.plan = nil // undo the harness so configurePlan is what wires it
+
+	s.configurePlan()
+	is.True(s.plan != nil, "configurePlan should wire s.plan")
+
+	pdb, err := s.play()
+	is.NoErr(err)
+	is.True(pdb == s.plan, "play() should return the cached plan")
+
+	// The executor is usable: a trivial read compiles and runs.
+	_, err = pdb.Model(&customerModel{}).Count(context.Background())
+	is.NoErr(err)
 }
 
 // TestPlaysqlReadInvoice proves phase-1 reads: create a cash invoice through the
@@ -57,7 +64,7 @@ func TestPlaysqlReadInvoice(t *testing.T) {
 	uuid := newInvoice(t, f, g).ForCustomer(custID).Cash().
 		WithLine(itemID, 2, 100, 18).Build()
 
-	inv, err := playsql.Query[psInvoice](playDB(t, s)).
+	inv, err := playsql.Query[psInvoice](s.plan).
 		WhereEq("company_id", int64(f.company.ID)).
 		WhereEq("uuid", uuid).
 		First(context.Background())

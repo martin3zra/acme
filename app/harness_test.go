@@ -19,6 +19,7 @@ import (
 	"github.com/martin3zra/forge/i18n"
 	"github.com/martin3zra/forge/routing"
 	"github.com/martin3zra/forge/session"
+	"github.com/martin3zra/playsql"
 	gonertia "github.com/romsar/gonertia/v2"
 )
 
@@ -46,7 +47,15 @@ func newTestServer(t *testing.T) *Server {
 	}
 	t.Cleanup(func() { _ = db.Close() })
 
-	return &Server{db: db}
+	// Mirror Boot's configurePlan so s.play() returns a live executor in tests.
+	// playsql.Use rides the same single-connection txdb transaction, so reads see
+	// the test's uncommitted writes and roll back with it.
+	pdb, err := playsql.Use(db, "postgres")
+	if err != nil {
+		t.Fatalf("playsql.Use: %v", err)
+	}
+
+	return &Server{db: db, plan: pdb}
 }
 
 // newHandlerServer is a test server with the extra wiring HTTP handlers need:

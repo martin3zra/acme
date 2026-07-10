@@ -20,10 +20,12 @@ import (
 	"github.com/martin3zra/forge/mailer"
 	"github.com/martin3zra/forge/routing"
 	"github.com/martin3zra/forge/session"
+	"github.com/martin3zra/playsql"
 )
 
 type Server struct {
 	db             *sql.DB
+	plan           *playsql.DB
 	config         *Config
 	sessionManager *session.SessionManager
 	mailer         mailer.Mailer
@@ -58,6 +60,7 @@ func (s *Server) Boot() {
 
 	s.config.ensureHasBeenSet()
 	s.openDatabaseConnection()
+	s.configurePlan()
 	s.configureMailClient()
 
 	if s.isRunningInCLI() {
@@ -67,6 +70,19 @@ func (s *Server) Boot() {
 	s.configureSessionManager()
 	s.configureRouting()
 	s.configureSSEServer()
+}
+
+// configurePlan builds the process-wide playsql read executor once, off the
+// server pool. It is safe to share across request goroutines: the returned
+// *playsql.DB holds only the concurrency-safe *sql.DB and an immutable grammar,
+// and every .Model() call allocates a fresh builder. Built before the CLI early
+// return in Boot because CLI commands run read paths too.
+func (s *Server) configurePlan() {
+	pdb, err := playsql.Use(s.db, "postgres")
+	if err != nil {
+		log.Fatalf("playsql.Use: %v", err)
+	}
+	s.plan = pdb
 }
 
 // configureSSEServer builds the event-stream listener here rather than inside

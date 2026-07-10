@@ -69,9 +69,9 @@ func (s *Server) findCustomeByID(ctx context.Context, customerID int) (*customer
 
 	// The old query INNER JOINed companies purely to assert the tenant row
 	// exists; the company_id predicate already scopes it, so the join is
-	// dropped. The softdelete tag on customerRead adds "deleted_at IS NULL".
-	var row customerRead
-	err = pdb.Model(&customerRead{}).
+	// dropped. The softdelete tag on customerModel adds "deleted_at IS NULL".
+	var row customerModel
+	err = pdb.Model(&customerModel{}).
 		WhereEq("company_id", CurrentCompany(ctx).ID).
 		WhereEq("id", customerID).
 		First(ctx, &row)
@@ -96,8 +96,8 @@ func (s *Server) findCustomeByUUID(ctx context.Context, customerID string) (*cus
 		return nil, err
 	}
 
-	var row customerRead
-	if err := pdb.Model(&customerRead{}).
+	var row customerModel
+	if err := pdb.Model(&customerModel{}).
 		WithConstraint("OpeningInvoice", withOpeningInvoice).
 		WhereEq("company_id", CurrentCompany(ctx).ID).
 		WhereEq("uuid", customerID).
@@ -116,8 +116,8 @@ func (s *Server) findCustomers(ctx context.Context, customerType CustomerType) (
 		return nil, err
 	}
 
-	var rows []customerRead
-	if err := pdb.Model(&customerRead{}).
+	var rows []customerModel
+	if err := pdb.Model(&customerModel{}).
 		WhereEq("company_id", CurrentCompany(ctx).ID).
 		Unless(customerType == "all", func(q *playsql.Builder) {
 			q.WhereEq("customer_type", string(customerType))
@@ -143,8 +143,8 @@ func (s *Server) findCustomersBySearchCriteria(ctx context.Context, term string)
 		return nil, err
 	}
 
-	var rows []customerRead
-	err = pdb.Model(&customerRead{}).
+	var rows []customerModel
+	err = pdb.Model(&customerModel{}).
 		WhereEq("company_id", CurrentCompany(ctx).ID).
 		Where("name", "ILIKE", "%"+term+"%").
 		WhereEq("status", "enabled").
@@ -180,26 +180,29 @@ func (s *Server) storeCustomerInternal(tx *sql.Tx, companyID int, code string, f
 	if err != nil {
 		return err
 	}
-	cust := &customerInsert{
-		CompanyID:     companyID,
-		Name:          form.Name,
-		ContactName:   form.Contact,
-		Email:         form.Email,
-		Phone:         form.Phone,
-		PaymentMethod: form.PaymentMethod,
-		PaymentTerms:  form.PaymentTerms,
-		CreditLimited: form.CreditLimited,
-		CreditLimit:   form.CreditLimit,
-		AmountDue:     form.OpenBalance,
-		CustomerType:  form.CustomerType,
-		TaxReceiptID:  form.TaxReceipt,
-		Code:          code,
-		Address:       form.Address,
-	}
-	if err = ptx.Insert(context.Background(), cust); err != nil {
+	// Map insert (not the struct form) so uuid stays unset and the DB default
+	// fills it; the merged customerModel maps uuid, which a struct insert would
+	// write as an empty string.
+	id, err := ptx.Model(&customerModel{}).Insert(context.Background(), map[string]any{
+		"company_id":     companyID,
+		"name":           form.Name,
+		"contact_name":   form.Contact,
+		"email":          form.Email,
+		"phone":          form.Phone,
+		"payment_method": form.PaymentMethod,
+		"payment_terms":  form.PaymentTerms,
+		"credit_limited": form.CreditLimited,
+		"credit_limit":   form.CreditLimit,
+		"amount_due":     form.OpenBalance,
+		"customer_type":  form.CustomerType,
+		"tax_receipt_id": form.TaxReceipt,
+		"code":           code,
+		"address":        form.Address,
+	})
+	if err != nil {
 		return err
 	}
-	customerID := int(cust.ID)
+	customerID := int(id)
 
 	if form.OpenBalance == 0 || form.OpenBalanceAsOf.IsZero() {
 		return nil
@@ -235,7 +238,7 @@ func (s *Server) storeCustomerInternal(tx *sql.Tx, companyID int, code string, f
 }
 
 // updateCustomer, deleteCustomer and toggleCustomerStatus all pick up
-// `deleted_at IS NULL` from customerRead's softdelete tag, which the raw statements
+// `deleted_at IS NULL` from customerModel's softdelete tag, which the raw statements
 // lacked. Editing or re-deleting a soft-deleted customer is now a not-found.
 func (s *Server) updateCustomer(ctx context.Context, customerID int, form *UpdateCustomerForm) error {
 	pdb, err := s.play()
@@ -243,7 +246,7 @@ func (s *Server) updateCustomer(ctx context.Context, customerID int, form *Updat
 		return err
 	}
 
-	affected, err := pdb.Model(&customerRead{}).
+	affected, err := pdb.Model(&customerModel{}).
 		WhereEq("company_id", CurrentCompany(ctx).ID).
 		WhereEq("id", customerID).
 		Update(ctx, map[string]any{
@@ -268,7 +271,7 @@ func (s *Server) deleteCustomer(ctx context.Context, customerID int) error {
 		return err
 	}
 
-	affected, err := pdb.Model(&customerRead{}).
+	affected, err := pdb.Model(&customerModel{}).
 		WhereEq("company_id", CurrentCompany(ctx).ID).
 		WhereEq("id", customerID).
 		Update(ctx, map[string]any{"deleted_at": time.Now()})
@@ -288,7 +291,7 @@ func (s *Server) toggleCustomerStatus(ctx context.Context, customer *customer) e
 		status = "enabled"
 	}
 
-	affected, err := pdb.Model(&customerRead{}).
+	affected, err := pdb.Model(&customerModel{}).
 		WhereEq("company_id", CurrentCompany(ctx).ID).
 		WhereEq("id", customer.ID).
 		Update(ctx, map[string]any{"status": string(status)})
@@ -338,8 +341,8 @@ func (s *Server) findCustomeReceivables(ctx context.Context, customerID string) 
 
 	companyID := CurrentCompany(ctx).ID
 
-	var c customerRead
-	if err := pdb.Model(&customerRead{}).
+	var c customerModel
+	if err := pdb.Model(&customerModel{}).
 		Select("id").
 		WithTrashed().
 		WhereEq("company_id", companyID).

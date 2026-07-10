@@ -104,8 +104,8 @@ func (s *Server) findExpenseByUUID(ctx context.Context, uuid string) (*expense, 
 		return nil, err
 	}
 
-	var row expenseRead
-	if err := pdb.Model(&expenseRead{}).
+	var row expenseModel
+	if err := pdb.Model(&expenseModel{}).
 		With("Category").
 		WithTrashed().
 		WhereEq("company_id", CurrentCompany(ctx).ID).
@@ -132,7 +132,7 @@ func (s *Server) findExpenses(ctx context.Context, opts ...ExpenseOption) ([]*ex
 		return nil, err
 	}
 
-	q := pdb.Model(&expenseRead{}).
+	q := pdb.Model(&expenseModel{}).
 		With("Category").
 		When(filter.IncludeDeleted, func(q *playsql.Builder) { q.WithTrashed() })
 
@@ -140,7 +140,7 @@ func (s *Server) findExpenses(ctx context.Context, opts ...ExpenseOption) ([]*ex
 	// condition that never varies.
 	applyExpenseFilter(companyID, filter)(q)
 
-	var rows []expenseRead
+	var rows []expenseModel
 	if err := q.OrderBy("id", playsql.Desc).Get(ctx, &rows); err != nil {
 		return nil, err
 	}
@@ -173,8 +173,8 @@ func (s *Server) findExpensesByCategories(ctx context.Context, opts ...ExpenseOp
 		return nil, err
 	}
 
-	var rows []expenseCategoryRead
-	if err := pdb.Model(&expenseCategoryRead{}).
+	var rows []expenseCategoryModel
+	if err := pdb.Model(&expenseCategoryModel{}).
 		Select("id", "name").
 		WithSum("Expenses", "amount", playsql.As("total_amount"), playsql.Constrain(constrain)).
 		WhereHas("Expenses", constrain).
@@ -192,15 +192,15 @@ func (s *Server) findExpensesByCategories(ctx context.Context, opts ...ExpenseOp
 }
 
 // findExpensesCategories is the only category read that hides soft-deleted rows,
-// so it filters explicitly — expenseCategoryRead carries no softdelete tag.
+// so it filters explicitly — expenseCategoryModel carries no softdelete tag.
 func (s *Server) findExpensesCategories(ctx context.Context) ([]*expenseCategory, error) {
 	pdb, err := s.play()
 	if err != nil {
 		return nil, err
 	}
 
-	var rows []expenseCategoryRead
-	if err := pdb.Model(&expenseCategoryRead{}).
+	var rows []expenseCategoryModel
+	if err := pdb.Model(&expenseCategoryModel{}).
 		WhereEq("company_id", CurrentCompany(ctx).ID).
 		WhereNull("deleted_at").
 		OrderBy("id", playsql.Desc).
@@ -221,8 +221,8 @@ func (s *Server) findExpenseCategory(ctx context.Context, uuid string) (*expense
 		return nil, err
 	}
 
-	var row expenseCategoryRead
-	if err := pdb.Model(&expenseCategoryRead{}).
+	var row expenseCategoryModel
+	if err := pdb.Model(&expenseCategoryModel{}).
 		WhereEq("company_id", CurrentCompany(ctx).ID).
 		WhereEq("uuid", uuid).
 		First(ctx, &row); err != nil {
@@ -243,18 +243,22 @@ func (s *Server) storeExpense(ctx context.Context, form *StoreExpenseForm) error
 		return err
 	}
 
-	return pdb.Insert(ctx, &expenseInsert{
-		CompanyID:  CurrentCompany(ctx).ID,
-		CategoryID: c.ID,
-		Date:       form.Date,
-		Amount:     form.Amount,
-		Notes:      form.Notes,
+	// Map insert (not the struct form) so uuid/receipt_url stay unset and the DB
+	// defaults fill them; the merged expenseModel maps uuid, which a struct insert
+	// would write as an empty string. created_at/updated_at are Go-stamped.
+	_, err = pdb.Model(&expenseModel{}).Insert(ctx, map[string]any{
+		"company_id":  CurrentCompany(ctx).ID,
+		"category_id": c.ID,
+		"date":        form.Date,
+		"amount":      form.Amount,
+		"notes":       form.Notes,
 	})
+	return err
 }
 
 // deleteExpense soft-deletes via Update rather than Delete: Builder.Delete stamps
 // deleted_at only, and the statement it replaced bumped updated_at too. Update
-// stamps updated_at for free because expenseRead maps it, and expenseRead's
+// stamps updated_at for free because expenseModel maps it, and expenseModel's
 // softdelete tag adds the `deleted_at IS NULL` guard the raw statement lacked.
 func (s *Server) deleteExpense(ctx context.Context, expenseID string) error {
 	pdb, err := s.play()
@@ -262,7 +266,7 @@ func (s *Server) deleteExpense(ctx context.Context, expenseID string) error {
 		return err
 	}
 
-	_, err = pdb.Model(&expenseRead{}).
+	_, err = pdb.Model(&expenseModel{}).
 		WhereEq("company_id", CurrentCompany(ctx).ID).
 		WhereEq("uuid", expenseID).
 		Update(ctx, map[string]any{"deleted_at": time.Now()})
@@ -280,7 +284,8 @@ func (s *Server) updateExpense(ctx context.Context, expenseID string, form *Stor
 		return err
 	}
 
-	_, err = pdb.Model(&expenseInsert{}).
+	// Now stamps updated_at (expenseModel maps it), matching the other update paths.
+	_, err = pdb.Model(&expenseModel{}).
 		WhereEq("company_id", CurrentCompany(ctx).ID).
 		WhereEq("uuid", expenseID).
 		Update(ctx, map[string]any{
@@ -298,11 +303,14 @@ func (s *Server) storeExpenseCategory(ctx context.Context, form *StoreExpenseCat
 		return err
 	}
 
-	return pdb.Insert(ctx, &expenseCategoryInsert{
-		CompanyID:   CurrentCompany(ctx).ID,
-		Name:        form.Name,
-		Description: form.Description,
+	// Map insert so uuid stays unset for the DB default; the merged
+	// expenseCategoryModel maps uuid. created_at/updated_at are Go-stamped.
+	_, err = pdb.Model(&expenseCategoryModel{}).Insert(ctx, map[string]any{
+		"company_id":  CurrentCompany(ctx).ID,
+		"name":        form.Name,
+		"description": form.Description,
 	})
+	return err
 }
 
 // updateExpenseCategory uses the read model so playsql stamps updated_at, which
@@ -313,7 +321,7 @@ func (s *Server) updateExpenseCategory(ctx context.Context, uuid string, form *S
 		return err
 	}
 
-	_, err = pdb.Model(&expenseCategoryRead{}).
+	_, err = pdb.Model(&expenseCategoryModel{}).
 		WhereEq("company_id", CurrentCompany(ctx).ID).
 		WhereEq("uuid", uuid).
 		Update(ctx, map[string]any{
