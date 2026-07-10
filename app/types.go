@@ -494,6 +494,17 @@ var TransactionKinds = struct {
 	Template: _TRANSACTION_KIND_TEMPLATE,
 }
 
+// Validate ensures the value is one of the allowed constants. The value reaches
+// the transaction_kind enum column, so an unchecked string is a query-time error.
+func (t TransactionKind) Validate() error {
+	switch t {
+	case _TRANSACTION_KIND_INVOICE, _TRANSACTION_KIND_ESTIMATE, _TRANSACTION_KIND_ORDER, _TRANSACTION_KIND_TEMPLATE:
+		return nil
+	default:
+		return fmt.Errorf("invalid transaction kind: %s", t)
+	}
+}
+
 type PurchaseTransactionKind string
 
 const (
