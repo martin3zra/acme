@@ -30,9 +30,9 @@ func TestFindCustomers_EnumFilterAndSoftDelete_Playsql(t *testing.T) {
 	f := mkAccountCompany(t, s)
 	g := newFaker(t)
 
-	bizID, _ := newCustomer(t, f, g).Build()                  // business
-	_, _ = newCustomer(t, f, g).Individual(g).Build()         // individual
-	delID, _ := newCustomer(t, f, g).Build()                  // business, to be soft-deleted
+	bizID, _ := newCustomer(t, f, g).Build()          // business
+	_, _ = newCustomer(t, f, g).Individual(g).Build() // individual
+	delID, _ := newCustomer(t, f, g).Build()          // business, to be soft-deleted
 
 	// Soft-delete one row; the softdelete scope must exclude it.
 	if err := s.deleteCustomer(f.ctx, delID); err != nil {

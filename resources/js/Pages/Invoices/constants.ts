@@ -80,5 +80,5 @@ export const defaultInvoiceForm: InvoiceForm = {
   lines: [],
   payment: defaultPaymentMethodsForm,
   kind: 'invoice',
-  source: { id: '', type: 'invoice' },
+  source: { id: '', type: 'invoice', code: '' },
 };

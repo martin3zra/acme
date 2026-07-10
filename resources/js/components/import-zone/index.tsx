@@ -37,6 +37,16 @@ type ImportCompletedPayload = {
 
 type ImportPhase = 'reading_file' | 'normalizing_encoding' | 'mapping_columns' | 'importing_rows';
 
+// Events pushed over SSE by the importer. `completed` carries its payload as a
+// JSON string, the rest as structured objects.
+type ImportSseEvent =
+  | { type: 'phase'; data: ImportPhase }
+  | { type: 'queued' }
+  | { type: 'processing'; data: { processed_rows: number; total_rows: number } }
+  | { type: 'progress'; data: { processed: number; total: number } }
+  | { type: 'completed'; data: string }
+  | { type: 'failed' };
+
 interface ImportProgress {
   processed: number;
   total: number;
@@ -82,7 +92,9 @@ export function ImportDrawer({ source, openImportDrawer, setImportDrawer }: Prop
   const [state, setState] = useState<ImportState>('idle');
   const [phase, setPhase] = useState<ImportPhase | null>(null);
   const [progress, setProgress] = useState<ImportProgress | null>(null);
-  const [errors, setErrors] = useState<ImportError[]>([]);
+  // Nothing populates this yet: the 'failed' SSE event carries no per-row errors,
+  // so ImportErrorTable always renders empty.
+  const [errors] = useState<ImportError[]>([]);
   const [delimiter, setDelimiter] = useState<Delimiter>(',');
   const [detectedDelimiter, setDetectedDelimiter] = useState<Delimiter>(',');
   const sseRef = useRef<EventSource | null>(null);
@@ -90,7 +102,7 @@ export function ImportDrawer({ source, openImportDrawer, setImportDrawer }: Prop
 
   const importDisabled = !file || state === 'initializing' || state === 'uploading' || state === 'processing' || state === 'completed';
 
-  function updateImportToast(event: { type: string; data?: any }) {
+  function updateImportToast(event: ImportSseEvent) {
     switch (event.type) {
       case 'phase': {
         setState('processing');
@@ -123,7 +135,7 @@ export function ImportDrawer({ source, openImportDrawer, setImportDrawer }: Prop
       case 'completed': {
         handleOnClear();
         const data: ImportCompletedPayload = JSON.parse(event.data);
-        const { total, success, failed, processed, warning } = data;
+        const { total, success, failed, warning } = data;
         toast.success(
           warning > 0
             ? `Imported ${success} rows of ${total} with ${warning} warning${warning > 1 ? 's' : ''}`
@@ -327,9 +339,9 @@ export function ImportDrawer({ source, openImportDrawer, setImportDrawer }: Prop
         import_id: string;
         status: 'queued';
       };
-    } catch (err: any) {
+    } catch (err) {
       // 1. Extract the error response from Axios
-      const errorData: ErrorResponse = err.response?.data;
+      const errorData = axios.isAxiosError(err) ? (err.response?.data as ErrorResponse | undefined) : undefined;
 
       // 2. Handle the toast (using the 'status' or 'error' field from your foundation.ErrorBag)
       toast.error(errorData?.status || 'Import initialization failed');
@@ -355,7 +367,7 @@ export function ImportDrawer({ source, openImportDrawer, setImportDrawer }: Prop
 
       const { import_id } = await startImport(uploadId);
       connectToSSE(import_id);
-    } catch (err) {
+    } catch {
       setState('error');
     }
   };
@@ -377,9 +389,9 @@ export function ImportDrawer({ source, openImportDrawer, setImportDrawer }: Prop
       // Axios wraps the backend response in a .data object
       // Your Go backend sends the struct decoded by ParseRequest
       return response.data.upload_id;
-    } catch (err: any) {
+    } catch (err) {
       // 1. Extract the error response from Axios
-      const errorData: ErrorResponse = err.response?.data;
+      const errorData = axios.isAxiosError(err) ? (err.response?.data as ErrorResponse | undefined) : undefined;
 
       // 2. Handle the toast (using the 'status' or 'error' field from your foundation.ErrorBag)
       toast.error(errorData?.status || 'Upload initialization failed');

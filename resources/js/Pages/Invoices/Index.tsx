@@ -145,7 +145,7 @@ export default function Index({
     if (!response.ok) {
       const error: ErrorResponse = await response.json();
       toast.error(error.status);
-      throw new Error('Failed marking invoice as recurrent.', error.data);
+      throw new Error('Failed marking invoice as recurrent.', { cause: error.data });
     }
     handleCancelRecurrence();
     const data = await response.json();

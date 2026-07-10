@@ -1,7 +1,7 @@
 import { AlertDestructive } from '@/components/alert-destructive';
-import { Alert, AlertDescription } from '@/components/ui/alert';
 import { DatePickerField } from '@/components/date-picker';
 import InputError from '@/components/input-error';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -23,7 +23,17 @@ import { usePersistedState } from '@/hooks/use-persisted-state';
 import { useTranslation } from '@/hooks/use-translation';
 import AppLayout from '@/layouts/app-layout';
 import { addDays, getDaysFromTerm, isNotEmpty } from '@/lib/utils';
-import type { DiscountType, Item, LineForm, PageProps, PaymentTermValue, PurchaseForm, PurchaseTransactionKind, Vendor } from '@/types';
+import type {
+  DiscountType,
+  Item,
+  LineForm,
+  PageProps,
+  PaymentTermValue,
+  PurchaseForm,
+  PurchaseSource,
+  PurchaseTransactionKind,
+  Vendor,
+} from '@/types';
 import { Textarea } from '@headlessui/react';
 import { router, useForm, usePage } from '@inertiajs/react';
 import { format } from 'date-fns';
@@ -40,16 +50,17 @@ interface PurchaseRedirectProps {
 export interface PurchaseFormData {
   vendor_id: number;
   terms: string;
-  lines: any[];
+  lines: LineForm[];
   date: Date;
   discount: DiscountType;
   notes: string;
   kind: PurchaseTransactionKind;
   transaction_kind?: PurchaseTransactionKind;
   code?: string;
-  source: any;
+  // Inertia's FormDataKeys cannot walk PurchaseSource's recursive `target`,
+  // and the form only ever submits the flat source anyway.
+  source: Omit<PurchaseSource, 'target'>;
   invoice_number?: string;
-  [key: string]: any;
 }
 
 export default function Create({
@@ -94,7 +105,7 @@ export default function Create({
 
   const [purchaseForm, setPurchaseForm, removePurchaseForm] = usePersistedState<PurchaseForm>(`purchase_${kind}`, initialForm());
 
-  const { setData, post, transform, processing, errors } = useForm<PurchaseFormData>({
+  const { post, transform, processing, errors } = useForm<PurchaseFormData>({
     vendor_id: 0,
     terms: 'pia',
     lines: [],
@@ -248,7 +259,10 @@ export default function Create({
 
   const handleDiscountValueChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     purchaseForm.header.discount.value = event.target.valueAsNumber;
-    setPurchaseForm(() => ({ ...purchaseForm, header: { ...purchaseForm.header, discount: { ...purchaseForm.header.discount, value: event.target.valueAsNumber } } }));
+    setPurchaseForm(() => ({
+      ...purchaseForm,
+      header: { ...purchaseForm.header, discount: { ...purchaseForm.header.discount, value: event.target.valueAsNumber } },
+    }));
   };
 
   const handleDiscountTypeChange = (value: 'fixed' | 'percentage') => {
@@ -292,7 +306,7 @@ export default function Create({
     setCodeError(null);
 
     transform((data) => {
-      const payload: Record<string, any> = {
+      const payload: Record<string, unknown> = {
         ...data,
         vendor_id: purchaseForm.header.vendor?.id,
         date: purchaseForm.header.date,
@@ -303,7 +317,15 @@ export default function Create({
         source: purchaseForm.source,
         lines: purchaseForm.lines
           .filter((l) => l.action !== 'deleted')
-          .map((line) => ({ id: line.id, variant_id: line.variant_id, qty: line.qty, unit: line.unit.id, price: line.price, rate: line.tax.rate, action: 'added' })),
+          .map((line) => ({
+            id: line.id,
+            variant_id: line.variant_id,
+            qty: line.qty,
+            unit: line.unit.id,
+            price: line.price,
+            rate: line.tax.rate,
+            action: 'added',
+          })),
       };
 
       if (kind === 'purchase_receipt') {
@@ -416,7 +438,7 @@ export default function Create({
                     }}
                     required
                   />
-                  <InputError className="mt-2" message={codeError || (errors as any).code} />
+                  <InputError className="mt-2" message={codeError || errors.code} />
                 </div>
               )}
 
@@ -432,7 +454,7 @@ export default function Create({
                       setPurchaseForm(() => ({ ...purchaseForm, header: { ...purchaseForm.header, invoice_number: e.target.value } }));
                     }}
                   />
-                  <InputError className="mt-2" message={(errors as any).invoice_number} />
+                  <InputError className="mt-2" message={errors.invoice_number} />
                 </div>
               )}
 

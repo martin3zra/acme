@@ -115,7 +115,9 @@ export default function CreateForm({ onFinish, params }: CreateFormProps) {
       {viewMode && (
         <ActionSection>
           <ActionSection.Title>{t(`warehouses.statuses.${params.warehouse?.status || 'enabled'}.section.title`)}</ActionSection.Title>
-          <ActionSection.Description>{t(`warehouses.statuses.${params.warehouse?.status || 'enabled'}.section.description`)}</ActionSection.Description>
+          <ActionSection.Description>
+            {t(`warehouses.statuses.${params.warehouse?.status || 'enabled'}.section.description`)}
+          </ActionSection.Description>
           <ActionSection.Content>
             <div className={`space-y-2 rounded-lg border ${isDisabled ? 'border-primary-100 bg-primary-50' : 'border-red-100 bg-red-50'} p-4`}>
               <div className={`relative space-y-0.5 ${isDisabled ? 'text-primary' : 'text-red-600'}`}>
@@ -127,7 +129,9 @@ export default function CreateForm({ onFinish, params }: CreateFormProps) {
               </Button>
 
               <ConfirmsPassword
-                title={t(`warehouses.statuses.${params.warehouse?.status || 'enabled'}.confirmsPassword.title`, { warehouse: params.warehouse?.name || '' })}
+                title={t(`warehouses.statuses.${params.warehouse?.status || 'enabled'}.confirmsPassword.title`, {
+                  warehouse: params.warehouse?.name || '',
+                })}
                 description={t(`warehouses.statuses.${params.warehouse?.status || 'enabled'}.confirmsPassword.description`)}
                 action={t(`warehouses.statuses.${params.warehouse?.status || 'enabled'}.confirmsPassword.confirm`)}
                 verb={'update'}

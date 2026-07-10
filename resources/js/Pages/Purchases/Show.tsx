@@ -196,15 +196,9 @@ export default function Show({ kind, purchase, auth }: Props) {
         <Separator />
         <div className="text-muted-foreground text-sm">{t('purchases.preview.description')}</div>
         <div className="text-muted-foreground text-xs">{kind}</div>
-        {(kind === 'purchase_receipt' || kind === 'vendor_bill') && (
-          <ConfirmPurchaseAction purchase={purchase} kind={kind} />
-        )}
+        {(kind === 'purchase_receipt' || kind === 'vendor_bill') && <ConfirmPurchaseAction purchase={purchase} kind={kind} />}
         {kind === 'purchase_receipt' && purchase.header.status !== 'draft' && (
-          <ConvertToVendorBillAction
-            title={t('global.convertToVendorBill')}
-            renderedAs="button"
-            source={purchase}
-          />
+          <ConvertToVendorBillAction title={t('global.convertToVendorBill')} renderedAs="button" source={purchase} />
         )}
       </div>
     </div>

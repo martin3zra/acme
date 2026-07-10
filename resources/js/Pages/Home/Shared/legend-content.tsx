@@ -2,8 +2,8 @@ import { useTranslation } from '@/hooks/use-translation';
 import { LegendProps } from 'recharts';
 
 export function CustomLegend({ payload }: LegendProps) {
-  if (!payload) return null; // guard against undefined
   const t = useTranslation().trans;
+  if (!payload) return null; // guard against undefined
   const filtered = payload.filter((p) => p.dataKey !== 'salesFill');
   return (
     <ul className="flex flex-col space-y-1">

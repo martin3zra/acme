@@ -28,9 +28,9 @@ func TestFindVendors_EnumFilterAndSoftDelete_Playsql(t *testing.T) {
 	f := mkAccountCompany(t, s)
 	g := newFaker(t)
 
-	bizID, _ := newVendor(t, f, g).Build()          // business
-	_, _ = newVendor(t, f, g).Individual().Build()  // individual
-	delID, _ := newVendor(t, f, g).Build()          // business, to be soft-deleted
+	bizID, _ := newVendor(t, f, g).Build()         // business
+	_, _ = newVendor(t, f, g).Individual().Build() // individual
+	delID, _ := newVendor(t, f, g).Build()         // business, to be soft-deleted
 
 	if err := s.deleteVendor(f.ctx, delID); err != nil {
 		t.Fatalf("deleteVendor: %v", err)

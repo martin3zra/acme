@@ -19,10 +19,10 @@ import { useDebounced } from '@/hooks/use-debounced';
 import { usePersistedState } from '@/hooks/use-persisted-state';
 import { useTranslation } from '@/hooks/use-translation';
 import AppLayout from '@/layouts/app-layout';
-import { BTForm, CardForm, CashForm, CheckForm, PageProps, Payable, PaymentMethod, Vendor, VendorPaymentForm } from '@/types';
+import { BTForm, CardForm, CashForm, CheckForm, PageProps, Payable, PaymentMethod, Vendor, VendorPaymentForm, VendorPaymentTotals } from '@/types';
 import { Textarea } from '@headlessui/react';
 import { router, useForm, usePage } from '@inertiajs/react';
-import { RowSelectionState } from '@tanstack/table-core/build/lib/features/RowSelection';
+import { RowSelectionState } from '@tanstack/react-table';
 import React, { useEffect } from 'react';
 import CheckoutForm from '../Invoices/Shared/checkout-form';
 import { VendorSection } from '../Purchases/Shared/vendor-section';
@@ -71,7 +71,7 @@ export default function Create({ auth, vendor, vendors, payables }: PageProps<{ 
     if (!payables) return;
     setPaymentForm((prev) => ({
       ...prev,
-      lines: buildLines(payables) as any,
+      lines: buildLines(payables),
     }));
   }, [payables]);
 
@@ -80,7 +80,7 @@ export default function Create({ auth, vendor, vendors, payables }: PageProps<{ 
     router.reload({ only: ['vendors'], data: { search: debouncedSearch }, preserveUrl: true });
   }, [debouncedSearch]);
 
-  const totalPaid = (): number => (paymentForm.lines as any[]).reduce((acc: number, line: any) => acc + (line.payment || 0), 0);
+  const totalPaid = (): number => paymentForm.lines.reduce((acc, line) => acc + (line.payment || 0), 0);
 
   const handleRecordPayment = (event: React.MouseEvent<HTMLButtonElement>) => {
     event.preventDefault();
@@ -89,9 +89,9 @@ export default function Create({ auth, vendor, vendors, payables }: PageProps<{ 
       date: paymentForm.header.date,
       amount: totalPaid(),
       notes: paymentForm.header.notes,
-      lines: (paymentForm.lines as any[])
-        .filter((line: any) => line.payment > 0)
-        .map((line: any) => ({
+      lines: paymentForm.lines
+        .filter((line) => line.payment > 0)
+        .map((line) => ({
           uuid: line.invoice_uuid,
           amount_due: line.amount_due,
           payment: line.payment,
@@ -122,7 +122,7 @@ export default function Create({ auth, vendor, vendors, payables }: PageProps<{ 
         onSuccess: (page) => {
           const payables = page.props.payables as Payable[];
           setRowSelection({});
-          setPaymentForm((prev) => ({ ...prev, lines: buildLines(payables) as any }));
+          setPaymentForm((prev) => ({ ...prev, lines: buildLines(payables) }));
         },
         onFinish: () => setLoading(false),
       });
@@ -135,16 +135,10 @@ export default function Create({ auth, vendor, vendors, payables }: PageProps<{ 
 
   const handleCellChange = (rowId: string, columnId: string, newValue: string | number) => {
     setPaymentForm((prev) => {
-      const lines = (prev.lines as any[]).map((line: any) => {
-        if (line.id.toString() === rowId) {
-          const payment = columnId === 'payment' ? Number(newValue) : line.payment || 0;
-          return { ...line, [columnId]: Number(newValue), remaining: (line.amount_due || 0) - payment };
-        }
-        return line;
-      });
+      const lines = prev.lines.map((line) => (line.id.toString() === rowId ? { ...line, [columnId]: Number(newValue) } : line));
 
-      const totals = lines.reduce(
-        (acc: any, line: any) => {
+      const totals = lines.reduce<VendorPaymentTotals>(
+        (acc, line) => {
           acc.totalPayment += line.payment || 0;
           acc.totalRemaining += (line.amount_due || 0) - (line.payment || 0);
           return acc;
@@ -159,9 +153,9 @@ export default function Create({ auth, vendor, vendors, payables }: PageProps<{ 
   };
 
   const onSelectionChange = (selection: RowSelectionState) => {
-    const lines = (paymentForm.lines as any[]).map((line: any) => ({ ...line, payment: 0 }));
+    const lines = paymentForm.lines.map((line) => ({ ...line, payment: 0 }));
     Object.keys(selection).forEach((id) => {
-      const index = lines.findIndex((l: any) => l.id === Number(id));
+      const index = lines.findIndex((l) => l.id === Number(id));
       if (index >= 0) lines[index].payment = lines[index].amount_due;
     });
     setPaymentForm((prev) => ({ ...prev, lines: [...lines] }));
@@ -186,7 +180,7 @@ export default function Create({ auth, vendor, vendors, payables }: PageProps<{ 
   const distributePayment = (amount: number) => {
     let remaining = amount;
     setPaymentForm((prev) => {
-      const updatedLines = (prev.lines as any[]).map((line: any) => {
+      const updatedLines = prev.lines.map((line) => {
         if (remaining <= 0) return { ...line, payment: 0 };
         if (remaining >= line.amount_due) {
           remaining -= line.amount_due;
@@ -199,7 +193,7 @@ export default function Create({ auth, vendor, vendors, payables }: PageProps<{ 
       });
 
       const newRowSelection: RowSelectionState = {};
-      updatedLines.forEach((line: any) => {
+      updatedLines.forEach((line) => {
         if (line.payment > 0) newRowSelection[line.id.toString()] = true;
       });
       setRowSelection(newRowSelection);

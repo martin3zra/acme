@@ -130,7 +130,7 @@ export default function Show({ auth, transfer, lines }: PageProps<{ transfer: Tr
             <Separator className="my-2" />
             <div className="flex items-center justify-between">
               <span className="text-base">{t('transfers.footer.totalCost')}</span>
-              <span className="text-base font-mono">{currency(transfer.total_cost)}</span>
+              <span className="font-mono text-base">{currency(transfer.total_cost)}</span>
             </div>
           </div>
         </div>

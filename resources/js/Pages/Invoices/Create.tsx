@@ -61,12 +61,11 @@ export interface InvoiceFormData {
   customer_id: number;
   terms: string;
   tax_receipt: number;
-  lines: any[];
+  lines: LineForm[];
   date: Date;
   discount: DiscountType;
   kind: string;
   recurrence: Recurrent;
-  [key: string]: any;
 }
 
 export default function Create({
@@ -330,7 +329,7 @@ export default function Create({
 
   const placedInvoice = () => {
     transform((data) => {
-      const payload: Record<string, any> = {
+      const payload: Record<string, unknown> = {
         ...data,
         customer_id: invoiceForm.header.customer?.id,
         date: invoiceForm.header.date,
@@ -340,7 +339,15 @@ export default function Create({
         notes: invoiceForm.header.notes || '',
         kind: invoiceForm.kind,
         lines: invoiceForm.lines.map((line) => {
-          return { id: line.id, variant_id: line.variant_id, qty: line.qty, unit: line.unit.id, price: line.price, rate: line.tax.rate, action: line.action };
+          return {
+            id: line.id,
+            variant_id: line.variant_id,
+            qty: line.qty,
+            unit: line.unit.id,
+            price: line.price,
+            rate: line.tax.rate,
+            action: line.action,
+          };
         }),
         // payment: invoiceForm.payment,
       };
@@ -423,7 +430,7 @@ export default function Create({
     });
   };
 
-  const handleMarkAsRecurrent = (event: React.MouseEvent<HTMLButtonElement>) => {
+  const handleMarkAsRecurrent = () => {
     setMarkAsRecurrent(true);
   };
 

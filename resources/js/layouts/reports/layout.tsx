@@ -8,7 +8,7 @@ import React, { JSX } from 'react';
 import { DateRange } from 'react-day-picker';
 import AppLayout from '../app-layout';
 
-export type ReportRequest<T extends Record<string, unknown> = {}> = {
+export type ReportRequest<T extends Record<string, unknown> = Record<string, unknown>> = {
   endpoint: string;
   reportType: string;
   dateRange: DateRange | undefined;

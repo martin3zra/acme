@@ -18,16 +18,7 @@ type VendorSectionProps = {
   debouncedSearch: string;
 };
 
-export const VendorSection = ({
-  vendor,
-  vendors,
-  errors,
-  handleVendorSelection,
-  setSearch,
-  open,
-  setOpen,
-  debouncedSearch,
-}: VendorSectionProps) => {
+export const VendorSection = ({ vendor, vendors, errors, handleVendorSelection, setSearch, open, setOpen, debouncedSearch }: VendorSectionProps) => {
   const t = useTranslation().trans;
 
   const handleOnCloseClick = (event: React.MouseEvent<HTMLButtonElement>) => {

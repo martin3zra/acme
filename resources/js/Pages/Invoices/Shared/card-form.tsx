@@ -76,13 +76,7 @@ export const CardFormView = ({ last4, brand, amount, reference, onChange }: Card
             <Label htmlFor="amount" className="text-end">
               {t('global.amount')}
             </Label>
-            <MoneyInput
-              name="amount"
-              pattern="[0-9]*"
-              className="h-12 text-end md:text-xl"
-              onChange={(c) => onChange(c, 'amount')}
-              value={amount}
-            />
+            <MoneyInput name="amount" pattern="[0-9]*" className="h-12 text-end md:text-xl" onChange={(c) => onChange(c, 'amount')} value={amount} />
           </div>
         </FormSection.Form>
       </FormSection>

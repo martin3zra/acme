@@ -62,8 +62,8 @@ func TestFlowInvoiceUpdateReconcilesVariantSwap(t *testing.T) {
 		{ID: itemID, VariantID: red, Unit: f.unitID, WarehouseID: f.warehouseID, Qty: 3, Price: 100, Rate: 18, Action: ADDED},
 	}))
 
-	is.EqualFloat(balanceOf(t, f, blue), 0)  // old variant restocked
-	is.EqualFloat(balanceOf(t, f, red), -3)  // new variant debited
+	is.EqualFloat(balanceOf(t, f, blue), 0) // old variant restocked
+	is.EqualFloat(balanceOf(t, f, red), -3) // new variant debited
 }
 
 // TestFlowInvoiceUpdateReconcileIsIdempotent: re-saving an invoice with no line

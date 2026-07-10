@@ -13,18 +13,17 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { Payable, PayableForm, PayableVerb, Replacements, VendorPaymentTotals } from '@/types';
+import { PayableLineRow, PayableVerb, Replacements, VendorPaymentTotals } from '@/types';
 import { ColumnDef } from '@tanstack/react-table';
 import { MoreHorizontal } from 'lucide-react';
 
 type Props = {
   totals: VendorPaymentTotals;
-  onDidClick: (item: PayableForm, action: PayableVerb) => void;
+  onDidClick: (item: PayableLineRow, action: PayableVerb) => void;
   t: (key: string, replacements?: Replacements) => string;
 };
 
-// We join Payable + PayableForm for the row data
-export type PayableLineRow = Payable & PayableForm;
+export type { PayableLineRow };
 
 export const getColumns = ({ totals, onDidClick, t }: Props): ColumnDef<PayableLineRow, string | number>[] => {
   return [
@@ -37,9 +36,7 @@ export const getColumns = ({ totals, onDidClick, t }: Props): ColumnDef<PayableL
           aria-label="Select all"
         />
       ),
-      cell: ({ row }) => (
-        <Checkbox checked={row.getIsSelected()} onCheckedChange={(value) => row.toggleSelected(!!value)} aria-label="Select row" />
-      ),
+      cell: ({ row }) => <Checkbox checked={row.getIsSelected()} onCheckedChange={(value) => row.toggleSelected(!!value)} aria-label="Select row" />,
       enableSorting: false,
       enableHiding: false,
       footer: () => null,
@@ -68,7 +65,7 @@ export const getColumns = ({ totals, onDidClick, t }: Props): ColumnDef<PayableL
         const dueDate = props.getValue() as string;
         const isOverdue = new Date(dueDate) < new Date();
         return (
-          <span className={isOverdue ? 'text-red-600 font-medium' : ''}>
+          <span className={isOverdue ? 'font-medium text-red-600' : ''}>
             <DateCell columnWidth={props.column.getSize()} value={dueDate} />
           </span>
         );
@@ -120,9 +117,7 @@ export const getColumns = ({ totals, onDidClick, t }: Props): ColumnDef<PayableL
           <DropdownMenuContent align="end" className="**:data-[slot=dropdown-menu-item]:cursor-pointer">
             <DropdownMenuLabel>{t('global.actions.title')}</DropdownMenuLabel>
             <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={() => onDidClick(props.row.original, 'void')}>
-              {t('global.actions.delete')}
-            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => onDidClick(props.row.original, 'void')}>{t('global.actions.delete')}</DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
       ),

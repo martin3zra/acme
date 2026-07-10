@@ -29,6 +29,7 @@ import type {
   PageProps,
   PaymentTermValue,
   PurchaseForm,
+  PurchaseSource,
   PurchaseTransactionKind,
   PurchaseWithLines,
   Vendor,
@@ -44,14 +45,15 @@ import { VendorSection } from './Shared/vendor-section';
 export interface PurchaseFormData {
   vendor_id: number;
   terms: string;
-  lines: any[];
+  lines: LineForm[];
   date: Date;
   discount: DiscountType;
   notes: string;
   kind: PurchaseTransactionKind;
-  source: any;
+  // Inertia's FormDataKeys cannot walk PurchaseSource's recursive `target`,
+  // and the form only ever submits the flat source anyway.
+  source: Omit<PurchaseSource, 'target'>;
   invoice_number?: string;
-  [key: string]: any;
 }
 
 export default function Edit({
@@ -240,7 +242,10 @@ export default function Edit({
 
   const handleDiscountValueChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     purchaseForm.header.discount.value = event.target.valueAsNumber;
-    setPurchaseForm(() => ({ ...purchaseForm, header: { ...purchaseForm.header, discount: { ...purchaseForm.header.discount, value: event.target.valueAsNumber } } }));
+    setPurchaseForm(() => ({
+      ...purchaseForm,
+      header: { ...purchaseForm.header, discount: { ...purchaseForm.header.discount, value: event.target.valueAsNumber } },
+    }));
   };
 
   const handleDiscountTypeChange = (value: 'fixed' | 'percentage') => {
@@ -277,7 +282,7 @@ export default function Edit({
 
   const performUpdate = () => {
     transform((data) => {
-      const payload: Record<string, any> = {
+      const payload: Record<string, unknown> = {
         ...data,
         vendor_id: purchaseForm.header.vendor?.id,
         date: purchaseForm.header.date,
@@ -385,7 +390,7 @@ export default function Edit({
                       setPurchaseForm(() => ({ ...purchaseForm, header: { ...purchaseForm.header, invoice_number: e.target.value } }));
                     }}
                   />
-                  <InputError className="mt-2" message={(errors as any).invoice_number} />
+                  <InputError className="mt-2" message={errors.invoice_number} />
                 </div>
               )}
               <div className="flex flex-col gap-y-2">

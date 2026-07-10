@@ -26,7 +26,7 @@ let onSuccessEvent = (e) => {
       }, 200);
     }
     if (props.flash.redirectTo) {
-      props.redirectTo = props.flash.redirectTo
+      props.redirectTo = props.flash.redirectTo;
     }
   }
 };

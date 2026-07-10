@@ -16,9 +16,7 @@ export function ConfirmPurchaseAction({ purchase, kind }: Props) {
 
   const isReceipt = kind === 'purchase_receipt';
   const label = isReceipt ? t('purchases.receipts.confirm') : t('purchases.vendorBills.post');
-  const description = isReceipt
-    ? t('purchases.receipts.confirmDescription')
-    : t('purchases.vendorBills.postDescription');
+  const description = isReceipt ? t('purchases.receipts.confirmDescription') : t('purchases.vendorBills.postDescription');
 
   if (purchase.header.status !== 'draft') return null;
 

@@ -34,7 +34,7 @@ export const parsePaymentMethod = (value: string, fallback: PaymentMethod = 'cas
 export const capitalize = (s: string) => (s.length ? s[0].toUpperCase() + s.substring(1) : s);
 
 export function getDaysFromTerm(term: PaymentTermValue): number {
-  if (term === 'pia') return 0 as any;
+  if (term === 'pia') return 0;
   const match = term.match(/^net(\d+)$/);
   return match ? parseInt(match[1], 10) : 0;
 }

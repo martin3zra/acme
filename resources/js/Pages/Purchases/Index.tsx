@@ -112,7 +112,9 @@ export default function Index({
                     <SheetDescription className="text-[12px]">{t(`${meta.key}.view.description`)}</SheetDescription>
                   </div>
                   <div className="mx-4 flex gap-x-3">
-                    {!(kind === 'purchase_order' && ['received', 'partially_received', 'partially_paid', 'closed'].includes(purchase.header.status)) && (
+                    {!(
+                      kind === 'purchase_order' && ['received', 'partially_received', 'partially_paid', 'closed'].includes(purchase.header.status)
+                    ) && (
                       <>
                         <Button variant={'destructive'} onClick={() => setDeleteDialogOpen(true)}>
                           <Trash2 /> {t('global.actions.delete')}
@@ -127,18 +129,10 @@ export default function Index({
                     )}
 
                     {kind === 'purchase_order' && purchase.header.status !== 'received' && (
-                      <ConvertToReceiptAction
-                        title={t('global.convertToReceipt')}
-                        renderedAs="button"
-                        source={purchase}
-                      />
+                      <ConvertToReceiptAction title={t('global.convertToReceipt')} renderedAs="button" source={purchase} />
                     )}
                     {kind === 'purchase_receipt' && (
-                      <ConvertToVendorBillAction
-                        title={t('global.convertToVendorBill')}
-                        renderedAs="button"
-                        source={purchase}
-                      />
+                      <ConvertToVendorBillAction title={t('global.convertToVendorBill')} renderedAs="button" source={purchase} />
                     )}
                   </div>
                 </div>

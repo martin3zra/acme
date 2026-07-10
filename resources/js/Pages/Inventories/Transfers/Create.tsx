@@ -35,6 +35,24 @@ type TransferFormState = {
 
 const emptyForm = (): TransferFormState => ({ header: { from: '', to: '', notes: '', date: new Date() }, lines: [] });
 
+// The wire payload built in performSave; the useForm seed is only a placeholder.
+type TransferLinePayload = {
+  id: TransferLine['id'];
+  variant_id: TransferLine['variant_id'];
+  qty: number;
+  unit: number;
+  cost: number;
+  description: string;
+};
+
+interface TransferFormData {
+  from_warehouse_id: number;
+  to_warehouse_id: number;
+  date: Date;
+  notes: string;
+  lines: TransferLinePayload[];
+}
+
 export default function Create({
   auth,
   warehouses,
@@ -58,7 +76,7 @@ export default function Create({
   const referenceInputRef = React.useRef<HTMLInputElement>(null);
   const qtyInputRef = React.useRef<HTMLInputElement>(null);
 
-  const { post, transform, processing, errors } = useForm<Record<string, any>>({
+  const { post, transform, processing, errors } = useForm<TransferFormData>({
     from_warehouse_id: 0,
     to_warehouse_id: 0,
     date: new Date(),
@@ -139,7 +157,14 @@ export default function Create({
       to_warehouse_id: Number(form.header.to),
       date: form.header.date,
       notes: form.header.notes || '',
-      lines: form.lines.map((l) => ({ id: l.id, variant_id: l.variant_id, qty: l.qty, unit: l.unit?.id ?? 0, cost: l.cost, description: l.description || '' })),
+      lines: form.lines.map((l) => ({
+        id: l.id,
+        variant_id: l.variant_id,
+        qty: l.qty,
+        unit: l.unit?.id ?? 0,
+        cost: l.cost,
+        description: l.description || '',
+      })),
     }));
     post('/inventories/transfers', {
       ...headers,

@@ -60,7 +60,7 @@ export function RecurrenceForm({ name, onSubmit, onCancel }: Props) {
       setError((err as Error).message);
     }
   };
-  const performRecurrenceCancelation = (event: React.MouseEvent<HTMLButtonElement>) => {
+  const performRecurrenceCancelation = () => {
     removeRecurrenceForm();
     onCancel();
   };

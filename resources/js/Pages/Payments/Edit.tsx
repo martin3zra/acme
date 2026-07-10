@@ -35,12 +35,12 @@ import {
 } from '@/types';
 import { Textarea } from '@headlessui/react';
 import { router, useForm, usePage } from '@inertiajs/react';
-import { RowSelectionState } from '@tanstack/table-core/build/lib/features/RowSelection';
+import { RowSelectionState } from '@tanstack/react-table';
 import React, { useEffect } from 'react';
 import CheckoutForm from '../Invoices/Shared/checkout-form';
 import { CustomerSection } from '../Invoices/Shared/customer-section';
 import { List } from './Shared/lines-payment';
-import { editPaymentBreadcrumbs } from './constants';
+import { computeTotals, editPaymentBreadcrumbs } from './constants';
 
 type FlagSet = {
   [key: string]: boolean;
@@ -64,11 +64,13 @@ export default function Edit({
   const [openCheckout, setCheckout] = React.useState(false);
 
   const [initialized, setInitialized] = React.useState(false);
+  const [loading, setLoading] = React.useState(false);
   const [open, setOpen] = React.useState(false);
   const [search, setSearch] = React.useState('');
   const dedbouncedSearch = useDebounced(search, 500);
 
   const initialAsPaymentForm = (): PaymentForm => {
+    const lines = payment.lines.map((line) => mapPaymentLineToReceivableInvoice(line));
     const _payment: PaymentForm = {
       header: {
         customer: payment.header.customer,
@@ -76,10 +78,9 @@ export default function Edit({
         notes: payment.header.notes,
         discount: 0,
       },
-      lines: payment.lines.map((line) => {
-        return mapPaymentLineToReceivableInvoice(line);
-      }),
+      lines,
       payment: payment.header.payment,
+      totals: computeTotals(lines),
     };
     return _payment;
   };
@@ -110,11 +111,14 @@ export default function Edit({
     let selectedRowId = -1;
     receivables.map((receivable) => {
       selectedRowId = invoice_uuid === receivable.invoice.uuid ? receivable.invoice.id : -1;
+      const linePayment = invoice_uuid === receivable.invoice.uuid ? receivable.invoice.amount_due : 0;
       const line: ReceivableInvoiceForm = {
         ...receivable.invoice,
-        payment: invoice_uuid === receivable.invoice.uuid ? receivable.invoice.amount_due : 0,
+        original_payment: 0,
+        payment: linePayment,
         discount: 0,
         balance: 0,
+        remaining: receivable.invoice.amount_due - linePayment,
         action: 'unchanged',
       };
       lines.push(line);
@@ -130,6 +134,7 @@ export default function Edit({
     setPaymentForm((prev) => ({
       ...prev,
       lines: [...lines],
+      totals: computeTotals(lines),
     }));
 
     setInitialized(true);
@@ -173,6 +178,8 @@ export default function Edit({
     put(`/payments/${payment.header.uuid}`, {
       ...headers,
       preserveState: 'errors',
+      onStart: () => setLoading(true),
+      onFinish: () => setLoading(false),
       onSuccess: () => {
         removePaymentForm();
         router.get('/payments');
@@ -190,6 +197,7 @@ export default function Edit({
     setPaymentForm((prev) => ({
       ...prev,
       lines: [...paymentForm.lines],
+      totals: computeTotals(paymentForm.lines),
     }));
   };
 
@@ -222,6 +230,7 @@ export default function Edit({
     setPaymentForm((prev) => ({
       ...prev,
       lines: [...paymentForm.lines],
+      totals: computeTotals(paymentForm.lines),
     }));
   };
 
@@ -237,6 +246,7 @@ export default function Edit({
 
     setPaymentForm((prev) => ({
       ...prev,
+      totals: computeTotals(paymentForm.lines),
       lines: [...paymentForm.lines],
     }));
   };
@@ -375,7 +385,9 @@ export default function Edit({
         </div>
         <div className="col-span-12">
           <List
+            loading={loading}
             data={paymentForm.lines.filter((line) => line?.action !== 'deleted')}
+            totals={paymentForm.totals}
             rowSelection={rowSelection}
             setRowSelection={setRowSelection}
             onSelectPaymentLine={onSelectPaymentLine}

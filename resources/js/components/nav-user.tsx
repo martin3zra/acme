@@ -14,13 +14,13 @@ import {
 import { SidebarMenu, SidebarMenuButton, SidebarMenuItem, useSidebar } from '@/components/ui/sidebar';
 import { useInitials } from '@/hooks/use-initials';
 import { useTranslation } from '@/hooks/use-translation';
-import { User } from '@/types';
+import { PageProps, User } from '@/types';
 import { Link, usePage } from '@inertiajs/react';
 import { IconLogout } from '@tabler/icons-react';
 
 export function NavUser({ user }: { user: User }) {
   const { isMobile } = useSidebar();
-  const props = usePage().props;
+  const props = usePage<PageProps>().props;
   const t = useTranslation().trans;
   const getInitials = useInitials();
 

@@ -57,8 +57,9 @@ class InputSearchable<T extends object> extends React.Component<Props<T>, InputS
     const { children, onOpenChange, title, options, value, valueKey, renderText, renderEmptyText, onSelected, open } = this.props;
     const { search } = this.state;
 
-    const actions = (React.Children.toArray(children) as React.ReactNode).find((children: React.ReactNode) => children.type === Actions);
-    const trigger = (React.Children.toArray(children) as React.ReactNode).find((children: React.ReactNode) => children.type === Trigger);
+    const slots = React.Children.toArray(children);
+    const actions = slots.find((slot) => React.isValidElement(slot) && slot.type === Actions);
+    const trigger = slots.find((slot) => React.isValidElement(slot) && slot.type === Trigger);
 
     return (
       <Popover modal={true} onOpenChange={onOpenChange}>
