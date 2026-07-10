@@ -9,12 +9,13 @@ export default defineConfig(({ mode }) => {
   // and extract the IP numbers only.
   const env = loadEnv(mode, process.cwd(), '');
   var regx = /\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\b/;
-  const viteAppURL = env.APP_URL.split(':')[1];
 
-  // If the .env use localhost we default to 0.0.0.0
+  // Only the dev server's HMR host is derived from APP_URL. A production build
+  // has no .env (e.g. in CI), so default to 0.0.0.0 when it is absent rather
+  // than crashing config load.
   let host = '0.0.0.0';
-  const matches = viteAppURL.match(regx);
-  if (matches !== null && matches.length > 0) {
+  const matches = env.APP_URL?.split(':')[1]?.match(regx);
+  if (matches !== null && matches !== undefined && matches.length > 0) {
     host = matches[0];
   }
 

@@ -3,7 +3,7 @@ import { IconName } from './icons';
 
 export interface ErrorResponse {
   status: string;
-  data?: any;
+  data?: unknown;
 }
 
 export interface LinkedCompany {
@@ -647,6 +647,10 @@ export type PayableForm = {
   action: LineAction;
 };
 
+// A payable as edited in the payment form: the persisted record joined with the
+// editable fields. This is what the form holds and what the table renders.
+export type PayableLineRow = Payable & PayableForm;
+
 export type VendorPaymentHeaderForm = {
   vendor: Vendor | undefined;
   date: Date | undefined;
@@ -660,7 +664,7 @@ export type VendorPaymentTotals = {
 
 export type VendorPaymentForm = {
   header: VendorPaymentHeaderForm;
-  lines: PayableForm[];
+  lines: PayableLineRow[];
   payment: PaymentMethodsForm;
   totals: VendorPaymentTotals;
 };

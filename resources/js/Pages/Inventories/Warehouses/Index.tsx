@@ -1,22 +1,18 @@
-import HeadingSmall from '@/components/heading-small';
 import { ConfirmsPassword } from '@/components/confirms-password';
+import HeadingSmall from '@/components/heading-small';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { useVerb } from '@/composables/use-verbs';
 import { useTranslation } from '@/hooks/use-translation';
 import AppLayout from '@/layouts/app-layout';
 import { PageProps, Verb, Warehouse } from '@/types';
-import { useEffect, useState } from 'react';
 import { Plus } from 'lucide-react';
+import { useEffect, useState } from 'react';
 import { breadcrumbs } from './constants';
 import { List } from './List/Index';
 import CreateForm, { CreateFormParams } from './Shared/CreateForm';
 
-export default function Index({
-  auth,
-  warehouses,
-  openState,
-}: PageProps<{ openState: boolean; warehouses: Warehouse[] }>) {
+export default function Index({ auth, warehouses, openState }: PageProps<{ openState: boolean; warehouses: Warehouse[] }>) {
   const t = useTranslation().trans;
   const [open, setOpen] = useState<boolean>(openState);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState<boolean>(false);

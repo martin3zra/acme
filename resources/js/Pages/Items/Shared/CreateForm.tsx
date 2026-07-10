@@ -95,7 +95,10 @@ export default function CreateForm({ onFinish, params }: CreateFormProps) {
   const canUseVariants = variantsEnabled === true && params.action === 'create' && data.item_type === 'product' && attributes.length > 0;
 
   const selectedAttributeIds = useMemo(
-    () => Object.keys(valuesByAttribute).map(Number).filter((id) => (valuesByAttribute[id] || []).length > 0),
+    () =>
+      Object.keys(valuesByAttribute)
+        .map(Number)
+        .filter((id) => (valuesByAttribute[id] || []).length > 0),
     [valuesByAttribute],
   );
 

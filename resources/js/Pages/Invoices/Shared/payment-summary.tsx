@@ -68,9 +68,9 @@ interface PaymentSummaryProps {
 }
 
 type CardAdditionalInfo = {
-  brand: string
-  last4: string
-}
+  brand: string;
+  last4: string;
+};
 
 const PaymentSummary: React.FC<PaymentSummaryProps> = ({ paymentData }) => {
   const t = useTranslation().trans;
@@ -78,13 +78,10 @@ const PaymentSummary: React.FC<PaymentSummaryProps> = ({ paymentData }) => {
   const { currency } = useNumber();
 
   function isCardInfo(info: Record<string, unknown>): info is CardAdditionalInfo {
-    return (
-      typeof info.brand === 'string' &&
-      typeof info.last4 === 'number'
-    )
+    return typeof info.brand === 'string' && typeof info.last4 === 'number';
   }
   const additionalInfoRenderers: Record<PaymentMethod, (info: Record<string, unknown>) => React.ReactNode> = {
-    card: info =>
+    card: (info) =>
       isCardInfo(info) ? (
         <div className="text-sm text-gray-500">
           <span>Brand: {info.brand}</span>
@@ -92,11 +89,10 @@ const PaymentSummary: React.FC<PaymentSummaryProps> = ({ paymentData }) => {
         </div>
       ) : null,
 
-      ck: () => null,
-      bt: () => null,
-      cash: () => null,
-
-  }
+    ck: () => null,
+    bt: () => null,
+    cash: () => null,
+  };
 
   return (
     <div className="mx-auto w-full rounded-md bg-white">
@@ -108,11 +104,7 @@ const PaymentSummary: React.FC<PaymentSummaryProps> = ({ paymentData }) => {
               <span className="font-semibold">{currency(method.amount)}</span>
               {method.reference && <span className="ml-2 text-sm text-gray-500">(Ref: {method.reference})</span>}
             </div>
-            {method.additionalInfo &&
-              additionalInfoRenderers[method.method]?.(
-                method.additionalInfo
-              )
-            }
+            {method.additionalInfo && additionalInfoRenderers[method.method]?.(method.additionalInfo)}
           </li>
         ))}
       </ul>

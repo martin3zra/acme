@@ -22,6 +22,9 @@ import { FC, useState } from 'react';
 import { getColumns } from './columns-definitions';
 
 declare module '@tanstack/react-table' {
+  // TData is unused here but must match TanStack's declaration for the
+  // interface merge to apply.
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   interface TableMeta<TData extends RowData> {
     updateData?: (rowId: string, columnId: string, value: string | number) => void;
   }

@@ -194,10 +194,7 @@ export default function Index({
                   <div className="mt-4 px-4">
                     <div className="mb-2 flex items-center justify-between">
                       <h3 className="text-sm font-semibold">{t('payables.title')}</h3>
-                      <a
-                        href={`/payables/create?vendor_id=${selectedVendor.vendor?.uuid}`}
-                        className="text-primary text-xs hover:underline"
-                      >
+                      <a href={`/payables/create?vendor_id=${selectedVendor.vendor?.uuid}`} className="text-primary text-xs hover:underline">
                         {t('payables.recordPayment')}
                       </a>
                     </div>
@@ -217,7 +214,9 @@ export default function Index({
                             <td>{p.due_date}</td>
                             <td className="text-right">{(p.amount_payable - p.amount_paid).toFixed(2)}</td>
                             <td>
-                              <span className={`rounded px-1.5 py-0.5 text-xs font-medium ${p.paid_status === 'paid' ? 'bg-green-100 text-green-700' : new Date(p.due_date) < new Date() ? 'bg-red-100 text-red-700' : 'bg-yellow-100 text-yellow-700'}`}>
+                              <span
+                                className={`rounded px-1.5 py-0.5 text-xs font-medium ${p.paid_status === 'paid' ? 'bg-green-100 text-green-700' : new Date(p.due_date) < new Date() ? 'bg-red-100 text-red-700' : 'bg-yellow-100 text-yellow-700'}`}
+                              >
                                 {p.paid_status}
                               </span>
                             </td>

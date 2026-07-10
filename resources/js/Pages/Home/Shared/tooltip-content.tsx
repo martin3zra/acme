@@ -31,9 +31,9 @@ export const tooltipLabelStyle = {
 };
 
 export const CustomTooltip: React.FC<CustomTooltipProps> = ({ payload, label, formatter }) => {
+  const t = useTranslation().trans;
   if (label === undefined || label === null) return null;
   if (!payload || payload.length === 0) return null;
-  const t = useTranslation().trans;
   // Split into [year, monthNumber]
   const [year, monthStr] = label.split('/');
   if (!year || !monthStr) return '';

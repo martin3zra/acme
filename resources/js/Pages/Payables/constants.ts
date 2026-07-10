@@ -27,7 +27,4 @@ export const createPayableBreadcrumbs: BreadcrumbItem[] = [
   { title: 'payables.create.title', href: '' },
 ];
 
-export const payablesBreadcrumbs: BreadcrumbItem[] = [
-  ...defaultBreadcrumbs,
-  { title: 'payables.title', href: '/payables' },
-];
+export const payablesBreadcrumbs: BreadcrumbItem[] = [...defaultBreadcrumbs, { title: 'payables.title', href: '/payables' }];

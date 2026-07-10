@@ -137,7 +137,7 @@ export default function UserForm({ params, companies, roles }: UserFormProps) {
                 aria-label="Companies Roles"
                 className="grid grid-cols-3 gap-6"
                 onChange={(role: Role) => updateUserCompanies(company, role)}
-                value={userCompanies.find((b: UserCompany) => b.company.id === company.id)?.role || ''}
+                value={userCompanies.find((b: UserCompany) => b.company.id === company.id)?.role}
               >
                 {roles.map((role) => (
                   <Field key={role.id}>

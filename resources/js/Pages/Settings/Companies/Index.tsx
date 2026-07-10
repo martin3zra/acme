@@ -19,7 +19,8 @@ export default function Index({ companies, company }: PageProps<{ companies: Com
   const { auth } = usePage<PageProps>().props;
   const t = useTranslation().trans;
   const [open, setOpen] = useState(company !== undefined);
-  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  // No delete dialog is rendered yet; only the setter is wired up.
+  const [, setDeleteDialogOpen] = useState(false);
   const [selectedCompany, setSelectedCompany] = useState<CreateFormParams>({
     company: company,
     action: company !== undefined ? 'view' : 'create',

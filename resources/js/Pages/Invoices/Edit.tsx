@@ -100,7 +100,7 @@ export default function Edit({
       }),
       payment: invoice.header.payment,
       kind: kind,
-      source: { type: kind, id: '' },
+      source: { type: kind, id: '', code: '' },
     };
 
     return _invoice;
@@ -191,7 +191,7 @@ export default function Edit({
 
   const performUpdate = () => {
     transform((data) => {
-      const payload: Record<string, any> = {
+      const payload: Record<string, unknown> = {
         ...data,
         customer_id: invoiceForm.header.customer?.id,
         date: invoiceForm.header.date,
@@ -201,7 +201,15 @@ export default function Edit({
         notes: invoiceForm.header.notes || '',
         kind: kind,
         lines: invoiceForm.lines.map((line) => {
-          return { id: line.id, variant_id: line.variant_id, unit: line.unit.id, qty: line.qty, price: line.price, rate: line.tax.rate, action: line.action };
+          return {
+            id: line.id,
+            variant_id: line.variant_id,
+            unit: line.unit.id,
+            qty: line.qty,
+            price: line.price,
+            rate: line.tax.rate,
+            action: line.action,
+          };
         }),
         // payment: invoiceForm.payment,
       };

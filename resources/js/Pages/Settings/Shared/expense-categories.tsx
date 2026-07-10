@@ -15,12 +15,10 @@ type Props = {
   categories: ExpenseCategory[];
 };
 
-type CategoryKey = 'uuid' | 'name' | 'description';
-
 export default function ExpenseCategoryList({ categories }: Props) {
   const { headers } = useHeader();
   const t = useTranslation().trans;
-  const { data, setData, post, put, processing, errors, reset } = useForm({
+  const { data, setData, post, put, processing, errors, reset } = useForm<{ uuid?: string; name: string; description: string }>({
     uuid: undefined,
     name: '',
     description: '',
@@ -33,7 +31,7 @@ export default function ExpenseCategoryList({ categories }: Props) {
     post('/expense-categories', { ...headers, preserveState: 'errors' });
   };
   const handleOnCategoryClick = (category: ExpenseCategory) => {
-    Object.entries(category).map(([k, v]) => setData(k as CategoryKey, v));
+    setData({ uuid: category.uuid, name: category.name, description: category.description });
   };
   return (
     <div className="flex w-full flex-col space-y-6 py-6 **:data-form:md:grid-cols-1">

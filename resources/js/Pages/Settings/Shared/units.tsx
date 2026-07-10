@@ -98,7 +98,7 @@ export default function UnitList({ units }: Props) {
                       )}
                     </Button>
                     {!processing && (
-                      <Button onClick={() => reset('name', 'base_qty', 'uuid')} type="reset" size="sm" className="mt-1" variant={'ghost'}>
+                      <Button onClick={() => reset('name', 'base_qty', 'id')} type="reset" size="sm" className="mt-1" variant={'ghost'}>
                         {t('global.cancel')}
                       </Button>
                     )}

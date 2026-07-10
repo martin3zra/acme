@@ -13,15 +13,7 @@ type Props = {
   qtyInputRef: React.RefObject<HTMLInputElement | null>;
 };
 
-export default function LinesForm({
-  referenceInputRef,
-  qtyInputRef,
-  currentItem,
-  amount,
-  currency,
-  handleOnKeyDown,
-  computedItemAmount,
-}: Props) {
+export default function LinesForm({ referenceInputRef, qtyInputRef, currentItem, amount, currency, handleOnKeyDown, computedItemAmount }: Props) {
   const t = useTranslation().trans;
 
   return (

@@ -23,13 +23,13 @@ import AppLayout from '@/layouts/app-layout';
 import { BTForm, CardForm, CashForm, CheckForm, Customer, PageProps, PaymentForm, PaymentMethod, Receivable, ReceivableInvoiceForm } from '@/types';
 import { Textarea } from '@headlessui/react';
 import { router, useForm, usePage } from '@inertiajs/react';
-import { RowSelectionState } from '@tanstack/table-core/build/lib/features/RowSelection';
+import { RowSelectionState } from '@tanstack/react-table';
 import React, { useEffect } from 'react';
 import CheckoutForm from '../Invoices/Shared/checkout-form';
 import { CustomerSection } from '../Invoices/Shared/customer-section';
 import { createPaymentBreadcrumbs } from '../Payments/constants';
 import { buildReceivableState, buildRowSelection } from './build-receivables-state';
-import { defaultPaymentForm } from './constants';
+import { computeTotals, defaultPaymentForm } from './constants';
 import { List } from './Shared/lines-payment';
 
 export default function Create({
@@ -174,18 +174,7 @@ export default function Create({
         return line;
       });
 
-      // recompute totals from updated lines
-      const totals = lines.reduce(
-        (acc, line) => {
-          acc.totalPayment += line.payment || 0;
-          acc.totalDiscount += line.discount || 0;
-          acc.totalRemaining += line.remaining || 0;
-          return acc;
-        },
-        { totalPayment: 0, totalDiscount: 0, totalRemaining: 0 },
-      );
-
-      return { ...prev, lines, totals };
+      return { ...prev, lines, totals: computeTotals(lines) };
     });
 
     // auto-select the row when edited

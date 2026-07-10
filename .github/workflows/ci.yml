@@ -1,0 +1,111 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# A newer push to the same branch makes the in-flight run obsolete.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  NODE_VERSION: '22'
+  # Keep in step with the toolchain in go.mod.
+  GO_VERSION: '1.25.7'
+  # Pinned so a camel release cannot change the test schema out from under us.
+  CAMEL_VERSION: v0.0.0-20260620170945-1cb0ebcc7072
+
+jobs:
+  frontend:
+    name: Frontend
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+
+      - run: npm ci
+
+      - name: Prettier
+        run: npm run format:check
+
+      # Not `npm run lint`: that is `eslint . --fix`, which rewrites files.
+      - name: ESLint
+        run: npx eslint .
+
+      - name: Typecheck
+        run: npx tsc --noEmit -p tsconfig.json
+
+      - name: Build
+        run: npm run build
+
+  go:
+    name: Go
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: secret
+          POSTGRES_DB: postgres
+        # 5433 on the host to match .env.test.sample, which the tests read.
+        ports:
+          - 5433:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+
+      # main.go embeds public/build, which is gitignored, so Go cannot compile
+      # until Vite has produced it.
+      - name: Build frontend assets
+        run: |
+          npm ci
+          npm run build
+
+      - name: Install camel
+        run: go install github.com/martin3zra/camel/cmd/camel@${{ env.CAMEL_VERSION }}
+
+      - name: Check formatting
+        run: |
+          unformatted="$(gofmt -l $(git ls-files '*.go'))"
+          if [ -n "$unformatted" ]; then
+            echo "These files are not gofmt'd:"
+            echo "$unformatted"
+            exit 1
+          fi
+
+      - name: Vet
+        run: go vet ./...
+
+      - name: Build
+        run: go build ./...
+
+      # TestMain creates acme_test and applies the camel migrations itself.
+      - name: Test (race)
+        env:
+          CGO_ENABLED: '1'
+        run: |
+          cp .env.test.sample .env.test
+          go test -race ./...

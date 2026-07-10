@@ -71,9 +71,15 @@ export default function Show({ vendorPayment, auth }: Props) {
               <tr className="bg-gray-50/50">
                 <th scope="col">{t('payables.single.bill')}</th>
                 <th scope="col">{t('global.date')}</th>
-                <th scope="col" data-format="number">{t('global.dueDate')}</th>
-                <th scope="col" data-format="number">{t('global.amount_due')}</th>
-                <th scope="col" data-format="number">{t('global.payment')}</th>
+                <th scope="col" data-format="number">
+                  {t('global.dueDate')}
+                </th>
+                <th scope="col" data-format="number">
+                  {t('global.amount_due')}
+                </th>
+                <th scope="col" data-format="number">
+                  {t('global.payment')}
+                </th>
                 <th scope="col">{t('global.status')}</th>
               </tr>
             </thead>

@@ -22,6 +22,9 @@ import { FC, useState } from 'react';
 import { getColumns, PayableLineRow } from './columns-definitions';
 
 declare module '@tanstack/react-table' {
+  // TData is unused here but must match TanStack's declaration for the
+  // interface merge to apply.
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   interface TableMeta<TData extends RowData> {
     updateData?: (rowId: string, columnId: string, value: string | number) => void;
   }
@@ -38,16 +41,7 @@ type Props = {
   onSelectionChange: (selection: RowSelectionState) => void;
 };
 
-export const List: FC<Props> = ({
-  data,
-  totals,
-  rowSelection,
-  loading,
-  setRowSelection,
-  onSelectPayableLine,
-  onValueChange,
-  onSelectionChange,
-}) => {
+export const List: FC<Props> = ({ data, totals, rowSelection, loading, setRowSelection, onSelectPayableLine, onValueChange, onSelectionChange }) => {
   const t = useTranslation().trans;
   const [sorting, setSorting] = useState<SortingState>([]);
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);

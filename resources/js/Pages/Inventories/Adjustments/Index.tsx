@@ -1,35 +1,16 @@
-import AppLayout from '@/layouts/app-layout';
-import { PageProps, Warehouse } from '@/types';
-import { breadcrumbs } from './constants';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
 import HeadingSmall from '@/components/heading-small';
 import { Button } from '@/components/ui/button';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from '@/components/ui/dialog';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useHeader } from '@/composables/use-headers';
-import { useForm, usePage } from '@inertiajs/react';
-import { useState } from 'react';
+import AppLayout from '@/layouts/app-layout';
+import { PageProps, Warehouse } from '@/types';
+import { useForm } from '@inertiajs/react';
 import { Plus } from 'lucide-react';
+import { useState } from 'react';
+import { breadcrumbs } from './constants';
 
 type AdjustmentRow = {
   id: number;
@@ -101,7 +82,7 @@ function NewAdjustmentDialog({ variants, warehouses }: { variants: ItemVariant[]
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
         <Button size="sm">
-          <Plus className="h-4 w-4 mr-1" />
+          <Plus className="mr-1 h-4 w-4" />
           New Adjustment
         </Button>
       </DialogTrigger>
@@ -109,7 +90,7 @@ function NewAdjustmentDialog({ variants, warehouses }: { variants: ItemVariant[]
         <DialogHeader>
           <DialogTitle>Record Stock Adjustment</DialogTitle>
         </DialogHeader>
-        <form onSubmit={submit} className="flex flex-col gap-4 mt-2">
+        <form onSubmit={submit} className="mt-2 flex flex-col gap-4">
           <div className="flex flex-col gap-1">
             <label className="text-sm font-medium">Item Variant</label>
             <Select value={data.variant_id} onValueChange={(v) => setData('variant_id', v)}>
@@ -124,7 +105,7 @@ function NewAdjustmentDialog({ variants, warehouses }: { variants: ItemVariant[]
                 ))}
               </SelectContent>
             </Select>
-            {errors.variant_id && <p className="text-sm text-destructive">{errors.variant_id}</p>}
+            {errors.variant_id && <p className="text-destructive text-sm">{errors.variant_id}</p>}
           </div>
 
           <div className="flex flex-col gap-1">
@@ -141,38 +122,24 @@ function NewAdjustmentDialog({ variants, warehouses }: { variants: ItemVariant[]
                 ))}
               </SelectContent>
             </Select>
-            {errors.warehouse_id && <p className="text-sm text-destructive">{errors.warehouse_id}</p>}
+            {errors.warehouse_id && <p className="text-destructive text-sm">{errors.warehouse_id}</p>}
           </div>
 
           <div className="flex flex-col gap-1">
             <label className="text-sm font-medium">Quantity (use negative to remove stock)</label>
-            <Input
-              type="number"
-              step="any"
-              value={data.qty}
-              onChange={(e) => setData('qty', e.target.value)}
-              placeholder="e.g. 10 or -5"
-            />
-            {errors.qty && <p className="text-sm text-destructive">{errors.qty}</p>}
+            <Input type="number" step="any" value={data.qty} onChange={(e) => setData('qty', e.target.value)} placeholder="e.g. 10 or -5" />
+            {errors.qty && <p className="text-destructive text-sm">{errors.qty}</p>}
           </div>
 
           <div className="flex flex-col gap-1">
             <label className="text-sm font-medium">Reason</label>
-            <Input
-              value={data.reason}
-              onChange={(e) => setData('reason', e.target.value)}
-              placeholder="e.g. Physical count correction"
-            />
-            {errors.reason && <p className="text-sm text-destructive">{errors.reason}</p>}
+            <Input value={data.reason} onChange={(e) => setData('reason', e.target.value)} placeholder="e.g. Physical count correction" />
+            {errors.reason && <p className="text-destructive text-sm">{errors.reason}</p>}
           </div>
 
           <div className="flex flex-col gap-1">
             <label className="text-sm font-medium">Notes (optional)</label>
-            <Input
-              value={data.notes}
-              onChange={(e) => setData('notes', e.target.value)}
-              placeholder="Additional notes…"
-            />
+            <Input value={data.notes} onChange={(e) => setData('notes', e.target.value)} placeholder="Additional notes…" />
           </div>
 
           <Button type="submit" disabled={processing}>
@@ -184,12 +151,7 @@ function NewAdjustmentDialog({ variants, warehouses }: { variants: ItemVariant[]
   );
 }
 
-export default function Index({
-  auth,
-  adjustments,
-  variants,
-  warehouses,
-}: PageProps<AdjustmentPageProps>) {
+export default function Index({ auth, adjustments, variants, warehouses }: PageProps<AdjustmentPageProps>) {
   return (
     <AppLayout user={auth.user} breadcrumbs={breadcrumbs}>
       <div className="flex flex-col gap-4 p-4">
@@ -212,14 +174,14 @@ export default function Index({
           <TableBody>
             {adjustments.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
+                <TableCell colSpan={6} className="text-muted-foreground py-8 text-center">
                   No adjustments recorded yet.
                 </TableCell>
               </TableRow>
             ) : (
               adjustments.map((a) => (
                 <TableRow key={a.id}>
-                  <TableCell className="text-sm text-muted-foreground">{a.created_at}</TableCell>
+                  <TableCell className="text-muted-foreground text-sm">{a.created_at}</TableCell>
                   <TableCell>
                     <span className="font-medium">{a.item_name}</span>
                     {a.variant_name && a.variant_name !== a.item_name && (
@@ -229,7 +191,8 @@ export default function Index({
                   <TableCell className="text-muted-foreground">{a.sku || '—'}</TableCell>
                   <TableCell>{a.warehouse}</TableCell>
                   <TableCell className={`text-right font-mono ${a.qty < 0 ? 'text-destructive' : 'text-green-600'}`}>
-                    {a.qty > 0 ? '+' : ''}{a.qty.toFixed(4)}
+                    {a.qty > 0 ? '+' : ''}
+                    {a.qty.toFixed(4)}
                   </TableCell>
                   <TableCell className="text-muted-foreground text-sm">{a.reason}</TableCell>
                 </TableRow>
@@ -241,4 +204,3 @@ export default function Index({
     </AppLayout>
   );
 }
-

@@ -30,7 +30,7 @@ function SourceIconLink({ Icon, tooltip, href }: { Icon: React.ElementType; tool
   );
 }
 
-export function PurchaseSourceIcon({ source, kind }: PurchaseSourceIconProp) {
+export function PurchaseSourceIcon({ source }: PurchaseSourceIconProp) {
   const t = useTranslation().trans;
 
   const backLinkMap: Record<string, { Icon: React.ElementType; tooltip: string }> = {
@@ -47,7 +47,6 @@ export function PurchaseSourceIcon({ source, kind }: PurchaseSourceIconProp) {
   const backEntry = backLinkMap[source.type];
   if (!backEntry) return null;
 
-  const backBase = purchaseSourceUrl[source.type] ?? '/purchases/orders';
   const entries: SourceEntry[] = [{ ...backEntry, id: source.id, type: source.type }];
 
   if (source.target) {
@@ -63,14 +62,7 @@ export function PurchaseSourceIcon({ source, kind }: PurchaseSourceIconProp) {
     <div className="flex items-center gap-1">
       {entries.map((entry) => {
         const base = purchaseSourceUrl[entry.type] ?? '/purchases/orders';
-        return (
-          <SourceIconLink
-            key={entry.type}
-            Icon={entry.Icon}
-            tooltip={entry.tooltip}
-            href={`${base}?id=${entry.id}`}
-          />
-        );
+        return <SourceIconLink key={entry.type} Icon={entry.Icon} tooltip={entry.tooltip} href={`${base}?id=${entry.id}`} />;
       })}
     </div>
   );

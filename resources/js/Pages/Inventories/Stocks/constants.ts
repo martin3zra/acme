@@ -7,4 +7,3 @@ export const breadcrumbs: BreadcrumbItem[] = [
     href: '/inventories/stocks',
   },
 ];
-

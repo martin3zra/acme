@@ -4,7 +4,7 @@ import { Box, Calendar, CheckCircle, CreditCard, FileText, Layers, Users } from 
 
 export default function Index({ auth }: PageProps) {
   // --- Data & small helpers
-  const FeatureCard = ({ icon: Icon, title, children }: { icon: any; title: string; children: React.ReactNode }) => (
+  const FeatureCard = ({ icon: Icon, title, children }: { icon: React.ElementType; title: string; children: React.ReactNode }) => (
     <div className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm dark:border-gray-700 dark:bg-gray-800">
       <div className="flex items-center gap-4">
         <div className="rounded-lg bg-indigo-50 p-3 text-indigo-600 dark:bg-indigo-900/30 dark:text-indigo-300">

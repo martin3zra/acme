@@ -1,15 +1,8 @@
+import HeadingSmall from '@/components/heading-small';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import AppLayout from '@/layouts/app-layout';
 import { PageProps } from '@/types';
 import { breadcrumbs } from './constants';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
-import HeadingSmall from '@/components/heading-small';
 
 type StockBalance = {
   variant_id: number;
@@ -43,7 +36,7 @@ export default function Index({ auth, stocks }: PageProps<{ stocks: StockBalance
           <TableBody>
             {stocks.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
+                <TableCell colSpan={6} className="text-muted-foreground py-8 text-center">
                   No stock records found. Inventory balances will appear here once you receive goods or record sales.
                 </TableCell>
               </TableRow>
@@ -54,9 +47,7 @@ export default function Index({ auth, stocks }: PageProps<{ stocks: StockBalance
                   <TableCell>{s.variant_name}</TableCell>
                   <TableCell className="text-muted-foreground">{s.sku || '—'}</TableCell>
                   <TableCell>{s.warehouse}</TableCell>
-                  <TableCell className={`text-right font-mono ${s.quantity < 0 ? 'text-destructive' : ''}`}>
-                    {s.quantity.toFixed(2)}
-                  </TableCell>
+                  <TableCell className={`text-right font-mono ${s.quantity < 0 ? 'text-destructive' : ''}`}>{s.quantity.toFixed(2)}</TableCell>
                   <TableCell className="text-muted-foreground text-sm">{s.updated_at}</TableCell>
                 </TableRow>
               ))
@@ -67,4 +58,3 @@ export default function Index({ auth, stocks }: PageProps<{ stocks: StockBalance
     </AppLayout>
   );
 }
-

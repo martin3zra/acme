@@ -1,5 +1,14 @@
 import { defaultBTForm, defaultCardForm, defaultCashForm, defaultCheckForm } from '@/constants';
-import { BreadcrumbItem, defaultBreadcrumbs, DiscountType, PaymentForm, PaymentHeaderForm, PaymentMethodsForm, PaymentTotals } from '@/types';
+import {
+  BreadcrumbItem,
+  defaultBreadcrumbs,
+  DiscountType,
+  PaymentForm,
+  PaymentHeaderForm,
+  PaymentMethodsForm,
+  PaymentTotals,
+  ReceivableInvoiceForm,
+} from '@/types';
 
 export const defaultPaymentMethodsForm: PaymentMethodsForm = {
   cash: defaultCashForm,
@@ -15,6 +24,19 @@ export const defaultHeaderForm: PaymentHeaderForm = {
   discount: 0,
 };
 export const defaultPaymentTotals: PaymentTotals = { totalPayment: 0, totalDiscount: 0, totalRemaining: 0 };
+
+// Totals are derived from the lines, never stored independently, so Create and
+// Edit cannot drift apart on what a payment adds up to.
+export const computeTotals = (lines: ReceivableInvoiceForm[]): PaymentTotals =>
+  lines.reduce(
+    (acc, line) => {
+      acc.totalPayment += line.payment || 0;
+      acc.totalDiscount += line.discount || 0;
+      acc.totalRemaining += line.remaining || 0;
+      return acc;
+    },
+    { totalPayment: 0, totalDiscount: 0, totalRemaining: 0 },
+  );
 
 export const defaultPaymentForm: PaymentForm = {
   header: defaultHeaderForm,

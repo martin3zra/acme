@@ -29,7 +29,7 @@ const statusConfig: Record<
   412: {
     title: 'Precondition Failed',
     icon: <FileWarning className="text-muted-foreground h-12 w-12" />,
-    description: "The resource you are trying to access has missing prerequisites.",
+    description: 'The resource you are trying to access has missing prerequisites.',
   },
   500: {
     title: 'Server Error',

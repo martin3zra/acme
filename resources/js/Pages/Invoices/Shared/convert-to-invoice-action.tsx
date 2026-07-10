@@ -20,6 +20,7 @@ type Props = {
 
 export function ConvertToInvoiceAction({ mode = 'convert', title, renderedAs = 'dropdown-item', kind, id, source }: Props) {
   const t = useTranslation().trans;
+  const { setItem } = useLocalStorage('invoice');
   const handleConvertion = () => {
     if (!source) {
       return;
@@ -32,7 +33,6 @@ export function ConvertToInvoiceAction({ mode = 'convert', title, renderedAs = '
     const clonedFrom: number | undefined = mode === 'duplicate' ? data.header.id : undefined;
     const taxReceipt: number = mode === 'duplicate' ? data.header.tax_receipt_id : 0;
     const converted = convertToInvoice(kind, data, { terms: data.header.terms, taxReceipt, ncf: '' }, clonedFrom);
-    const { setItem } = useLocalStorage('invoice');
     setItem(converted);
 
     router.visit('/invoices/create');
@@ -54,7 +54,7 @@ export function ConvertToInvoiceAction({ mode = 'convert', title, renderedAs = '
     if (!response.ok) {
       const error: ErrorResponse = await response.json();
       toast.error(error.status);
-      throw new Error('Failed fetching the data', error.data);
+      throw new Error('Failed fetching the data', { cause: error.data });
     }
     const data: InvoiceWithLines = await response.json();
     processConvertion(data);
