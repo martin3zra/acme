@@ -16,9 +16,9 @@ import (
 )
 
 func resolveTransactionKind(ctx *routing.Context) TransactionKind {
-	kind := ctx.Request.Header.Get("X-Transaction-Kind")
-	if kind != "" {
-		return TransactionKind(kind)
+	kind := TransactionKind(ctx.Request.Header.Get("X-Transaction-Kind"))
+	if kind.Validate() == nil {
+		return kind
 	}
 
 	path := ctx.Request.URL.Path
