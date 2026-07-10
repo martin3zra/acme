@@ -85,7 +85,7 @@ func (i *invoice) deriveTerms() {
 // filter — the NCF comes from invoices.tax_number, not from the receipt. tax_receipts.id
 // is its primary key, so it could not duplicate rows either. It was dead weight.
 //
-// INNER JOIN customers becomes a belongsTo eager load. It needs WithTrashed: customerRead
+// INNER JOIN customers becomes a belongsTo eager load. It needs WithTrashed: customerModel
 // is softdelete-tagged, but the join never filtered customers.deleted_at, and an invoice
 // to a since-deleted customer must still render.
 

@@ -89,7 +89,7 @@ func TestFindPayments_HidesTrashedButDetailDoesNot(t *testing.T) {
 	is.Equal(p.Invoices, 1)
 }
 
-// TestFindPaymentByUUID_SoftDeletedCustomer: customerRead is softdelete-tagged but
+// TestFindPaymentByUUID_SoftDeletedCustomer: customerModel is softdelete-tagged but
 // the old INNER JOIN never filtered deleted_at. voidPayment needs Customer.ID to
 // restore the balance, so the eager load must include trashed customers.
 func TestFindPaymentByUUID_SoftDeletedCustomer(t *testing.T) {
