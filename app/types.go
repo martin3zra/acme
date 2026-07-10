@@ -1395,10 +1395,19 @@ func (form StoreProfileForm) Rules() map[string]any {
 		panic("database connection need to be set.")
 	}
 
-	var userId int
-	if err := db.QueryRow("SELECT owner_id FROM accounts WHERE uuid = $1", form.Param("account")).Scan(&userId); err != nil {
+	pdb, err := playOn(db)
+	if err != nil {
+		panic("database connection need to be set.")
+	}
+
+	var acc accountRead
+	if err := pdb.Model(&accountRead{}).
+		Select("owner_id").
+		WhereEq("uuid", form.Param("account")).
+		First(context.Background(), &acc); err != nil {
 		panic("unable to find the account owner.")
 	}
+	userId := acc.OwnerID
 
 	return map[string]any{
 		"name": "required|min:3",
@@ -1492,19 +1501,40 @@ func (u *User) HasVerifiedEmail() bool {
 	return u.EmailVerifiedAt != nil
 }
 
+// MarkEmailAsVerified stamps the verification time. The raw statement discarded the
+// affected-row count, so verifying a user id that matches no row returned true;
+// mustAffectRows makes that false, as the name promises.
+//
+// updated_at is stamped by Update, since userRead maps the column.
 func (u *User) MarkEmailAsVerified(db *sql.DB) bool {
-	_, err := db.Exec("UPDATE users SET email_verified_at = now(), updated_at = now() WHERE id = $1", u.Id)
-	return err == nil
+	pdb, err := playOn(db)
+	if err != nil {
+		return false
+	}
+
+	affected, err := pdb.Model(&userRead{}).
+		WhereEq("id", u.Id).
+		Update(context.Background(), map[string]any{"email_verified_at": time.Now()})
+	return mustAffectRows(affected, err, "user") == nil
 }
 
+// Account returns the account this user owns, or nil.
 func (u *User) Account(db *sql.DB) *account {
-	var a = new(account)
-	if err := db.QueryRow("SELECT id, uuid, owner_id, status, verified_at, created_at, updated_at, deleted_at FROM accounts WHERE owner_id = $1", u.Id).
-		Scan(&a.ID, &a.UUID, &a.Owner.ID, &a.Status, &a.VerifiedAt, &a.CreatedAt, &a.UpdatedAt, &a.DeletedAt); err != nil {
+	pdb, err := playOn(db)
+	if err != nil {
 		log.Println("An error occurred fetching the account using the ownerID:", err)
 		return nil
 	}
 
+	var row accountRead
+	if err := pdb.Model(&accountRead{}).
+		WhereEq("owner_id", u.Id).
+		First(context.Background(), &row); err != nil {
+		log.Println("An error occurred fetching the account using the ownerID:", err)
+		return nil
+	}
+
+	a := row.toAccountStruct()
 	u.account = a
 
 	return a
@@ -1515,17 +1545,26 @@ func (u *User) OwnedBy(db *sql.DB) (*account, error) {
 		return u.account, nil
 	}
 
-	var a = new(account)
-	if err := db.QueryRow(`
-    SELECT accounts.id, accounts.uuid, accounts.owner_id, accounts.status, accounts.verified_at, accounts.created_at, accounts.updated_at, accounts.deleted_at
-    FROM accounts
-    INNER JOIN accounts_users on accounts.id = accounts_users.account_id
-    WHERE accounts_users.user_id = $1
-  `, u.Id).
-		Scan(&a.ID, &a.UUID, &a.Owner.ID, &a.Status, &a.VerifiedAt, &a.CreatedAt, &a.UpdatedAt, &a.DeletedAt); err != nil {
+	pdb, err := playOn(db)
+	if err != nil {
 		return nil, err
 	}
 
+	// Rooted on the pivot: the INNER JOIN becomes a belongsTo, and Has("Account") keeps
+	// the join's semantics — a membership row whose account is gone matches nothing.
+	var link accountUserRead
+	if err := pdb.Model(&accountUserRead{}).
+		With("Account").
+		Has("Account").
+		WhereEq("user_id", u.Id).
+		First(context.Background(), &link); err != nil {
+		return nil, err
+	}
+	if link.Account == nil {
+		return nil, sql.ErrNoRows
+	}
+
+	a := link.Account.toAccountStruct()
 	u.account = a
 
 	return a, nil
@@ -1566,31 +1605,32 @@ func UserFromFoundationUser(u foundation.Authenticatable) *User {
 	}
 }
 
+// currentCompany reads the user's current company together with the role they hold in
+// it. The role lives on the pivot, so the read is rooted there and the company arrives
+// through a belongsTo; Has("Company") preserves the INNER JOIN.
 func (u *User) currentCompany(db *sql.DB) (*Company, error) {
-	result := db.QueryRow(`
-    SELECT companies.id, companies.uuid, companies.name, companies.identifier, companies.city,
-    companies.address, companies.created_at, companies.updated_at, companies_users.role
-    FROM companies
-    JOIN companies_users ON companies.id = companies_users.company_id
-    WHERE companies_users.user_id = $1 AND companies_users.current = true
-  `, u.Id)
-	var company Company
-	err := result.Scan(
-		&company.ID,
-		&company.UUID,
-		&company.Name,
-		&company.Identifier,
-		&company.City,
-		&company.Address,
-		&company.CreatedAt,
-		&company.UpdatedAt,
-		&company.UserRole,
-	)
+	pdb, err := playOn(db)
 	if err != nil {
 		return nil, err
 	}
 
-	return &company, err
+	var link companyUserRead
+	if err := pdb.Model(&companyUserRead{}).
+		With("Company").
+		Has("Company").
+		WhereEq("user_id", u.Id).
+		WhereEq("current", true).
+		First(context.Background(), &link); err != nil {
+		return nil, err
+	}
+	if link.Company == nil {
+		return nil, sql.ErrNoRows
+	}
+
+	company := link.Company.toCompany()
+	company.UserRole = link.Role
+
+	return company, nil
 }
 
 func CurrentCompany(ctx context.Context) *Company {
