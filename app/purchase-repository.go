@@ -418,6 +418,15 @@ func resolveItemTaxIDs(tx *sql.Tx, companyID int, itemIDs []int) (map[int]*int, 
 	return m, nil
 }
 
+// sourceValue unwraps the optional jsonb source blob. A nil pointer becomes a nil
+// map value, which playsql writes as SQL NULL.
+func sourceValue(source *[]byte) any {
+	if source == nil {
+		return nil
+	}
+	return *source
+}
+
 func (s *Server) storePurchaseInternal(tx *sql.Tx, companyID int, form *StorePurchaseForm) (string, error) {
 	seqInfo, err := GetNextSequence(tx, companyID, string(form.Kind))
 	if err != nil {
@@ -448,46 +457,52 @@ func (s *Server) storePurchaseInternal(tx *sql.Tx, companyID int, form *StorePur
 	needsDraftStatus := form.Kind == PurchaseTransactionKinds.PurchaseReceipt ||
 		form.Kind == PurchaseTransactionKinds.VendorBill
 
-	insertCols := "INSERT INTO purchases (company_id, vendor_id, warehouse_id, transaction_kind, notes, subtotal, discount_amount, tax_amount, total, payment_status, code, source, date, due_date"
-	valuesCols := "VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14"
-	args := []any{
-		companyID,
-		form.VendorID,
-		warehouseID,
-		form.Kind,
-		form.Notes,
-		form.amount,
-		discountAmount,
-		form.tax,
-		form.total,
-		form.paymentStatus,
-		seqInfo.Code,
-		source,
-		form.Date,
-		form.dueOn,
-	}
-
-	if needsDraftStatus {
-		insertCols += ", purchase_status"
-		valuesCols += fmt.Sprintf(", $%d", len(args)+1)
-		args = append(args, "draft")
-	}
-
-	if form.InvoiceNumber != "" {
-		insertCols += ", invoice_number"
-		valuesCols += fmt.Sprintf(", $%d", len(args)+1)
-		args = append(args, form.InvoiceNumber)
-	}
-
-	var purchaseID int
-	var purchaseUUID string
-	err = tx.QueryRow(
-		insertCols+") "+valuesCols+") RETURNING id, uuid",
-		args...,
-	).Scan(&purchaseID, &purchaseUUID)
+	ptx, err := playTx(tx)
 	if err != nil {
 		return "", err
 	}
+
+	// The old statement concatenated columns and renumbered placeholders by hand to
+	// leave purchase_status and invoice_number at their defaults. A map insert says
+	// the same thing: a key that is absent is a column that is not written.
+	row := map[string]any{
+		"company_id":       companyID,
+		"vendor_id":        form.VendorID,
+		"warehouse_id":     warehouseID,
+		"transaction_kind": string(form.Kind),
+		"notes":            form.Notes,
+		"subtotal":         form.amount,
+		"discount_amount":  discountAmount,
+		"tax_amount":       form.tax,
+		"total":            form.total,
+		"payment_status":   string(form.paymentStatus),
+		"code":             seqInfo.Code,
+		"source":           sourceValue(source),
+		"date":             form.Date,
+		"due_date":         form.dueOn,
+	}
+	if needsDraftStatus {
+		row["purchase_status"] = "draft"
+	}
+	if form.InvoiceNumber != "" {
+		row["invoice_number"] = form.InvoiceNumber
+	}
+
+	id, err := ptx.Model(&purchaseRead{}).Insert(context.Background(), row)
+	if err != nil {
+		return "", err
+	}
+	purchaseID := int(id)
+
+	// Insert returns the pk only; uuid is DB-generated, so it is read back.
+	var stored purchaseRead
+	if err := ptx.Model(&purchaseRead{}).
+		Select("uuid").
+		WhereEq("id", purchaseID).
+		First(context.Background(), &stored); err != nil {
+		return "", err
+	}
+	purchaseUUID := stored.UUID
 
 	if err := s.attachPurchaseLines(tx, companyID, purchaseID, form); err != nil {
 		return "", err
@@ -506,17 +521,17 @@ func (s *Server) storePurchaseInternal(tx *sql.Tx, companyID int, form *StorePur
 			return "", err
 		}
 
-		_, err = tx.Exec(
-			"UPDATE purchases SET purchase_status = $3, source = $4, updated_at = NOW() WHERE company_id = $1 AND uuid = $2",
-			companyID, form.Source.ID,
-			poStatus,
-			foundation.AsJSON(map[string]any{
-				"type": string(form.Kind),
-				"id":   purchaseUUID,
-				"code": seqInfo.Code,
-			}),
-		)
-		if err != nil {
+		if _, err := ptx.Model(&purchaseRead{}).
+			WhereEq("company_id", companyID).
+			WhereEq("uuid", form.Source.ID).
+			Update(context.Background(), map[string]any{
+				"purchase_status": poStatus,
+				"source": foundation.AsJSON(map[string]any{
+					"type": string(form.Kind),
+					"id":   purchaseUUID,
+					"code": seqInfo.Code,
+				}),
+			}); err != nil {
 			return "", err
 		}
 
@@ -529,17 +544,20 @@ func (s *Server) storePurchaseInternal(tx *sql.Tx, companyID int, form *StorePur
 	// receipt's source.target so the receipt list view can show a forward link.
 	isConversionVendorBill := form.Kind == PurchaseTransactionKinds.VendorBill && form.Source != nil && form.Source.ID != ""
 	if isConversionVendorBill {
-		var rawSource []byte
-		err := tx.QueryRow(
-			"SELECT COALESCE(source, '{}'::jsonb) FROM purchases WHERE company_id = $1 AND uuid = $2",
-			companyID, form.Source.ID,
-		).Scan(&rawSource)
-		if err != nil {
+		// The old COALESCE(source, '{}') is unnecessary: playsql scans a SQL NULL as
+		// the field's zero value, and unmarshalling an empty slice leaves the map nil —
+		// which the branch below already handles.
+		var receipt purchaseRead
+		if err := ptx.Model(&purchaseRead{}).
+			Select("source").
+			WhereEq("company_id", companyID).
+			WhereEq("uuid", form.Source.ID).
+			First(context.Background(), &receipt); err != nil {
 			return "", err
 		}
 
 		var existingSource map[string]any
-		if jsonErr := json.Unmarshal(rawSource, &existingSource); jsonErr != nil {
+		if jsonErr := json.Unmarshal(receipt.Source, &existingSource); jsonErr != nil || existingSource == nil {
 			existingSource = map[string]any{}
 		}
 
@@ -560,12 +578,12 @@ func (s *Server) storePurchaseInternal(tx *sql.Tx, companyID int, form *StorePur
 				"code": seqInfo.Code,
 			}
 
-			_, err = tx.Exec(
-				"UPDATE purchases SET source = $3, updated_at = NOW() WHERE company_id = $1 AND uuid = $2",
-				companyID, form.Source.ID,
-				foundation.AsJSON(existingSource),
-			)
-			if err != nil {
+			if _, err := ptx.Model(&purchaseRead{}).
+				WhereEq("company_id", companyID).
+				WhereEq("uuid", form.Source.ID).
+				Update(context.Background(), map[string]any{
+					"source": foundation.AsJSON(existingSource),
+				}); err != nil {
 				return "", err
 			}
 		}
@@ -706,37 +724,29 @@ func (s *Server) updatePurchase(ctx context.Context, uuid string, form *UpdatePu
 	}
 
 	if err := database.WithTransaction(s.db, func(tx *sql.Tx) error {
-		_, err := tx.Exec(`
-      UPDATE purchases
-      SET vendor_id = $3,
-          date = $4,
-          due_date = $5,
-          subtotal = $6,
-          discount_amount = $7,
-          tax_amount = $8,
-          total = $9,
-          notes = $10,
-          payment_status = $11,
-          transaction_kind = $12,
-          invoice_number = $13,
-          updated_at = NOW()
-      WHERE company_id = $1 AND id = $2
-    `,
-			companyID,
-			purchase.ID,
-			form.VendorID,
-			form.Date,
-			form.dueOn,
-			form.amount,
-			discountAmount,
-			form.tax,
-			form.total,
-			form.Notes,
-			form.paymentStatus,
-			form.Kind,
-			form.InvoiceNumber,
-		)
+		ptx, err := playTx(tx)
 		if err != nil {
+			return err
+		}
+
+		// purchase.ID came from a company-scoped read, so this must match a row.
+		affected, err := ptx.Model(&purchaseRead{}).
+			WhereEq("company_id", companyID).
+			WhereEq("id", purchase.ID).
+			Update(context.Background(), map[string]any{
+				"vendor_id":        form.VendorID,
+				"date":             form.Date,
+				"due_date":         form.dueOn,
+				"subtotal":         form.amount,
+				"discount_amount":  discountAmount,
+				"tax_amount":       form.tax,
+				"total":            form.total,
+				"notes":            form.Notes,
+				"payment_status":   string(form.paymentStatus),
+				"transaction_kind": string(form.Kind),
+				"invoice_number":   form.InvoiceNumber,
+			})
+		if err := mustAffectRows(affected, err, "purchase"); err != nil {
 			return err
 		}
 
@@ -1046,41 +1056,48 @@ func resolvePOPaymentStatus(tx *sql.Tx, companyID int, poUUID string) (PaidStatu
 
 // updatePOPaymentStatus recalculates and writes payment_status on the source PO.
 // When fully paid it also advances purchase_status to 'closed'.
+//
+// The three branches differ only in what they SET and in one extra predicate, so
+// they collapse into one builder. Each is deliberately allowed to match no row —
+// a closed PO is not demoted to partially_paid, and a paid one is not demoted at
+// all — so no zero-row guard belongs here.
+//
+// playsql stamps updated_at because purchaseRead maps it, and purchaseRead's
+// softdelete tag adds `deleted_at IS NULL`. The raw statements had no such
+// predicate; a soft-deleted PO should not have its status rewritten.
 func updatePOPaymentStatus(tx *sql.Tx, companyID int, poUUID string) error {
 	newPaymentStatus, err := resolvePOPaymentStatus(tx, companyID, poUUID)
 	if err != nil {
 		return err
 	}
 
-	if newPaymentStatus == PaidStatuses.Paid {
-		_, err = tx.Exec(
-			`UPDATE purchases
-			    SET payment_status  = $3,
-			        purchase_status = $4,
-			        updated_at      = NOW()
-			  WHERE company_id = $1 AND uuid = $2`,
-			companyID, poUUID, newPaymentStatus, string(PurchaseStatuses.Closed),
-		)
-	} else if newPaymentStatus == PaidStatuses.Partial {
-		_, err = tx.Exec(
-			`UPDATE purchases
-			    SET payment_status  = $3,
-			        purchase_status = $4,
-			        updated_at      = NOW()
-			  WHERE company_id = $1 AND uuid = $2
-			    AND purchase_status NOT IN ('closed')`,
-			companyID, poUUID, newPaymentStatus, string(PurchaseStatuses.PartiallyPaid),
-		)
-	} else {
-		_, err = tx.Exec(
-			`UPDATE purchases
-			    SET payment_status = $3,
-			        updated_at     = NOW()
-			  WHERE company_id = $1 AND uuid = $2
-			    AND payment_status != $4`,
-			companyID, poUUID, newPaymentStatus, string(PaidStatuses.Paid),
-		)
+	ptx, err := playTx(tx)
+	if err != nil {
+		return err
 	}
+
+	paid := newPaymentStatus == PaidStatuses.Paid
+	partial := newPaymentStatus == PaidStatuses.Partial
+
+	changes := map[string]any{"payment_status": string(newPaymentStatus)}
+	switch {
+	case paid:
+		changes["purchase_status"] = string(PurchaseStatuses.Closed)
+	case partial:
+		changes["purchase_status"] = string(PurchaseStatuses.PartiallyPaid)
+	}
+
+	_, err = ptx.Model(&purchaseRead{}).
+		WhereEq("company_id", companyID).
+		WhereEq("uuid", poUUID).
+		// A closed PO keeps its status; an already-paid PO is never demoted.
+		When(partial, func(q *playsql.Builder) {
+			q.Where("purchase_status", "!=", string(PurchaseStatuses.Closed))
+		}).
+		When(!paid && !partial, func(q *playsql.Builder) {
+			q.Where("payment_status", "!=", string(PaidStatuses.Paid))
+		}).
+		Update(context.Background(), changes)
 	return err
 }
 
@@ -1192,16 +1209,19 @@ func (s *Server) confirmPurchase(ctx context.Context, uuid string) error {
 			}
 		}
 
-		_, err := tx.Exec(
-			`UPDATE purchases
-			    SET purchase_status   = $3,
-			        movement_recorded = $4,
-			        updated_at        = NOW()
-			  WHERE company_id = $1 AND id = $2`,
-			companyID, purchase.ID,
-			string(targetStatus),
-			needsMovements,
-		)
-		return err
+		ptx, err := playTx(tx)
+		if err != nil {
+			return err
+		}
+
+		// purchase.ID came from a company-scoped read, so this must match a row.
+		affected, err := ptx.Model(&purchaseRead{}).
+			WhereEq("company_id", companyID).
+			WhereEq("id", purchase.ID).
+			Update(context.Background(), map[string]any{
+				"purchase_status":   string(targetStatus),
+				"movement_recorded": needsMovements,
+			})
+		return mustAffectRows(affected, err, "purchase")
 	})
 }
