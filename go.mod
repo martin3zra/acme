@@ -6,7 +6,7 @@ require github.com/romsar/gonertia/v2 v2.0.3
 
 require github.com/martin3zra/forge v0.1.4
 
-require github.com/martin3zra/playsql v0.3.0
+require github.com/martin3zra/playsql v0.4.0
 
 require (
 	github.com/google/uuid v1.6.0
