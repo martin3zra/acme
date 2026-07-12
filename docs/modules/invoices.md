@@ -14,6 +14,23 @@ An invoice bills a customer for items. It can be **cash** (paid on the spot) or
 invoice also carries an **NCF** (a government tax-receipt number) drawn from a
 tax-receipt sequence.
 
+### Before you can create one
+
+These must already exist in the current company before an invoice will save:
+
+- An enabled **customer** to bill ([customers.md](customers.md)).
+- At least one **item**, each with a **unit**, for the lines
+  ([inventory.md](inventory.md)).
+- For a **fiscal invoice** (kind `invoice`), an **NCF tax-receipt sequence** with
+  room left ([taxes.md](taxes.md)). Estimates and orders don't need one.
+
+Two runtime refusals also act like prerequisites:
+
+- A credit invoice that would push the customer **over their credit limit** is
+  rejected ([customers.md](customers.md)).
+- With **paid-in-advance ("pia") terms**, the payment total must equal the
+  invoice total.
+
 ### Creating one
 
 1. Pick a customer (must exist and be enabled — see [customers.md](customers.md)).
@@ -59,6 +76,26 @@ Selling an inventory-tracked item **moves stock out** of the warehouse.
 
 Model: `invoiceModel` in `app/playsql_models.go` (the merged read/write model;
 jsonb columns are `[]byte`).
+
+### Required fields & dependencies
+
+Enforced by `StoreInvoiceForm.Rules` (`app/invoice-types.go:227`). `tenantExists(…)`
+means the referenced row must exist **within the current company** — this is the
+shared line-item contract for the whole transaction-kind family.
+
+| Field | Rule | Must pre-exist |
+|---|---|---|
+| `customer_id` | required, `tenantExists` customers | a customer |
+| `kind` | required, in `invoice,estimate,order,template` | — |
+| `lines` | required, min 1 | — |
+| `lines.*.id` | required, `tenantExists` items | each line's item |
+| `lines.*.unit` | required, `tenantExists` units | each line's unit |
+| `tax_receipt` | `required_if` kind=invoice, `tenantExists` tax_receipts | an NCF sequence (fiscal invoice only) |
+| `terms` | `required_if` kind in invoice/order/template | — |
+| `date` | `required_if` kind in invoice/estimate, `after:yesterday` | — |
+
+Beyond the form rules, the handler refuses over-limit credit invoices at runtime
+(`app/invoice-handlers.go:280`).
 
 ### The transaction-kind family
 

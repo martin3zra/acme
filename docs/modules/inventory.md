@@ -17,6 +17,17 @@ as a movement, so stock levels are always derivable from an audit trail.
 - **Warehouses** — locations that hold stock. Balances are per variant, per
   warehouse.
 
+### Before you can create an item
+
+An **item** is the prerequisite for every invoice, estimate, order, and purchase
+line — and creating one needs two things to already exist in the company:
+
+- a **tax** to apply ([taxes.md](taxes.md)), and
+- a **unit** of measure.
+
+The item name must be unique. (Warehouses have no prerequisites; they're a base
+record you set up before receiving stock.)
+
 ### How stock moves
 
 You never edit a stock number directly; instead the system records a **movement**
@@ -50,6 +61,22 @@ its own screen under Inventory.
   lines (`inventoryTransferRead`, `inventoryTransferLine`).
 - **`attributes`**, **`attribute_values`**, **`product_attributes`**,
   **`variant_attribute_values`** — the variant matrix.
+
+### Required fields & dependencies (item creation)
+
+Enforced by `StoreItemForm.Rules` (`app/item-types.go:54`). `tenantExists(…)`
+means the referenced row must exist **within the current company**.
+
+| Field | Rule | Must pre-exist |
+|---|---|---|
+| `name` | required, 3–120, unique(items) | — |
+| `price` | required, min 0 | — |
+| `tax_id` | required, `tenantExists` taxes | a tax |
+| `unit_id` | required, `tenantExists` units | a unit |
+| `item_type` | required, in `product,service` | — |
+
+Items with attributes use `StoreItemWithAttributesForm.Rules`
+(`app/item-types.go:281`) instead, adding the attribute/variant fields.
 
 ### Routes (`app/route.go`)
 

@@ -12,6 +12,14 @@ A non-binding quote. You build it exactly like an invoice — customer, line
 items, totals — but nothing financial happens: the customer isn't charged,
 inventory isn't touched, and no tax receipt is consumed.
 
+### Before you can create one
+
+Same prerequisites as an invoice — an enabled **customer** and at least one
+**item** with a **unit** per line — but an estimate consumes **no NCF**, so no
+tax-receipt sequence is needed (and unlike an order, no `terms`; a `date` is
+required). See [invoices.md](invoices.md#before-you-can-create-one) for the full
+list.
+
 ### Typical flow
 
 1. Create an estimate for a customer with the lines you're proposing.
@@ -36,6 +44,10 @@ handlers, repository, model — is shared with [invoices.md](invoices.md); only 
   `GET /estimates/:id/print/:hash`. All bound to the shared invoice handlers.
 - **Kind**: `TransactionKinds.Estimate` (`app/types.go`); branching in
   `app/invoice-handlers.go`.
+- **Create rules**: the shared `StoreInvoiceForm.Rules`
+  (`app/invoice-types.go:227`) — for `estimate`, `date` is required and
+  `tax_receipt` is **not**. See the table in
+  [invoices.md](invoices.md#required-fields--dependencies).
 - **Conversion**: estimate → invoice is where financial effects apply; the
   `source` jsonb on the new invoice records the origin. See
   `app/flow_conversion_test.go`.

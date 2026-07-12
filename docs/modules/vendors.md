@@ -12,6 +12,14 @@ A vendor record holds contact details, purchasing preferences (terms, payment
 method, lead time), a purchase note, and a running **amount payable** (what you
 currently owe them).
 
+### Before you can create one
+
+Like a customer, a vendor is a base record — nothing else needs to exist first.
+The **email** must be unique across your vendors, and recording an **opening
+balance** starts an accounts-payable entry from day one. Assigning a fiscal
+**tax-receipt** is optional but, if set, must be a real sequence
+([taxes.md](taxes.md)).
+
 ### Creating one
 
 1. Enter name/contact/email/phone and pick **individual** or **business**.
@@ -44,6 +52,17 @@ The vendor gets a sequential **code** automatically.
 `email`, `phone`, `status`, `amount_payable`, `purchase_note`, `lead_time_days`,
 `address`, `vendor_type`, `payment_method`, `payment_terms`, `deleted_at`
 (soft-delete). Model: `vendorModel` in `app/playsql_models.go`.
+
+### Required fields & dependencies
+
+Enforced by `StoreVendorForm.Rules` (`app/vendor-types.go:30`).
+
+| Field | Rule | Note |
+|---|---|---|
+| `name` | required, 3–120 | — |
+| `email` | required, `email`, lowercase, unique(vendors) | — |
+| `credit_limited` | required | boolean |
+| `tax_receipt` | `sometimes`, `tenantExists` tax_receipts | an NCF sequence, only if assigned |
 
 ### Routes (`app/route.go`)
 

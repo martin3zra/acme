@@ -12,6 +12,13 @@ A confirmed order to fulfil. Like an estimate it is built with a customer and
 line items, but it represents a commitment to deliver rather than a quote. It
 doesn't bill the customer or move inventory on its own.
 
+### Before you can create one
+
+Same prerequisites as an invoice — an enabled **customer** and at least one
+**item** with a **unit** per line — with one difference: an order consumes **no
+NCF**, so no tax-receipt sequence is needed (a `terms` value is still required).
+See [invoices.md](invoices.md#before-you-can-create-one) for the full list.
+
 ### Typical flow
 
 1. Create the order for a customer with the agreed lines.
@@ -35,6 +42,10 @@ repository, and model are shared with [invoices.md](invoices.md).
   `GET /orders/:id/print/:hash` — all on the shared invoice handlers.
 - **Kind**: `TransactionKinds.Order` (`app/types.go`); branching in
   `app/invoice-handlers.go:308`.
+- **Create rules**: the shared `StoreInvoiceForm.Rules`
+  (`app/invoice-types.go:227`) — for `order`, `terms` is required and
+  `tax_receipt` is **not** (it's `required_if` kind=invoice). See the table in
+  [invoices.md](invoices.md#required-fields--dependencies).
 - **Conversion** to an invoice carries the origin in the `source` jsonb; see
   `app/flow_conversion_test.go`.
 - **Permissions**: `viewAny/create/update/void:order`

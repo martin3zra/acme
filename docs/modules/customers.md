@@ -11,6 +11,17 @@ A customer record holds contact details, billing preferences (cash vs credit
 terms, credit limit), a fiscal tax-receipt assignment, and a running
 **amount due** (what they currently owe you).
 
+### Before you can create one
+
+A customer is a starting point — nothing else needs to exist first. Two
+constraints to know:
+
+- The **email** must be unique across your customers.
+- If you record an **opening balance**, you must also give the **as-of date** it
+  applied on.
+- Assigning a fiscal **tax-receipt** is optional, but if set it must be a real
+  sequence ([taxes.md](taxes.md)).
+
 ### Creating one
 
 1. Enter name/contact/email/phone and pick **individual** or **business**.
@@ -46,6 +57,18 @@ The customer gets a sequential **code** automatically.
 `customer_type`, `payment_method`, `payment_terms`, `credit_limited`,
 `credit_limit`, `tax_receipt_id`, `deleted_at` (soft-delete). Model:
 `customerModel` in `app/playsql_models.go`.
+
+### Required fields & dependencies
+
+Enforced by `StoreCustomerForm.Rules` (`app/customer-types.go:28`).
+
+| Field | Rule | Note |
+|---|---|---|
+| `name` | required, 3–120 | — |
+| `email` | required, `email`, lowercase, unique(customers) | — |
+| `credit_limited` | required | boolean |
+| `tax_receipt` | `sometimes`, `tenantExists` tax_receipts | an NCF sequence, only if assigned |
+| `open_balance_as_of` | required when `open_balance` > 0 | runtime guard, `app/customer-handlers.go:69` |
 
 ### Routes (`app/route.go`)
 

@@ -17,6 +17,17 @@ All three are the same underlying document in a different `transaction_kind`:
 - **Vendor bill** — the vendor's invoice to you; creates an **accounts-payable**
   entry (money you owe), settled by vendor payments.
 
+### Before you can create one
+
+Whichever kind you're creating, these must already exist in the current company:
+
+- A **vendor** to buy from ([vendors.md](vendors.md)).
+- At least one **item**, each with a **unit**, for the lines
+  ([inventory.md](inventory.md)).
+- For a **vendor bill** specifically, the vendor's own **invoice number**.
+
+No NCF is involved on the buy side (that's a sales-only concern).
+
 ### Lifecycle
 
 A purchase carries a status: **draft → partially_received → received →
@@ -56,6 +67,22 @@ of customer [payments](payments.md).
 
 Kinds/statuses: `PurchaseTransactionKinds` and `PurchaseStatuses` in
 `app/types.go`.
+
+### Required fields & dependencies
+
+Enforced by `StorePurchaseForm.Rules` (`app/purchase-types.go:116`).
+`tenantExists(…)` means the referenced row must exist **within the current
+company**.
+
+| Field | Rule | Must pre-exist |
+|---|---|---|
+| `vendor_id` | required, `tenantExists` vendors | a vendor |
+| `kind` | required, in `purchase_order,purchase_receipt,vendor_bill` | — |
+| `lines` | required, min 1 | — |
+| `lines.*.id` | required, `tenantExists` items | each line's item |
+| `lines.*.unit` | required, `tenantExists` units | each line's unit |
+| `invoice_number` | required when kind=`vendor_bill` | — |
+| `date` | required, `after:yesterday` | — |
 
 ### Routes (`app/route.go`)
 
