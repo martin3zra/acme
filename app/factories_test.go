@@ -93,15 +93,23 @@ func mkAccountCompany(t *testing.T, s *Server) *fixture {
 	).Scan(&f.unitID); err != nil {
 		t.Fatalf("insert unit: %v", err)
 	}
+	// storeCompany now seeds one tax (ITBIS) and one warehouse (General) via
+	// copy_shared_data. Reuse the seeded rows instead of inserting duplicates, so
+	// tests that count taxes/warehouses keep their one-row baseline.
 	if err := s.db.QueryRow(
-		`INSERT INTO taxes (company_id, name, rate) VALUES ($1, 'ITBIS', 18) RETURNING id`, companyID,
+		`SELECT id FROM taxes WHERE company_id = $1 ORDER BY id LIMIT 1`, companyID,
 	).Scan(&f.taxID); err != nil {
-		t.Fatalf("insert tax: %v", err)
+		t.Fatalf("seeded tax: %v", err)
 	}
 	if err := s.db.QueryRow(
-		`INSERT INTO warehouses (company_id, name) VALUES ($1, 'General') RETURNING id`, companyID,
+		`SELECT id FROM warehouses WHERE company_id = $1 ORDER BY id LIMIT 1`, companyID,
 	).Scan(&f.warehouseID); err != nil {
-		t.Fatalf("insert warehouse: %v", err)
+		t.Fatalf("seeded warehouse: %v", err)
+	}
+	// copy_shared_data also seeds starter expense categories; drop them so tests
+	// that assume an empty categories table keep their baseline.
+	if _, err := s.db.Exec(`DELETE FROM expenses_categories WHERE company_id = $1`, companyID); err != nil {
+		t.Fatalf("clear seeded expense categories: %v", err)
 	}
 	if err := s.db.QueryRow(
 		`INSERT INTO tax_receipts (company_id, name, serie, type, sequence_start, sequence_end, current)

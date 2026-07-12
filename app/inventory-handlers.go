@@ -178,10 +178,18 @@ func (s *Server) adjustmentsHandler(ctx *routing.Context) {
 		return
 	}
 
+	defaults, err := s.findCompanyDefaults(ctx.Request.Context())
+	if err != nil {
+		log.Printf("adjustmentsHandler: defaults: %v", err)
+		ctx.Error(err)
+		return
+	}
+
 	ctx.Render("Inventories/Adjustments/Index", map[string]any{
-		"adjustments": adjustments,
-		"variants":    variants,
-		"warehouses":  warehouses,
+		"adjustments":        adjustments,
+		"variants":           variants,
+		"warehouses":         warehouses,
+		"defaultWarehouseId": defaults.WarehouseID,
 	})
 }
 

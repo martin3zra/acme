@@ -79,6 +79,13 @@ func (s *Server) itemsHandler(ctx *routing.Context) {
 			return
 		}
 		props["attributes"] = attributes
+
+		defaults, err := s.findCompanyDefaults(ctx.Request.Context())
+		if err != nil {
+			ctx.Error(err)
+			return
+		}
+		props["defaultTaxId"] = defaults.TaxID
 	}
 
 	ctx.Render("Items/Index", props)

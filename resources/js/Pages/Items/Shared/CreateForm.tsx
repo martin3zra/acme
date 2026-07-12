@@ -65,13 +65,15 @@ export default function CreateForm({ onFinish, params }: CreateFormProps) {
   const t = useTranslation().trans;
   const [dialogOpen, setDialogOpen] = useState(false);
   const { headers } = useHeader();
-  const { errors: propsErrors, variantsEnabled } = usePage<PageProps & { variantsEnabled?: boolean }>().props;
+  const { errors: propsErrors, variantsEnabled, defaultTaxId } = usePage<
+    PageProps & { variantsEnabled?: boolean; defaultTaxId?: number | null }
+  >().props;
   const { data, setData, post, put, transform, errors, reset, processing } = useForm<Required<ItemForm>>({
     id: params.item?.id,
     name: params.item?.name || '',
     description: params.item?.description || '',
     price: params.item?.price || 0,
-    tax_id: params.item?.tax.id || 0,
+    tax_id: params.item?.tax.id || defaultTaxId || 0,
     unit_id: params.item?.unit.id || 0,
     item_type: params.item?.item_type || 'product', // Default to 'product'
     reference: params.item?.identifiers?.reference || '',

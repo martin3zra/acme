@@ -210,8 +210,34 @@ func (s *Server) storeCompany(accountID, userID int, form StoreCompanyForm) erro
 			return err
 		}
 
-		return s.linkCompanyDefaultSequences(tx, companyID)
+		if err := s.linkCompanyDefaultSequences(tx, companyID); err != nil {
+			return err
+		}
+
+		return s.linkCompanyDefaults(tx, companyID)
 	})
+}
+
+// linkCompanyDefaults records the seeded tax and warehouse ids in the settings
+// row so the product form and stock forms can pre-select them. It runs after
+// copySharedData (which seeds exactly one tax and one warehouse per company) and
+// after linkCompanyDefaultSequences (which creates the settings row), inside the
+// same transaction — the subqueries see the just-inserted rows, and the UPDATE
+// targets the row that now exists. ORDER BY id LIMIT 1 pins the seeded default
+// even if the user adds more taxes/warehouses later in the same request.
+//
+// updated_at is deliberately left untouched: it was just stamped by the sequences
+// upsert at creation, and re-stamping it here with SQL NOW() would mix a DB-clock
+// value into a column playsql otherwise Go-stamps ([[playsql-timestamp-skew]]).
+func (s *Server) linkCompanyDefaults(tx *sql.Tx, companyID int) error {
+	_, err := tx.Exec(`
+		UPDATE companies_settings
+		SET defaults = jsonb_build_object(
+				'tax_id',       (SELECT id FROM taxes WHERE company_id = $1 ORDER BY id LIMIT 1),
+				'warehouse_id', (SELECT id FROM warehouses WHERE company_id = $1 ORDER BY id LIMIT 1)
+			)
+		WHERE company_id = $1;`, companyID)
+	return err
 }
 
 func (s *Server) linkCompanyDefaultSequences(tx *sql.Tx, companyID int) error {
@@ -373,6 +399,31 @@ func (s *Server) findRedirectPreferences(ctx context.Context, uuid string) (*Com
 		}
 	}
 	return crp, nil
+}
+
+// CompanyDefaults holds the pre-seeded selections a company starts with, written
+// by linkCompanyDefaults on create. Pointers so a company whose seeded rows were
+// deleted (nulled by the jsonb subquery) reports absence rather than id 0.
+type CompanyDefaults struct {
+	TaxID       *int64 `json:"tax_id"`
+	WarehouseID *int64 `json:"warehouse_id"`
+}
+
+// findCompanyDefaults reads the current company's seeded defaults. A company with
+// no settings row or an empty defaults blob reports zero-value (nil) fields.
+func (s *Server) findCompanyDefaults(ctx context.Context) (*CompanyDefaults, error) {
+	row, err := s.findCompanySettings(ctx, CurrentCompany(ctx).UUID, "defaults")
+	if err != nil {
+		return nil, err
+	}
+
+	d := &CompanyDefaults{}
+	if len(row.Defaults) > 0 {
+		if err := json.Unmarshal(row.Defaults, d); err != nil {
+			return nil, err
+		}
+	}
+	return d, nil
 }
 
 func (s *Server) updateSequences(ctx context.Context, uuid string, form *SequenceForm) error {

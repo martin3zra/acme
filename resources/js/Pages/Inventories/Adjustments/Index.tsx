@@ -37,6 +37,7 @@ type AdjustmentPageProps = {
   adjustments: AdjustmentRow[];
   variants: ItemVariant[];
   warehouses: Warehouse[];
+  defaultWarehouseId?: number | null;
 };
 
 type AdjustmentForm = {
@@ -47,12 +48,20 @@ type AdjustmentForm = {
   notes: string;
 };
 
-function NewAdjustmentDialog({ variants, warehouses }: { variants: ItemVariant[]; warehouses: Warehouse[] }) {
+function NewAdjustmentDialog({
+  variants,
+  warehouses,
+  defaultWarehouseId,
+}: {
+  variants: ItemVariant[];
+  warehouses: Warehouse[];
+  defaultWarehouseId?: number | null;
+}) {
   const { headers } = useHeader();
   const [open, setOpen] = useState(false);
   const { data, setData, post, transform, reset, errors, processing } = useForm<AdjustmentForm>({
     variant_id: '',
-    warehouse_id: '',
+    warehouse_id: defaultWarehouseId ? String(defaultWarehouseId) : '',
     qty: '',
     reason: '',
     notes: '',
@@ -151,13 +160,13 @@ function NewAdjustmentDialog({ variants, warehouses }: { variants: ItemVariant[]
   );
 }
 
-export default function Index({ auth, adjustments, variants, warehouses }: PageProps<AdjustmentPageProps>) {
+export default function Index({ auth, adjustments, variants, warehouses, defaultWarehouseId }: PageProps<AdjustmentPageProps>) {
   return (
     <AppLayout user={auth.user} breadcrumbs={breadcrumbs}>
       <div className="flex flex-col gap-4 p-4">
         <div className="flex items-center justify-between">
           <HeadingSmall title="Stock Adjustments" description="Manual inventory adjustments" />
-          <NewAdjustmentDialog variants={variants ?? []} warehouses={warehouses ?? []} />
+          <NewAdjustmentDialog variants={variants ?? []} warehouses={warehouses ?? []} defaultWarehouseId={defaultWarehouseId} />
         </div>
 
         <Table>

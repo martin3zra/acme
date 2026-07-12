@@ -418,6 +418,7 @@ type companySettingsRead struct {
 	CompanyID           int       `db:"company_id"`
 	Sequences           []byte    `db:"sequences"`
 	RedirectPreferences []byte    `db:"redirect_preferences"`
+	Defaults            []byte    `db:"defaults"`
 	HandlesVariants     bool      `db:"handles_variants"`
 	UpdatedAt           time.Time `db:"updated_at"`
 }
