@@ -12,8 +12,7 @@ func (s *Server) bootRoutes() {
 	s.route.WithMiddleware(s.RememberMe, s.SharedProps)
 
 	s.route.
-		WithMiddleware(RedirectIfAuthenticated).
-		Group(func(route *routing.Router) {
+		GroupWithMiddleware([]routing.Middleware{RedirectIfAuthenticated}, func(route *routing.Router) {
 			route.GET("/login", s.login)
 			route.POST("/login", s.authHandler)
 
@@ -30,15 +29,12 @@ func (s *Server) bootRoutes() {
 		})
 
 	s.route.
-		WithMiddleware(AuthenticatedMiddleware, Verified, EnforceVerifiedUserAccess).
-		WithoutGroupMiddleware(RedirectIfAuthenticated).
-		Group(func(route *routing.Router) {
+		GroupWithMiddleware([]routing.Middleware{AuthenticatedMiddleware, Verified, EnforceVerifiedUserAccess}, func(route *routing.Router) {
 			route.GET("/onboarding", s.onboardingHandler).WithoutMiddleware(RestrictedAccess)
 			route.POST("/companies", s.storeCompanyHandler).WithoutMiddleware(RestrictedAccess)
 
 			route.
-				WithMiddleware(RestrictedAccess, AutoResourcePrerequisiteMiddleware).
-				Group(func(route *routing.Router) {
+				GroupWithMiddleware([]routing.Middleware{RestrictedAccess, AutoResourcePrerequisiteMiddleware}, func(route *routing.Router) {
 					route.GET("/home", s.homeHandler)
 
 					route.GET("/customers", s.customersHandler).Can("viewAny:customer")
@@ -61,8 +57,7 @@ func (s *Server) bootRoutes() {
 					route.DELETE("/items/:id", s.deleteItemHandler())
 
 					route.
-						WithMiddleware(s.RequiresVariants).
-						Group(func(route *routing.Router) {
+						GroupWithMiddleware([]routing.Middleware{s.RequiresVariants}, func(route *routing.Router) {
 							route.GET("/attributes", s.attributesHandler).Can("viewAny:attribute")
 							route.POST("/attributes", s.storeAttributeHandler()).Can("create:attribute")
 							route.PUT("/attributes/:id", s.updateAttributeHandler()).Can("update:attribute")
