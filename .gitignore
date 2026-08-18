@@ -2,6 +2,8 @@ node_modules
 
 .env
 .air.toml
+*.sublime-project
+*.sublime-workspace
 
 /bin/*
 

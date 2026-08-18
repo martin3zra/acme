@@ -3,6 +3,9 @@
 # Prereqs for tests:
 #   - Postgres reachable per .env.test (cp .env.test.sample .env.test)
 #   - `camel` on PATH (or ~/go/bin/camel) to build the test schema
+#
+# Prereqs for lint:
+#   - `staticcheck` on PATH (go install honnef.co/go/tools/cmd/staticcheck@latest)
 
 .PHONY: test test-db test-unit lint
 
@@ -21,3 +24,14 @@ test-db:
 # Only the pure unit tests (no DB needed).
 test-unit:
 	go test ./app/ -run 'Test(Map|Get|Parse|Normalize|Detect|NextOccurrence|MapHeaders)' ./...
+
+# gofmt (matches the CI formatting check) + go vet + staticcheck.
+lint:
+	@unformatted="$$(gofmt -l $$(git ls-files '*.go'))"; \
+	if [ -n "$$unformatted" ]; then \
+		echo "These files are not gofmt'd:"; \
+		echo "$$unformatted"; \
+		exit 1; \
+	fi
+	go vet ./...
+	staticcheck ./...
