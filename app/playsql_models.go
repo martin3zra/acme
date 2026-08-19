@@ -909,6 +909,15 @@ type taxReceiptRead struct {
 	CreatedAt     *time.Time `db:"created_at"`
 	UpdatedAt     *time.Time `db:"updated_at"`
 	DeletedAt     *time.Time `db:"deleted_at"`
+	// SharedTaxReceiptID is the load-bearing FK sharedTaxReceiptRead.TaxReceipt eager
+	// loads on: the eager loader groups fetched children by this field's raw
+	// interface{} value, so it must stay in the projection even where nothing else
+	// here reads it directly. Deliberately non-pointer despite the nullable column:
+	// a *int here would make the group-by key a pointer, which never equals the
+	// parent's plain int primary key and silently breaks every match (confirmed —
+	// this was the exact bug on first pass). NULL scans to 0, which never matches a
+	// real catalog id (they start at 1), so the nullability is preserved in effect.
+	SharedTaxReceiptID int `db:"shared_tax_receipt_id"`
 }
 
 func (taxReceiptRead) TableName() string { return "tax_receipts" }
@@ -927,6 +936,42 @@ func (r taxReceiptRead) toTaxReceipt() *taxReceipt {
 	t.CreatedAt = r.CreatedAt
 	t.UpdatedAt = r.UpdatedAt
 	t.DeletedAt = r.DeletedAt
+	return t
+}
+
+// sharedTaxReceiptRead is the DGII comprobante catalog (shared_tax_receipts):
+// id/name/serie/type are DGII-fixed, not company data. TaxReceipt eager-loads this
+// company's own activation of that catalog entry — nil for a type the company
+// hasn't configured yet, exactly like the LEFT JOIN it replaces. The caller scopes
+// it to one company with WithConstraint("TaxReceipt", ...WhereEq("company_id", ...))
+// (see findTaxReceiptsForSetup); there's no package-level withX helper here since
+// the company id is a per-request value, not a fixed filter. id has no identity/
+// default (see the seed migration): these are manually-assigned, stable DGII
+// codes, not autoincrement rows.
+type sharedTaxReceiptRead struct {
+	ID    int    `db:"id" play:"pk"`
+	Name  string `db:"name"`
+	Serie string `db:"serie"`
+	Type  string `db:"type"`
+
+	TaxReceipt *taxReceiptRead `play:"hasOne,fk=shared_tax_receipt_id"`
+}
+
+func (sharedTaxReceiptRead) TableName() string { return "shared_tax_receipts" }
+
+// toTaxReceiptForSetup merges a catalog row with this company's activation of it
+// (if any), matching the zero-value semantics the old LEFT JOIN's COALESCE(..., 0)
+// gave an unconfigured type.
+func (r sharedTaxReceiptRead) toTaxReceiptForSetup() *taxReceipt {
+	t := &taxReceipt{ID: r.ID, Name: r.Name, Serie: r.Serie, Type: r.Type}
+	if r.TaxReceipt != nil {
+		t.SequenceStart = r.TaxReceipt.SequenceStart
+		t.SequenceEnd = r.TaxReceipt.SequenceEnd
+		t.Current = r.TaxReceipt.Current
+		t.CreatedAt = r.TaxReceipt.CreatedAt
+		t.UpdatedAt = r.TaxReceipt.UpdatedAt
+		t.DeletedAt = r.TaxReceipt.DeletedAt
+	}
 	return t
 }
 

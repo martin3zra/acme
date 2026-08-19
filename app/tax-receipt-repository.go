@@ -55,11 +55,12 @@ func (s *Server) findTaxesReceipts(ctx context.Context) ([]*taxReceipt, error) {
 }
 
 // findTaxReceiptsForSetup lists the full shared_tax_receipts catalog (every DGII
-// comprobante type), left-joined against this company's own tax_receipts so an
-// already-configured type reports its real sequence_start/sequence_end/current
-// and an unconfigured one reports zero. The settings/profile taxSequences tab
-// renders this as a checkbox per catalog row — the user enables the types their
-// business actually uses and enters the DGII-assigned range for each.
+// comprobante type), eager-loading this company's own activation of each one (a
+// constrained hasOne, in place of the LEFT JOIN it replaces) so an already-
+// configured type reports its real sequence_start/sequence_end/current and an
+// unconfigured one reports zero. The settings/profile taxSequences tab renders
+// this as a checkbox per catalog row — the user enables the types their business
+// actually uses and enters the DGII-assigned range for each.
 //
 // This used to delegate to findTaxesReceipts (company-scoped only, no catalog
 // join), which meant the setup screen only ever showed types the company had
@@ -67,34 +68,27 @@ func (s *Server) findTaxesReceipts(ctx context.Context) ([]*taxReceipt, error) {
 // collapse happened by accident in a commit titled "Hotfix unrelated to the
 // feature"; restoring the original shared_tax_receipts join here.
 func (s *Server) findTaxReceiptsForSetup(ctx context.Context) ([]*taxReceipt, error) {
-	rows, err := s.db.QueryContext(ctx, `
-		SELECT s.id, s.name, s.serie, s.type,
-		       COALESCE(b.sequence_start, 0), COALESCE(b.sequence_end, 0), COALESCE(b.current, 0),
-		       b.created_at, b.updated_at, b.deleted_at
-		FROM shared_tax_receipts s
-		LEFT JOIN tax_receipts b
-		  ON s.id = b.shared_tax_receipt_id
-		  AND b.company_id = $1
-		ORDER BY s.id;
-	`, CurrentCompany(ctx).ID)
+	pdb, err := s.play()
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
 
-	data := make([]*taxReceipt, 0)
-	for rows.Next() {
-		t := new(taxReceipt)
-		if err := rows.Scan(
-			&t.ID, &t.Name, &t.Serie, &t.Type,
-			&t.SequenceStart, &t.SequenceEnd, &t.Current,
-			&t.CreatedAt, &t.UpdatedAt, &t.DeletedAt,
-		); err != nil {
-			return nil, err
-		}
-		data = append(data, t)
+	companyID := CurrentCompany(ctx).ID
+	var rows []sharedTaxReceiptRead
+	if err := pdb.Model(&sharedTaxReceiptRead{}).
+		WithConstraint("TaxReceipt", func(b *playsql.Builder) {
+			b.WhereEq("company_id", companyID)
+		}).
+		OrderBy("id", playsql.Asc).
+		Get(ctx, &rows); err != nil {
+		return nil, err
 	}
-	return data, rows.Err()
+
+	data := make([]*taxReceipt, 0, len(rows))
+	for _, r := range rows {
+		data = append(data, r.toTaxReceiptForSetup())
+	}
+	return data, nil
 }
 
 var (
