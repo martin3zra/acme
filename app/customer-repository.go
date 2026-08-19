@@ -180,6 +180,14 @@ func (s *Server) storeCustomerInternal(tx *sql.Tx, companyID int, code string, f
 	if err != nil {
 		return err
 	}
+
+	// 0 means "no tax receipt selected" on the form; write NULL rather than
+	// the literal 0, which would violate customers_tax_receipt_fk.
+	var taxReceiptID *int
+	if form.TaxReceipt > 0 {
+		taxReceiptID = &form.TaxReceipt
+	}
+
 	// Map insert (not the struct form) so uuid stays unset and the DB default
 	// fills it; the merged customerModel maps uuid, which a struct insert would
 	// write as an empty string.
@@ -195,7 +203,7 @@ func (s *Server) storeCustomerInternal(tx *sql.Tx, companyID int, code string, f
 		"credit_limit":   form.CreditLimit,
 		"amount_due":     form.OpenBalance,
 		"customer_type":  form.CustomerType,
-		"tax_receipt_id": form.TaxReceipt,
+		"tax_receipt_id": taxReceiptID,
 		"code":           code,
 		"address":        form.Address,
 	})
@@ -248,6 +256,13 @@ func (s *Server) updateCustomer(ctx context.Context, customerID int, form *Updat
 		return err
 	}
 
+	// 0 means "no tax receipt selected" on the form; write NULL rather than
+	// the literal 0, which would violate customers_tax_receipt_fk.
+	var taxReceiptID *int
+	if form.TaxReceipt > 0 {
+		taxReceiptID = &form.TaxReceipt
+	}
+
 	affected, err := pdb.Model(&customerModel{}).
 		WhereEq("company_id", CurrentCompany(ctx).ID).
 		WhereEq("id", customerID).
@@ -260,7 +275,7 @@ func (s *Server) updateCustomer(ctx context.Context, customerID int, form *Updat
 			"payment_terms":  form.PaymentTerms,
 			"credit_limit":   form.CreditLimit,
 			"customer_type":  form.CustomerType,
-			"tax_receipt_id": form.TaxReceipt,
+			"tax_receipt_id": taxReceiptID,
 			"credit_limited": form.CreditLimited,
 			"address":        form.Address,
 		})

@@ -204,6 +204,42 @@ func TestUpdateCustomer_ScopedToCompany(t *testing.T) {
 	is.True(errors.Is(err, ErrRecordNotFound), "another tenant's customer is not deletable")
 }
 
+// TestCustomerWrites_NoTaxReceiptWritesNull pins the fix for a bug where the
+// frontend's unset-tax-receipt sentinel (0) was written into tax_receipt_id
+// literally, tripping customers_tax_receipt_fk since no tax_receipts row has
+// id 0. storeCustomer/updateCustomer must translate 0 to NULL.
+func TestCustomerWrites_NoTaxReceiptWritesNull(t *testing.T) {
+	s := newTestServer(t)
+	is := newIs(t)
+	f := mkAccountCompany(t, s)
+	g := newFaker(t)
+
+	form := StoreCustomerForm{
+		Name:          g.Company(),
+		Contact:       g.Name(),
+		Email:         uniq("cust") + "@test.local",
+		Phone:         g.Phone(),
+		PaymentMethod: "cash",
+		PaymentTerms:  "pia",
+		CustomerType:  "business",
+		TaxReceipt:    0,
+	}
+	is.NoErr(s.storeCustomer(f.ctx, &form))
+
+	var id int
+	is.NoErr(s.db.QueryRow(
+		`SELECT id FROM customers WHERE company_id = $1 AND email = $2`,
+		f.company.ID, form.Email,
+	).Scan(&id))
+	is.Equal(scalarInt(t, s.db, `SELECT count(*) FROM customers WHERE id = $1 AND tax_receipt_id IS NULL`, id), 1)
+
+	is.NoErr(s.updateCustomer(f.ctx, id, &UpdateCustomerForm{
+		Name: "Still no receipt", CustomerType: "business", PaymentMethod: "cash", PaymentTerms: "net30",
+		TaxReceipt: 0,
+	}))
+	is.Equal(scalarInt(t, s.db, `SELECT count(*) FROM customers WHERE id = $1 AND tax_receipt_id IS NULL`, id), 1)
+}
+
 // ─── customer receivables ─────────────────────────────────────────────────────
 
 // TestFindCustomeReceivables_FiltersAndMaps: unpaid only, this customer only, live
