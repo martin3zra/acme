@@ -1,0 +1,87 @@
+# Populates resource_prerequisites, which AutoResourcePrerequisiteMiddleware and
+# abortWhenPrerequisiteMissing (app/server.go) have been reading from all along —
+# the route gating, the Error/Prerequisites.tsx page, and the dependency-key
+# translations in app/locales/es.json already existed. Only the table itself was
+# ever left empty, so every check silently passed (0 rows = always ok).
+#
+# Rules are grounded in docs/modules/*.md's "Before you can create one" sections,
+# not invented:
+#   - customers, vendors: docs are explicit that nothing else needs to exist
+#     first, so neither resource gets a row here.
+#   - item: needs a tax and a unit (inventory.md).
+#   - invoice: needs a customer, an item, and an NCF tax-receipt sequence with
+#     room left (invoices.md).
+#   - order: same as invoice minus the NCF requirement, plus the order-document
+#     sequence (sales-orders.md; order_sequence's translation already existed
+#     with no rule ever driving it).
+#   - estimate: customer + item only (estimates.md).
+#   - payment: a customer, and at least one real invoice to apply the payment
+#     against.
+#   - expense: an expense category.
+#
+# Every check is dependency_type: custom_check with an explicit
+# `deleted_at IS NULL`, not table_exists — every target table here is
+# soft-deletable, and table_exists has no notion of deleted_at, so it would
+# report a company's only tax/customer/item as "existing" after it was deleted.
+#
+# The payment -> invoice check scopes to transaction_kind = 'invoice'
+# specifically: invoices, estimates, and orders all share the same `invoices`
+# table (see invoices.md's "transaction-kind family"), so a plain existence
+# check would be satisfied by a quote or an order that was never billed.
+up:
+  seed_resource_prerequisites:
+    action: raw
+    statements:
+      - |
+        INSERT INTO public.resource_prerequisites (resource, dependency_key, dependency_type, target, error_message) VALUES
+            ('item', 'taxes', 'custom_check',
+             'SELECT EXISTS (SELECT 1 FROM taxes WHERE company_id = $1 AND deleted_at IS NULL)',
+             'Debe existir al menos una tasa impositiva.'),
+            ('item', 'units', 'custom_check',
+             'SELECT EXISTS (SELECT 1 FROM units WHERE company_id = $1 AND deleted_at IS NULL)',
+             'Debe existir al menos una unidad.'),
+
+            ('invoice', 'customers', 'custom_check',
+             'SELECT EXISTS (SELECT 1 FROM customers WHERE company_id = $1 AND deleted_at IS NULL)',
+             'Debe existir al menos un cliente.'),
+            ('invoice', 'items', 'custom_check',
+             'SELECT EXISTS (SELECT 1 FROM items WHERE company_id = $1 AND deleted_at IS NULL)',
+             'Debe existir al menos un producto ó servicio.'),
+            ('invoice', 'tax_sequence', 'custom_check',
+             'SELECT EXISTS (SELECT 1 FROM tax_receipts WHERE company_id = $1 AND deleted_at IS NULL AND current < sequence_end)',
+             'La secuencia de impuestos de la factura no está configurada.'),
+
+            ('order', 'customers', 'custom_check',
+             'SELECT EXISTS (SELECT 1 FROM customers WHERE company_id = $1 AND deleted_at IS NULL)',
+             'Debe existir al menos un cliente.'),
+            ('order', 'items', 'custom_check',
+             'SELECT EXISTS (SELECT 1 FROM items WHERE company_id = $1 AND deleted_at IS NULL)',
+             'Debe existir al menos un producto ó servicio.'),
+            ('order', 'order_sequence', 'jsonb_key_exists', 'sequences.order',
+             'La secuencia de pedidos no está configurada.'),
+
+            ('estimate', 'customers', 'custom_check',
+             'SELECT EXISTS (SELECT 1 FROM customers WHERE company_id = $1 AND deleted_at IS NULL)',
+             'Debe existir al menos un cliente.'),
+            ('estimate', 'items', 'custom_check',
+             'SELECT EXISTS (SELECT 1 FROM items WHERE company_id = $1 AND deleted_at IS NULL)',
+             'Debe existir al menos un producto ó servicio.'),
+
+            ('payment', 'customers', 'custom_check',
+             'SELECT EXISTS (SELECT 1 FROM customers WHERE company_id = $1 AND deleted_at IS NULL)',
+             'Debe existir al menos un cliente.'),
+            ('payment', 'invoices', 'custom_check',
+             'SELECT EXISTS (SELECT 1 FROM invoices WHERE company_id = $1 AND transaction_kind = ''invoice'' AND deleted_at IS NULL)',
+             'Debe existir al menos una factura.'),
+
+            ('expense', 'expenses_categories', 'custom_check',
+             'SELECT EXISTS (SELECT 1 FROM expenses_categories WHERE company_id = $1 AND deleted_at IS NULL)',
+             'Debe existir al menos una categoria de gastos.');
+
+down:
+  seed_resource_prerequisites:
+    action: raw
+    statements:
+      - |
+        DELETE FROM public.resource_prerequisites
+        WHERE resource IN ('item', 'invoice', 'order', 'estimate', 'payment', 'expense');

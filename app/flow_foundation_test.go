@@ -1,6 +1,7 @@
 package app
 
 import (
+	"errors"
 	"strings"
 	"testing"
 )
@@ -88,13 +89,38 @@ func TestFlowCompanySeedsStarterData(t *testing.T) {
 	)
 }
 
-// TestFlowPrerequisitesPass confirms that with an empty resource_prerequisites
-// table the gate passes (the default/happy path).
+// TestFlowPrerequisitesPass exercises the real seeded resource_prerequisites
+// rules (db/migrations/20260819122354_seed_resource_prerequisites.yaml) end to
+// end: a fresh company has no customers or items yet, so the "invoice" gate
+// reports missing; creating both flips it to Ok. The fixture's seeded tax
+// receipt (f.taxReceiptID, sequence_end 1000) already satisfies the
+// tax_sequence leg throughout, so this isolates the customer/item legs.
 func TestFlowPrerequisitesPass(t *testing.T) {
 	s := newTestServer(t)
 	is := newIs(t)
 	f := mkAccountCompany(t, s)
+	g := newFaker(t)
 
 	_, err := CheckResourcePrerequisites(f.ctx, "invoice", f.company.ID)
+	is.True(errors.Is(err, ErrPrerequisitesMissing), "fresh company has no customers/items yet")
+
+	mkItem(t, f, 100, 60)
+	newCustomer(t, f, g).Build()
+
+	_, err = CheckResourcePrerequisites(f.ctx, "invoice", f.company.ID)
+	is.NoErr(err)
+}
+
+// TestFlowPrerequisitesPass_NoRulesAlwaysOk confirms a resource with zero rows
+// (customer, vendor — docs.modules/customers.md and vendors.md: nothing else
+// needs to exist first) always passes, regardless of company state.
+func TestFlowPrerequisitesPass_NoRulesAlwaysOk(t *testing.T) {
+	s := newTestServer(t)
+	is := newIs(t)
+	f := mkAccountCompany(t, s)
+
+	_, err := CheckResourcePrerequisites(f.ctx, "customer", f.company.ID)
+	is.NoErr(err)
+	_, err = CheckResourcePrerequisites(f.ctx, "vendor", f.company.ID)
 	is.NoErr(err)
 }

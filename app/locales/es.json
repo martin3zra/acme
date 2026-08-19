@@ -199,10 +199,12 @@
       "resources": {
         "estimate": "la Cotización",
         "invoice": "la Factura",
+        "order": "el Pedido",
         "purchase": "la Compra",
         "item": "el Producto ó Servicio",
         "payment": "el Recibo de Ingreso",
-        "customer": "el Cliente"
+        "customer": "el Cliente",
+        "expense": "el Gasto"
       },
       "missing": {
         "customers": "Debe existir al menos un cliente.",

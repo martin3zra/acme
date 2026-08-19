@@ -216,6 +216,7 @@ func (s *Server) abortWhenPrerequisiteMissing(ctx *routing.Context, resource str
 		"tax_sequence":        fmt.Sprintf("/settings/%v/profile?company_id=%s&tab=taxSequences", account["uuid"], company.UUID),
 		"order_sequence":      fmt.Sprintf("/settings/%v/profile?company_id=%s&tab=sequences", account["uuid"], company.UUID),
 		"taxes":               fmt.Sprintf("/settings/%v/profile?company_id=%s&tab=taxes", account["uuid"], company.UUID),
+		"units":               fmt.Sprintf("/settings/%v/profile?company_id=%s&tab=units", account["uuid"], company.UUID),
 		"invoices":            "/invoices/create",
 		"expenses_categories": fmt.Sprintf("/settings/%v/profile?company_id=%s&tab=expenseCategories", account["uuid"], company.UUID),
 	}
