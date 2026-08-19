@@ -1,0 +1,125 @@
+# upsert_tax_receipts' `ON CONFLICT (company_id, id)` was dead code: id is a
+# fresh serial value on every INSERT, so it can never collide with an existing
+# row — the intended dedup key was always the pair (company_id,
+# shared_tax_receipt_id), i.e. "this company already activated this catalog
+# entry". Without a real conflict target, re-saving an already-activated
+# comprobante type from the settings taxSequences tab inserted a second
+# tax_receipts row instead of updating the range on the first one.
+#
+# shared_tax_receipt_id is nullable (rows created outside the catalog-activation
+# flow, e.g. directly in tests, never set it), so the uniqueness only applies
+# where it's set — a partial index, matched by the ON CONFLICT ... WHERE clause
+# below, which Postgres requires to target a partial unique index.
+up:
+  fix_upsert_tax_receipts_conflict_target:
+    action: raw
+    statements:
+      - |
+        CREATE UNIQUE INDEX tax_receipts_company_shared_receipt_unique
+            ON public.tax_receipts (company_id, shared_tax_receipt_id)
+            WHERE shared_tax_receipt_id IS NOT NULL;
+      - |
+        CREATE OR REPLACE FUNCTION public.upsert_tax_receipts(p_company_id integer, p_receipts jsonb) RETURNS void
+            LANGUAGE plpgsql
+            AS $$
+        DECLARE
+            r JSONB;
+            v_id INT;
+            v_start_seq INT;
+            v_end_seq INT;
+        BEGIN
+            FOR r IN SELECT jsonb_array_elements(p_receipts)
+            LOOP
+                v_id := (r->>'id')::INT;
+                v_start_seq := (r->>'start')::INT;
+                v_end_seq   := (r->>'end')::INT;
+
+                INSERT INTO tax_receipts (
+                    company_id,
+                    name,
+                    serie,
+                    type,
+                    sequence_start,
+                    sequence_end,
+                    current,
+                    created_at,
+                    updated_at,
+                    shared_tax_receipt_id
+                )
+                SELECT
+                    p_company_id,
+                    s.name,
+                    s.serie,
+                    s.type,
+                    v_start_seq,
+                    v_end_seq,
+                    v_start_seq,
+                    NOW(),
+                    NOW(),
+                    s.id
+                FROM shared_tax_receipts s
+                WHERE s.id = v_id
+                ON CONFLICT (company_id, shared_tax_receipt_id) WHERE shared_tax_receipt_id IS NOT NULL
+                DO UPDATE SET
+                    sequence_start = v_start_seq,
+                    sequence_end = v_end_seq,
+                    updated_at = NOW();
+            END LOOP;
+        END;
+        $$;
+
+down:
+  fix_upsert_tax_receipts_conflict_target:
+    action: raw
+    statements:
+      - |
+        CREATE OR REPLACE FUNCTION public.upsert_tax_receipts(p_company_id integer, p_receipts jsonb) RETURNS void
+            LANGUAGE plpgsql
+            AS $$
+        DECLARE
+            r JSONB;
+            v_id INT;
+            v_start_seq INT;
+            v_end_seq INT;
+        BEGIN
+            FOR r IN SELECT jsonb_array_elements(p_receipts)
+            LOOP
+                v_id := (r->>'id')::INT;
+                v_start_seq := (r->>'start')::INT;
+                v_end_seq   := (r->>'end')::INT;
+
+                INSERT INTO tax_receipts (
+                    company_id,
+                    name,
+                    serie,
+                    type,
+                    sequence_start,
+                    sequence_end,
+                    current,
+                    created_at,
+                    updated_at,
+                    shared_tax_receipt_id
+                )
+                SELECT
+                    p_company_id,
+                    s.name,
+                    s.serie,
+                    s.type,
+                    v_start_seq,
+                    v_end_seq,
+                    v_start_seq,
+                    NOW(),
+                    NOW(),
+                    s.id
+                FROM shared_tax_receipts s
+                WHERE s.id = v_id
+                ON CONFLICT (company_id, id)
+                DO UPDATE SET
+                    sequence_start = v_start_seq,
+                    sequence_end = v_end_seq,
+                    updated_at = NOW();
+            END LOOP;
+        END;
+        $$;
+      - |
+        DROP INDEX IF EXISTS public.tax_receipts_company_shared_receipt_unique;

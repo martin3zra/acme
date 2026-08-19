@@ -1,0 +1,37 @@
+# Seeds the DGII comprobante-fiscal (NCF) catalog into shared_tax_receipts.
+#
+# findTaxReceiptsForSetup left-joins this catalog against each company's own
+# tax_receipts so the settings/profile taxSequences tab can show every DGII
+# comprobante type with a checkbox — the user enables the ones their business
+# uses and enters the DGII-assigned sequence range for each (upsert_tax_receipts
+# links the resulting tax_receipts row back via shared_tax_receipt_id). Nothing
+# here is company-specific and no ranges are seeded; only the DGII-fixed
+# id/name/serie/type.
+#
+# shared_tax_receipts.id has no identity/default (see the baseline's CREATE
+# TABLE) — these are fixed, manually-assigned DGII codes, not autoincrement
+# rows, so tax_receipts.shared_tax_receipt_id references stay stable across
+# environments.
+#
+# action: raw — a plain INSERT list, matching the sibling
+# seed_shared_company_defaults migration's style.
+up:
+  seed_shared_tax_receipts:
+    action: raw
+    statements:
+      - |
+        INSERT INTO public.shared_tax_receipts (id, name, serie, type) VALUES
+            (1, 'Crédito Fiscal', 'B01', 'fiscal'),
+            (2, 'Consumo', 'B02', 'fiscal'),
+            (3, 'Nota de Débito', 'B03', 'fiscal'),
+            (4, 'Nota de Crédito', 'B04', 'fiscal'),
+            (5, 'Regímenes Especiales', 'B14', 'especial'),
+            (6, 'Gubernamental', 'B15', 'especial'),
+            (7, 'Exportaciones', 'B16', 'especial');
+
+down:
+  seed_shared_tax_receipts:
+    action: raw
+    statements:
+      - |
+        DELETE FROM public.shared_tax_receipts WHERE id IN (1, 2, 3, 4, 5, 6, 7);

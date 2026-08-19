@@ -154,31 +154,69 @@ func TestUnitCRUD(t *testing.T) {
 
 // ─── tax receipts ────────────────────────────────────────────────────────────
 
-// TestFindTaxReceipts_DuplicateEntryPoints: findTaxReceiptsForSetup was a duplicate of
-// findTaxesReceipts once the dead COALESCEs are removed. Both return the same rows.
-//
-// The sequence columns are NOT NULL, so the old COALESCE(..., 0) never fired.
-func TestFindTaxReceipts_DuplicateEntryPoints(t *testing.T) {
+// TestFindTaxReceiptsForSetup_CatalogJoin: findTaxReceiptsForSetup lists the full
+// shared_tax_receipts catalog left-joined against this company's own tax_receipts,
+// so the settings taxSequences tab can show every DGII comprobante type with a
+// checkbox — configured ones report their real range, unconfigured ones report
+// zero. findTaxesReceipts, by contrast, only ever lists what the company has
+// actually configured; it has no notion of the catalog at all.
+func TestFindTaxReceiptsForSetup_CatalogJoin(t *testing.T) {
 	s := newTestServer(t)
 	is := newIs(t)
 	f := mkAccountCompany(t, s)
 
+	// shared_tax_receipts.id has no identity/default — DGII comprobante codes get
+	// fixed, manually-assigned ids so tax_receipts.shared_tax_receipt_id references
+	// stay stable across environments, unlike shared_taxes/shared_warehouses/etc.
+	// Sentinel ids well clear of any real seeded catalog range.
+	const configuredCatalogID, unconfiguredCatalogID = 900001, 900002
+	_, err := s.db.Exec(
+		`INSERT INTO shared_tax_receipts (id, name, serie, type) VALUES ($1, 'Fiscal', 'B01', 'fiscal')`,
+		configuredCatalogID,
+	)
+	is.NoErr(err)
+	_, err = s.db.Exec(
+		`INSERT INTO shared_tax_receipts (id, name, serie, type) VALUES ($1, 'Consumo', 'B02', 'fiscal')`,
+		unconfiguredCatalogID,
+	)
+	is.NoErr(err)
+
+	// Link the fixture's existing tax_receipts row back to the "configured" catalog
+	// entry — this is what upsert_tax_receipts does when a user activates a type.
+	_, err = s.db.Exec(
+		`UPDATE tax_receipts SET shared_tax_receipt_id = $1 WHERE id = $2`,
+		configuredCatalogID, f.taxReceiptID,
+	)
+	is.NoErr(err)
+
 	forSetup, err := s.findTaxReceiptsForSetup(f.ctx)
 	is.NoErr(err)
+	// >= 2, not ==: the real seed migration also populates shared_tax_receipts, so
+	// this asserts our two sentinel rows are present among the whole catalog rather
+	// than assuming the catalog is otherwise empty.
+	is.True(len(forSetup) >= 2, "catalog includes at least our two sentinel rows")
+
+	var configuredRow, unconfiguredRow *taxReceipt
+	for _, r := range forSetup {
+		if r.ID == configuredCatalogID {
+			configuredRow = r
+		}
+		if r.ID == unconfiguredCatalogID {
+			unconfiguredRow = r
+		}
+	}
+	is.True(configuredRow != nil, "configured catalog entry present")
+	is.True(unconfiguredRow != nil, "unconfigured catalog entry present")
+
+	is.Equal(configuredRow.SequenceStart, 1)
+	is.Equal(configuredRow.SequenceEnd, 1000)
+	is.Equal(unconfiguredRow.SequenceStart, 0)
+	is.Equal(unconfiguredRow.SequenceEnd, 0)
+
 	listed, err := s.findTaxesReceipts(f.ctx)
 	is.NoErr(err)
-
-	is.Equal(len(forSetup), 1)
-	is.Equal(len(listed), len(forSetup))
-	is.Equal(forSetup[0].ID, listed[0].ID)
-	is.Equal(forSetup[0].Serie, listed[0].Serie)
-	is.Equal(forSetup[0].SequenceStart, listed[0].SequenceStart)
-	is.Equal(forSetup[0].SequenceEnd, listed[0].SequenceEnd)
-	is.Equal(forSetup[0].Current, listed[0].Current)
-
-	is.Equal(forSetup[0].ID, f.taxReceiptID)
-	is.Equal(forSetup[0].SequenceStart, 1)
-	is.Equal(forSetup[0].SequenceEnd, 1000)
+	is.Equal(len(listed), 1) // only what the company actually has, catalog or not
+	is.Equal(listed[0].ID, f.taxReceiptID)
 
 	// Neither read filters deleted_at, so a retired receipt still shows up. That is
 	// existing behaviour; grabTaxReceiptSequence is the one that excludes it.
@@ -194,4 +232,44 @@ func TestFindTaxReceipts_DuplicateEntryPoints(t *testing.T) {
 	defer tx.Rollback()
 	_, err = s.grabTaxReceiptSequence(tx, f.company.ID, f.taxReceiptID)
 	is.True(errors.Is(err, ErrTaxReceiptNotFound), "but a retired receipt issues no numbers")
+}
+
+// TestUpsertTaxReceipts_ReactivatingUpdatesInPlace: upsert_tax_receipts' conflict
+// target used to be (company_id, id) — dead code, since id is a fresh serial value
+// on every INSERT and can never collide. Saving the taxSequences form twice for the
+// same catalog entry (e.g. editing an already-activated type's range) inserted a
+// second tax_receipts row instead of updating the first. The real key is
+// (company_id, shared_tax_receipt_id), enforced by a partial unique index since
+// shared_tax_receipt_id is nullable for rows created outside this flow.
+func TestUpsertTaxReceipts_ReactivatingUpdatesInPlace(t *testing.T) {
+	s := newTestServer(t)
+	is := newIs(t)
+	f := mkAccountCompany(t, s)
+
+	const catalogID = 900101
+	_, err := s.db.Exec(
+		`INSERT INTO shared_tax_receipts (id, name, serie, type) VALUES ($1, 'Fiscal', 'B01', 'fiscal')`,
+		catalogID,
+	)
+	is.NoErr(err)
+
+	is.NoErr(s.upsertTaxReceipts(f.ctx, &TaxReceiptsForm{
+		Receipts: []TaxReceiptSequenceForm{{ID: catalogID, Start: 1, End: 500}},
+	}))
+	is.NoErr(s.upsertTaxReceipts(f.ctx, &TaxReceiptsForm{
+		Receipts: []TaxReceiptSequenceForm{{ID: catalogID, Start: 1, End: 600}},
+	}))
+
+	var count, sequenceEnd int
+	is.NoErr(s.db.QueryRow(
+		`SELECT count(*) FROM tax_receipts WHERE company_id = $1 AND shared_tax_receipt_id = $2`,
+		f.company.ID, catalogID,
+	).Scan(&count))
+	is.Equal(count, 1) // updated in place, not duplicated
+
+	is.NoErr(s.db.QueryRow(
+		`SELECT sequence_end FROM tax_receipts WHERE company_id = $1 AND shared_tax_receipt_id = $2`,
+		f.company.ID, catalogID,
+	).Scan(&sequenceEnd))
+	is.Equal(sequenceEnd, 600) // the second save's range won
 }
